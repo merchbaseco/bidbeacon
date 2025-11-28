@@ -1,0 +1,113 @@
+import cors from '@fastify/cors';
+import helmet from '@fastify/helmet';
+import Fastify from 'fastify';
+import { env } from '@/config/env.js';
+
+console.log('Starting BidBeacon Server...');
+
+const fastify = Fastify({
+    logger: false, // Disable Pino logger to avoid bundling issues
+});
+
+// Register Fastify plugins
+await fastify.register(helmet);
+await fastify.register(cors, {
+    origin: (origin, callback) => {
+        const allowedOrigins = [
+            'https://merchbase.co',
+            'http://localhost:3000',
+            'http://localhost:5173',
+        ];
+
+        // Allow requests with no origin (e.g., mobile apps, server-to-server)
+        if (!origin) return callback(null, true);
+
+        // Check if origin is in allowed list
+        if (allowedOrigins.includes(origin)) {
+            return callback(null, true);
+        }
+
+        return callback(new Error('Not allowed by CORS'), false);
+    },
+    credentials: true,
+});
+
+// Health check endpoint
+fastify.get('/api/health', async () => {
+    return {
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        service: 'bidbeacon-server',
+    };
+});
+
+// API routes
+fastify.register(async fastify => {
+    // Register API routes
+    const { registerTestRoute } = await import('@/api/test.js');
+    await registerTestRoute(fastify);
+});
+
+// 404 handler
+fastify.setNotFoundHandler(async (_request, reply) => {
+    reply.status(404);
+    return {
+        success: false,
+        error: 'Route not found',
+    };
+});
+
+// Error handler
+fastify.setErrorHandler(async (error, _request, reply) => {
+    console.error(`[${new Date().toISOString()}] Unhandled error:`, error);
+    reply.status(500);
+    return {
+        success: false,
+        error: 'Internal server error',
+    };
+});
+
+const port = env.PORT;
+
+console.log(`Attempting to start server on port ${port}...`);
+
+// Graceful shutdown handler
+const shutdown = async (signal: string) => {
+    console.log(`[${new Date().toISOString()}] Received ${signal}, shutting down gracefully...`);
+
+    try {
+        // Close Fastify server
+        await fastify.close();
+        console.log('[Server] Fastify server closed');
+
+        console.log(`[${new Date().toISOString()}] Shutdown complete`);
+        process.exit(0);
+    } catch (error) {
+        console.error('[Server] Error during shutdown:', error);
+        process.exit(1);
+    }
+};
+
+// Register shutdown handlers
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));
+
+try {
+    // Start Fastify server
+    await fastify.listen({ port, host: '0.0.0.0' });
+
+    // Print startup status summary
+    console.log('');
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log(`[${new Date().toISOString()}] BidBeacon Server Ready`);
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log(`✓ Server running on port ${port}`);
+    console.log(`✓ Health check endpoint: /api/health`);
+    console.log(`✓ Test endpoint: /api/test`);
+    console.log('═══════════════════════════════════════════════════════════════');
+    console.log('');
+} catch (err) {
+    console.error('Failed to start server:', err);
+    process.exit(1);
+}
+
