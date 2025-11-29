@@ -10,9 +10,13 @@ services:
       - "8080:8080"
     environment:
       - PORT=8080
+      - BIDBEACON_DATABASE_PASSWORD=${BIDBEACON_DATABASE_PASSWORD:?BIDBEACON_DATABASE_PASSWORD must be set}
     env_file:
       - .env
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080/api/health').then(res=>process.exit(res.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
@@ -21,6 +25,27 @@ services:
       start_period: 40s
     networks:
       - bidbeacon-network
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: bidbeacon-postgres
+    environment:
+      POSTGRES_DB: bidbeacon
+      POSTGRES_USER: bidbeacon
+      POSTGRES_PASSWORD: ${BIDBEACON_DATABASE_PASSWORD:?BIDBEACON_DATABASE_PASSWORD must be set}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bidbeacon -d bidbeacon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - bidbeacon-network
+
+volumes:
+  postgres_data:
 
 networks:
   bidbeacon-network:

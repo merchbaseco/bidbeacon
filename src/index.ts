@@ -1,7 +1,8 @@
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import Fastify from 'fastify';
-import { env } from '@/config/env.js';
+import { testConnection } from '@/db/index.js';
+import { runMigrations } from '@/db/migrate.js';
 
 console.log('Starting BidBeacon Server...');
 
@@ -67,7 +68,7 @@ fastify.setErrorHandler(async (error, _request, reply) => {
     };
 });
 
-const port = env.PORT;
+const port = Number(process.env.PORT) || 8080;
 
 console.log(`Attempting to start server on port ${port}...`);
 
@@ -93,6 +94,12 @@ process.on('SIGTERM', () => shutdown('SIGTERM'));
 process.on('SIGINT', () => shutdown('SIGINT'));
 
 try {
+    // Run database migrations
+    await runMigrations();
+    
+    // Test database connection
+    await testConnection();
+    
     // Start Fastify server
     await fastify.listen({ port, host: '0.0.0.0' });
 
@@ -101,6 +108,7 @@ try {
     console.log('═══════════════════════════════════════════════════════════════');
     console.log(`[${new Date().toISOString()}] BidBeacon Server Ready`);
     console.log('═══════════════════════════════════════════════════════════════');
+    console.log(`✓ Database connected`);
     console.log(`✓ Server running on port ${port}`);
     console.log(`✓ Health check endpoint: /api/health`);
     console.log(`✓ Test endpoint: /api/test`);
