@@ -1,0 +1,836 @@
+{
+  "id": "886e96b3-f4c3-48df-8b2e-a6dfec08973b",
+  "prevId": "c1b40831-0f9f-4966-b318-04c42065cb52",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.ams_budget_usage": {
+      "name": "ams_budget_usage",
+      "schema": "",
+      "columns": {
+        "advertiser_id": {
+          "name": "advertiser_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marketplace_id": {
+          "name": "marketplace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dataset_id": {
+          "name": "dataset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "budget_scope_id": {
+          "name": "budget_scope_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "budget_scope_type": {
+          "name": "budget_scope_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "advertising_product_type": {
+          "name": "advertising_product_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "budget": {
+          "name": "budget",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "budget_usage_percentage": {
+          "name": "budget_usage_percentage",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "usage_updated_timestamp": {
+          "name": "usage_updated_timestamp",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ams_cm_adgroups": {
+      "name": "ams_cm_adgroups",
+      "schema": "",
+      "columns": {
+        "ad_group_id": {
+          "name": "ad_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ad_product": {
+          "name": "ad_product",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "delivery_status": {
+          "name": "delivery_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivery_reasons": {
+          "name": "delivery_reasons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creative_type": {
+          "name": "creative_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creation_date_time": {
+          "name": "creation_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_updated_date_time": {
+          "name": "last_updated_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bid_default_bid": {
+          "name": "bid_default_bid",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bid_currency_code": {
+          "name": "bid_currency_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "optimization_goal_setting_goal": {
+          "name": "optimization_goal_setting_goal",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "optimization_goal_setting_kpi": {
+          "name": "optimization_goal_setting_kpi",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ams_cm_ads": {
+      "name": "ams_cm_ads",
+      "schema": "",
+      "columns": {
+        "ad_id": {
+          "name": "ad_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ad_group_id": {
+          "name": "ad_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ad_product": {
+          "name": "ad_product",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivery_status": {
+          "name": "delivery_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "delivery_reasons": {
+          "name": "delivery_reasons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creative_type": {
+          "name": "creative_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creation_date_time": {
+          "name": "creation_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_updated_date_time": {
+          "name": "last_updated_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "serving_status": {
+          "name": "serving_status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "serving_reasons": {
+          "name": "serving_reasons",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ams_cm_campaigns": {
+      "name": "ams_cm_campaigns",
+      "schema": "",
+      "columns": {
+        "dataset_id": {
+          "name": "dataset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "advertiser_id": {
+          "name": "advertiser_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marketplace_id": {
+          "name": "marketplace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "account_id": {
+          "name": "account_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "portfolio_id": {
+          "name": "portfolio_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ad_product": {
+          "name": "ad_product",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "product_location": {
+          "name": "product_location",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "version": {
+          "name": "version",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "start_date_time": {
+          "name": "start_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_date_time": {
+          "name": "end_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "tags": {
+          "name": "tags",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "targeting_settings": {
+          "name": "targeting_settings",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "budget_budget_cap_monetary_budget_amount": {
+          "name": "budget_budget_cap_monetary_budget_amount",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "budget_budget_cap_monetary_budget_currency_code": {
+          "name": "budget_budget_cap_monetary_budget_currency_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "budget_budget_cap_recurrence_recurrence_type": {
+          "name": "budget_budget_cap_recurrence_recurrence_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bid_setting_bid_strategy": {
+          "name": "bid_setting_bid_strategy",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bid_setting_placement_bid_adjustment": {
+          "name": "bid_setting_placement_bid_adjustment",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "bid_setting_shopper_cohort_bid_adjustment": {
+          "name": "bid_setting_shopper_cohort_bid_adjustment",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "audit_creation_date_time": {
+          "name": "audit_creation_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "audit_last_updated_date_time": {
+          "name": "audit_last_updated_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ams_cm_targets": {
+      "name": "ams_cm_targets",
+      "schema": "",
+      "columns": {
+        "target_id": {
+          "name": "target_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ad_group_id": {
+          "name": "ad_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ad_product": {
+          "name": "ad_product",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expression_type": {
+          "name": "expression_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "expression": {
+          "name": "expression",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "state": {
+          "name": "state",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "start_date_time": {
+          "name": "start_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "end_date_time": {
+          "name": "end_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "creation_date_time": {
+          "name": "creation_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_updated_date_time": {
+          "name": "last_updated_date_time",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ams_sp_conversion": {
+      "name": "ams_sp_conversion",
+      "schema": "",
+      "columns": {
+        "idempotency_id": {
+          "name": "idempotency_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dataset_id": {
+          "name": "dataset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marketplace_id": {
+          "name": "marketplace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "advertiser_id": {
+          "name": "advertiser_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ad_group_id": {
+          "name": "ad_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ad_id": {
+          "name": "ad_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "keyword_id": {
+          "name": "keyword_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "placement": {
+          "name": "placement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_window_start": {
+          "name": "time_window_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attributed_conversions_1d": {
+          "name": "attributed_conversions_1d",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_conversions_7d": {
+          "name": "attributed_conversions_7d",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_conversions_14d": {
+          "name": "attributed_conversions_14d",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_conversions_30d": {
+          "name": "attributed_conversions_30d",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_conversions_1d_same_sku": {
+          "name": "attributed_conversions_1d_same_sku",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_conversions_7d_same_sku": {
+          "name": "attributed_conversions_7d_same_sku",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_conversions_14d_same_sku": {
+          "name": "attributed_conversions_14d_same_sku",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_conversions_30d_same_sku": {
+          "name": "attributed_conversions_30d_same_sku",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_sales_1d": {
+          "name": "attributed_sales_1d",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_sales_7d": {
+          "name": "attributed_sales_7d",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_sales_14d": {
+          "name": "attributed_sales_14d",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_sales_30d": {
+          "name": "attributed_sales_30d",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_sales_1d_same_sku": {
+          "name": "attributed_sales_1d_same_sku",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_sales_7d_same_sku": {
+          "name": "attributed_sales_7d_same_sku",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_sales_14d_same_sku": {
+          "name": "attributed_sales_14d_same_sku",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_sales_30d_same_sku": {
+          "name": "attributed_sales_30d_same_sku",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_units_ordered_1d": {
+          "name": "attributed_units_ordered_1d",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_units_ordered_7d": {
+          "name": "attributed_units_ordered_7d",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_units_ordered_14d": {
+          "name": "attributed_units_ordered_14d",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_units_ordered_30d": {
+          "name": "attributed_units_ordered_30d",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_units_ordered_1d_same_sku": {
+          "name": "attributed_units_ordered_1d_same_sku",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_units_ordered_7d_same_sku": {
+          "name": "attributed_units_ordered_7d_same_sku",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_units_ordered_14d_same_sku": {
+          "name": "attributed_units_ordered_14d_same_sku",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "attributed_units_ordered_30d_same_sku": {
+          "name": "attributed_units_ordered_30d_same_sku",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.ams_sp_traffic": {
+      "name": "ams_sp_traffic",
+      "schema": "",
+      "columns": {
+        "idempotency_id": {
+          "name": "idempotency_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "dataset_id": {
+          "name": "dataset_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "marketplace_id": {
+          "name": "marketplace_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "currency": {
+          "name": "currency",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "advertiser_id": {
+          "name": "advertiser_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "campaign_id": {
+          "name": "campaign_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ad_group_id": {
+          "name": "ad_group_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "ad_id": {
+          "name": "ad_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "keyword_id": {
+          "name": "keyword_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "keyword_text": {
+          "name": "keyword_text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "match_type": {
+          "name": "match_type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "placement": {
+          "name": "placement",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "time_window_start": {
+          "name": "time_window_start",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "clicks": {
+          "name": "clicks",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "impressions": {
+          "name": "impressions",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "cost": {
+          "name": "cost",
+          "type": "double precision",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

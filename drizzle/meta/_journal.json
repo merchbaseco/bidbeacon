@@ -8,6 +8,13 @@
       "when": 1764387000403,
       "tag": "0000_mature_manta",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1764453852186,
+      "tag": "0001_quick_thena",
+      "breakpoints": true
     }
   ]
 }
