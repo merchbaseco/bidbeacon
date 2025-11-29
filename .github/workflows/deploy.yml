@@ -132,9 +132,9 @@ jobs:
             ./deploy.sh
             
             # Update server-level Caddy if Caddyfile changed
-            if [[ -f "${REPO_DIR}/caddy-proxy/Caddyfile" ]] && [[ -d "${HOME}/caddy-proxy" ]]; then
-              cp "${REPO_DIR}/caddy-proxy/Caddyfile" "${HOME}/caddy-proxy/Caddyfile"
-              cd "${HOME}/caddy-proxy"
+            if [[ -f "${REPO_DIR}/caddy-proxy/Caddyfile" ]] && [[ -d "/opt/caddy-proxy" ]]; then
+              cp "${REPO_DIR}/caddy-proxy/Caddyfile" "/opt/caddy-proxy/Caddyfile"
+              cd "/opt/caddy-proxy"
               docker compose restart caddy || docker compose up -d
             fi
 
