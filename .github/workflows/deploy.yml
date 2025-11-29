@@ -49,6 +49,7 @@ jobs:
       IMAGE_TAG: ${{ github.sha }}
       GHCR_USERNAME: ${{ secrets.GHCR_USERNAME }}
       GHCR_TOKEN: ${{ secrets.GHCR_TOKEN }}
+      BIDBEACON_DATABASE_PASSWORD: ${{ secrets.BIDBEACON_DATABASE_PASSWORD }}
     steps:
       - name: Create stack env file
         run: |
@@ -58,6 +59,7 @@ jobs:
 
           keys = [
               ("BIDBEACON_IMAGE_TAG", os.environ.get("IMAGE_TAG", "")),
+              ("BIDBEACON_DATABASE_PASSWORD", os.environ.get("BIDBEACON_DATABASE_PASSWORD", "")),
           ]
 
           with open("stack.env", "w", encoding="utf-8") as env_file:
@@ -66,6 +68,7 @@ jobs:
           PY
         env:
           IMAGE_TAG: ${{ env.IMAGE_TAG }}
+          BIDBEACON_DATABASE_PASSWORD: ${{ env.BIDBEACON_DATABASE_PASSWORD }}
 
       - name: Remove previous stack env artifact
         uses: appleboy/ssh-action@v1.0.3
