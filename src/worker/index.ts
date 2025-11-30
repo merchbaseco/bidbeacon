@@ -1,7 +1,7 @@
 import { testConnection } from '@/db/index.js';
 import { routePayload } from './router.js';
 import { snsEnvelopeSchema } from './schemas.js';
-import { deleteMessage, receiveMessages } from './sqsClient.js';
+import { deleteMessage, receiveMessages, testAwsConnection } from './sqsClient.js';
 
 console.log('[Worker] Starting Amazon Marketing Stream worker...');
 
@@ -136,8 +136,18 @@ async function runWorker(): Promise<void> {
             if (shuttingDown) {
                 break;
             }
-            // Log polling errors but continue
-            console.error('[Worker] Error during polling:', error);
+
+            const errorMessage = error instanceof Error ? error.message : String(error);
+
+            // Credential errors are fatal - exit immediately
+            if (errorMessage.includes('Credentials') || errorMessage.includes('credentials')) {
+                console.error('[Worker] Fatal: AWS credentials error:', errorMessage);
+                console.error('[Worker] Exiting - credentials must be fixed before worker can run');
+                process.exit(1);
+            }
+
+            // Log other polling errors but continue
+            console.error('[Worker] Error during polling:', errorMessage);
             // Wait a bit before retrying to avoid tight error loops
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
@@ -187,15 +197,34 @@ process.on('uncaughtException', error => {
         await testConnection();
         console.log('[Worker] Database connection verified');
 
+        // Test AWS credentials and queue access
+        await testAwsConnection();
+        console.log('[Worker] AWS credentials verified');
+
+        // Print startup status summary
+        console.log('');
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log(`[${new Date().toISOString()}] BidBeacon Worker Ready`);
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log(`✓ Database connected`);
+        console.log(`✓ AWS credentials verified`);
+        console.log(`✓ Queue: ${process.env.AMS_QUEUE_URL}`);
+        console.log(`✓ Region: ${process.env.AWS_REGION || 'us-east-1'}`);
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log('');
+
         // Start the main loop
-        console.log('[Worker] Starting message polling loop...');
         await runWorker();
 
         // Worker loop exited cleanly
         console.log('[Worker] Shutdown complete');
         process.exit(0);
     } catch (error) {
-        console.error('[Worker] Fatal error:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.error('[Worker] Fatal startup error:', errorMessage);
+        if (error instanceof Error && error.stack) {
+            console.error('[Worker] Stack trace:', error.stack);
+        }
         process.exit(1);
     }
 })();

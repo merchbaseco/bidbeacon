@@ -1,5 +1,10 @@
-import { SQSClient, ReceiveMessageCommand, DeleteMessageCommand } from '@aws-sdk/client-sqs';
 import type { Message } from '@aws-sdk/client-sqs';
+import {
+    DeleteMessageCommand,
+    GetQueueAttributesCommand,
+    ReceiveMessageCommand,
+    SQSClient,
+} from '@aws-sdk/client-sqs';
 
 // Create SQS client singleton
 const sqsClient = new SQSClient({
@@ -9,6 +14,29 @@ const sqsClient = new SQSClient({
 const queueUrl = process.env.AMS_QUEUE_URL;
 if (!queueUrl) {
     throw new Error('AMS_QUEUE_URL environment variable is required');
+}
+
+/**
+ * Test AWS credentials and queue access at startup
+ * Throws if credentials are missing or invalid
+ */
+export async function testAwsConnection(): Promise<void> {
+    try {
+        // Try to get queue attributes - this will fail if credentials are missing
+        const command = new GetQueueAttributesCommand({
+            QueueUrl: queueUrl,
+            AttributeNames: ['QueueArn'],
+        });
+        await sqsClient.send(command);
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (errorMessage.includes('Credentials') || errorMessage.includes('credentials')) {
+            throw new Error(
+                `AWS credentials not found. Provide credentials via IAM role, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars, or ~/.aws/credentials file. Error: ${errorMessage}`
+            );
+        }
+        throw error;
+    }
 }
 
 /**
@@ -39,4 +67,3 @@ export async function deleteMessage(receiptHandle: string): Promise<void> {
 
     await sqsClient.send(command);
 }
-
