@@ -1,4 +1,12 @@
-import { bigint, doublePrecision, jsonb, pgTable, text, timestamp } from 'drizzle-orm/pg-core';
+import {
+    bigint,
+    doublePrecision,
+    jsonb,
+    pgTable,
+    text,
+    timestamp,
+    uniqueIndex,
+} from 'drizzle-orm/pg-core';
 
 // Campaigns dataset
 export const ams_cm_campaigns = pgTable('ams_cm_campaigns', {
@@ -37,6 +45,12 @@ export const ams_cm_campaigns = pgTable('ams_cm_campaigns', {
     }),
 });
 
+// Unique index for campaigns idempotency
+export const amsCmCampaignsUniqueIndex = uniqueIndex('ams_cm_campaigns_campaign_id_version_idx').on(
+    ams_cm_campaigns.campaignId,
+    ams_cm_campaigns.version
+);
+
 // AdGroups dataset
 export const ams_cm_adgroups = pgTable('ams_cm_adgroups', {
     adGroupId: text('ad_group_id').notNull(),
@@ -55,6 +69,12 @@ export const ams_cm_adgroups = pgTable('ams_cm_adgroups', {
     optimizationGoalSettingKpi: text('optimization_goal_setting_kpi'),
 });
 
+// Unique index for adgroups idempotency
+export const amsCmAdgroupsUniqueIndex = uniqueIndex('ams_cm_adgroups_ad_group_id_campaign_id_idx').on(
+    ams_cm_adgroups.adGroupId,
+    ams_cm_adgroups.campaignId
+);
+
 // Ads dataset
 export const ams_cm_ads = pgTable('ams_cm_ads', {
     adId: text('ad_id').notNull(),
@@ -72,6 +92,9 @@ export const ams_cm_ads = pgTable('ams_cm_ads', {
     servingReasons: jsonb('serving_reasons'),
 });
 
+// Unique index for ads idempotency
+export const amsCmAdsUniqueIndex = uniqueIndex('ams_cm_ads_ad_id_idx').on(ams_cm_ads.adId);
+
 // Targets dataset
 export const ams_cm_targets = pgTable('ams_cm_targets', {
     targetId: text('target_id').notNull(),
@@ -86,6 +109,11 @@ export const ams_cm_targets = pgTable('ams_cm_targets', {
     creationDateTime: timestamp('creation_date_time', { withTimezone: true, mode: 'date' }),
     lastUpdatedDateTime: timestamp('last_updated_date_time', { withTimezone: true, mode: 'date' }),
 });
+
+// Unique index for targets idempotency
+export const amsCmTargetsUniqueIndex = uniqueIndex('ams_cm_targets_target_id_idx').on(
+    ams_cm_targets.targetId
+);
 
 // Sponsored Products traffic dataset
 export const ams_sp_traffic = pgTable('ams_sp_traffic', {
@@ -106,6 +134,11 @@ export const ams_sp_traffic = pgTable('ams_sp_traffic', {
     impressions: bigint('impressions', { mode: 'number' }).notNull(),
     cost: doublePrecision('cost').notNull(),
 });
+
+// Unique index for sp_traffic idempotency
+export const amsSpTrafficUniqueIndex = uniqueIndex('ams_sp_traffic_idempotency_id_idx').on(
+    ams_sp_traffic.idempotencyId
+);
 
 // Sponsored Products conversions dataset
 export const ams_sp_conversion = pgTable('ams_sp_conversion', {
@@ -162,6 +195,11 @@ export const ams_sp_conversion = pgTable('ams_sp_conversion', {
     }),
 });
 
+// Unique index for sp_conversion idempotency
+export const amsSpConversionUniqueIndex = uniqueIndex('ams_sp_conversion_idempotency_id_idx').on(
+    ams_sp_conversion.idempotencyId
+);
+
 // Sponsored ads budget usage dataset
 export const ams_budget_usage = pgTable('ams_budget_usage', {
     advertiserId: text('advertiser_id').notNull(),
@@ -177,3 +215,13 @@ export const ams_budget_usage = pgTable('ams_budget_usage', {
         mode: 'date',
     }).notNull(),
 });
+
+// Unique index for budget_usage idempotency
+export const amsBudgetUsageUniqueIndex = uniqueIndex(
+    'ams_budget_usage_advertiser_marketplace_budget_scope_timestamp_idx'
+).on(
+    ams_budget_usage.advertiserId,
+    ams_budget_usage.marketplaceId,
+    ams_budget_usage.budgetScopeId,
+    ams_budget_usage.usageUpdatedTimestamp
+);
