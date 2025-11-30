@@ -26,8 +26,8 @@ Store as repository secrets; workflow renders `stack/bidbeacon/.env` automatical
 - `BIDBEACON_DATABASE_PASSWORD` – PostgreSQL password
 - `AMS_QUEUE_URL` – SQS queue URL (region in URL determines `AWS_REGION`)
 - `AWS_REGION` – AWS region (defaults to `us-east-1`)
-
-Worker needs AWS credentials via IAM role or `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars.
+- `AWS_ACCESS_KEY_ID` – AWS access key for SQS access
+- `AWS_SECRET_ACCESS_KEY` – AWS secret key for SQS access
 
 ## Server Preparation
 
