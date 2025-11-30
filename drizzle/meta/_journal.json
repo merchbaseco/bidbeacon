@@ -15,6 +15,13 @@
       "when": 1764453852186,
       "tag": "0001_quick_thena",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1764471537336,
+      "tag": "0002_lonely_roxanne_simpson",
+      "breakpoints": true
     }
   ]
 }
