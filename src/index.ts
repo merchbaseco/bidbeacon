@@ -47,6 +47,9 @@ fastify.register(async fastify => {
     // Register API routes
     const { registerTestRoute } = await import('@/api/test.js');
     await registerTestRoute(fastify);
+
+    const { registerWorkerRoutes } = await import('@/api/worker.js');
+    await registerWorkerRoutes(fastify);
 });
 
 // 404 handler
@@ -112,6 +115,7 @@ try {
     console.log(`✓ Server running on port ${port}`);
     console.log(`✓ Health check endpoint: /api/health`);
     console.log(`✓ Test endpoint: /api/test`);
+    console.log(`✓ Worker control endpoints: /api/worker/status, /api/worker/start, /api/worker/stop`);
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('');
 } catch (err) {

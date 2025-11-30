@@ -1,4 +1,6 @@
-import { testConnection } from '@/db/index.js';
+import { eq } from 'drizzle-orm';
+import { db, testConnection } from '@/db/index.js';
+import { worker_control } from '@/db/schema.js';
 import { routePayload } from './router.js';
 import { deleteMessage, receiveMessages, testAwsConnection } from './sqsClient.js';
 
@@ -113,11 +115,51 @@ async function processMessage(message: {
 }
 
 /**
+ * Check if worker is enabled in the database
+ */
+async function isWorkerEnabled(): Promise<boolean> {
+    try {
+        const control = await db
+            .select()
+            .from(worker_control)
+            .where(eq(worker_control.id, 'main'))
+            .limit(1);
+
+        // If no row exists, default to enabled (backward compatibility)
+        if (control.length === 0) {
+            // Initialize the row with enabled = true
+            try {
+                await db.insert(worker_control).values({ id: 'main', enabled: true });
+            } catch {
+                // Row might have been created by another process, ignore
+            }
+            return true;
+        }
+
+        return control[0].enabled;
+    } catch (error) {
+        // On error, default to enabled to avoid breaking existing behavior
+        console.error('[Worker] Error checking worker control state:', error);
+        return true;
+    }
+}
+
+/**
  * Main worker loop
  */
 async function runWorker(): Promise<void> {
     while (!shuttingDown) {
         try {
+            // Check if worker is enabled before processing
+            const enabled = await isWorkerEnabled();
+            if (!enabled) {
+                console.log(
+                    '[Worker] Queue processing is disabled. Waiting 5 seconds before checking again...'
+                );
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                continue;
+            }
+
             // Long-poll for messages (will return after WaitTimeSeconds or when messages arrive)
             const messages = await receiveMessages();
 

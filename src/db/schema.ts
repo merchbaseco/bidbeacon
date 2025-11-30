@@ -1,5 +1,6 @@
 import {
     bigint,
+    boolean,
     doublePrecision,
     jsonb,
     pgTable,
@@ -261,3 +262,16 @@ export const ams_budget_usage = pgTable(
         ),
     })
 );
+
+// Worker control table - stores whether the queue processor is enabled
+// This table should only ever have one row (id = 'main')
+export const worker_control = pgTable('worker_control', {
+    id: text('id').primaryKey().default('main'),
+    enabled: boolean('enabled').notNull().default(true),
+    updatedAt: timestamp('updated_at', {
+        withTimezone: true,
+        mode: 'date',
+    })
+        .notNull()
+        .defaultNow(),
+});
