@@ -1,6 +1,5 @@
 import { testConnection } from '@/db/index.js';
 import { routePayload } from './router.js';
-import { snsEnvelopeSchema } from './schemas.js';
 import { deleteMessage, receiveMessages, testAwsConnection } from './sqsClient.js';
 
 console.log('[Worker] Starting Amazon Marketing Stream worker...');
@@ -9,27 +8,31 @@ console.log('[Worker] Starting Amazon Marketing Stream worker...');
 let shuttingDown = false;
 
 /**
- * Parse SNS envelope from SQS message body
+ * Parse AMS payload from SQS message body
+ *
+ * Amazon Marketing Stream delivers messages directly to SQS with Raw Message Delivery enabled,
+ * so messages are NOT wrapped in SNS envelopes. The message body contains the AMS payload directly.
  */
-function parseSnsEnvelope(body: string | undefined): {
-    Type: string;
-    Message?: string;
-    MessageId?: string;
-    TopicArn?: string;
-    SubscribeURL?: string;
-    Token?: string;
-} {
+function parseAmsPayload(body: string | undefined): unknown {
     if (!body) {
         throw new Error('Message body is empty');
     }
 
     try {
-        const parsed = JSON.parse(body);
-        const envelope = snsEnvelopeSchema.parse(parsed);
-        return envelope;
+        const payload = JSON.parse(body);
+
+        // Verify this looks like an AMS payload (should have datasetId)
+        if (!payload || typeof payload !== 'object') {
+            throw new Error('Message body is not a valid JSON object');
+        }
+
+        return payload;
     } catch (error) {
+        // Log the actual body for debugging
+        const bodyPreview = body.length > 500 ? `${body.substring(0, 500)}...` : body;
+        console.error(`[Worker] Failed to parse message body. Preview: ${bodyPreview}`);
         throw new Error(
-            `Failed to parse SNS envelope: ${error instanceof Error ? error.message : String(error)}`
+            `Failed to parse AMS payload: ${error instanceof Error ? error.message : String(error)}`
         );
     }
 }
@@ -46,56 +49,63 @@ async function processMessage(message: {
         throw new Error('Message missing ReceiptHandle');
     }
 
+    const messageId = message.MessageId || 'unknown';
+    
     try {
-        // Parse SNS envelope
-        const envelope = parseSnsEnvelope(message.Body);
-
-        // Handle subscription/unsubscription confirmations
-        if (envelope.Type === 'SubscriptionConfirmation') {
-            console.log(
-                `[Worker] Received SubscriptionConfirmation for topic ${envelope.TopicArn}`
-            );
-            console.log(`[Worker] SubscribeURL: ${envelope.SubscribeURL}`);
-            // Delete the message - we don't need to process these
-            await deleteMessage(message.ReceiptHandle);
-            return;
+        console.log('');
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log(`[Worker] Processing message: ${messageId}`);
+        console.log('═══════════════════════════════════════════════════════════════');
+        
+        // Log full message body
+        if (message.Body) {
+            console.log('[Worker] Raw message body:');
+            try {
+                const parsed = JSON.parse(message.Body);
+                console.log(JSON.stringify(parsed, null, 2));
+            } catch {
+                console.log(message.Body);
+            }
+        } else {
+            console.log('[Worker] Message body is empty');
         }
-
-        if (envelope.Type === 'UnsubscribeConfirmation') {
-            console.log(`[Worker] Received UnsubscribeConfirmation for topic ${envelope.TopicArn}`);
-            // Delete the message - we don't need to process these
-            await deleteMessage(message.ReceiptHandle);
-            return;
-        }
-
-        // Handle actual notifications
-        if (envelope.Type !== 'Notification') {
-            console.warn(`[Worker] Unknown SNS message type: ${envelope.Type}. Deleting message.`);
-            await deleteMessage(message.ReceiptHandle);
-            return;
-        }
-
-        if (!envelope.Message) {
-            throw new Error('Notification message is empty');
-        }
-
-        // Parse the AMS payload from the SNS message
-        const payload = JSON.parse(envelope.Message);
-
+        
+        // Parse AMS payload directly (AMS uses Raw Message Delivery, no SNS envelope)
+        console.log('[Worker] Parsing AMS payload...');
+        const payload = parseAmsPayload(message.Body);
+        console.log('[Worker] ✓ Payload parsed successfully');
+        
+        // Extract datasetId for logging
+        const datasetId = typeof payload === 'object' && payload !== null && 'datasetId' in payload
+            ? String(payload.datasetId)
+            : 'unknown';
+        console.log(`[Worker] Dataset ID: ${datasetId}`);
+        
         // Route to appropriate handler
+        console.log('[Worker] Routing to handler...');
         await routePayload(payload);
+        console.log('[Worker] ✓ Handler completed successfully');
 
         // Success - delete message from queue
+        console.log('[Worker] Deleting message from queue...');
         await deleteMessage(message.ReceiptHandle);
-        console.log(`[Worker] Successfully processed message ${message.MessageId || 'unknown'}`);
+        console.log(`[Worker] ✓ Successfully processed and deleted message ${messageId}`);
+        console.log('═══════════════════════════════════════════════════════════════');
+        console.log('');
     } catch (error) {
         // Log error but don't delete message - SQS will retry
-        const messageId = message.MessageId || 'unknown';
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`[Worker] Failed to process message ${messageId}:`, errorMessage);
+        console.error('');
+        console.error('═══════════════════════════════════════════════════════════════');
+        console.error(`[Worker] ✗ Failed to process message ${messageId}`);
+        console.error('═══════════════════════════════════════════════════════════════');
+        console.error(`[Worker] Error: ${errorMessage}`);
         if (error instanceof Error && error.stack) {
             console.error(`[Worker] Stack trace:`, error.stack);
         }
+        console.error('[Worker] Message will NOT be deleted - SQS will retry');
+        console.error('═══════════════════════════════════════════════════════════════');
+        console.error('');
         // Don't delete - let SQS handle retries and DLQ routing
         throw error;
     }
@@ -129,6 +139,10 @@ async function runWorker(): Promise<void> {
 
                 try {
                     await processMessage(message);
+                    
+                    // TEMPORARY: Slow down processing - wait 10 seconds between messages
+                    console.log('[Worker] Waiting 10 seconds before processing next message...');
+                    await new Promise(resolve => setTimeout(resolve, 10000));
                 } catch {}
             }
         } catch (error) {
@@ -138,7 +152,7 @@ async function runWorker(): Promise<void> {
             }
 
             const errorMessage = error instanceof Error ? error.message : String(error);
-            
+
             // Log polling errors but continue (credentials should have been checked at startup)
             console.error('[Worker] Error during polling:', errorMessage);
             // Wait a bit before retrying to avoid tight error loops
