@@ -138,15 +138,8 @@ async function runWorker(): Promise<void> {
             }
 
             const errorMessage = error instanceof Error ? error.message : String(error);
-
-            // Credential errors are fatal - exit immediately
-            if (errorMessage.includes('Credentials') || errorMessage.includes('credentials')) {
-                console.error('[Worker] Fatal: AWS credentials error:', errorMessage);
-                console.error('[Worker] Exiting - credentials must be fixed before worker can run');
-                process.exit(1);
-            }
-
-            // Log other polling errors but continue
+            
+            // Log polling errors but continue (credentials should have been checked at startup)
             console.error('[Worker] Error during polling:', errorMessage);
             // Wait a bit before retrying to avoid tight error loops
             await new Promise(resolve => setTimeout(resolve, 1000));
@@ -198,8 +191,39 @@ process.on('uncaughtException', error => {
         console.log('[Worker] Database connection verified');
 
         // Test AWS credentials and queue access
-        await testAwsConnection();
-        console.log('[Worker] AWS credentials verified');
+        let awsReady = false;
+        try {
+            await testAwsConnection();
+            console.log('[Worker] AWS credentials verified');
+            awsReady = true;
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.error('');
+            console.error('═══════════════════════════════════════════════════════════════');
+            console.error(`[${new Date().toISOString()}] BidBeacon Worker - AWS Credentials Error`);
+            console.error('═══════════════════════════════════════════════════════════════');
+            console.error('✗ AWS credentials not available');
+            console.error(`  Error: ${errorMessage}`);
+            console.error('');
+            console.error('Worker will not start SQS polling until credentials are configured.');
+            console.error('Container will remain running for log visibility.');
+            console.error('');
+            console.error('To fix:');
+            console.error('  1. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars, or');
+            console.error('  2. Configure IAM role with SQS permissions, or');
+            console.error('  3. Mount ~/.aws/credentials file');
+            console.error('═══════════════════════════════════════════════════════════════');
+            console.error('');
+        }
+
+        if (!awsReady) {
+            // Keep container alive but don't start polling
+            console.log('[Worker] Waiting for AWS credentials to be configured...');
+            // Wait indefinitely (container stays up, logs visible)
+            await new Promise(() => {
+                // Never resolves - keeps container alive
+            });
+        }
 
         // Print startup status summary
         console.log('');
