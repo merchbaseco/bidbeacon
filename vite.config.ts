@@ -6,7 +6,10 @@ export default defineConfig({
     target: 'node18',
     ssr: true,
     rollupOptions: {
-      input: resolve(__dirname, 'src/index.ts'),
+      input: {
+        index: resolve(__dirname, 'src/index.ts'),
+        worker: resolve(__dirname, 'src/worker/index.ts'),
+      },
       external: [
         // Node.js built-ins
         /^node:/,
@@ -17,7 +20,7 @@ export default defineConfig({
       ],
       output: {
         format: 'es',
-        entryFileNames: 'index.js'
+        entryFileNames: '[name].js'
       }
     },
     outDir: 'dist',

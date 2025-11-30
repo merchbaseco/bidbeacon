@@ -21,9 +21,13 @@ The workflow connects to the Hetzner host as the dedicated `bidbeacon` user. Add
 
 ## Runtime Secrets (GitHub Actions)
 
-Store the application secrets as repository secrets; the workflow renders `stack/bidbeacon/.env` on the server automatically.
+Store as repository secrets; workflow renders `stack/bidbeacon/.env` automatically.
 
-Currently, BidBeacon requires no runtime secrets. Add them here as needed.
+- `BIDBEACON_DATABASE_PASSWORD` – PostgreSQL password
+- `AMS_QUEUE_URL` – SQS queue URL (region in URL determines `AWS_REGION`)
+- `AWS_REGION` – AWS region (defaults to `us-east-1`)
+
+Worker needs AWS credentials via IAM role or `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY` env vars.
 
 ## Server Preparation
 
@@ -33,4 +37,8 @@ Currently, BidBeacon requires no runtime secrets. Add them here as needed.
 4. Ensure the shared network exists: `docker network create webserver || true`.
 
 Once configured, pushes to `main` build and push the container image. The workflow logs in as `bidbeacon`, updates `merchbase-infra`, writes `stack/bidbeacon/.env` from the stored secrets, and executes `stack/bidbeacon/deploy.sh` automatically.
+
+## Worker Service
+
+Worker runs as separate container: `node dist/worker.js` (vs server's `node dist/index.js`). See [INFRA.md](./INFRA.md) for deployment setup.
 

@@ -18,13 +18,11 @@ cp .env.example .env
 
 ## Local Development
 
-Run the API in development mode with Docker:
-
 ```bash
 docker compose up --build
 ```
 
-This uses the local `docker-compose.yml`, which builds the server image from the current workspace and wires the exposed port `8080`.
+Runs both API server (port 8080) and worker. Worker needs `AMS_QUEUE_URL` and AWS credentials in `.env`.
 
 To build and run the service manually:
 
@@ -35,11 +33,10 @@ NODE_ENV=production yarn start
 
 ## Scripts
 
-- `yarn build` – bundle the server with Vite
-- `yarn start` – run the compiled server using `dotenv-cli` (expects `dist/index.js`)
-- `yarn deploy` – helper script for the legacy standalone deployment (exits with guidance)
-- `./scripts/commands.sh` – utilities for managing the production container over SSH (`logs`, `status`, `restart`, etc.)
-- `./test-api.sh` – quick smoke tests for the health check endpoint
+- `yarn build` – bundle server and worker
+- `yarn start` – run compiled server
+- `yarn worker` – run worker in dev mode (`tsx`)
+- `yarn start:worker` – run compiled worker
 
 ## Docker
 
@@ -48,7 +45,7 @@ NODE_ENV=production yarn start
 - Health endpoint: `GET /api/health`
 - Test endpoint: `GET /api/test`
 
-The default GitHub Actions workflow (`.github/workflows/deploy.yml`) builds and pushes `ghcr.io/merchbaseco/bidbeacon-server` and triggers the infrastructure deployment in `merchbase-infra`.
+GitHub Actions builds and deploys via `merchbase-infra`. Two services: API server and SQS worker. See [AGENTS.md](./AGENTS.md) for context.
 
 ## Testing
 

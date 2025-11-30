@@ -7,6 +7,7 @@
   "scripts": {
     "build": "vite build",
     "start": "dotenv -e .env node dist/index.js",
+    "start:worker": "dotenv -e .env node dist/worker.js",
     "deploy": "./scripts/deploy-stack.sh",
     "logs": "./scripts/commands.sh logs",
     "status": "./scripts/commands.sh status",

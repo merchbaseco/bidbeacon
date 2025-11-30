@@ -25,6 +25,28 @@ services:
       start_period: 40s
     networks:
       - bidbeacon-network
+    command: ["node", "dist/index.js"]
+
+  bidbeacon-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bidbeacon-worker
+    environment:
+      - BIDBEACON_DATABASE_PASSWORD=${BIDBEACON_DATABASE_PASSWORD:?BIDBEACON_DATABASE_PASSWORD must be set}
+      - AMS_QUEUE_URL=${AMS_QUEUE_URL:?AMS_QUEUE_URL must be set}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+    env_file:
+      - .env
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      bidbeacon-server:
+        condition: service_healthy
+    networks:
+      - bidbeacon-network
+    command: ["node", "dist/worker.js"]
 
   postgres:
     image: postgres:16-alpine
