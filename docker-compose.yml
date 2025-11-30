@@ -44,6 +44,12 @@ services:
         condition: service_healthy
       bidbeacon-server:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f 'node dist/worker.js' > /dev/null"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     networks:
       - bidbeacon-network
     command: ["node", "dist/worker.js"]
