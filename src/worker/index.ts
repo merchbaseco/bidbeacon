@@ -50,13 +50,13 @@ async function processMessage(message: {
     }
 
     const messageId = message.MessageId || 'unknown';
-    
+
     try {
         console.log('');
         console.log('═══════════════════════════════════════════════════════════════');
         console.log(`[Worker] Processing message: ${messageId}`);
         console.log('═══════════════════════════════════════════════════════════════');
-        
+
         // Log full message body
         if (message.Body) {
             console.log('[Worker] Raw message body:');
@@ -69,18 +69,19 @@ async function processMessage(message: {
         } else {
             console.log('[Worker] Message body is empty');
         }
-        
+
         // Parse AMS payload directly (AMS uses Raw Message Delivery, no SNS envelope)
         console.log('[Worker] Parsing AMS payload...');
         const payload = parseAmsPayload(message.Body);
         console.log('[Worker] ✓ Payload parsed successfully');
-        
-        // Extract datasetId for logging
-        const datasetId = typeof payload === 'object' && payload !== null && 'datasetId' in payload
-            ? String(payload.datasetId)
-            : 'unknown';
+
+        // Extract datasetId for logging (AMS uses snake_case: dataset_id)
+        const datasetId =
+            typeof payload === 'object' && payload !== null && 'dataset_id' in payload
+                ? String(payload.dataset_id)
+                : 'unknown';
         console.log(`[Worker] Dataset ID: ${datasetId}`);
-        
+
         // Route to appropriate handler
         console.log('[Worker] Routing to handler...');
         await routePayload(payload);
@@ -130,21 +131,22 @@ async function runWorker(): Promise<void> {
                 continue;
             }
 
-            // Process each message in the current batch
-            for (const message of messages) {
-                // Check shutdown flag before each message
-                if (shuttingDown) {
-                    break;
-                }
+            // TEMPORARY: Process only one message per iteration, then wait 10 seconds
+            // Process the first message only
+            const message = messages[0];
 
-                try {
-                    await processMessage(message);
-                    
-                    // TEMPORARY: Slow down processing - wait 10 seconds between messages
-                    console.log('[Worker] Waiting 10 seconds before processing next message...');
-                    await new Promise(resolve => setTimeout(resolve, 10000));
-                } catch {}
+            // Check shutdown flag before processing
+            if (shuttingDown) {
+                break;
             }
+
+            try {
+                await processMessage(message);
+            } catch {}
+
+            // Wait 10 seconds before processing next message
+            console.log('[Worker] Waiting 10 seconds before processing next message...');
+            await new Promise(resolve => setTimeout(resolve, 10000));
         } catch (error) {
             // If shutting down, exit on error
             if (shuttingDown) {

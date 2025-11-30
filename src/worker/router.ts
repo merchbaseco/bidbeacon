@@ -1,10 +1,10 @@
 import {
-    handleSpTraffic,
-    handleSpConversion,
-    handleBudgetUsage,
-    handleCampaigns,
     handleAdGroups,
     handleAds,
+    handleBudgetUsage,
+    handleCampaigns,
+    handleSpConversion,
+    handleSpTraffic,
     handleTargets,
 } from './handlers/index.js';
 
@@ -37,10 +37,10 @@ async function routeSinglePayload(payload: unknown): Promise<void> {
     }
 
     const payloadObj = payload as Record<string, unknown>;
-    const datasetId = payloadObj.datasetId;
+    const datasetId = payloadObj.dataset_id;
 
     if (typeof datasetId !== 'string') {
-        throw new Error('Payload must contain a string datasetId field');
+        throw new Error('Payload must contain a string dataset_id field');
     }
 
     console.log(`[Router] Routing payload with datasetId: ${datasetId}`);
@@ -79,4 +79,3 @@ async function routeSinglePayload(payload: unknown): Promise<void> {
         // Don't throw - just log and skip unknown datasets
     }
 }
-

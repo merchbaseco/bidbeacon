@@ -6,40 +6,42 @@ import { targetSchema } from '../schemas.js';
  * Handle Campaign Management Target events
  */
 export async function handleTargets(payload: unknown): Promise<void> {
-    // Validate payload with Zod
+    // Validate payload with Zod (AMS uses snake_case)
     const validationResult = targetSchema.safeParse(payload);
     if (!validationResult.success) {
-        const datasetId = typeof payload === 'object' && payload !== null && 'datasetId' in payload
-            ? String(payload.datasetId)
-            : 'unknown';
-        console.error(`[handleTargets] Validation failed for datasetId ${datasetId}:`, validationResult.error.format());
+        const datasetId =
+            typeof payload === 'object' && payload !== null && 'dataset_id' in payload
+                ? String(payload.dataset_id)
+                : 'unknown';
+        console.error(
+            `[handleTargets] Validation failed for datasetId ${datasetId}:`,
+            validationResult.error.format()
+        );
         throw new Error(`Invalid targets payload: ${validationResult.error.message}`);
     }
 
     const data = validationResult.data;
 
-    // Map to Drizzle schema format
+    // Map from snake_case (AMS) to camelCase (Drizzle schema)
     const record = {
-        targetId: data.targetId,
-        adGroupId: data.adGroupId ?? null,
-        campaignId: data.campaignId ?? null,
-        adProduct: data.adProduct ?? null,
-        expressionType: data.expressionType ?? null,
+        targetId: data.target_id,
+        adGroupId: data.ad_group_id ?? null,
+        campaignId: data.campaign_id ?? null,
+        adProduct: data.ad_product ?? null,
+        expressionType: data.expression_type ?? null,
         expression: data.expression ?? null,
         state: data.state ?? null,
-        startDateTime: data.startDateTime ? new Date(data.startDateTime) : null,
-        endDateTime: data.endDateTime ? new Date(data.endDateTime) : null,
-        creationDateTime: data.creationDateTime ? new Date(data.creationDateTime) : null,
-        lastUpdatedDateTime: data.lastUpdatedDateTime ? new Date(data.lastUpdatedDateTime) : null,
+        startDateTime: data.start_date_time ? new Date(data.start_date_time) : null,
+        endDateTime: data.end_date_time ? new Date(data.end_date_time) : null,
+        creationDateTime: data.creation_date_time ? new Date(data.creation_date_time) : null,
+        lastUpdatedDateTime: data.last_updated_date_time
+            ? new Date(data.last_updated_date_time)
+            : null,
     };
 
     // Upsert with idempotency using targetId
-    await db
-        .insert(ams_cm_targets)
-        .values(record)
-        .onConflictDoUpdate({
-            target: ams_cm_targets.targetId,
-            set: record,
-        });
+    await db.insert(ams_cm_targets).values(record).onConflictDoUpdate({
+        target: ams_cm_targets.targetId,
+        set: record,
+    });
 }
-

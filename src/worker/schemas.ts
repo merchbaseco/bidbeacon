@@ -1,185 +1,170 @@
 import { z } from 'zod';
 
-// SNS envelope schema for parsing SQS message bodies
-export const snsEnvelopeSchema = z.object({
-    Type: z.string(),
-    MessageId: z.string().optional(),
-    TopicArn: z.string().optional(),
-    Message: z.string().optional(),
-    Timestamp: z.string().optional(),
-    SignatureVersion: z.string().optional(),
-    Signature: z.string().optional(),
-    SigningCertURL: z.string().optional(),
-    UnsubscribeURL: z.string().optional(),
-    SubscribeURL: z.string().optional(),
-    Token: z.string().optional(),
-});
-
-// Base schema for AMS payloads - includes datasetId
+// Base schema for AMS payloads - AMS uses snake_case field names
 const baseAmsPayloadSchema = z.object({
-    datasetId: z.string(),
+    dataset_id: z.string(),
 });
 
-// Sponsored Products Traffic schema
+// Sponsored Products Traffic schema - AMS uses snake_case
 export const spTrafficSchema = baseAmsPayloadSchema
     .extend({
-        datasetId: z.string(),
-        marketplaceId: z.string(),
+        dataset_id: z.string(),
+        marketplace_id: z.string(),
         currency: z.string(),
-        advertiserId: z.string(),
-        campaignId: z.string(),
-        adGroupId: z.string(),
-        adId: z.string(),
-        keywordId: z.string(),
-        keywordText: z.string(),
-        matchType: z.string(),
+        advertiser_id: z.string(),
+        campaign_id: z.string(),
+        ad_group_id: z.string(),
+        ad_id: z.string(),
+        keyword_id: z.string(),
+        keyword_text: z.string(),
+        match_type: z.string(),
         placement: z.string(),
-        timeWindowStart: z.string(), // ISO 8601 timestamp
-        clicks: z.number().int().nonnegative(),
-        impressions: z.number().int().nonnegative(),
-        cost: z.number().nonnegative(),
-        idempotencyId: z.string(),
+        time_window_start: z.string(), // ISO 8601 timestamp
+        clicks: z.number().int(),
+        impressions: z.number().int(), // Can be negative for corrections
+        cost: z.number(),
+        idempotency_id: z.string(),
     })
     .passthrough();
 
-// Sponsored Products Conversion schema
+// Sponsored Products Conversion schema - AMS uses snake_case
 export const spConversionSchema = baseAmsPayloadSchema
     .extend({
-        datasetId: z.string(),
-        marketplaceId: z.string(),
+        dataset_id: z.string(),
+        marketplace_id: z.string(),
         currency: z.string(),
-        advertiserId: z.string(),
-        campaignId: z.string(),
-        adGroupId: z.string(),
-        adId: z.string(),
-        keywordId: z.string(),
+        advertiser_id: z.string(),
+        campaign_id: z.string(),
+        ad_group_id: z.string(),
+        ad_id: z.string(),
+        keyword_id: z.string(),
         placement: z.string(),
-        timeWindowStart: z.string(), // ISO 8601 timestamp
-        idempotencyId: z.string(),
-        // All conversion fields are optional
-        attributedConversions1d: z.number().int().nonnegative().optional(),
-        attributedConversions7d: z.number().int().nonnegative().optional(),
-        attributedConversions14d: z.number().int().nonnegative().optional(),
-        attributedConversions30d: z.number().int().nonnegative().optional(),
-        attributedConversions1dSameSku: z.number().int().nonnegative().optional(),
-        attributedConversions7dSameSku: z.number().int().nonnegative().optional(),
-        attributedConversions14dSameSku: z.number().int().nonnegative().optional(),
-        attributedConversions30dSameSku: z.number().int().nonnegative().optional(),
-        attributedSales1d: z.number().nonnegative().optional(),
-        attributedSales7d: z.number().nonnegative().optional(),
-        attributedSales14d: z.number().nonnegative().optional(),
-        attributedSales30d: z.number().nonnegative().optional(),
-        attributedSales1dSameSku: z.number().nonnegative().optional(),
-        attributedSales7dSameSku: z.number().nonnegative().optional(),
-        attributedSales14dSameSku: z.number().nonnegative().optional(),
-        attributedSales30dSameSku: z.number().nonnegative().optional(),
-        attributedUnitsOrdered1d: z.number().int().nonnegative().optional(),
-        attributedUnitsOrdered7d: z.number().int().nonnegative().optional(),
-        attributedUnitsOrdered14d: z.number().int().nonnegative().optional(),
-        attributedUnitsOrdered30d: z.number().int().nonnegative().optional(),
-        attributedUnitsOrdered1dSameSku: z.number().int().nonnegative().optional(),
-        attributedUnitsOrdered7dSameSku: z.number().int().nonnegative().optional(),
-        attributedUnitsOrdered14dSameSku: z.number().int().nonnegative().optional(),
-        attributedUnitsOrdered30dSameSku: z.number().int().nonnegative().optional(),
+        time_window_start: z.string(), // ISO 8601 timestamp
+        idempotency_id: z.string(),
+        // All conversion fields are optional - AMS uses snake_case
+        attributed_conversions_1d: z.number().int().optional(),
+        attributed_conversions_7d: z.number().int().optional(),
+        attributed_conversions_14d: z.number().int().optional(),
+        attributed_conversions_30d: z.number().int().optional(),
+        attributed_conversions_1d_same_sku: z.number().int().optional(),
+        attributed_conversions_7d_same_sku: z.number().int().optional(),
+        attributed_conversions_14d_same_sku: z.number().int().optional(),
+        attributed_conversions_30d_same_sku: z.number().int().optional(),
+        attributed_sales_1d: z.number().optional(),
+        attributed_sales_7d: z.number().optional(),
+        attributed_sales_14d: z.number().optional(),
+        attributed_sales_30d: z.number().optional(),
+        attributed_sales_1d_same_sku: z.number().optional(),
+        attributed_sales_7d_same_sku: z.number().optional(),
+        attributed_sales_14d_same_sku: z.number().optional(),
+        attributed_sales_30d_same_sku: z.number().optional(),
+        attributed_units_ordered_1d: z.number().int().optional(),
+        attributed_units_ordered_7d: z.number().int().optional(),
+        attributed_units_ordered_14d: z.number().int().optional(),
+        attributed_units_ordered_30d: z.number().int().optional(),
+        attributed_units_ordered_1d_same_sku: z.number().int().optional(),
+        attributed_units_ordered_7d_same_sku: z.number().int().optional(),
+        attributed_units_ordered_14d_same_sku: z.number().int().optional(),
+        attributed_units_ordered_30d_same_sku: z.number().int().optional(),
     })
     .passthrough();
 
-// Budget Usage schema
+// Budget Usage schema - AMS uses snake_case
 export const budgetUsageSchema = baseAmsPayloadSchema
     .extend({
-        datasetId: z.string(),
-        advertiserId: z.string(),
-        marketplaceId: z.string(),
-        budgetScopeId: z.string(),
-        budgetScopeType: z.string(),
-        advertisingProductType: z.string(),
-        budget: z.number().nonnegative(),
-        budgetUsagePercentage: z.number().min(0).max(100),
-        usageUpdatedTimestamp: z.string(), // ISO 8601 timestamp
+        dataset_id: z.string(),
+        advertiser_id: z.string(),
+        marketplace_id: z.string(),
+        budget_scope_id: z.string(),
+        budget_scope_type: z.string(),
+        advertising_product_type: z.string(),
+        budget: z.number(),
+        budget_usage_percentage: z.number().min(0).max(100),
+        usage_updated_timestamp: z.string(), // ISO 8601 timestamp
     })
     .passthrough();
 
-// Campaign Management Campaign schema
+// Campaign Management Campaign schema - AMS uses snake_case
 export const campaignSchema = baseAmsPayloadSchema
     .extend({
-        datasetId: z.string(),
-        advertiserId: z.string(),
-        marketplaceId: z.string(),
-        campaignId: z.string(),
-        accountId: z.string(),
-        portfolioId: z.string().optional(),
-        adProduct: z.string(),
-        productLocation: z.string().optional(),
+        dataset_id: z.string(),
+        advertiser_id: z.string(),
+        marketplace_id: z.string(),
+        campaign_id: z.string(),
+        account_id: z.string(),
+        portfolio_id: z.string().optional(),
+        ad_product: z.string(),
+        product_location: z.string().optional(),
         version: z.number().int().positive(),
         name: z.string(),
-        startDateTime: z.string().optional(), // ISO 8601 timestamp
-        endDateTime: z.string().optional(), // ISO 8601 timestamp
+        start_date_time: z.string().optional(), // ISO 8601 timestamp
+        end_date_time: z.string().optional(), // ISO 8601 timestamp
         state: z.string().optional(),
         tags: z.record(z.unknown()).optional(),
-        targetingSettings: z.string().optional(),
-        budgetBudgetCapMonetaryBudgetAmount: z.number().nonnegative().optional(),
-        budgetBudgetCapMonetaryBudgetCurrencyCode: z.string().optional(),
-        budgetBudgetCapRecurrenceRecurrenceType: z.string().optional(),
-        bidSettingBidStrategy: z.string().optional(),
-        bidSettingPlacementBidAdjustment: z.record(z.unknown()).optional(),
-        bidSettingShopperCohortBidAdjustment: z.record(z.unknown()).optional(),
-        auditCreationDateTime: z.string().optional(), // ISO 8601 timestamp
-        auditLastUpdatedDateTime: z.string().optional(), // ISO 8601 timestamp
+        targeting_settings: z.string().optional(),
+        budget_budget_cap_monetary_budget_amount: z.number().optional(),
+        budget_budget_cap_monetary_budget_currency_code: z.string().optional(),
+        budget_budget_cap_recurrence_recurrence_type: z.string().optional(),
+        bid_setting_bid_strategy: z.string().optional(),
+        bid_setting_placement_bid_adjustment: z.record(z.unknown()).optional(),
+        bid_setting_shopper_cohort_bid_adjustment: z.record(z.unknown()).optional(),
+        audit_creation_date_time: z.string().optional(), // ISO 8601 timestamp
+        audit_last_updated_date_time: z.string().optional(), // ISO 8601 timestamp
     })
     .passthrough();
 
-// Campaign Management AdGroup schema
+// Campaign Management AdGroup schema - AMS uses snake_case
 export const adGroupSchema = baseAmsPayloadSchema
     .extend({
-        adGroupId: z.string(),
-        campaignId: z.string(),
-        adProduct: z.string(),
+        ad_group_id: z.string(),
+        campaign_id: z.string(),
+        ad_product: z.string(),
         name: z.string(),
         state: z.string(),
-        deliveryStatus: z.string().optional(),
-        deliveryReasons: z.array(z.unknown()).optional(),
-        creativeType: z.string().optional(),
-        creationDateTime: z.string().optional(), // ISO 8601 timestamp
-        lastUpdatedDateTime: z.string().optional(), // ISO 8601 timestamp
-        bidDefaultBid: z.number().nonnegative().optional(),
-        bidCurrencyCode: z.string().optional(),
-        optimizationGoalSettingGoal: z.string().optional(),
-        optimizationGoalSettingKpi: z.string().optional(),
+        delivery_status: z.string().optional(),
+        delivery_reasons: z.array(z.unknown()).optional(),
+        creative_type: z.string().optional(),
+        creation_date_time: z.string().optional(), // ISO 8601 timestamp
+        last_updated_date_time: z.string().optional(), // ISO 8601 timestamp
+        bid_default_bid: z.number().optional(),
+        bid_currency_code: z.string().optional(),
+        optimization_goal_setting_goal: z.string().optional(),
+        optimization_goal_setting_kpi: z.string().optional(),
     })
     .passthrough();
 
-// Campaign Management Ad schema
+// Campaign Management Ad schema - AMS uses snake_case
 export const adSchema = baseAmsPayloadSchema
     .extend({
-        adId: z.string(),
-        adGroupId: z.string().optional(),
-        campaignId: z.string().optional(),
-        adProduct: z.string().optional(),
+        ad_id: z.string(),
+        ad_group_id: z.string().optional(),
+        campaign_id: z.string().optional(),
+        ad_product: z.string().optional(),
         name: z.string().optional(),
         state: z.string().optional(),
-        deliveryStatus: z.string().optional(),
-        deliveryReasons: z.array(z.unknown()).optional(),
-        creativeType: z.string().optional(),
-        creationDateTime: z.string().optional(), // ISO 8601 timestamp
-        lastUpdatedDateTime: z.string().optional(), // ISO 8601 timestamp
-        servingStatus: z.string().optional(),
-        servingReasons: z.array(z.unknown()).optional(),
+        delivery_status: z.string().optional(),
+        delivery_reasons: z.array(z.unknown()).optional(),
+        creative_type: z.string().optional(),
+        creation_date_time: z.string().optional(), // ISO 8601 timestamp
+        last_updated_date_time: z.string().optional(), // ISO 8601 timestamp
+        serving_status: z.string().optional(),
+        serving_reasons: z.array(z.unknown()).optional(),
     })
     .passthrough();
 
-// Campaign Management Target schema
+// Campaign Management Target schema - AMS uses snake_case
 export const targetSchema = baseAmsPayloadSchema
     .extend({
-        targetId: z.string(),
-        adGroupId: z.string().optional(),
-        campaignId: z.string().optional(),
-        adProduct: z.string().optional(),
-        expressionType: z.string().optional(),
+        target_id: z.string(),
+        ad_group_id: z.string().optional(),
+        campaign_id: z.string().optional(),
+        ad_product: z.string().optional(),
+        expression_type: z.string().optional(),
         expression: z.record(z.unknown()).optional(),
         state: z.string().optional(),
-        startDateTime: z.string().optional(), // ISO 8601 timestamp
-        endDateTime: z.string().optional(), // ISO 8601 timestamp
-        creationDateTime: z.string().optional(), // ISO 8601 timestamp
-        lastUpdatedDateTime: z.string().optional(), // ISO 8601 timestamp
+        start_date_time: z.string().optional(), // ISO 8601 timestamp
+        end_date_time: z.string().optional(), // ISO 8601 timestamp
+        creation_date_time: z.string().optional(), // ISO 8601 timestamp
+        last_updated_date_time: z.string().optional(), // ISO 8601 timestamp
     })
     .passthrough();

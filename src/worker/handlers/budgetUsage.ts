@@ -6,29 +6,33 @@ import { budgetUsageSchema } from '../schemas.js';
  * Handle Budget Usage events
  */
 export async function handleBudgetUsage(payload: unknown): Promise<void> {
-    // Validate payload with Zod
+    // Validate payload with Zod (AMS uses snake_case)
     const validationResult = budgetUsageSchema.safeParse(payload);
     if (!validationResult.success) {
-        const datasetId = typeof payload === 'object' && payload !== null && 'datasetId' in payload
-            ? String(payload.datasetId)
-            : 'unknown';
-        console.error(`[handleBudgetUsage] Validation failed for datasetId ${datasetId}:`, validationResult.error.format());
+        const datasetId =
+            typeof payload === 'object' && payload !== null && 'dataset_id' in payload
+                ? String(payload.dataset_id)
+                : 'unknown';
+        console.error(
+            `[handleBudgetUsage] Validation failed for datasetId ${datasetId}:`,
+            validationResult.error.format()
+        );
         throw new Error(`Invalid budget-usage payload: ${validationResult.error.message}`);
     }
 
     const data = validationResult.data;
 
-    // Map to Drizzle schema format
+    // Map from snake_case (AMS) to camelCase (Drizzle schema)
     const record = {
-        advertiserId: data.advertiserId,
-        marketplaceId: data.marketplaceId,
-        datasetId: data.datasetId,
-        budgetScopeId: data.budgetScopeId,
-        budgetScopeType: data.budgetScopeType,
-        advertisingProductType: data.advertisingProductType,
+        advertiserId: data.advertiser_id,
+        marketplaceId: data.marketplace_id,
+        datasetId: data.dataset_id,
+        budgetScopeId: data.budget_scope_id,
+        budgetScopeType: data.budget_scope_type,
+        advertisingProductType: data.advertising_product_type,
         budget: data.budget,
-        budgetUsagePercentage: data.budgetUsagePercentage,
-        usageUpdatedTimestamp: new Date(data.usageUpdatedTimestamp),
+        budgetUsagePercentage: data.budget_usage_percentage,
+        usageUpdatedTimestamp: new Date(data.usage_updated_timestamp),
     };
 
     // Upsert with idempotency using composite unique key
@@ -51,4 +55,3 @@ export async function handleBudgetUsage(payload: unknown): Promise<void> {
             },
         });
 }
-
