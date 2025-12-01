@@ -244,6 +244,9 @@ async function getMetricTotal(
  */
 export async function getQueueMetrics(queueUrl: string): Promise<{
     sparkline: number[];
+    sparklineSent: number[];
+    sparklineReceived: number[];
+    sparklineDeleted: number[];
     messagesLastHour: number;
     messagesLast24h: number;
     approximateVisible: number;
@@ -259,13 +262,15 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    // Get sparkline data (last 60 minutes) - using NumberOfMessagesReceived
-    const sparkline = await getQueueMetric(
-        queueUrl,
-        'NumberOfMessagesReceived',
-        oneHourAgo,
-        now
-    );
+    // Get sparkline data for all three metrics (last 60 minutes)
+    const [sparklineSent, sparklineReceived, sparklineDeleted] = await Promise.all([
+        getQueueMetric(queueUrl, 'NumberOfMessagesSent', oneHourAgo, now),
+        getQueueMetric(queueUrl, 'NumberOfMessagesReceived', oneHourAgo, now),
+        getQueueMetric(queueUrl, 'NumberOfMessagesDeleted', oneHourAgo, now),
+    ]);
+
+    // Keep backward compatibility - use received sparkline as default
+    const sparkline = sparklineReceived;
 
     // Get last hour totals for all metrics
     const [
@@ -295,6 +300,9 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
 
     return {
         sparkline,
+        sparklineSent,
+        sparklineReceived,
+        sparklineDeleted,
         messagesLastHour: messagesReceivedLastHour, // Keep for backward compatibility
         messagesLast24h: messagesReceivedLast24h, // Keep for backward compatibility
         approximateVisible,

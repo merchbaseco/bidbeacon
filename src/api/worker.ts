@@ -66,11 +66,14 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            reply.status(500);
-            return {
+            console.error('[API] Error starting queue:', errorMessage);
+            if (error instanceof Error && error.stack) {
+                console.error('[API] Stack trace:', error.stack);
+            }
+            return reply.code(500).send({
                 success: false,
                 error: errorMessage,
-            };
+            });
         }
     });
 
@@ -97,11 +100,14 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
-            reply.status(500);
-            return {
+            console.error('[API] Error starting queue:', errorMessage);
+            if (error instanceof Error && error.stack) {
+                console.error('[API] Stack trace:', error.stack);
+            }
+            return reply.code(500).send({
                 success: false,
                 error: errorMessage,
-            };
+            });
         }
     });
 
@@ -130,6 +136,9 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
                     // DLQ might not exist or be accessible, return empty metrics
                     dlqMetrics = {
                         sparkline: new Array(60).fill(0),
+                        sparklineSent: new Array(60).fill(0),
+                        sparklineReceived: new Array(60).fill(0),
+                        sparklineDeleted: new Array(60).fill(0),
                         messagesLastHour: 0,
                         messagesLast24h: 0,
                         approximateVisible: 0,
