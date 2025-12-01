@@ -191,10 +191,21 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
                 } catch (error) {
                     // Log the error so we can debug DLQ access issues
                     const errorMessage = error instanceof Error ? error.message : String(error);
-                    console.error('[API] Error fetching DLQ metrics:', errorMessage);
-                    if (error instanceof Error && error.stack) {
+                    const isAccessDenied = errorMessage.includes('not authorized') || errorMessage.includes('AccessDenied');
+                    
+                    if (isAccessDenied) {
+                        console.error('[API] ⚠️  DLQ access denied - IAM permissions missing');
+                        console.error('[API] The IAM user needs sqs:GetQueueAttributes permission on the DLQ');
+                        console.error('[API] DLQ URL:', dlqUrlFromPolicy);
+                        console.error('[API] See INFRA.md for required IAM permissions');
+                    } else {
+                        console.error('[API] Error fetching DLQ metrics:', errorMessage);
+                    }
+                    
+                    if (error instanceof Error && error.stack && !isAccessDenied) {
                         console.error('[API] DLQ error stack:', error.stack);
                     }
+                    
                     // DLQ might not exist or be accessible, return empty metrics
                     dlqMetrics = {
                         sparkline: new Array(60).fill(0),
