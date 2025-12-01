@@ -20,6 +20,7 @@
     "worker": "dotenv -e .env tsx src/worker/index.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.700.0",
     "@aws-sdk/client-sqs": "^3.700.0",
     "@fastify/cors": "^11.1.0",
     "@fastify/helmet": "^13.0.1",

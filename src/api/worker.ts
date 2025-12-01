@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '@/db/index.js';
 import { worker_control } from '@/db/schema.js';
+import { getQueueMetrics } from '@/worker/sqsClient.js';
 
 export async function registerWorkerRoutes(fastify: FastifyInstance) {
     // Get current worker status
@@ -92,6 +93,62 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
                 enabled: result[0].enabled,
                 message: 'Queue processing stopped',
                 updatedAt: result[0].updatedAt,
+            };
+        } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            return {
+                success: false,
+                error: errorMessage,
+            };
+        }
+    });
+
+    // Get queue metrics for monitoring
+    fastify.get('/api/worker/metrics', async () => {
+        try {
+            const mainQueueUrl = process.env.AMS_QUEUE_URL;
+            const dlqUrl = process.env.AWS_QUEUE_DLQ_URL;
+
+            if (!mainQueueUrl) {
+                return {
+                    success: false,
+                    error: 'AMS_QUEUE_URL not configured',
+                };
+            }
+
+            // Get main queue metrics
+            const mainQueueMetrics = await getQueueMetrics(mainQueueUrl);
+
+            // Get DLQ metrics if configured
+            let dlqMetrics = null;
+            if (dlqUrl) {
+                try {
+                    dlqMetrics = await getQueueMetrics(dlqUrl);
+                } catch (error) {
+                    // DLQ might not exist or be accessible, return empty metrics
+                    dlqMetrics = {
+                        sparkline: new Array(60).fill(0),
+                        messagesLastHour: 0,
+                        messagesLast24h: 0,
+                        approximateVisible: 0,
+                        oldestMessageAge: 0,
+                    };
+                }
+            } else {
+                // No DLQ configured, return empty metrics
+                dlqMetrics = {
+                    sparkline: new Array(60).fill(0),
+                    messagesLastHour: 0,
+                    messagesLast24h: 0,
+                    approximateVisible: 0,
+                    oldestMessageAge: 0,
+                };
+            }
+
+            return {
+                success: true,
+                mainQueue: mainQueueMetrics,
+                dlq: dlqMetrics,
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
