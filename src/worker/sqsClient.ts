@@ -159,17 +159,50 @@ async function getApproximateVisibleMessages(queueUrl: string): Promise<number> 
 }
 
 /**
- * Get approximate age of oldest message in queue (seconds)
+ * Get approximate age of oldest message in queue (seconds) from CloudWatch
+ * Returns 0 if metric is not available or queue is empty
+ * Note: This is a CloudWatch metric, not a queue attribute
  */
 async function getOldestMessageAge(queueUrl: string): Promise<number> {
-    const command = new GetQueueAttributesCommand({
-        QueueUrl: queueUrl,
-        AttributeNames: ['ApproximateAgeOfOldestMessage'],
-    });
+    try {
+        const queueName = extractQueueName(queueUrl);
+        const now = new Date();
+        const fiveMinutesAgo = new Date(now.getTime() - 5 * 60 * 1000);
 
-    const response = await sqsClient.send(command);
-    const attr = response.Attributes?.ApproximateAgeOfOldestMessage;
-    return attr ? parseInt(attr, 10) : 0;
+        const command = new GetMetricStatisticsCommand({
+            Namespace: 'AWS/SQS',
+            MetricName: 'ApproximateAgeOfOldestMessage',
+            Dimensions: [
+                {
+                    Name: 'QueueName',
+                    Value: queueName,
+                },
+            ],
+            StartTime: fiveMinutesAgo,
+            EndTime: now,
+            Period: 60,
+            Statistics: ['Average'],
+        });
+
+        const response = await cloudWatchClient.send(command);
+        const datapoints = response.Datapoints || [];
+
+        if (datapoints.length === 0) {
+            // No data means queue is likely empty
+            return 0;
+        }
+
+        // Get the most recent datapoint
+        const sorted = datapoints.sort(
+            (a, b) => (b.Timestamp?.getTime() || 0) - (a.Timestamp?.getTime() || 0)
+        );
+        const latest = sorted[0];
+        return latest.Average ? Math.round(latest.Average) : 0;
+    } catch (error) {
+        // Metric might not be available if queue is empty or CloudWatch hasn't reported it yet
+        // Return 0 as a safe default
+        return 0;
+    }
 }
 
 /**
