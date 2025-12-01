@@ -44,7 +44,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
     });
 
     // Start the queue (enable processing)
-    fastify.post('/api/worker/start', async () => {
+    fastify.post('/api/worker/start', async (_request, reply) => {
         try {
             const result = await db
                 .insert(worker_control)
@@ -66,6 +66,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
+            reply.status(500);
             return {
                 success: false,
                 error: errorMessage,
@@ -74,7 +75,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
     });
 
     // Stop the queue (disable processing)
-    fastify.post('/api/worker/stop', async () => {
+    fastify.post('/api/worker/stop', async (_request, reply) => {
         try {
             const result = await db
                 .insert(worker_control)
@@ -96,6 +97,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             };
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
+            reply.status(500);
             return {
                 success: false,
                 error: errorMessage,
@@ -124,7 +126,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             if (dlqUrl) {
                 try {
                     dlqMetrics = await getQueueMetrics(dlqUrl);
-                } catch (error) {
+                } catch {
                     // DLQ might not exist or be accessible, return empty metrics
                     dlqMetrics = {
                         sparkline: new Array(60).fill(0),
@@ -132,6 +134,12 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
                         messagesLast24h: 0,
                         approximateVisible: 0,
                         oldestMessageAge: 0,
+                        messagesSentLastHour: 0,
+                        messagesSentLast24h: 0,
+                        messagesReceivedLastHour: 0,
+                        messagesReceivedLast24h: 0,
+                        messagesDeletedLastHour: 0,
+                        messagesDeletedLast24h: 0,
                     };
                 }
             } else {
@@ -159,4 +167,3 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
         }
     });
 }
-

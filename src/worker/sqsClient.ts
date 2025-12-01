@@ -206,6 +206,38 @@ async function getOldestMessageAge(queueUrl: string): Promise<number> {
 }
 
 /**
+ * Get total count of a metric over a time period
+ */
+async function getMetricTotal(
+    queueUrl: string,
+    metricName: string,
+    startTime: Date,
+    endTime: Date
+): Promise<number> {
+    const queueName = extractQueueName(queueUrl);
+
+    const command = new GetMetricStatisticsCommand({
+        Namespace: 'AWS/SQS',
+        MetricName: metricName,
+        Dimensions: [
+            {
+                Name: 'QueueName',
+                Value: queueName,
+            },
+        ],
+        StartTime: startTime,
+        EndTime: endTime,
+        Period: 60,
+        Statistics: ['Sum'],
+    });
+
+    const response = await cloudWatchClient.send(command);
+    const datapoints = response.Datapoints || [];
+
+    return datapoints.reduce((sum, point) => sum + (point.Sum || 0), 0);
+}
+
+/**
  * Get comprehensive queue metrics for monitoring
  * @param queueUrl - The SQS queue URL
  * @returns Queue metrics including sparkline data and summary stats
@@ -216,12 +248,18 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
     messagesLast24h: number;
     approximateVisible: number;
     oldestMessageAge: number;
+    messagesSentLastHour: number;
+    messagesSentLast24h: number;
+    messagesReceivedLastHour: number;
+    messagesReceivedLast24h: number;
+    messagesDeletedLastHour: number;
+    messagesDeletedLast24h: number;
 }> {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
 
-    // Get sparkline data (last 60 minutes)
+    // Get sparkline data (last 60 minutes) - using NumberOfMessagesReceived
     const sparkline = await getQueueMetric(
         queueUrl,
         'NumberOfMessagesReceived',
@@ -229,17 +267,27 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
         now
     );
 
-    // Get last hour total
-    const messagesLastHour = sparkline.reduce((sum, val) => sum + val, 0);
+    // Get last hour totals for all metrics
+    const [
+        messagesReceivedLastHour,
+        messagesSentLastHour,
+        messagesDeletedLastHour,
+    ] = await Promise.all([
+        getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneHourAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneHourAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneHourAgo, now),
+    ]);
 
-    // Get last 24 hours total
-    const last24hData = await getQueueMetric(
-        queueUrl,
-        'NumberOfMessagesReceived',
-        oneDayAgo,
-        now
-    );
-    const messagesLast24h = last24hData.reduce((sum, val) => sum + val, 0);
+    // Get last 24 hours totals
+    const [
+        messagesReceivedLast24h,
+        messagesSentLast24h,
+        messagesDeletedLast24h,
+    ] = await Promise.all([
+        getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneDayAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneDayAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneDayAgo, now),
+    ]);
 
     // Get current queue state
     const approximateVisible = await getApproximateVisibleMessages(queueUrl);
@@ -247,9 +295,15 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
 
     return {
         sparkline,
-        messagesLastHour,
-        messagesLast24h,
+        messagesLastHour: messagesReceivedLastHour, // Keep for backward compatibility
+        messagesLast24h: messagesReceivedLast24h, // Keep for backward compatibility
         approximateVisible,
         oldestMessageAge,
+        messagesSentLastHour,
+        messagesSentLast24h,
+        messagesReceivedLastHour,
+        messagesReceivedLast24h,
+        messagesDeletedLastHour,
+        messagesDeletedLast24h,
     };
 }
