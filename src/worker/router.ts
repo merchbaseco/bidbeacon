@@ -75,7 +75,7 @@ async function routeSinglePayload(payload: unknown): Promise<void> {
         await handleTargets(payload);
         console.log('[Router] ✓ handleTargets completed');
     } else {
-        console.warn(`[Router] Unknown datasetId: ${datasetId}. Skipping message.`);
-        // Don't throw - just log and skip unknown datasets
+        // Throw error so unknown datasets go through SQS retry → DLQ for triage
+        throw new Error(`Unknown datasetId: ${datasetId}. Message will be retried and eventually routed to DLQ.`);
     }
 }
