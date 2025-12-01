@@ -9,75 +9,82 @@ import {
     uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
-// Campaigns dataset
+// Campaigns dataset - Based on official AMS Campaign Management Campaign dataset schema
 export const ams_cm_campaigns = pgTable(
     'ams_cm_campaigns',
     {
         datasetId: text('dataset_id').notNull(),
-        advertiserId: text('advertiser_id').notNull(),
-        marketplaceId: text('marketplace_id').notNull(),
         campaignId: text('campaign_id').notNull(),
-        accountId: text('account_id').notNull(),
         portfolioId: text('portfolio_id'),
         adProduct: text('ad_product').notNull(),
-        productLocation: text('product_location'),
-        version: bigint('version', { mode: 'number' }).notNull(),
+        marketplaceScope: text('marketplace_scope'), // enum: GLOBAL vs SINGLE_MARKETPLACE
+        marketplaces: jsonb('marketplaces'), // enum[] - Array of marketplace strings
         name: text('name').notNull(),
+        skanAppId: text('skan_app_id'),
         startDateTime: timestamp('start_date_time', { withTimezone: true, mode: 'date' }),
         endDateTime: timestamp('end_date_time', { withTimezone: true, mode: 'date' }),
-        state: text('state'),
-        tags: jsonb('tags'),
-        targetingSettings: text('targeting_settings'),
-        budgetBudgetCapMonetaryBudgetAmount: doublePrecision(
-            'budget_budget_cap_monetary_budget_amount'
-        ),
-        budgetBudgetCapMonetaryBudgetCurrencyCode: text(
-            'budget_budget_cap_monetary_budget_currency_code'
-        ),
-        budgetBudgetCapRecurrenceRecurrenceType: text(
-            'budget_budget_cap_recurrence_recurrence_type'
-        ),
-        bidSettingBidStrategy: text('bid_setting_bid_strategy'),
-        bidSettingPlacementBidAdjustment: jsonb('bid_setting_placement_bid_adjustment'),
-        bidSettingShopperCohortBidAdjustment: jsonb('bid_setting_shopper_cohort_bid_adjustment'),
-        auditCreationDateTime: timestamp('audit_creation_date_time', {
-            withTimezone: true,
-            mode: 'date',
-        }),
-        auditLastUpdatedDateTime: timestamp('audit_last_updated_date_time', {
-            withTimezone: true,
-            mode: 'date',
-        }),
-    },
-    table => ({
-        amsCmCampaignsUniqueIndex: uniqueIndex('ams_cm_campaigns_campaign_id_version_idx').on(
-            table.campaignId,
-            table.version
-        ),
-    })
-);
-
-// AdGroups dataset
-export const ams_cm_adgroups = pgTable(
-    'ams_cm_adgroups',
-    {
-        adGroupId: text('ad_group_id').notNull(),
-        campaignId: text('campaign_id').notNull(),
-        adProduct: text('ad_product').notNull(),
-        name: text('name').notNull(),
-        state: text('state').notNull(),
-        deliveryStatus: text('delivery_status'),
-        deliveryReasons: jsonb('delivery_reasons'),
-        creativeType: text('creative_type'),
         creationDateTime: timestamp('creation_date_time', { withTimezone: true, mode: 'date' }),
         lastUpdatedDateTime: timestamp('last_updated_date_time', {
             withTimezone: true,
             mode: 'date',
         }),
-        bidDefaultBid: doublePrecision('bid_default_bid'),
-        bidCurrencyCode: text('bid_currency_code'),
-        optimizationGoalSettingGoal: text('optimization_goal_setting_goal'),
-        optimizationGoalSettingKpi: text('optimization_goal_setting_kpi'),
+        targetsAmazonDeal: boolean('targets_amazon_deal'),
+        brandId: text('brand_id'), // 16 chars
+        costType: text('cost_type'), // enum: CPC / vCPM
+        salesChannel: text('sales_channel'), // enum: AMAZON / OFF_AMAZON
+        isMultiAdGroupsEnabled: boolean('is_multi_ad_groups_enabled'),
+        purchaseOrderNumber: text('purchase_order_number'),
+        // Nested objects stored as jsonb
+        state: jsonb('state'), // { state: enum, marketplace_settings: [...] }
+        status: jsonb('status'), // { delivery_status: enum, delivery_reasons: [], marketplace_settings: [...] }
+        tags: jsonb('tags'), // Array of { key: string, value: string }
+        budgets: jsonb('budgets'), // Mixed structure - all budget caps and marketplace budget settings
+        frequencies: jsonb('frequencies'), // Mixed structure - frequency capping settings
+        autoCreationSettings: jsonb('auto_creation_settings'), // { auto_create_targets: boolean }
+        optimizations: jsonb('optimizations'), // Mixed structure - bid strategies, goals, budget allocation
+        fee: jsonb('fee'), // Mixed structure - third-party fee metadata
+        flights: jsonb('flights'), // Mixed structure - flight scheduling and budgets
+    },
+    table => ({
+        amsCmCampaignsUniqueIndex: uniqueIndex('ams_cm_campaigns_campaign_id_idx').on(
+            table.campaignId
+        ),
+    })
+);
+
+// AdGroups dataset - Based on official AMS Campaign Management AdGroup dataset schema
+export const ams_cm_adgroups = pgTable(
+    'ams_cm_adgroups',
+    {
+        datasetId: text('dataset_id').notNull(),
+        adGroupId: text('ad_group_id').notNull(),
+        campaignId: text('campaign_id').notNull(),
+        adProduct: text('ad_product').notNull(),
+        marketplaceScope: text('marketplace_scope'), // enum: Global/single marketplace
+        marketplaces: jsonb('marketplaces'), // enum[] - Array of marketplace strings
+        name: text('name').notNull(),
+        creationDateTime: timestamp('creation_date_time', { withTimezone: true, mode: 'date' }),
+        lastUpdatedDateTime: timestamp('last_updated_date_time', {
+            withTimezone: true,
+            mode: 'date',
+        }),
+        startDateTime: timestamp('start_date_time', { withTimezone: true, mode: 'date' }),
+        endDateTime: timestamp('end_date_time', { withTimezone: true, mode: 'date' }),
+        inventoryType: text('inventory_type'), // enum: What inventory this ad group can appear on
+        creativeRotationType: text('creative_rotation_type'), // enum: RANDOM / WEIGHTED
+        purchaseOrderNumber: text('purchase_order_number'),
+        advertisedProductCategoryIds: jsonb('advertised_product_category_ids'), // string[] - Product category IDs
+        // Nested objects stored as jsonb
+        state: jsonb('state'), // { state: enum, marketplace_settings: {...} }
+        status: jsonb('status'), // Delivery info - enum
+        bid: jsonb('bid'), // { bid: { default_bid, base_bid, currency_code, max_average_bid }, marketplace_settings: {...} }
+        optimization: jsonb('optimization'), // { bid_strategy: enum, budget_settings: {...} }
+        budgets: jsonb('budgets'), // Budget caps and marketplace budget settings
+        pacing: jsonb('pacing'), // Delivery pacing
+        frequencies: jsonb('frequencies'), // Frequency caps
+        targetingSettings: jsonb('targeting_settings'), // Language, viewability, audience, etc.
+        tags: jsonb('tags'), // Array of { key: string, value: string }
+        fees: jsonb('fees'), // Fee metadata
     },
     table => ({
         amsCmAdgroupsUniqueIndex: uniqueIndex('ams_cm_adgroups_ad_group_id_campaign_id_idx').on(
@@ -87,50 +94,60 @@ export const ams_cm_adgroups = pgTable(
     })
 );
 
-// Ads dataset
+// Ads dataset - Based on official AMS Campaign Management Ad dataset schema
 export const ams_cm_ads = pgTable(
     'ams_cm_ads',
     {
+        datasetId: text('dataset_id').notNull(),
         adId: text('ad_id').notNull(),
-        adGroupId: text('ad_group_id'),
-        campaignId: text('campaign_id'),
-        adProduct: text('ad_product'),
-        name: text('name'),
-        state: text('state'),
-        deliveryStatus: text('delivery_status'),
-        deliveryReasons: jsonb('delivery_reasons'),
-        creativeType: text('creative_type'),
+        adGroupId: text('ad_group_id').notNull(),
+        campaignId: text('campaign_id').notNull(), // Read-only parent campaign
+        adProduct: text('ad_product').notNull(), // enum: SP / SB / DSP
+        marketplaceScope: text('marketplace_scope'), // enum: Global/single marketplace
+        marketplaces: jsonb('marketplaces'), // enum[] - Array of marketplace strings
+        name: text('name').notNull(),
         creationDateTime: timestamp('creation_date_time', { withTimezone: true, mode: 'date' }),
         lastUpdatedDateTime: timestamp('last_updated_date_time', {
             withTimezone: true,
             mode: 'date',
         }),
-        servingStatus: text('serving_status'),
-        servingReasons: jsonb('serving_reasons'),
+        adType: text('ad_type'), // enum: VIDEO / COMPONENT / PRODUCT_AD
+        // Nested objects stored as jsonb
+        state: jsonb('state'), // { state: enum, marketplace_settings: {...} }
+        status: jsonb('status'), // { delivery_status: enum, delivery_reasons: enum[], marketplace_settings: {...} }
+        creative: jsonb('creative'), // { product_creative: {...} } - Advertised product + headline + store settings
+        tags: jsonb('tags'), // Array of { key: string, value: string }
     },
     table => ({
         amsCmAdsUniqueIndex: uniqueIndex('ams_cm_ads_ad_id_idx').on(table.adId),
     })
 );
 
-// Targets dataset
+// Targets dataset - Based on official AMS Campaign Management Target dataset schema
 export const ams_cm_targets = pgTable(
     'ams_cm_targets',
     {
+        datasetId: text('dataset_id').notNull(),
         targetId: text('target_id').notNull(),
-        adGroupId: text('ad_group_id'),
-        campaignId: text('campaign_id'),
-        adProduct: text('ad_product'),
-        expressionType: text('expression_type'),
-        expression: jsonb('expression'),
-        state: text('state'),
-        startDateTime: timestamp('start_date_time', { withTimezone: true, mode: 'date' }),
-        endDateTime: timestamp('end_date_time', { withTimezone: true, mode: 'date' }),
+        adGroupId: text('ad_group_id').notNull(),
+        campaignId: text('campaign_id').notNull(),
+        adProduct: text('ad_product').notNull(), // enum: Ad product
+        marketplaceScope: text('marketplace_scope'), // enum: Global/single marketplace
+        marketplaces: jsonb('marketplaces'), // enum[] - Array of marketplace strings
+        negative: boolean('negative'), // Is negative target
+        targetLevel: text('target_level'), // enum: CAMPAIGN / AD_GROUP
         creationDateTime: timestamp('creation_date_time', { withTimezone: true, mode: 'date' }),
         lastUpdatedDateTime: timestamp('last_updated_date_time', {
             withTimezone: true,
             mode: 'date',
         }),
+        targetType: text('target_type'), // enum: Massive list of target types
+        // Nested objects stored as jsonb
+        state: jsonb('state'), // { state: enum, marketplace_settings: {...} }
+        status: jsonb('status'), // Delivery info - enum
+        bid: jsonb('bid'), // { bid: { bid: double, currency_code: enum }, marketplace_settings: {...} }
+        targetDetails: jsonb('target_details'), // { keyword_target: { match_type: enum, keyword: {...}, native_language_locale: enum } }
+        tags: jsonb('tags'), // Array of { key: string, value: string }
     },
     table => ({
         amsCmTargetsUniqueIndex: uniqueIndex('ams_cm_targets_target_id_idx').on(table.targetId),

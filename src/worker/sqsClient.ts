@@ -85,6 +85,53 @@ function extractQueueName(queueUrl: string): string {
 }
 
 /**
+ * Get DLQ URL from main queue's RedrivePolicy attribute
+ * Returns null if no DLQ is configured
+ */
+export async function getDlqUrlFromMainQueue(mainQueueUrl: string): Promise<string | null> {
+    try {
+        const command = new GetQueueAttributesCommand({
+            QueueUrl: mainQueueUrl,
+            AttributeNames: ['RedrivePolicy'],
+        });
+
+        const response = await sqsClient.send(command);
+        const redrivePolicy = response.Attributes?.RedrivePolicy;
+
+        if (!redrivePolicy) {
+            return null;
+        }
+
+        // Parse RedrivePolicy JSON
+        const policy = JSON.parse(redrivePolicy);
+        const dlqArn = policy.deadLetterTargetArn;
+
+        if (!dlqArn) {
+            return null;
+        }
+
+        // Convert ARN to queue URL
+        // ARN format: arn:aws:sqs:REGION:ACCOUNT_ID:QUEUE_NAME
+        // URL format: https://sqs.REGION.amazonaws.com/ACCOUNT_ID/QUEUE_NAME
+        const arnParts = dlqArn.split(':');
+        if (arnParts.length !== 6 || arnParts[0] !== 'arn' || arnParts[1] !== 'aws' || arnParts[2] !== 'sqs') {
+            console.warn('[SQS] Invalid DLQ ARN format:', dlqArn);
+            return null;
+        }
+
+        const region = arnParts[3];
+        const accountId = arnParts[4];
+        const queueName = arnParts[5];
+
+        return `https://sqs.${region}.amazonaws.com/${accountId}/${queueName}`;
+    } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        console.warn('[SQS] Error getting DLQ URL from RedrivePolicy:', errorMessage);
+        return null;
+    }
+}
+
+/**
  * Get queue metrics from CloudWatch
  * @param queueUrl - The SQS queue URL
  * @param metricName - The CloudWatch metric name (e.g., 'NumberOfMessagesReceived')

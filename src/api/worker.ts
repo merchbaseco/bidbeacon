@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '@/db/index.js';
 import { worker_control } from '@/db/schema.js';
-import { getQueueMetrics } from '@/worker/sqsClient.js';
+import { getQueueMetrics, getDlqUrlFromMainQueue } from '@/worker/sqsClient.js';
 
 export async function registerWorkerRoutes(fastify: FastifyInstance) {
     // Get current worker status
@@ -169,7 +169,6 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
     fastify.get('/api/worker/metrics', async () => {
         try {
             const mainQueueUrl = process.env.AMS_QUEUE_URL;
-            const dlqUrl = process.env.AWS_QUEUE_DLQ_URL;
 
             if (!mainQueueUrl) {
                 return {
@@ -181,12 +180,21 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             // Get main queue metrics
             const mainQueueMetrics = await getQueueMetrics(mainQueueUrl);
 
-            // Get DLQ metrics if configured
+            // Get DLQ URL from main queue's RedrivePolicy
+            const dlqUrlFromPolicy = await getDlqUrlFromMainQueue(mainQueueUrl);
+
+            // Get DLQ metrics if DLQ is configured via RedrivePolicy
             let dlqMetrics = null;
-            if (dlqUrl) {
+            if (dlqUrlFromPolicy) {
                 try {
-                    dlqMetrics = await getQueueMetrics(dlqUrl);
-                } catch {
+                    dlqMetrics = await getQueueMetrics(dlqUrlFromPolicy);
+                } catch (error) {
+                    // Log the error so we can debug DLQ access issues
+                    const errorMessage = error instanceof Error ? error.message : String(error);
+                    console.error('[API] Error fetching DLQ metrics:', errorMessage);
+                    if (error instanceof Error && error.stack) {
+                        console.error('[API] DLQ error stack:', error.stack);
+                    }
                     // DLQ might not exist or be accessible, return empty metrics
                     dlqMetrics = {
                         sparkline: new Array(60).fill(0),
@@ -203,16 +211,31 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
                         messagesReceivedLast24h: 0,
                         messagesDeletedLastHour: 0,
                         messagesDeletedLast24h: 0,
+                        messagesSentLast60s: 0,
+                        messagesReceivedLast60s: 0,
+                        messagesDeletedLast60s: 0,
                     };
                 }
             } else {
                 // No DLQ configured, return empty metrics
                 dlqMetrics = {
                     sparkline: new Array(60).fill(0),
+                    sparklineSent: new Array(60).fill(0),
+                    sparklineReceived: new Array(60).fill(0),
+                    sparklineDeleted: new Array(60).fill(0),
                     messagesLastHour: 0,
                     messagesLast24h: 0,
                     approximateVisible: 0,
                     oldestMessageAge: 0,
+                    messagesSentLastHour: 0,
+                    messagesSentLast24h: 0,
+                    messagesReceivedLastHour: 0,
+                    messagesReceivedLast24h: 0,
+                    messagesDeletedLastHour: 0,
+                    messagesDeletedLast24h: 0,
+                    messagesSentLast60s: 0,
+                    messagesReceivedLast60s: 0,
+                    messagesDeletedLast60s: 0,
                 };
             }
 

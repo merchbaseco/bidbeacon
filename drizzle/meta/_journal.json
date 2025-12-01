@@ -36,6 +36,13 @@
       "when": 1764568207385,
       "tag": "0004_worthless_genesis",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1764570202816,
+      "tag": "0005_solid_ezekiel",
+      "breakpoints": true
     }
   ]
 }

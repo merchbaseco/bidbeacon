@@ -25,43 +25,43 @@ export async function handleCampaigns(payload: unknown): Promise<void> {
     // Map from snake_case (AMS) to camelCase (Drizzle schema)
     const record = {
         datasetId: data.dataset_id,
-        advertiserId: data.advertiser_id,
-        marketplaceId: data.marketplace_id,
         campaignId: data.campaign_id,
-        accountId: data.account_id,
         portfolioId: data.portfolio_id ?? null,
         adProduct: data.ad_product,
-        productLocation: data.product_location ?? null,
-        version: data.version,
+        marketplaceScope: data.marketplace_scope ?? null,
+        marketplaces: data.marketplaces ?? null, // Array stored as jsonb
         name: data.name,
+        skanAppId: data.skan_app_id ?? null,
         startDateTime: data.start_date_time ? new Date(data.start_date_time) : null,
         endDateTime: data.end_date_time ? new Date(data.end_date_time) : null,
+        creationDateTime: data.creation_date_time ? new Date(data.creation_date_time) : null,
+        lastUpdatedDateTime: data.last_updated_date_time
+            ? new Date(data.last_updated_date_time)
+            : null,
+        targetsAmazonDeal: data.targets_amazon_deal ?? null,
+        brandId: data.brand_id ?? null,
+        costType: data.cost_type ?? null,
+        salesChannel: data.sales_channel ?? null,
+        isMultiAdGroupsEnabled: data.is_multi_ad_groups_enabled ?? null,
+        purchaseOrderNumber: data.purchase_order_number ?? null,
+        // Nested objects stored as jsonb
         state: data.state ?? null,
-        tags: data.tags ?? null,
-        targetingSettings: data.targeting_settings ?? null,
-        budgetBudgetCapMonetaryBudgetAmount: data.budget_budget_cap_monetary_budget_amount ?? null,
-        budgetBudgetCapMonetaryBudgetCurrencyCode:
-            data.budget_budget_cap_monetary_budget_currency_code ?? null,
-        budgetBudgetCapRecurrenceRecurrenceType:
-            data.budget_budget_cap_recurrence_recurrence_type ?? null,
-        bidSettingBidStrategy: data.bid_setting_bid_strategy ?? null,
-        bidSettingPlacementBidAdjustment: data.bid_setting_placement_bid_adjustment ?? null,
-        bidSettingShopperCohortBidAdjustment:
-            data.bid_setting_shopper_cohort_bid_adjustment ?? null,
-        auditCreationDateTime: data.audit_creation_date_time
-            ? new Date(data.audit_creation_date_time)
-            : null,
-        auditLastUpdatedDateTime: data.audit_last_updated_date_time
-            ? new Date(data.audit_last_updated_date_time)
-            : null,
+        status: data.status ?? null,
+        tags: data.tags ?? null, // Array of { key, value } objects
+        budgets: data.budgets ?? null,
+        frequencies: data.frequencies ?? null,
+        autoCreationSettings: data.auto_creation_settings ?? null,
+        optimizations: data.optimizations ?? null,
+        fee: data.fee ?? null,
+        flights: data.flights ?? null,
     };
 
-    // Upsert with idempotency using campaignId + version
+    // Upsert with idempotency using campaignId (unique identifier)
     await db
         .insert(ams_cm_campaigns)
         .values(record)
         .onConflictDoUpdate({
-            target: [ams_cm_campaigns.campaignId, ams_cm_campaigns.version],
+            target: [ams_cm_campaigns.campaignId],
             set: record,
         });
 }

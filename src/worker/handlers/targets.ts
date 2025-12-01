@@ -24,24 +24,31 @@ export async function handleTargets(payload: unknown): Promise<void> {
 
     // Map from snake_case (AMS) to camelCase (Drizzle schema)
     const record = {
+        datasetId: data.dataset_id,
         targetId: data.target_id,
-        adGroupId: data.ad_group_id ?? null,
-        campaignId: data.campaign_id ?? null,
-        adProduct: data.ad_product ?? null,
-        expressionType: data.expression_type ?? null,
-        expression: data.expression ?? null,
-        state: data.state ?? null,
-        startDateTime: data.start_date_time ? new Date(data.start_date_time) : null,
-        endDateTime: data.end_date_time ? new Date(data.end_date_time) : null,
+        adGroupId: data.ad_group_id,
+        campaignId: data.campaign_id,
+        adProduct: data.ad_product,
+        marketplaceScope: data.marketplace_scope ?? null,
+        marketplaces: data.marketplaces ?? null, // Array stored as jsonb
+        negative: data.negative ?? null,
+        targetLevel: data.target_level ?? null,
         creationDateTime: data.creation_date_time ? new Date(data.creation_date_time) : null,
         lastUpdatedDateTime: data.last_updated_date_time
             ? new Date(data.last_updated_date_time)
             : null,
+        targetType: data.target_type ?? null,
+        // Nested objects stored as jsonb
+        state: data.state ?? null,
+        status: data.status ?? null,
+        bid: data.bid ?? null,
+        targetDetails: data.target_details ?? null,
+        tags: data.tags ?? null, // Array of { key, value } objects
     };
 
     // Upsert with idempotency using targetId
     await db.insert(ams_cm_targets).values(record).onConflictDoUpdate({
-        target: ams_cm_targets.targetId,
+        target: [ams_cm_targets.targetId],
         set: record,
     });
 }
