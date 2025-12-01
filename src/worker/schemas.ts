@@ -112,25 +112,28 @@ export const campaignSchema = baseAmsPayloadSchema
         sales_channel: z.string().optional(), // enum: AMAZON / OFF_AMAZON
         is_multi_ad_groups_enabled: z.boolean().optional(),
         purchase_order_number: z.string().optional(),
-        // Nested state object
+        // Nested state object - can be string or object
         state: z
-            .object({
-                state: z.string().optional(), // enum: Default state
-                marketplace_settings: z
-                    .array(
-                        z.object({
-                            marketplace: z.string().optional(), // enum: Marketplace
-                            state: z.string().optional(), // enum: Marketplace-specific state
-                        })
-                    )
-                    .optional(),
-            })
+            .union([
+                z.string(), // Sometimes AMS sends state as a simple string
+                z.object({
+                    state: z.string().optional(), // enum: Default state
+                    marketplace_settings: z
+                        .array(
+                            z.object({
+                                marketplace: z.string().optional(), // enum: Marketplace
+                                state: z.string().optional(), // enum: Marketplace-specific state
+                            })
+                        )
+                        .optional(),
+                }),
+            ])
             .optional(),
         // Nested status object
         status: z
             .object({
                 delivery_status: z.string().optional(), // enum: Delivering / Not delivering
-                delivery_reasons: z.array(z.string()).optional(), // enum[] - Up to 50 reasons
+                delivery_reasons: z.array(z.string()).nullable().optional(), // enum[] - Up to 50 reasons, can be null
                 marketplace_settings: z
                     .array(
                         z.object({
@@ -151,8 +154,8 @@ export const campaignSchema = baseAmsPayloadSchema
                 })
             )
             .optional(),
-        // Budgets - mixed structure, store as jsonb
-        budgets: z.record(z.unknown()).optional(),
+        // Budgets - mixed structure (can be object or array), store as jsonb
+        budgets: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(),
         // Frequencies - mixed structure, store as jsonb
         frequencies: z.record(z.unknown()).optional(),
         // Auto creation settings
