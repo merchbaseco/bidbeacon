@@ -195,8 +195,8 @@ async function getOldestMessageAge(queueUrl: string): Promise<number> {
         );
         const latest = sorted[0];
         return latest.Average ? Math.round(latest.Average) : 0;
-    } catch (error) {
-        // Me_errormight not be available if queue is empty or CloudWatch hasn't reported it yet
+    } catch {
+        // Metric might not be available if queue is empty or CloudWatch hasn't reported it yet
         // Return 0 as a safe default
         return 0;
     }
@@ -254,10 +254,14 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
     messagesReceivedLast24h: number;
     messagesDeletedLastHour: number;
     messagesDeletedLast24h: number;
+    messagesSentLast60s: number;
+    messagesReceivedLast60s: number;
+    messagesDeletedLast60s: number;
 }> {
     const now = new Date();
     const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
     const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
 
     // Get sparkline data for all three metrics (last 60 minutes)
     const [sparklineSent, sparklineReceived, sparklineDeleted] = await Promise.all([
@@ -268,6 +272,14 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
 
     // Keep backward compatibility - use received sparkline as default
     const sparkline = sparklineReceived;
+
+    // Get last 60 seconds totals (most recent minute)
+    const [messagesReceivedLast60s, messagesSentLast60s, messagesDeletedLast60s] =
+        await Promise.all([
+            getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneMinuteAgo, now),
+            getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneMinuteAgo, now),
+            getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneMinuteAgo, now),
+        ]);
 
     // Get last hour totals for all metrics
     const [messagesReceivedLastHour, messagesSentLastHour, messagesDeletedLastHour] =
@@ -304,5 +316,8 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
         messagesReceivedLast24h,
         messagesDeletedLastHour,
         messagesDeletedLast24h,
+        messagesSentLast60s,
+        messagesReceivedLast60s,
+        messagesDeletedLast60s,
     };
 }
