@@ -1,3 +1,4 @@
+import Bottleneck from 'bottleneck';
 import { eq } from 'drizzle-orm';
 import { db, testConnection } from '@/db/index.js';
 import { worker_control } from '@/db/schema.js';
@@ -54,70 +55,39 @@ async function processMessage(message: {
     const messageId = message.MessageId || 'unknown';
 
     try {
-        console.log('');
-        console.log('═══════════════════════════════════════════════════════════════');
-        console.log(`[Worker] Processing message: ${messageId}`);
-        console.log('═══════════════════════════════════════════════════════════════');
-
-        // Log full message body
-        if (message.Body) {
-            console.log('[Worker] Raw message body:');
-            try {
-                const parsed = JSON.parse(message.Body);
-                console.log(JSON.stringify(parsed, null, 2));
-            } catch {
-                console.log(message.Body);
-            }
-        } else {
-            console.log('[Worker] Message body is empty');
-        }
-
         // Parse AMS payload directly (AMS uses Raw Message Delivery, no SNS envelope)
-        console.log('[Worker] Parsing AMS payload...');
         const payload = parseAmsPayload(message.Body);
-        console.log('[Worker] ✓ Payload parsed successfully');
 
         // Extract datasetId for logging (AMS uses snake_case: dataset_id)
         const datasetId =
             typeof payload === 'object' && payload !== null && 'dataset_id' in payload
                 ? String(payload.dataset_id)
                 : 'unknown';
-        console.log(`[Worker] Dataset ID: ${datasetId}`);
+
+        console.log(`[Worker] Processing message ${messageId} (dataset: ${datasetId})`);
 
         // Route to appropriate handler
-        console.log('[Worker] Routing to handler...');
         await routePayload(payload);
-        console.log('[Worker] ✓ Handler completed successfully');
 
         // Success - delete message from queue
-        console.log('[Worker] Deleting message from queue...');
         await deleteMessage(message.ReceiptHandle);
-        console.log(`[Worker] ✓ Successfully processed and deleted message ${messageId}`);
-        console.log('═══════════════════════════════════════════════════════════════');
-        console.log('');
+        console.log(`[Worker] ✓ Successfully processed message ${messageId}`);
     } catch (error) {
         // Log error but don't delete message - SQS will retry
         const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('');
-        console.error('═══════════════════════════════════════════════════════════════');
-        console.error(`[Worker] ✗ Failed to process message ${messageId}`);
-        console.error('═══════════════════════════════════════════════════════════════');
-        console.error(`[Worker] Error: ${errorMessage}`);
+        console.error(`[Worker] ✗ Failed to process message ${messageId}: ${errorMessage}`);
         if (error instanceof Error && error.stack) {
             console.error(`[Worker] Stack trace:`, error.stack);
         }
-        console.error('[Worker] Message will NOT be deleted - SQS will retry');
-        console.error('═══════════════════════════════════════════════════════════════');
-        console.error('');
         // Don't delete - let SQS handle retries and DLQ routing
         throw error;
     }
 }
 
 /**
- * Check if worker is enabled in the database
+ * Get worker configuration from the database
  */
-async function isWorkerEnabled(): Promise<boolean> {
+async function getWorkerConfig(): Promise<{ enabled: boolean; messagesPerSecond: number }> {
     try {
         const control = await db
             .select()
@@ -125,22 +95,27 @@ async function isWorkerEnabled(): Promise<boolean> {
             .where(eq(worker_control.id, 'main'))
             .limit(1);
 
-        // If no row exists, default to enabled (backward compatibility)
+        // If no row exists, default to enabled with unlimited speed (backward compatibility)
         if (control.length === 0) {
-            // Initialize the row with enabled = true
+            // Initialize the row with enabled = true and messagesPerSecond = 0 (unlimited)
             try {
-                await db.insert(worker_control).values({ id: 'main', enabled: true });
+                await db
+                    .insert(worker_control)
+                    .values({ id: 'main', enabled: true, messagesPerSecond: 0 });
             } catch {
                 // Row might have been created by another process, ignore
             }
-            return true;
+            return { enabled: true, messagesPerSecond: 0 };
         }
 
-        return control[0].enabled;
+        return {
+            enabled: control[0].enabled,
+            messagesPerSecond: control[0].messagesPerSecond ?? 0,
+        };
     } catch (error) {
-        // On error, default to enabled to avoid breaking existing behavior
+        // On error, default to enabled with unlimited speed to avoid breaking existing behavior
         console.error('[Worker] Error checking worker control state:', error);
-        return true;
+        return { enabled: true, messagesPerSecond: 0 };
     }
 }
 
@@ -148,11 +123,13 @@ async function isWorkerEnabled(): Promise<boolean> {
  * Main worker loop
  */
 async function runWorker(): Promise<void> {
+    let limiter: Bottleneck | null = null;
+
     while (!shuttingDown) {
         try {
-            // Check if worker is enabled before processing
-            const enabled = await isWorkerEnabled();
-            if (!enabled) {
+            // Get worker configuration
+            const config = await getWorkerConfig();
+            if (!config.enabled) {
                 console.log(
                     '[Worker] Queue processing is disabled. Waiting 5 seconds before checking again...'
                 );
@@ -160,8 +137,23 @@ async function runWorker(): Promise<void> {
                 continue;
             }
 
-            // Long-poll for messages (will return after WaitTimeSeconds or when messages arrive)
-            const messages = await receiveMessages();
+            // Update rate limiter if config changed
+            if (config.messagesPerSecond > 0) {
+                // Create bottleneck limiter: minTime = milliseconds between messages
+                // messagesPerSecond = 10 means minTime = 100ms (1000ms / 10)
+                const minTime = 1000 / config.messagesPerSecond;
+                limiter = new Bottleneck({
+                    minTime, // Minimum time between jobs in milliseconds
+                    maxConcurrent: 1, // Process one message at a time
+                });
+            } else {
+                limiter = null; // Unlimited
+            }
+
+            // Adjust long-polling based on rate limit
+            // If rate limited, use longer polling to reduce API calls
+            const waitTimeSeconds = limiter ? 20 : 10;
+            const messages = await receiveMessages(waitTimeSeconds);
 
             // If shutting down, exit immediately without processing
             if (shuttingDown) {
@@ -173,22 +165,29 @@ async function runWorker(): Promise<void> {
                 continue;
             }
 
-            // TEMPORARY: Process only one message per iteration, then wait 10 seconds
-            // Process the first message only
-            const message = messages[0];
+            // Process all messages in the batch with rate limiting
+            const processPromises = messages.map(message => {
+                if (shuttingDown) {
+                    return Promise.resolve();
+                }
 
-            // Check shutdown flag before processing
-            if (shuttingDown) {
-                break;
-            }
+                // Use bottleneck to schedule the job if rate limiting is enabled
+                if (limiter) {
+                    return limiter
+                        .schedule(() => processMessage(message))
+                        .catch(() => {
+                            // Error already logged in processMessage
+                        });
+                } else {
+                    // No rate limiting - process immediately
+                    return processMessage(message).catch(() => {
+                        // Error already logged in processMessage
+                    });
+                }
+            });
 
-            try {
-                await processMessage(message);
-            } catch {}
-
-            // Wait 10 seconds before processing next message
-            console.log('[Worker] Waiting 10 seconds before processing next message...');
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            // Wait for all messages in the batch to be processed
+            await Promise.all(processPromises);
         } catch (error) {
             // If shutting down, exit on error
             if (shuttingDown) {

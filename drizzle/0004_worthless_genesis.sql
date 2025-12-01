@@ -1,0 +1,1 @@
+ALTER TABLE "worker_control" ADD COLUMN "messages_per_second" bigint DEFAULT 0 NOT NULL;

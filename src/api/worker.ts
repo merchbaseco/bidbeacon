@@ -16,15 +16,18 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
 
             // If no row exists, default to enabled and initialize the row
             if (control.length === 0) {
-                // Initialize the row with enabled = true
+                // Initialize the row with enabled = true and messagesPerSecond = 0 (unlimited)
                 try {
-                    await db.insert(worker_control).values({ id: 'main', enabled: true });
+                    await db
+                        .insert(worker_control)
+                        .values({ id: 'main', enabled: true, messagesPerSecond: 0 });
                 } catch {
                     // Row might have been created by another request, ignore
                 }
                 return {
                     success: true,
                     enabled: true,
+                    messagesPerSecond: 0,
                     message: 'Worker is enabled (default)',
                 };
             }
@@ -32,6 +35,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             return {
                 success: true,
                 enabled: control[0].enabled,
+                messagesPerSecond: control[0].messagesPerSecond ?? 0,
                 updatedAt: control[0].updatedAt,
             };
         } catch (error) {
@@ -48,7 +52,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
         try {
             const result = await db
                 .insert(worker_control)
-                .values({ id: 'main', enabled: true })
+                .values({ id: 'main', enabled: true, messagesPerSecond: 0 })
                 .onConflictDoUpdate({
                     target: worker_control.id,
                     set: {
@@ -61,6 +65,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             return {
                 success: true,
                 enabled: result[0].enabled,
+                messagesPerSecond: result[0].messagesPerSecond ?? 0,
                 message: 'Queue processing started',
                 updatedAt: result[0].updatedAt,
             };
@@ -82,7 +87,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
         try {
             const result = await db
                 .insert(worker_control)
-                .values({ id: 'main', enabled: false })
+                .values({ id: 'main', enabled: false, messagesPerSecond: 0 })
                 .onConflictDoUpdate({
                     target: worker_control.id,
                     set: {
@@ -95,6 +100,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             return {
                 success: true,
                 enabled: result[0].enabled,
+                messagesPerSecond: result[0].messagesPerSecond ?? 0,
                 message: 'Queue processing stopped',
                 updatedAt: result[0].updatedAt,
             };
@@ -110,6 +116,54 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
             });
         }
     });
+
+    // Set messages per second rate limit
+    fastify.post<{ Body: { messagesPerSecond: number } }>(
+        '/api/worker/speed',
+        async (request, reply) => {
+            try {
+                const { messagesPerSecond } = request.body;
+
+                // Validate input
+                if (typeof messagesPerSecond !== 'number' || messagesPerSecond < 0) {
+                    return reply.code(400).send({
+                        success: false,
+                        error: 'messagesPerSecond must be a non-negative number (0 = unlimited)',
+                    });
+                }
+
+                const result = await db
+                    .insert(worker_control)
+                    .values({ id: 'main', messagesPerSecond })
+                    .onConflictDoUpdate({
+                        target: worker_control.id,
+                        set: {
+                            messagesPerSecond,
+                            updatedAt: new Date(),
+                        },
+                    })
+                    .returning();
+
+                return {
+                    success: true,
+                    enabled: result[0].enabled,
+                    messagesPerSecond: result[0].messagesPerSecond ?? 0,
+                    message: `Rate limit set to ${messagesPerSecond === 0 ? 'unlimited' : `${messagesPerSecond} messages/second`}`,
+                    updatedAt: result[0].updatedAt,
+                };
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.error('[API] Error setting rate limit:', errorMessage);
+                if (error instanceof Error && error.stack) {
+                    console.error('[API] Stack trace:', error.stack);
+                }
+                return reply.code(500).send({
+                    success: false,
+                    error: errorMessage,
+                });
+            }
+        }
+    );
 
     // Get queue metrics for monitoring
     fastify.get('/api/worker/metrics', async () => {

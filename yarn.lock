@@ -579,6 +579,7 @@ __metadata:
     "@fastify/cors": "npm:^11.1.0"
     "@fastify/helmet": "npm:^13.0.1"
     "@types/node": "npm:^24.3.0"
+    bottleneck: "npm:^2.19.5"
     dotenv-cli: "npm:^10.0.0"
     drizzle-kit: "npm:^0.31.7"
     drizzle-orm: "npm:^0.44.7"
@@ -1951,6 +1952,13 @@ __metadata:
     "@fastify/error": "npm:^4.0.0"
     fastq: "npm:^1.17.1"
   checksum: 10c0/bdc294a7e8f38e1e21f9d338d97d7240025db54f1005fc419cfe0499a35edf2276ab1fe91135739faa3a9437358ec6912d5a56f23361b061880333cb4f1c7884
+  languageName: node
+  linkType: hard
+
+"bottleneck@npm:^2.19.5":
+  version: 2.19.5
+  resolution: "bottleneck@npm:2.19.5"
+  checksum: 10c0/b0f72e45b2e0f56a21ba720183f16bef8e693452fb0495d997fa354e42904353a94bd8fd429868e6751bc85e54b6755190519eed5a0ae0a94a5185209ae7c6d0
   languageName: node
   linkType: hard
 

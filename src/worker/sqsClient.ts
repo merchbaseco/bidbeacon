@@ -1,3 +1,4 @@
+import { CloudWatchClient, GetMetricStatisticsCommand } from '@aws-sdk/client-cloudwatch';
 import type { Message } from '@aws-sdk/client-sqs';
 import {
     DeleteMessageCommand,
@@ -5,11 +6,6 @@ import {
     ReceiveMessageCommand,
     SQSClient,
 } from '@aws-sdk/client-sqs';
-import {
-    CloudWatchClient,
-    GetMetricStatisticsCommand,
-    type Datapoint,
-} from '@aws-sdk/client-cloudwatch';
 
 // Create SQS client singleton
 const sqsClient = new SQSClient({
@@ -51,12 +47,13 @@ export async function testAwsConnection(): Promise<void> {
 
 /**
  * Receive messages from SQS queue using long polling
+ * @param waitTimeSeconds - How long to wait for messages (default: 10)
  * @returns Array of messages, or empty array if none received
  */
-export async function receiveMessages(): Promise<Message[]> {
+export async function receiveMessages(waitTimeSeconds: number = 10): Promise<Message[]> {
     const command = new ReceiveMessageCommand({
         QueueUrl: queueUrl,
-        WaitTimeSeconds: 10, // Long polling
+        WaitTimeSeconds: waitTimeSeconds,
         MaxNumberOfMessages: 10,
         VisibilityTimeout: 30, // Give worker 30 seconds to process before retry
     });
@@ -199,7 +196,7 @@ async function getOldestMessageAge(queueUrl: string): Promise<number> {
         const latest = sorted[0];
         return latest.Average ? Math.round(latest.Average) : 0;
     } catch (error) {
-        // Metric might not be available if queue is empty or CloudWatch hasn't reported it yet
+        // Me_errormight not be available if queue is empty or CloudWatch hasn't reported it yet
         // Return 0 as a safe default
         return 0;
     }
@@ -273,26 +270,20 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
     const sparkline = sparklineReceived;
 
     // Get last hour totals for all metrics
-    const [
-        messagesReceivedLastHour,
-        messagesSentLastHour,
-        messagesDeletedLastHour,
-    ] = await Promise.all([
-        getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneHourAgo, now),
-        getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneHourAgo, now),
-        getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneHourAgo, now),
-    ]);
+    const [messagesReceivedLastHour, messagesSentLastHour, messagesDeletedLastHour] =
+        await Promise.all([
+            getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneHourAgo, now),
+            getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneHourAgo, now),
+            getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneHourAgo, now),
+        ]);
 
     // Get last 24 hours totals
-    const [
-        messagesReceivedLast24h,
-        messagesSentLast24h,
-        messagesDeletedLast24h,
-    ] = await Promise.all([
-        getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneDayAgo, now),
-        getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneDayAgo, now),
-        getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneDayAgo, now),
-    ]);
+    const [messagesReceivedLast24h, messagesSentLast24h, messagesDeletedLast24h] =
+        await Promise.all([
+            getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneDayAgo, now),
+            getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneDayAgo, now),
+            getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneDayAgo, now),
+        ]);
 
     // Get current queue state
     const approximateVisible = await getApproximateVisibleMessages(queueUrl);

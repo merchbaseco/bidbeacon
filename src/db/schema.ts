@@ -268,6 +268,7 @@ export const ams_budget_usage = pgTable(
 export const worker_control = pgTable('worker_control', {
     id: text('id').primaryKey().default('main'),
     enabled: boolean('enabled').notNull().default(true),
+    messagesPerSecond: bigint('messages_per_second', { mode: 'number' }).notNull().default(0), // max messages per second (0 = unlimited)
     updatedAt: timestamp('updated_at', {
         withTimezone: true,
         mode: 'date',
