@@ -150,9 +150,9 @@ async function runWorker(): Promise<void> {
                 limiter = null; // Unlimited
             }
 
-            // Adjust long-polling based on rate limit
-            // If rate limited, use longer polling to reduce API calls
-            const waitTimeSeconds = limiter ? 20 : 10;
+            // Always use 10 second long polling
+            const waitTimeSeconds = 10;
+            console.log(`[Worker] Polling SQS queue (waitTimeSeconds: ${waitTimeSeconds})...`);
             const messages = await receiveMessages(waitTimeSeconds);
 
             // If shutting down, exit immediately without processing
@@ -161,7 +161,11 @@ async function runWorker(): Promise<void> {
             }
 
             if (messages.length === 0) {
-                // No messages - continue polling
+                // No messages - wait 60 seconds before polling again
+                console.log(
+                    '[Worker] No messages received. Waiting 60 seconds before next poll...'
+                );
+                await new Promise(resolve => setTimeout(resolve, 60000));
                 continue;
             }
 
