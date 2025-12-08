@@ -43,6 +43,13 @@
       "when": 1764570202816,
       "tag": "0005_solid_ezekiel",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1765238352546,
+      "tag": "0006_loving_sabra",
+      "breakpoints": true
     }
   ]
 }

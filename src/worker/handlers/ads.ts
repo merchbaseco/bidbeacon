@@ -26,8 +26,8 @@ export async function handleAds(payload: unknown): Promise<void> {
     const record = {
         datasetId: data.dataset_id,
         adId: data.ad_id,
-        adGroupId: data.ad_group_id,
-        campaignId: data.campaign_id, // Read-only parent campaign
+        adGroupId: data.ad_group_id ?? null, // May be missing due to AMS data quality issues
+        campaignId: data.campaign_id ?? null, // May be missing due to AMS data quality issues
         adProduct: data.ad_product,
         marketplaceScope: data.marketplace_scope ?? null,
         marketplaces: data.marketplaces ?? null, // Array stored as jsonb
@@ -45,8 +45,11 @@ export async function handleAds(payload: unknown): Promise<void> {
     };
 
     // Upsert with idempotency using adId
-    await db.insert(ams_cm_ads).values(record).onConflictDoUpdate({
-        target: [ams_cm_ads.adId],
-        set: record,
-    });
+    await db
+        .insert(ams_cm_ads)
+        .values(record)
+        .onConflictDoUpdate({
+            target: [ams_cm_ads.adId],
+            set: record,
+        });
 }

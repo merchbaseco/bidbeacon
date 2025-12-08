@@ -264,8 +264,8 @@ export const adSchema = baseAmsPayloadSchema
     .extend({
         dataset_id: z.string(),
         ad_id: z.string(),
-        ad_group_id: z.string(),
-        campaign_id: z.string(), // Read-only parent campaign
+        ad_group_id: z.string().optional(), // Sometimes missing due to AMS data quality issues
+        campaign_id: z.string().optional(), // Sometimes missing due to AMS data quality issues
         ad_product: z.string(), // enum: SP / SB / DSP
         marketplace_scope: z.string().optional(), // enum: Global/single marketplace
         marketplaces: z.array(z.string()).optional(), // enum[] - List of marketplaces
@@ -299,7 +299,9 @@ export const adSchema = baseAmsPayloadSchema
             .object({
                 delivery_status: z.string().optional(), // enum: Delivering / Not delivering
                 delivery_reasons: z.array(z.string()).nullable().optional(), // enum[]: Delivery reasons, can be null
-                marketplace_settings: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(), // Can be object or array
+                marketplace_settings: z
+                    .union([z.record(z.unknown()), z.array(z.unknown())])
+                    .optional(), // Can be object or array
             })
             .optional(),
         // Nested creative object
@@ -371,7 +373,9 @@ export const targetSchema = baseAmsPayloadSchema
                         }),
                     ])
                     .optional(),
-                marketplace_settings: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(), // Can be object or array
+                marketplace_settings: z
+                    .union([z.record(z.unknown()), z.array(z.unknown())])
+                    .optional(), // Can be object or array
             })
             .optional(),
         // Nested target_details object (keyword_target is one type)

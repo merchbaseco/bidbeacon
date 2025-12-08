@@ -249,9 +249,25 @@ async function peekDlqMessages(dlqUrl: string, limit: number, filterDataset?: st
             if (msg.approximateReceiveCount) {
                 console.log(`Receive Count: ${msg.approximateReceiveCount}`);
             }
+            
+            // Check for missing fields
+            const payload = msg.payload as Record<string, unknown>;
+            const missingFields: string[] = [];
+            if (!('ad_id' in payload)) missingFields.push('ad_id');
+            if (!('ad_group_id' in payload)) missingFields.push('ad_group_id');
+            if (!('campaign_id' in payload)) missingFields.push('campaign_id');
+            if ('status' in payload && payload.status && typeof payload.status === 'object') {
+                const status = payload.status as Record<string, unknown>;
+                if (!('delivery_status' in status)) missingFields.push('status.delivery_status');
+            }
+            
+            if (missingFields.length > 0) {
+                console.log(`⚠️  Missing fields: ${missingFields.join(', ')}`);
+            }
+            
             console.log(`Payload preview:`);
-            console.log(JSON.stringify(msg.payload, null, 2).substring(0, 500));
-            if (JSON.stringify(msg.payload).length > 500) {
+            console.log(JSON.stringify(msg.payload, null, 2).substring(0, 2000));
+            if (JSON.stringify(msg.payload).length > 2000) {
                 console.log('... (truncated)');
             }
             console.log('');

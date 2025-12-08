@@ -100,8 +100,8 @@ export const ams_cm_ads = pgTable(
     {
         datasetId: text('dataset_id').notNull(),
         adId: text('ad_id').notNull(),
-        adGroupId: text('ad_group_id').notNull(),
-        campaignId: text('campaign_id').notNull(), // Read-only parent campaign
+        adGroupId: text('ad_group_id'), // Optional - may be missing due to AMS data quality issues
+        campaignId: text('campaign_id'), // Optional - may be missing due to AMS data quality issues
         adProduct: text('ad_product').notNull(), // enum: SP / SB / DSP
         marketplaceScope: text('marketplace_scope'), // enum: Global/single marketplace
         marketplaces: jsonb('marketplaces'), // enum[] - Array of marketplace strings
