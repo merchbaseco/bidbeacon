@@ -169,6 +169,8 @@ async function runWorker(): Promise<void> {
                 continue;
             }
 
+            console.log(`[Worker] Received ${messages.length} message(s) in batch`);
+
             // Process all messages in the batch with rate limiting
             const processPromises = messages.map(message => {
                 if (shuttingDown) {
@@ -192,6 +194,7 @@ async function runWorker(): Promise<void> {
 
             // Wait for all messages in the batch to be processed
             await Promise.all(processPromises);
+            console.log(`[Worker] Completed processing batch of ${messages.length} message(s)`);
         } catch (error) {
             // If shutting down, exit on error
             if (shuttingDown) {

@@ -112,8 +112,27 @@ export const campaignSchema = baseAmsPayloadSchema
         sales_channel: z.string().optional(), // enum: AMAZON / OFF_AMAZON
         is_multi_ad_groups_enabled: z.boolean().optional(),
         purchase_order_number: z.string().optional(),
-        // State as string (AMS sends it as a simple string enum)
-        state: z.string().optional(),
+        // State field - supports both formats for compatibility
+        // API docs specify object format with string enum values:
+        //   { state: "PAUSED", marketplace_settings: [{ marketplace: "US", state: "ENABLED" }] }
+        // However, AMS sometimes sends state as a simple string enum directly: "PAUSED"
+        // We accept both to handle real-world payload variations
+        state: z
+            .union([
+                z.string(), // Simple string enum when AMS sends it directly ("PAUSED", "ENABLED")
+                z.object({
+                    state: z.string().optional(), // enum: Default state (per API docs)
+                    marketplace_settings: z
+                        .array(
+                            z.object({
+                                marketplace: z.string().optional(), // enum: Marketplace (per API docs)
+                                state: z.string().optional(), // enum: Marketplace-specific state (per API docs)
+                            })
+                        )
+                        .optional(),
+                }),
+            ])
+            .optional(),
         // Nested status object
         status: z
             .object({
@@ -177,8 +196,27 @@ export const adGroupSchema = baseAmsPayloadSchema
         creative_rotation_type: z.string().optional(), // enum: RANDOM / WEIGHTED
         purchase_order_number: z.string().optional(),
         advertised_product_category_ids: z.array(z.string()).optional(), // string[] - Product category IDs
-        // State as string (AMS sends it as a simple string enum)
-        state: z.string().optional(),
+        // State field - supports both formats for compatibility
+        // API docs specify object format with string enum values:
+        //   { state: "PAUSED", marketplace_settings: [{ marketplace: "US", state: "ENABLED" }] }
+        // However, AMS sometimes sends state as a simple string enum directly: "PAUSED"
+        // We accept both to handle real-world payload variations
+        state: z
+            .union([
+                z.string(), // Simple string enum when AMS sends it directly ("PAUSED", "ENABLED")
+                z.object({
+                    state: z.string().optional(), // enum: Default state (per API docs)
+                    marketplace_settings: z
+                        .array(
+                            z.object({
+                                marketplace: z.string().optional(), // enum: Marketplace (per API docs)
+                                state: z.string().optional(), // enum: Marketplace-specific state (per API docs)
+                            })
+                        )
+                        .optional(),
+                }),
+            ])
+            .optional(),
         // Nested status object
         status: z.record(z.unknown()).optional(), // Delivery info - enum
         // Nested bid object
@@ -231,18 +269,37 @@ export const adSchema = baseAmsPayloadSchema
         ad_product: z.string(), // enum: SP / SB / DSP
         marketplace_scope: z.string().optional(), // enum: Global/single marketplace
         marketplaces: z.array(z.string()).optional(), // enum[] - List of marketplaces
-        name: z.string(),
+        name: z.string().optional(), // Sometimes missing in AMS payloads
         creation_date_time: z.string().optional(), // ISO 8601 datetime
         last_updated_date_time: z.string().optional(), // ISO 8601 datetime
         ad_type: z.string().optional(), // enum: VIDEO / COMPONENT / PRODUCT_AD
-        // State as string (AMS sends it as a simple string enum)
-        state: z.string().optional(),
+        // State field - supports both formats for compatibility
+        // API docs specify object format with string enum values:
+        //   { state: "PAUSED", marketplace_settings: [{ marketplace: "US", state: "ENABLED" }] }
+        // However, AMS sometimes sends state as a simple string enum directly: "PAUSED"
+        // We accept both to handle real-world payload variations
+        state: z
+            .union([
+                z.string(), // Simple string enum when AMS sends it directly ("PAUSED", "ENABLED")
+                z.object({
+                    state: z.string().optional(), // enum: Default state (per API docs)
+                    marketplace_settings: z
+                        .array(
+                            z.object({
+                                marketplace: z.string().optional(), // enum: Marketplace (per API docs)
+                                state: z.string().optional(), // enum: Marketplace-specific state (per API docs)
+                            })
+                        )
+                        .optional(),
+                }),
+            ])
+            .optional(),
         // Nested status object
         status: z
             .object({
                 delivery_status: z.string().optional(), // enum: Delivering / Not delivering
-                delivery_reasons: z.array(z.string()).optional(), // enum[]: Delivery reasons
-                marketplace_settings: z.record(z.unknown()).optional(), // Per-marketplace delivery info - mixed
+                delivery_reasons: z.array(z.string()).nullable().optional(), // enum[]: Delivery reasons, can be null
+                marketplace_settings: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(), // Can be object or array
             })
             .optional(),
         // Nested creative object
@@ -279,8 +336,27 @@ export const targetSchema = baseAmsPayloadSchema
         creation_date_time: z.string().optional(), // ISO 8601 datetime
         last_updated_date_time: z.string().optional(), // ISO 8601 datetime
         target_type: z.string().optional(), // enum: Massive list of target types
-        // State as string (AMS sends it as a simple string enum)
-        state: z.string().optional(),
+        // State field - supports both formats for compatibility
+        // API docs specify object format with string enum values:
+        //   { state: "PAUSED", marketplace_settings: [{ marketplace: "US", state: "ENABLED" }] }
+        // However, AMS sometimes sends state as a simple string enum directly: "PAUSED"
+        // We accept both to handle real-world payload variations
+        state: z
+            .union([
+                z.string(), // Simple string enum when AMS sends it directly ("PAUSED", "ENABLED")
+                z.object({
+                    state: z.string().optional(), // enum: Default state (per API docs)
+                    marketplace_settings: z
+                        .array(
+                            z.object({
+                                marketplace: z.string().optional(), // enum: Marketplace (per API docs)
+                                state: z.string().optional(), // enum: Marketplace-specific state (per API docs)
+                            })
+                        )
+                        .optional(),
+                }),
+            ])
+            .optional(),
         // Nested status object
         status: z.record(z.unknown()).optional(), // Delivery info - enum
         // Nested bid object

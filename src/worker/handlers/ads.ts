@@ -31,7 +31,7 @@ export async function handleAds(payload: unknown): Promise<void> {
         adProduct: data.ad_product,
         marketplaceScope: data.marketplace_scope ?? null,
         marketplaces: data.marketplaces ?? null, // Array stored as jsonb
-        name: data.name,
+        name: data.name ?? '', // Default to empty string if missing (DB requires NOT NULL)
         creationDateTime: data.creation_date_time ? new Date(data.creation_date_time) : null,
         lastUpdatedDateTime: data.last_updated_date_time
             ? new Date(data.last_updated_date_time)
