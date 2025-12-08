@@ -359,16 +359,19 @@ export const targetSchema = baseAmsPayloadSchema
             .optional(),
         // Nested status object
         status: z.record(z.unknown()).optional(), // Delivery info - enum
-        // Nested bid object
+        // Nested bid object - AMS sends variations
         bid: z
             .object({
                 bid: z
-                    .object({
-                        bid: z.number().optional(), // double: Bid amount
-                        currency_code: z.string().optional(), // enum: Currency
-                    })
+                    .union([
+                        z.number(), // Sometimes AMS sends bid.bid as a number directly
+                        z.object({
+                            bid: z.number().optional(), // double: Bid amount
+                            currency_code: z.string().optional(), // enum: Currency
+                        }),
+                    ])
                     .optional(),
-                marketplace_settings: z.record(z.unknown()).optional(), // Per-marketplace bid overrides - mixed
+                marketplace_settings: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(), // Can be object or array
             })
             .optional(),
         // Nested target_details object (keyword_target is one type)
