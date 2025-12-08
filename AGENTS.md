@@ -33,6 +33,100 @@ Both share the same PostgreSQL database.
 5. Unique index in `schema.ts` for idempotency
 6. Migration: `yarn db:generate`
 
+## DLQ Triage Workflow
+
+When messages fail validation, they're retried by SQS and eventually end up in the Dead Letter Queue (DLQ). Use this workflow to triage and fix DLQ issues.
+
+### 1. Check DLQ Status
+
+Monitor DLQ metrics via the CLI or API:
+- CLI shows DLQ message count and sparkline
+- API endpoint: `GET /api/worker/metrics` → `dlq.approximateVisible`
+
+### 2. Peek at DLQ Messages (Local Script)
+
+Use the local `peek-dlq` script to inspect messages without deleting them:
+
+```bash
+# Basic usage - peek at 10 messages
+yarn peek-dlq
+
+# Peek at more messages
+yarn peek-dlq --limit 50
+
+# Filter by specific dataset
+yarn peek-dlq --dataset ads-campaign-management-campaigns
+```
+
+**Requirements:**
+- `.env` file with `AWS_QUEUE_URL` (or `AMS_QUEUE_URL`) and AWS credentials
+- Script automatically loads `.env` and converts ARN to URL if needed
+- Messages are peeked (not deleted) - they become visible again after 30 seconds
+
+### 3. Identify Validation Errors
+
+The script groups messages by `dataset_id` and shows payload previews. Common validation issues:
+
+- **Type mismatches**: Field expected as object but received as string (or vice versa)
+- **Missing required fields**: Schema expects field but AMS doesn't send it
+- **Null values**: Schema expects array/object but receives null
+- **Format variations**: AMS sends different formats for the same field
+
+### 4. Fix Schema Issues
+
+Update the schema in `src/worker/schemas.ts`:
+
+1. **Make fields optional** if AMS doesn't always send them:
+   ```typescript
+   field: z.string().optional()
+   ```
+
+2. **Accept multiple formats** using `z.union()`:
+   ```typescript
+   field: z.union([z.string(), z.object({...})]).optional()
+   ```
+
+3. **Allow null values**:
+   ```typescript
+   field: z.array(z.string()).nullable().optional()
+   ```
+
+4. **Use `.passthrough()`** on the schema for tolerance of unknown fields
+
+### 5. Common Patterns
+
+**State fields**: AMS sends `state` as a simple string (e.g., `"PAUSED"`, `"ENABLED"`), not an object:
+```typescript
+state: z.string().optional()  // ✅ Correct
+state: z.object({...}).optional()  // ❌ Too strict
+```
+
+**Tags**: Can be array or object depending on AMS version:
+```typescript
+tags: z.union([z.array(z.unknown()), z.record(z.unknown())]).optional()
+```
+
+**Budgets**: Can be object or array:
+```typescript
+budgets: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional()
+```
+
+### 6. Deploy and Verify
+
+1. Deploy the schema fixes
+2. Monitor DLQ metrics - message count should decrease
+3. Check worker logs for successful processing
+4. Re-run `peek-dlq` to verify remaining messages (if any)
+
+### 7. Reprocess DLQ Messages
+
+After fixing schemas, DLQ messages need to be reprocessed:
+- Move messages from DLQ back to main queue (via AWS Console or CLI)
+- Worker will process them with the updated schemas
+- Messages that still fail will go back to DLQ (investigate further)
+
+**Note**: The worker only processes the main queue, not the DLQ. Messages must be moved back to the main queue for reprocessing.
+
 ## Deployment
 
 Worker needs `AMS_QUEUE_URL` and AWS credentials. See [INFRA.md](./INFRA.md) for server setup.

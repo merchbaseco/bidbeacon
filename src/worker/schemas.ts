@@ -112,23 +112,8 @@ export const campaignSchema = baseAmsPayloadSchema
         sales_channel: z.string().optional(), // enum: AMAZON / OFF_AMAZON
         is_multi_ad_groups_enabled: z.boolean().optional(),
         purchase_order_number: z.string().optional(),
-        // Nested state object - can be string or object
-        state: z
-            .union([
-                z.string(), // Sometimes AMS sends state as a simple string
-                z.object({
-                    state: z.string().optional(), // enum: Default state
-                    marketplace_settings: z
-                        .array(
-                            z.object({
-                                marketplace: z.string().optional(), // enum: Marketplace
-                                state: z.string().optional(), // enum: Marketplace-specific state
-                            })
-                        )
-                        .optional(),
-                }),
-            ])
-            .optional(),
+        // State as string (AMS sends it as a simple string enum)
+        state: z.string().optional(),
         // Nested status object
         status: z
             .object({
@@ -192,13 +177,8 @@ export const adGroupSchema = baseAmsPayloadSchema
         creative_rotation_type: z.string().optional(), // enum: RANDOM / WEIGHTED
         purchase_order_number: z.string().optional(),
         advertised_product_category_ids: z.array(z.string()).optional(), // string[] - Product category IDs
-        // Nested state object
-        state: z
-            .object({
-                state: z.string().optional(), // enum: Default state
-                marketplace_settings: z.record(z.unknown()).optional(), // Marketplace state overrides
-            })
-            .optional(),
+        // State as string (AMS sends it as a simple string enum)
+        state: z.string().optional(),
         // Nested status object
         status: z.record(z.unknown()).optional(), // Delivery info - enum
         // Nested bid object
@@ -255,13 +235,8 @@ export const adSchema = baseAmsPayloadSchema
         creation_date_time: z.string().optional(), // ISO 8601 datetime
         last_updated_date_time: z.string().optional(), // ISO 8601 datetime
         ad_type: z.string().optional(), // enum: VIDEO / COMPONENT / PRODUCT_AD
-        // Nested state object
-        state: z
-            .object({
-                state: z.string().optional(), // enum: Default state
-                marketplace_settings: z.record(z.unknown()).optional(), // State per marketplace - enum
-            })
-            .optional(),
+        // State as string (AMS sends it as a simple string enum)
+        state: z.string().optional(),
         // Nested status object
         status: z
             .object({
@@ -304,13 +279,8 @@ export const targetSchema = baseAmsPayloadSchema
         creation_date_time: z.string().optional(), // ISO 8601 datetime
         last_updated_date_time: z.string().optional(), // ISO 8601 datetime
         target_type: z.string().optional(), // enum: Massive list of target types
-        // Nested state object
-        state: z
-            .object({
-                state: z.string().optional(), // enum: Default state
-                marketplace_settings: z.record(z.unknown()).optional(), // Marketplace-specific state - enum
-            })
-            .optional(),
+        // State as string (AMS sends it as a simple string enum)
+        state: z.string().optional(),
         // Nested status object
         status: z.record(z.unknown()).optional(), // Delivery info - enum
         // Nested bid object
