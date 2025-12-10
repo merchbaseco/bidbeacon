@@ -1,7 +1,7 @@
 import Bottleneck from 'bottleneck';
 import { eq } from 'drizzle-orm';
 import { db, testConnection } from '@/db/index.js';
-import { worker_control } from '@/db/schema.js';
+import { workerControl } from '@/db/schema.js';
 import { routePayload } from './router.js';
 import { deleteMessage, receiveMessages, testAwsConnection } from './sqsClient.js';
 
@@ -91,8 +91,8 @@ async function getWorkerConfig(): Promise<{ enabled: boolean; messagesPerSecond:
     try {
         const control = await db
             .select()
-            .from(worker_control)
-            .where(eq(worker_control.id, 'main'))
+            .from(workerControl)
+            .where(eq(workerControl.id, 'main'))
             .limit(1);
 
         // If no row exists, default to enabled with unlimited speed (backward compatibility)
@@ -100,7 +100,7 @@ async function getWorkerConfig(): Promise<{ enabled: boolean; messagesPerSecond:
             // Initialize the row with enabled = true and messagesPerSecond = 0 (unlimited)
             try {
                 await db
-                    .insert(worker_control)
+                    .insert(workerControl)
                     .values({ id: 'main', enabled: true, messagesPerSecond: 0 });
             } catch {
                 // Row might have been created by another process, ignore

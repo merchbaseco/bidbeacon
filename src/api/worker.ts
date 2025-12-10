@@ -1,8 +1,8 @@
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { db } from '@/db/index.js';
-import { worker_control } from '@/db/schema.js';
-import { getQueueMetrics, getDlqUrlFromMainQueue } from '@/worker/sqsClient.js';
+import { workerControl } from '@/db/schema.js';
+import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqsClient.js';
 
 export async function registerWorkerRoutes(fastify: FastifyInstance) {
     // Get current worker status
@@ -10,8 +10,8 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
         try {
             const control = await db
                 .select()
-                .from(worker_control)
-                .where(eq(worker_control.id, 'main'))
+                .from(workerControl)
+                .where(eq(workerControl.id, 'main'))
                 .limit(1);
 
             // If no row exists, default to enabled and initialize the row
@@ -19,7 +19,7 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
                 // Initialize the row with enabled = true and messagesPerSecond = 0 (unlimited)
                 try {
                     await db
-                        .insert(worker_control)
+                        .insert(workerControl)
                         .values({ id: 'main', enabled: true, messagesPerSecond: 0 });
                 } catch {
                     // Row might have been created by another request, ignore
@@ -51,10 +51,10 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
     fastify.post('/api/worker/start', async (_request, reply) => {
         try {
             const result = await db
-                .insert(worker_control)
+                .insert(workerControl)
                 .values({ id: 'main', enabled: true, messagesPerSecond: 0 })
                 .onConflictDoUpdate({
-                    target: worker_control.id,
+                    target: workerControl.id,
                     set: {
                         enabled: true,
                         updatedAt: new Date(),
@@ -86,10 +86,10 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
     fastify.post('/api/worker/stop', async (_request, reply) => {
         try {
             const result = await db
-                .insert(worker_control)
+                .insert(workerControl)
                 .values({ id: 'main', enabled: false, messagesPerSecond: 0 })
                 .onConflictDoUpdate({
-                    target: worker_control.id,
+                    target: workerControl.id,
                     set: {
                         enabled: false,
                         updatedAt: new Date(),
@@ -133,10 +133,10 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
                 }
 
                 const result = await db
-                    .insert(worker_control)
+                    .insert(workerControl)
                     .values({ id: 'main', messagesPerSecond })
                     .onConflictDoUpdate({
-                        target: worker_control.id,
+                        target: workerControl.id,
                         set: {
                             messagesPerSecond,
                             updatedAt: new Date(),
@@ -191,21 +191,25 @@ export async function registerWorkerRoutes(fastify: FastifyInstance) {
                 } catch (error) {
                     // Log the error so we can debug DLQ access issues
                     const errorMessage = error instanceof Error ? error.message : String(error);
-                    const isAccessDenied = errorMessage.includes('not authorized') || errorMessage.includes('AccessDenied');
-                    
+                    const isAccessDenied =
+                        errorMessage.includes('not authorized') ||
+                        errorMessage.includes('AccessDenied');
+
                     if (isAccessDenied) {
                         console.error('[API] ⚠️  DLQ access denied - IAM permissions missing');
-                        console.error('[API] The IAM user needs sqs:GetQueueAttributes permission on the DLQ');
+                        console.error(
+                            '[API] The IAM user needs sqs:GetQueueAttributes permission on the DLQ'
+                        );
                         console.error('[API] DLQ URL:', dlqUrlFromPolicy);
                         console.error('[API] See INFRA.md for required IAM permissions');
                     } else {
                         console.error('[API] Error fetching DLQ metrics:', errorMessage);
                     }
-                    
+
                     if (error instanceof Error && error.stack && !isAccessDenied) {
                         console.error('[API] DLQ error stack:', error.stack);
                     }
-                    
+
                     // DLQ might not exist or be accessible, return empty metrics
                     dlqMetrics = {
                         sparkline: new Array(60).fill(0),

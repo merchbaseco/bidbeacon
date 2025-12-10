@@ -1,5 +1,5 @@
 import { db } from '@/db/index.js';
-import { ams_cm_adgroups } from '@/db/schema.js';
+import { amsCmAdgroups } from '@/db/schema.js';
 import { adGroupSchema } from '../schemas.js';
 
 /**
@@ -56,10 +56,10 @@ export async function handleAdGroups(payload: unknown): Promise<void> {
 
     // Upsert with idempotency using adGroupId + campaignId
     await db
-        .insert(ams_cm_adgroups)
+        .insert(amsCmAdgroups)
         .values(record)
         .onConflictDoUpdate({
-            target: [ams_cm_adgroups.adGroupId, ams_cm_adgroups.campaignId],
+            target: [amsCmAdgroups.adGroupId, amsCmAdgroups.campaignId],
             set: record,
         });
 }

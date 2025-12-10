@@ -1,5 +1,5 @@
 import { db } from '@/db/index.js';
-import { ams_cm_ads } from '@/db/schema.js';
+import { amsCmAds } from '@/db/schema.js';
 import { adSchema } from '../schemas.js';
 
 /**
@@ -46,10 +46,10 @@ export async function handleAds(payload: unknown): Promise<void> {
 
     // Upsert with idempotency using adId
     await db
-        .insert(ams_cm_ads)
+        .insert(amsCmAds)
         .values(record)
         .onConflictDoUpdate({
-            target: [ams_cm_ads.adId],
+            target: [amsCmAds.adId],
             set: record,
         });
 }

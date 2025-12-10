@@ -1,5 +1,5 @@
 import { db } from '@/db/index.js';
-import { ams_cm_targets } from '@/db/schema.js';
+import { amsCmTargets } from '@/db/schema.js';
 import { targetSchema } from '../schemas.js';
 
 /**
@@ -47,8 +47,11 @@ export async function handleTargets(payload: unknown): Promise<void> {
     };
 
     // Upsert with idempotency using targetId
-    await db.insert(ams_cm_targets).values(record).onConflictDoUpdate({
-        target: [ams_cm_targets.targetId],
-        set: record,
-    });
+    await db
+        .insert(amsCmTargets)
+        .values(record)
+        .onConflictDoUpdate({
+            target: [amsCmTargets.targetId],
+            set: record,
+        });
 }

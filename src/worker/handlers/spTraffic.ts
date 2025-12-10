@@ -1,5 +1,5 @@
 import { db } from '@/db/index.js';
-import { ams_sp_traffic } from '@/db/schema.js';
+import { amsSpTraffic } from '@/db/schema.js';
 import { spTrafficSchema } from '../schemas.js';
 
 /**
@@ -43,8 +43,8 @@ export async function handleSpTraffic(payload: unknown): Promise<void> {
     };
 
     // Upsert with idempotency
-    await db.insert(ams_sp_traffic).values(record).onConflictDoUpdate({
-        target: ams_sp_traffic.idempotencyId,
+    await db.insert(amsSpTraffic).values(record).onConflictDoUpdate({
+        target: amsSpTraffic.idempotencyId,
         set: record,
     });
 }

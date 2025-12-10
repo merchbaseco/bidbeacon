@@ -1,5 +1,5 @@
 import { db } from '@/db/index.js';
-import { ams_budget_usage } from '@/db/schema.js';
+import { amsBudgetUsage } from '@/db/schema.js';
 import { budgetUsageSchema } from '../schemas.js';
 
 /**
@@ -37,14 +37,14 @@ export async function handleBudgetUsage(payload: unknown): Promise<void> {
 
     // Upsert with idempotency using composite unique key
     await db
-        .insert(ams_budget_usage)
+        .insert(amsBudgetUsage)
         .values(record)
         .onConflictDoUpdate({
             target: [
-                ams_budget_usage.advertiserId,
-                ams_budget_usage.marketplaceId,
-                ams_budget_usage.budgetScopeId,
-                ams_budget_usage.usageUpdatedTimestamp,
+                amsBudgetUsage.advertiserId,
+                amsBudgetUsage.marketplaceId,
+                amsBudgetUsage.budgetScopeId,
+                amsBudgetUsage.usageUpdatedTimestamp,
             ],
             set: {
                 datasetId: record.datasetId,

@@ -1,16 +1,185 @@
 import {
     bigint,
     boolean,
+    date,
     doublePrecision,
+    index,
+    integer,
     jsonb,
+    numeric,
     pgTable,
     text,
     timestamp,
     uniqueIndex,
 } from 'drizzle-orm/pg-core';
 
-// Campaigns dataset - Based on official AMS Campaign Management Campaign dataset schema
-export const ams_cm_campaigns = pgTable(
+/**
+ * ----------------------------------------------------------------------------
+ * Ad Structure
+ * ----------------------------------------------------------------------------
+ */
+export const campaign = pgTable(
+    'campaign',
+    {
+        id: text('id').primaryKey(),
+        campaignId: text('campaign_id').notNull(),
+        portfolioId: text('portfolio_id'), // Optional
+        name: text('name').notNull(),
+        adProduct: text('ad_product').notNull(),
+        state: text('state').notNull(),
+        deliveryStatus: text('delivery_status').notNull(),
+        startDate: date('start_date').notNull(),
+        endDate: date('end_date'), // Optional - only some campaigns have this
+        targetingSettings: text('targeting_settings').notNull(), // AUTO or MANUAL
+        bidStrategy: text('bid_strategy'), // From optimization.bidStrategy
+        budgetType: text('budget_type'), // From budgetCaps.budgetType
+        budgetPeriod: text('budget_period'), // From budgetCaps.recurrenceTimePeriod
+        budgetAmount: numeric('budget_amount', { precision: 6, scale: 2 }), // From budgetCaps.budgetValue.monetaryBudget.amount
+        creationDateTime: timestamp('creation_date_time').notNull(),
+        lastUpdatedDateTime: timestamp('last_updated_date_time').notNull(),
+    },
+    table => [uniqueIndex('campaign_campaign_id_idx').on(table.campaignId)]
+);
+
+export const adGroup = pgTable(
+    'ad_group',
+    {
+        id: text('id').primaryKey(),
+        adGroupId: text('ad_group_id').notNull(),
+        campaignId: text('campaign_id').notNull(),
+        name: text('name').notNull(),
+        adProduct: text('ad_product').notNull(),
+        state: text('state').notNull(),
+        deliveryStatus: text('delivery_status').notNull(),
+        bidAmount: numeric('bid_amount', { precision: 4, scale: 2 }), // From bid.defaultBid
+        creationDateTime: timestamp('creation_date_time').notNull(),
+        lastUpdatedDateTime: timestamp('last_updated_date_time').notNull(),
+    },
+    table => [
+        uniqueIndex('ad_group_ad_group_id_idx').on(table.adGroupId),
+        index('ad_group_campaign_id_idx').on(table.campaignId),
+    ]
+);
+
+export const ad = pgTable(
+    'ad',
+    {
+        id: text('id').primaryKey(),
+        adId: text('ad_id').notNull(),
+        adGroupId: text('ad_group_id').notNull(),
+        campaignId: text('campaign_id').notNull(),
+        adProduct: text('ad_product').notNull(),
+        adType: text('ad_type').notNull(),
+        state: text('state').notNull(),
+        deliveryStatus: text('delivery_status').notNull(), // vvvv below is from creative.products[0] array.
+        productAsin: text('product_asin'), // May need to support multiple ASINs in the future with a M:M...
+        creationDateTime: timestamp('creation_date_time').notNull(), // but for now, since we only support SP,
+        lastUpdatedDateTime: timestamp('last_updated_date_time').notNull(), // just take the first in the export.
+    },
+    table => [
+        uniqueIndex('ad_ad_id_idx').on(table.adId),
+        index('ad_ad_group_id_idx').on(table.adGroupId),
+        index('ad_product_asin_idx').on(table.productAsin),
+        index('ad_product_asin_state_idx').on(table.productAsin, table.state),
+    ]
+);
+
+export const target = pgTable(
+    'target',
+    {
+        id: text('id').primaryKey(),
+        campaignId: text('campaign_id').notNull(),
+        targetId: text('target_id').notNull(),
+        adGroupId: text('ad_group_id'), // Campaign-level targets won't have an adGroupId.
+        adProduct: text('ad_product').notNull(),
+        state: text('state').notNull(),
+        negative: boolean('negative').notNull(),
+        bidAmount: numeric('bid_amount', { precision: 4, scale: 2 }),
+        targetMatchType: text('target_details_match_type'),
+        targetAsin: text('target_details_asin'),
+        targetKeyword: text('target_details_keyword'),
+        targetType: text('target_type').notNull(),
+        deliveryStatus: text('delivery_status').notNull(),
+        creationDateTime: timestamp('creation_date_time').notNull(),
+        lastUpdatedDateTime: timestamp('last_updated_date_time').notNull(),
+    },
+    table => [
+        uniqueIndex('target_target_id_idx').on(table.targetId),
+        index('target_ad_group_id_idx').on(table.adGroupId),
+    ]
+);
+
+/**
+ * ----------------------------------------------------------------------------
+ * Ad Performance
+ * ----------------------------------------------------------------------------
+ */
+export const reportDatasetMetadata = pgTable(
+    'report_dataset_metadata',
+    {
+        accountId: text('account_id').notNull(),
+        timestamp: timestamp('timestamp', { withTimezone: false, mode: 'date' }).notNull(), // utc
+        aggregation: text('aggregation').notNull(), // daily or hourly
+        status: text('status').notNull(), // enum: missing, fetching, completed, failed
+        lastRefreshed: timestamp('last_refreshed', { withTimezone: false, mode: 'date' }), // utc
+        reportId: text('report_id').notNull(),
+        error: text('error'),
+    },
+    table => [
+        uniqueIndex('report_dataset_metadata_pk_idx').on(
+            table.accountId,
+            table.timestamp,
+            table.aggregation
+        ),
+    ]
+);
+
+export const performance = pgTable(
+    'performance',
+    {
+        accountId: text('account_id').notNull(),
+        date: timestamp('date', { withTimezone: false, mode: 'date' }).notNull(), // utc
+        aggregation: text('aggregation').notNull(), // daily or hourly
+
+        campaignId: text('campaign_id').notNull(),
+        adGroupId: text('ad_group_id').notNull(),
+        adId: text('ad_id').notNull(),
+
+        targetId: text('target_id').notNull(),
+        targetMatchType: text('target_match_type').notNull(),
+        searchTerm: text('search_term').notNull(),
+        matchedTarget: text('matched_target').notNull(),
+
+        impressions: integer('impressions').notNull(),
+        clicks: integer('clicks').notNull(),
+        spend: numeric('spend', { precision: 7, scale: 2 }).notNull(),
+        sales: numeric('sales', { precision: 10, scale: 2 }).notNull(),
+        orders: integer('orders_14d').notNull(),
+    },
+    table => [
+        // 1. PRIMARY COMPOSITE KEY (Required for Timescale/Upsert)
+        uniqueIndex('performance_pk_idx').on(
+            table.accountId,
+            table.date,
+            table.aggregation,
+            table.adId,
+            table.targetId
+        ),
+
+        // 2. ANALYTICAL/ROLLUP INDEXES
+        index('idx_campaign_time').on(table.campaignId, table.date),
+        index('idx_ad_group_time').on(table.adGroupId, table.date),
+        index('idx_ad_time').on(table.adId, table.date),
+        index('idx_target_time').on(table.targetId, table.date),
+    ]
+);
+
+/**
+ * ----------------------------------------------------------------------------
+ * Marketing Streams
+ * ----------------------------------------------------------------------------
+ */
+export const amsCmCampaigns = pgTable(
     'ams_cm_campaigns',
     {
         datasetId: text('dataset_id').notNull(),
@@ -45,15 +214,10 @@ export const ams_cm_campaigns = pgTable(
         fee: jsonb('fee'), // Mixed structure - third-party fee metadata
         flights: jsonb('flights'), // Mixed structure - flight scheduling and budgets
     },
-    table => ({
-        amsCmCampaignsUniqueIndex: uniqueIndex('ams_cm_campaigns_campaign_id_idx').on(
-            table.campaignId
-        ),
-    })
+    table => [uniqueIndex('ams_cm_campaigns_campaign_id_idx').on(table.campaignId)]
 );
 
-// AdGroups dataset - Based on official AMS Campaign Management AdGroup dataset schema
-export const ams_cm_adgroups = pgTable(
+export const amsCmAdgroups = pgTable(
     'ams_cm_adgroups',
     {
         datasetId: text('dataset_id').notNull(),
@@ -86,16 +250,15 @@ export const ams_cm_adgroups = pgTable(
         tags: jsonb('tags'), // Array of { key: string, value: string }
         fees: jsonb('fees'), // Fee metadata
     },
-    table => ({
-        amsCmAdgroupsUniqueIndex: uniqueIndex('ams_cm_adgroups_ad_group_id_campaign_id_idx').on(
+    table => [
+        uniqueIndex('ams_cm_adgroups_ad_group_id_campaign_id_idx').on(
             table.adGroupId,
             table.campaignId
         ),
-    })
+    ]
 );
 
-// Ads dataset - Based on official AMS Campaign Management Ad dataset schema
-export const ams_cm_ads = pgTable(
+export const amsCmAds = pgTable(
     'ams_cm_ads',
     {
         datasetId: text('dataset_id').notNull(),
@@ -118,13 +281,10 @@ export const ams_cm_ads = pgTable(
         creative: jsonb('creative'), // { product_creative: {...} } - Advertised product + headline + store settings
         tags: jsonb('tags'), // Array of { key: string, value: string }
     },
-    table => ({
-        amsCmAdsUniqueIndex: uniqueIndex('ams_cm_ads_ad_id_idx').on(table.adId),
-    })
+    table => [uniqueIndex('ams_cm_ads_ad_id_idx').on(table.adId)]
 );
 
-// Targets dataset - Based on official AMS Campaign Management Target dataset schema
-export const ams_cm_targets = pgTable(
+export const amsCmTargets = pgTable(
     'ams_cm_targets',
     {
         datasetId: text('dataset_id').notNull(),
@@ -149,13 +309,10 @@ export const ams_cm_targets = pgTable(
         targetDetails: jsonb('target_details'), // { keyword_target: { match_type: enum, keyword: {...}, native_language_locale: enum } }
         tags: jsonb('tags'), // Array of { key: string, value: string }
     },
-    table => ({
-        amsCmTargetsUniqueIndex: uniqueIndex('ams_cm_targets_target_id_idx').on(table.targetId),
-    })
+    table => [uniqueIndex('ams_cm_targets_target_id_idx').on(table.targetId)]
 );
 
-// Sponsored Products traffic dataset
-export const ams_sp_traffic = pgTable(
+export const amsSpTraffic = pgTable(
     'ams_sp_traffic',
     {
         idempotencyId: text('idempotency_id').notNull(),
@@ -178,15 +335,10 @@ export const ams_sp_traffic = pgTable(
         impressions: bigint('impressions', { mode: 'number' }).notNull(),
         cost: doublePrecision('cost').notNull(),
     },
-    table => ({
-        amsSpTrafficUniqueIndex: uniqueIndex('ams_sp_traffic_idempotency_id_idx').on(
-            table.idempotencyId
-        ),
-    })
+    table => [uniqueIndex('ams_sp_traffic_idempotency_id_idx').on(table.idempotencyId)]
 );
 
-// Sponsored Products conversions dataset
-export const ams_sp_conversion = pgTable(
+export const amsSpConversion = pgTable(
     'ams_sp_conversion',
     {
         idempotencyId: text('idempotency_id').notNull(),
@@ -244,15 +396,10 @@ export const ams_sp_conversion = pgTable(
             mode: 'number',
         }),
     },
-    table => ({
-        amsSpConversionUniqueIndex: uniqueIndex('ams_sp_conversion_idempotency_id_idx').on(
-            table.idempotencyId
-        ),
-    })
+    table => [uniqueIndex('ams_sp_conversion_idempotency_id_idx').on(table.idempotencyId)]
 );
 
-// Sponsored ads budget usage dataset
-export const ams_budget_usage = pgTable(
+export const amsBudgetUsage = pgTable(
     'ams_budget_usage',
     {
         advertiserId: text('advertiser_id').notNull(),
@@ -268,21 +415,25 @@ export const ams_budget_usage = pgTable(
             mode: 'date',
         }).notNull(),
     },
-    table => ({
-        amsBudgetUsageUniqueIndex: uniqueIndex(
-            'ams_budget_usage_advertiser_marketplace_budget_scope_timestamp_idx'
-        ).on(
+    table => [
+        uniqueIndex('ams_budget_usage_advertiser_marketplace_budget_scope_timestamp_idx').on(
             table.advertiserId,
             table.marketplaceId,
             table.budgetScopeId,
             table.usageUpdatedTimestamp
         ),
-    })
+    ]
 );
 
-// Worker control table - stores whether the queue processor is enabled
-// This table should only ever have one row (id = 'main')
-export const worker_control = pgTable('worker_control', {
+/**
+ * ----------------------------------------------------------------------------
+ * Worker Control
+ * ----------------------------------------------------------------------------
+ *
+ * Worker control table - stores whether the queue processor is enabled
+ * This table should only ever have one row (id = 'main')
+ */
+export const workerControl = pgTable('worker_control', {
     id: text('id').primaryKey().default('main'),
     enabled: boolean('enabled').notNull().default(true),
     messagesPerSecond: bigint('messages_per_second', { mode: 'number' }).notNull().default(0), // max messages per second (0 = unlimited)

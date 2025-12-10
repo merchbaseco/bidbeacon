@@ -1,5 +1,5 @@
 import { db } from '@/db/index.js';
-import { ams_cm_campaigns } from '@/db/schema.js';
+import { amsCmCampaigns } from '@/db/schema.js';
 import { campaignSchema } from '../schemas.js';
 
 /**
@@ -58,10 +58,10 @@ export async function handleCampaigns(payload: unknown): Promise<void> {
 
     // Upsert with idempotency using campaignId (unique identifier)
     await db
-        .insert(ams_cm_campaigns)
+        .insert(amsCmCampaigns)
         .values(record)
         .onConflictDoUpdate({
-            target: [ams_cm_campaigns.campaignId],
+            target: [amsCmCampaigns.campaignId],
             set: record,
         });
 }

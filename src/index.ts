@@ -3,6 +3,7 @@ import helmet from '@fastify/helmet';
 import Fastify from 'fastify';
 import { testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
+import { startJobs, stopJobs } from '@/jobs/index.js';
 
 console.log('Starting BidBeacon Server...');
 
@@ -80,6 +81,8 @@ const shutdown = async (signal: string) => {
     console.log(`[${new Date().toISOString()}] Received ${signal}, shutting down gracefully...`);
 
     try {
+        await stopJobs();
+
         // Close Fastify server
         await fastify.close();
         console.log('[Server] Fastify server closed');
@@ -99,10 +102,13 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 try {
     // Run database migrations
     await runMigrations();
-    
+
     // Test database connection
     await testConnection();
-    
+
+    // Start recurring jobs
+    await startJobs();
+
     // Start Fastify server
     await fastify.listen({ port, host: '0.0.0.0' });
 
@@ -115,11 +121,12 @@ try {
     console.log(`✓ Server running on port ${port}`);
     console.log(`✓ Health check endpoint: /api/health`);
     console.log(`✓ Test endpoint: /api/test`);
-    console.log(`✓ Worker control endpoints: /api/worker/status, /api/worker/start, /api/worker/stop`);
+    console.log(
+        `✓ Worker control endpoints: /api/worker/status, /api/worker/start, /api/worker/stop`
+    );
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('');
 } catch (err) {
     console.error('Failed to start server:', err);
     process.exit(1);
 }
-

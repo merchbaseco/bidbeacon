@@ -1,5 +1,5 @@
 import { db } from '@/db/index.js';
-import { ams_sp_conversion } from '@/db/schema.js';
+import { amsSpConversion } from '@/db/schema.js';
 import { spConversionSchema } from '../schemas.js';
 
 /**
@@ -62,8 +62,8 @@ export async function handleSpConversion(payload: unknown): Promise<void> {
     };
 
     // Upsert with idempotency
-    await db.insert(ams_sp_conversion).values(record).onConflictDoUpdate({
-        target: ams_sp_conversion.idempotencyId,
+    await db.insert(amsSpConversion).values(record).onConflictDoUpdate({
+        target: amsSpConversion.idempotencyId,
         set: record,
     });
 }
