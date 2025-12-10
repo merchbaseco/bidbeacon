@@ -122,12 +122,10 @@ class Job<T extends JobData> {
             ? { batchSize: this.workOpts.batchSize }
             : undefined;
 
-        // Register the worker
-        await pgBoss.work<T>(this.jobName, workOptions ?? {}, async jobs => {
-            await this.workFn?.(jobs.map(j => ({ data: j.data })));
-        });
+        // pg-boss v10+ requires explicit queue creation before work() or schedule()
+        await pgBoss.createQueue(this.jobName);
 
-        // Start schedule if configured
+        // Set up schedule if configured
         if (this.scheduleOptions) {
             try {
                 await pgBoss.unschedule(this.jobName);
@@ -145,6 +143,11 @@ class Job<T extends JobData> {
             console.log(`[Jobs] Scheduled ${this.jobName} (${this.scheduleOptions.cron} UTC)`);
         }
 
+        // Register the worker
+        await pgBoss.work<T>(this.jobName, workOptions ?? {}, async jobs => {
+            await this.workFn?.(jobs.map(j => ({ data: j.data })));
+        });
+
         console.log(`[Jobs] Registered worker for ${this.jobName}`);
     }
 
@@ -158,6 +161,9 @@ class Job<T extends JobData> {
         if (this.inputSchema) {
             this.inputSchema.parse(data);
         }
+
+        // pg-boss v10+ requires explicit queue creation before send()
+        await pgBoss.createQueue(this.jobName);
 
         const options: Record<string, unknown> = {};
 
@@ -226,6 +232,11 @@ class BossWrapper {
         this.instance = new PgBoss({
             connectionString,
             schema: process.env.PG_BOSS_SCHEMA ?? 'pgboss',
+        });
+
+        // Handle errors to prevent unhandled error crashes
+        this.instance.on('error', error => {
+            console.error('[Jobs] PgBoss error:', error);
         });
 
         await this.instance.start();
