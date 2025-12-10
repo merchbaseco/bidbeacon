@@ -285,25 +285,11 @@ function buildConnectionString(): string {
         throw new Error('BIDBEACON_DATABASE_PASSWORD is required for PgBoss connection');
     }
 
-    const host = process.env.BIDBEACON_DATABASE_HOST;
-    if (!host) {
-        throw new Error('BIDBEACON_DATABASE_HOST is required for PgBoss connection');
-    }
-
-    const user = process.env.BIDBEACON_DATABASE_USER;
-    if (!user) {
-        throw new Error('BIDBEACON_DATABASE_USER is required for PgBoss connection');
-    }
-
-    const port = process.env.BIDBEACON_DATABASE_PORT;
-    if (!port) {
-        throw new Error('BIDBEACON_DATABASE_PORT is required for PgBoss connection');
-    }
-
-    const database = process.env.BIDBEACON_DATABASE_NAME;
-    if (!database) {
-        throw new Error('BIDBEACON_DATABASE_NAME is required for PgBoss connection');
-    }
+    // Use same defaults as src/db/index.ts
+    const host = process.env.BIDBEACON_DATABASE_HOST || 'postgres';
+    const user = process.env.BIDBEACON_DATABASE_USER || 'bidbeacon';
+    const port = process.env.BIDBEACON_DATABASE_PORT || '5432';
+    const database = process.env.BIDBEACON_DATABASE_NAME || 'bidbeacon';
 
     return `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
 }
