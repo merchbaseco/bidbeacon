@@ -17,9 +17,11 @@ await fastify.register(cors, {
     origin: (origin, callback) => {
         const allowedOrigins = [
             'https://merchbase.co',
+            'https://admin.bidbeacon.merchbase.co',
             'http://localhost:3000',
             'http://localhost:5173',
             'http://localhost:4173',
+            'http://localhost:4174',
         ];
 
         // Allow requests with no origin (e.g., mobile apps, server-to-server)
@@ -28,6 +30,17 @@ await fastify.register(cors, {
         // Check if origin is in allowed list
         if (allowedOrigins.includes(origin)) {
             return callback(null, true);
+        }
+
+        // Allow any localhost origin for development convenience
+        // (origin is the client's origin, not the server's)
+        try {
+            const url = new URL(origin);
+            if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+                return callback(null, true);
+            }
+        } catch {
+            // Invalid URL, reject
         }
 
         return callback(new Error('Not allowed by CORS'), false);
