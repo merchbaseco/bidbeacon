@@ -69,6 +69,23 @@ export const updateReportDatasetMetadataJob = boss
         }
     });
 
+const reprocessJobInputSchema = z.object({
+    accountId: z.string(),
+    timestamp: z.string(), // ISO string
+    aggregation: z.enum(['hourly', 'daily']),
+});
+
+export const reprocessReportDatasetMetadataJob = boss
+    .createJob('reprocess-report-dataset-metadata')
+    .input(reprocessJobInputSchema)
+    .work(async jobs => {
+        for (const { data } of jobs) {
+            const { accountId, timestamp, aggregation } = data;
+            const windowStart = new Date(timestamp);
+            await updateForWindow(accountId, windowStart, aggregation);
+        }
+    });
+
 // ============================================================================
 // Utility Functions
 // ============================================================================

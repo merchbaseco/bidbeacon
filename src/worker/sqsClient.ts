@@ -114,7 +114,12 @@ export async function getDlqUrlFromMainQueue(mainQueueUrl: string): Promise<stri
         // ARN format: arn:aws:sqs:REGION:ACCOUNT_ID:QUEUE_NAME
         // URL format: https://sqs.REGION.amazonaws.com/ACCOUNT_ID/QUEUE_NAME
         const arnParts = dlqArn.split(':');
-        if (arnParts.length !== 6 || arnParts[0] !== 'arn' || arnParts[1] !== 'aws' || arnParts[2] !== 'sqs') {
+        if (
+            arnParts.length !== 6 ||
+            arnParts[0] !== 'arn' ||
+            arnParts[1] !== 'aws' ||
+            arnParts[2] !== 'sqs'
+        ) {
             console.warn('[SQS] Invalid DLQ ARN format:', dlqArn);
             return null;
         }

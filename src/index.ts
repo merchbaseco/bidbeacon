@@ -19,6 +19,7 @@ await fastify.register(cors, {
             'https://merchbase.co',
             'http://localhost:3000',
             'http://localhost:5173',
+            'http://localhost:4173',
         ];
 
         // Allow requests with no origin (e.g., mobile apps, server-to-server)
@@ -51,6 +52,9 @@ fastify.register(async fastify => {
 
     const { registerWorkerRoutes } = await import('@/api/worker.js');
     await registerWorkerRoutes(fastify);
+
+    const { registerDashboardRoutes } = await import('@/api/dashboard.js');
+    await registerDashboardRoutes(fastify);
 });
 
 // 404 handler
