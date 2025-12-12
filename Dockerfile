@@ -18,7 +18,13 @@ RUN --mount=type=secret,id=merchbase_npm_token \
 
 FROM deps AS build
 COPY . .
-RUN yarn build
+RUN --mount=type=secret,id=merchbase_npm_token \
+  set -eux; \
+  if [ -f /run/secrets/merchbase_npm_token ]; then \
+    printf "MERCHBASE_NPM_TOKEN=%s\n" "$(cat /run/secrets/merchbase_npm_token)" > .env; \
+  fi; \
+  yarn build; \
+  rm -f .env
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
