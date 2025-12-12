@@ -89,6 +89,14 @@ fastify.register(async fastify => {
     );
     await registerListAdvertiserAccountsRoute(fastify);
 
+    const { registerListProfilesRoute } = await import('@/api/dashboard/list-profiles.js');
+    await registerListProfilesRoute(fastify);
+
+    const { registerListAdvertisingAccountsRoute } = await import(
+        '@/api/dashboard/list-advertising-accounts.js'
+    );
+    await registerListAdvertisingAccountsRoute(fastify);
+
     const { registerSyncProfilesRoute } = await import('@/api/dashboard/sync-profiles.js');
     await registerSyncProfilesRoute(fastify);
 

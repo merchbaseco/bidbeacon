@@ -103,3 +103,56 @@ export async function syncAdvertiserAccounts() {
 
     return (await response.json()) as { message?: string };
 }
+
+export async function fetchListProfiles() {
+    const response = await fetch(`${apiBaseUrl}/api/dashboard/list-profiles`);
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to list profiles: ${response.status} ${text}`);
+    }
+
+    const body = (await response.json()) as {
+        success: boolean;
+        data: Array<{
+            profileId: number;
+            countryCode: string;
+            currencyCode: string;
+            dailyBudget: number | null;
+            timezone: string;
+            marketplaceStringId: string;
+            accountId: string;
+            accountType: string;
+            accountName: string;
+            validPaymentMethod: boolean;
+        }>;
+    };
+
+    return body.data;
+}
+
+export async function fetchListAdvertisingAccounts() {
+    const response = await fetch(`${apiBaseUrl}/api/dashboard/list-advertising-accounts`);
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Failed to list advertising accounts: ${response.status} ${text}`);
+    }
+
+    const body = (await response.json()) as {
+        success: boolean;
+        data: Array<{
+            adsAccountId: string;
+            accountName: string;
+            status: string;
+            alternateIds: Array<{
+                countryCode: string;
+                entityId?: string;
+                profileId?: number;
+            }>;
+            countryCodes: string[];
+        }>;
+    };
+
+    return body.data;
+}
