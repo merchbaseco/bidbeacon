@@ -71,6 +71,25 @@ class WebSocketManager {
             return;
         }
 
+        // Clean up any existing connection first
+        if (this.ws) {
+            console.log('[WS Manager] Cleaning up existing connection before creating new one');
+            // Clear ping interval
+            if ((this.ws as any).__pingInterval) {
+                clearInterval((this.ws as any).__pingInterval);
+            }
+            this.ws.onclose = null;
+            this.ws.onerror = null;
+            this.ws.onopen = null;
+            this.ws.onmessage = null;
+            try {
+                this.ws.close();
+            } catch {
+                // Ignore errors closing
+            }
+            this.ws = null;
+        }
+
         console.log('[WS Manager] Creating new WebSocket connection');
         this.notifyStatus('connecting');
         const ws = new WebSocket(WS_URL);
@@ -82,6 +101,23 @@ class WebSocketManager {
             });
             this.reconnectAttempts = 0;
             this.notifyStatus('connected');
+
+            // Send ping every 30 seconds to keep connection alive
+            const pingInterval = setInterval(() => {
+                if (this.ws?.readyState === WebSocket.OPEN) {
+                    try {
+                        this.ws.send(JSON.stringify({ type: 'ping' }));
+                    } catch (e) {
+                        console.error('[WS Manager] Ping failed', e);
+                        clearInterval(pingInterval);
+                    }
+                } else {
+                    clearInterval(pingInterval);
+                }
+            }, 30000);
+
+            // Store interval ID so we can clear it on close
+            (ws as any).__pingInterval = pingInterval;
         };
 
         ws.onmessage = e => {
@@ -98,6 +134,11 @@ class WebSocketManager {
         };
 
         ws.onclose = e => {
+            // Clear ping interval
+            if ((ws as any).__pingInterval) {
+                clearInterval((ws as any).__pingInterval);
+            }
+
             console.log('[WS Manager] onclose fired', {
                 code: e.code,
                 reason: e.reason,
@@ -105,25 +146,46 @@ class WebSocketManager {
                 subscribers: this.statusCallbacks.size,
                 reconnectAttempts: this.reconnectAttempts,
             });
-            this.ws = null;
+
+            // Only clear ws ref if this is the current connection
+            if (this.ws === ws) {
+                this.ws = null;
+            }
+
             this.notifyStatus('disconnected');
 
-            if (
-                this.statusCallbacks.size > 0 &&
-                this.reconnectAttempts < this.MAX_RECONNECT_ATTEMPTS
-            ) {
-                const delay = this.BASE_DELAY_MS * 2 ** this.reconnectAttempts++;
-                console.log('[WS Manager] Scheduling reconnect', {
-                    delay,
-                    attempt: this.reconnectAttempts,
-                });
-                this.reconnectTimeout = window.setTimeout(() => this.connect(), delay);
-            } else {
-                console.log('[WS Manager] Not reconnecting', {
-                    hasSubscribers: this.statusCallbacks.size > 0,
-                    maxAttemptsReached: this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS,
-                });
+            // Don't reconnect if no subscribers or max attempts reached
+            if (this.statusCallbacks.size === 0) {
+                console.log('[WS Manager] No subscribers, not reconnecting');
+                return;
             }
+
+            if (this.reconnectAttempts >= this.MAX_RECONNECT_ATTEMPTS) {
+                console.log('[WS Manager] Max reconnect attempts reached, giving up');
+                return;
+            }
+
+            // For code 1006 (abnormal closure), wait longer before retrying
+            const baseDelay = e.code === 1006 ? this.BASE_DELAY_MS * 5 : this.BASE_DELAY_MS;
+            const delay = baseDelay * 2 ** this.reconnectAttempts++;
+
+            console.log('[WS Manager] Scheduling reconnect', {
+                delay,
+                attempt: this.reconnectAttempts,
+                code: e.code,
+            });
+
+            // Clear any existing timeout
+            if (this.reconnectTimeout) {
+                clearTimeout(this.reconnectTimeout);
+            }
+
+            this.reconnectTimeout = window.setTimeout(() => {
+                // Double-check we still have subscribers before connecting
+                if (this.statusCallbacks.size > 0) {
+                    this.connect();
+                }
+            }, delay);
         };
     }
 
