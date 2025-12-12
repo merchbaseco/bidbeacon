@@ -2,7 +2,13 @@ import type { FastifyInstance } from 'fastify';
 import { registerWebSocketConnection } from '@/utils/events.js';
 
 export function registerWebSocketRoute(fastify: FastifyInstance) {
-    fastify.get('/api/events', { websocket: true }, (connection, _req) => {
+    fastify.get('/api/events', { websocket: true }, (connection, req) => {
+        console.log('[WebSocket Route] New connection request', {
+            url: req.url,
+            headers: req.headers,
+            readyState: connection.socket.readyState,
+        });
+
         registerWebSocketConnection(connection);
 
         connection.socket.on('message', message => {

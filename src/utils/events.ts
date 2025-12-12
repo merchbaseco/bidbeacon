@@ -31,15 +31,22 @@ class EventEmitter {
      * Add a WebSocket connection to the emitter
      */
     addConnection(connection: SocketStream) {
+        const connectionId = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         this.connections.add(connection);
-        console.log(`[Events] Client connected. Total connections: ${this.connections.size}`);
+        console.log(
+            `[Events] Client connected. ID: ${connectionId}, Total connections: ${this.connections.size}, ReadyState: ${connection.socket.readyState}`
+        );
 
         // Remove connection when it closes
-        connection.socket.on('close', () => {
+        connection.socket.on('close', (code, reason) => {
             this.connections.delete(connection);
             console.log(
-                `[Events] Client disconnected. Total connections: ${this.connections.size}`
+                `[Events] Client disconnected. ID: ${connectionId}, Code: ${code}, Reason: ${reason?.toString() || 'none'}, Total connections: ${this.connections.size}`
             );
+        });
+
+        connection.socket.on('error', error => {
+            console.error(`[Events] WebSocket error. ID: ${connectionId}`, error);
         });
     }
 

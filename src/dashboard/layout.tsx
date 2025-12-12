@@ -9,13 +9,14 @@ import './global.css';
 import { HugeiconsIcon } from '@hugeicons/react';
 import LighthouseIcon from '@merchbaseco/icons/core-solid-rounded/LighthouseIcon';
 import { Outlet } from 'react-router';
+import { ConnectionStatusBadge } from './components/connection-status-badge';
 import { ThemeToggle } from './components/theme-toggle';
 import { ToastProvider } from './components/ui/toast';
 import { useWebSocket } from './routes/hooks/use-websocket';
 
 export function RootRoute() {
     // Initialize WebSocket connection for real-time events
-    useWebSocket();
+    const connectionStatus = useWebSocket();
 
     return (
         <div className="relative isolate min-h-screen bg-neutral-50/50 dark:bg-zinc-950">
@@ -38,7 +39,10 @@ export function RootRoute() {
                 </header>
 
                 <main>
-                    <div className="mx-auto max-w-background-frame-max p-4 font-mono">
+                    <div className="mx-auto max-w-background-frame-max p-4 pt-2 font-mono">
+                        <div className="flex items-center justify-end gap-2">
+                            <ConnectionStatusBadge status={connectionStatus} />
+                        </div>
                         <Outlet />
                     </div>
                 </main>
