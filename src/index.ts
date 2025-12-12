@@ -84,8 +84,18 @@ fastify.register(async fastify => {
     const { registerTriggerUpdateRoute } = await import('@/api/dashboard/trigger-update.js');
     await registerTriggerUpdateRoute(fastify);
 
-    const { registerListProfilesRoute } = await import('@/api/dashboard/list-profiles.js');
-    await registerListProfilesRoute(fastify);
+    const { registerListAdvertiserAccountsRoute } = await import(
+        '@/api/dashboard/list-advertiser-accounts.js'
+    );
+    await registerListAdvertiserAccountsRoute(fastify);
+
+    const { registerSyncProfilesRoute } = await import('@/api/dashboard/sync-profiles.js');
+    await registerSyncProfilesRoute(fastify);
+
+    const { registerSyncAdvertiserAccountsRoute } = await import(
+        '@/api/dashboard/sync-advertiser-accounts.js'
+    );
+    await registerSyncAdvertiserAccountsRoute(fastify);
 });
 
 // 404 handler
