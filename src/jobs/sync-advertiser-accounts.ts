@@ -8,6 +8,7 @@ import { listAdvertiserAccounts } from '@/amazon-ads/list-advertiser-accounts.js
 import { db } from '@/db/index.js';
 import { advertiserAccount } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
+import { emitEvent } from '@/utils/events.js';
 
 // ============================================================================
 // Job Definition
@@ -88,5 +89,15 @@ export const syncAdvertiserAccountsJob = boss
             console.log(
                 `[Sync Advertiser Accounts] Synced ${result.adsAccounts.length} account(s)`
             );
+
+            // Emit event to notify clients that accounts were synced
+            // This triggers a refresh of the advertising accounts list
+            if (result.adsAccounts.length > 0) {
+                emitEvent({
+                    type: 'account:updated',
+                    accountId: result.adsAccounts[0].adsAccountId,
+                    enabled: true, // Placeholder - sync doesn't change enabled status
+                });
+            }
         }
     });
