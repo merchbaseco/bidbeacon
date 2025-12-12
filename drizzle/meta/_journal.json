@@ -64,6 +64,13 @@
       "when": 1765501386472,
       "tag": "0008_striped_amazoness",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1765506637715,
+      "tag": "0009_talented_vin_gonzales",
+      "breakpoints": true
     }
   ]
 }
