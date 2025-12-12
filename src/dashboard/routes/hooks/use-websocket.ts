@@ -11,7 +11,7 @@ export function useWebSocket(): ConnectionStatus {
 
     useEffect(() => {
         console.log('[useWebSocket] Effect running');
-        // Set query client for event handling
+        // Set query client for event handling (use ref to avoid re-runs)
         websocketManager.setQueryClient(queryClient);
 
         // Subscribe to status updates
@@ -21,7 +21,7 @@ export function useWebSocket(): ConnectionStatus {
             console.log('[useWebSocket] Effect cleanup running');
             unsubscribe();
         };
-    }, [queryClient]);
+    }, [queryClient]); // Empty deps - only run once on mount
 
     return status;
 }

@@ -1,22 +1,38 @@
 import type { FastifyInstance } from 'fastify';
+import type { WebSocket } from 'ws';
 import { registerWebSocketConnection } from '@/utils/events.js';
 
 export function registerWebSocketRoute(fastify: FastifyInstance) {
-    fastify.get('/api/events', { websocket: true }, (connection, _req) => {
-        // SIMPLE TEST - log immediately
-        console.log('=== WEBSOCKET HANDLER CALLED ===');
+    // In @fastify/websocket v11, the handler receives the raw WebSocket directly
+    fastify.get('/api/events', { websocket: true }, (socket: WebSocket, _req) => {
+        console.log('[WebSocket] Connection opened, readyState:', socket.readyState);
 
-        registerWebSocketConnection(connection);
+        // Attach close handler immediately
+        socket.on('close', (code, reason) => {
+            console.log(`[WebSocket] CLOSE - Code: ${code}, Reason: ${reason}`);
+        });
 
-        connection.socket.on('message', message => {
+        socket.on('error', error => {
+            console.error('[WebSocket] ERROR:', error);
+        });
+
+        if (socket.readyState !== 1) {
+            console.log(`[WebSocket] Connection not OPEN (${socket.readyState}), skipping`);
+            return;
+        }
+
+        // Register with the event emitter for broadcasts
+        registerWebSocketConnection(socket);
+
+        // Handle incoming messages
+        socket.on('message', (message: Buffer | ArrayBuffer | Buffer[]) => {
             try {
                 const data = JSON.parse(message.toString());
                 if (data.type === 'ping') {
-                    connection.socket.send(JSON.stringify({ type: 'pong' }));
-                    return;
+                    socket.send(JSON.stringify({ type: 'pong' }));
                 }
             } catch {
-                // Ignore
+                // Ignore malformed messages
             }
         });
     });

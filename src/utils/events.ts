@@ -1,4 +1,4 @@
-import type { SocketStream } from '@fastify/websocket';
+import type { WebSocket } from 'ws';
 
 export type EventType = 'error' | 'account:updated';
 
@@ -25,25 +25,51 @@ export type Event = ErrorEvent | AccountUpdatedEvent;
  * Singleton event emitter for WebSocket connections
  */
 class EventEmitter {
-    private connections: Set<SocketStream> = new Set();
+    private connections: Set<WebSocket> = new Set();
+
+    constructor() {
+        // Clean up dead connections every 30 seconds
+        this.cleanupInterval = setInterval(() => {
+            const before = this.connections.size;
+            for (const socket of this.connections) {
+                if (socket.readyState !== 1) {
+                    // Connection is not OPEN, remove it
+                    this.connections.delete(socket);
+                    console.log(
+                        `[Events] Cleanup: Removed dead connection. ReadyState: ${socket.readyState}`
+                    );
+                }
+            }
+            const after = this.connections.size;
+            if (before !== after) {
+                console.log(`[Events] Cleanup: ${before} -> ${after} connections`);
+            }
+        }, 30000);
+    }
 
     /**
      * Add a WebSocket connection to the emitter
      */
-    addConnection(connection: SocketStream) {
-        console.log('=== ADD CONNECTION CALLED ===');
-        this.connections.add(connection);
-        console.log(`[Events] Connected. Total: ${this.connections.size}`);
-
-        connection.socket.on('close', (code, reason) => {
-            console.log(`[Events] CLOSED. Code: ${code}, Reason: ${reason}`);
-            this.connections.delete(connection);
+    addConnection(socket: WebSocket) {
+        // Attach handlers for cleanup
+        socket.on('close', (code, reason) => {
+            console.log(`[Events] Connection closed. Code: ${code}, Reason: ${reason}`);
+            this.connections.delete(socket);
             console.log(`[Events] Removed. Total: ${this.connections.size}`);
         });
 
-        connection.socket.on('error', error => {
-            console.error('[Events] ERROR:', error);
+        socket.on('error', error => {
+            console.error('[Events] Connection error:', error);
+            this.connections.delete(socket);
         });
+
+        // Only add if connection is still open
+        if (socket.readyState === 1) {
+            this.connections.add(socket);
+            console.log(`[Events] Connected. Total: ${this.connections.size}`);
+        } else {
+            console.log(`[Events] Connection not open (${socket.readyState}), not adding`);
+        }
     }
 
     /**
@@ -53,19 +79,19 @@ class EventEmitter {
         const message = JSON.stringify(event);
         let sentCount = 0;
 
-        for (const connection of this.connections) {
+        for (const socket of this.connections) {
             try {
-                if (connection.socket.readyState === 1) {
+                if (socket.readyState === 1) {
                     // WebSocket.OPEN = 1
-                    connection.socket.send(message);
+                    socket.send(message);
                     sentCount++;
                 } else {
                     // Connection is not open, remove it
-                    this.connections.delete(connection);
+                    this.connections.delete(socket);
                 }
             } catch (error) {
                 console.error('[Events] Error sending message to client:', error);
-                this.connections.delete(connection);
+                this.connections.delete(socket);
             }
         }
 
@@ -93,6 +119,6 @@ export function emitEvent(event: Omit<Event, 'timestamp'>) {
 /**
  * Register a WebSocket connection with the event emitter
  */
-export function registerWebSocketConnection(connection: SocketStream) {
-    eventEmitter.addConnection(connection);
+export function registerWebSocketConnection(socket: WebSocket) {
+    eventEmitter.addConnection(socket);
 }
