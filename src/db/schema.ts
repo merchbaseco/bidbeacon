@@ -8,6 +8,7 @@ import {
     jsonb,
     numeric,
     pgTable,
+    primaryKey,
     text,
     timestamp,
     uniqueIndex,
@@ -125,13 +126,7 @@ export const reportDatasetMetadata = pgTable(
         reportId: text('report_id').notNull(),
         error: text('error'),
     },
-    table => [
-        uniqueIndex('report_dataset_metadata_pk_idx').on(
-            table.accountId,
-            table.timestamp,
-            table.aggregation
-        ),
-    ]
+    table => [primaryKey({ columns: [table.accountId, table.timestamp, table.aggregation] })]
 );
 
 export const performance = pgTable(
@@ -158,13 +153,9 @@ export const performance = pgTable(
     },
     table => [
         // 1. PRIMARY COMPOSITE KEY (Required for Timescale/Upsert)
-        uniqueIndex('performance_pk_idx').on(
-            table.accountId,
-            table.date,
-            table.aggregation,
-            table.adId,
-            table.targetId
-        ),
+        primaryKey({
+            columns: [table.accountId, table.date, table.aggregation, table.adId, table.targetId],
+        }),
 
         // 2. ANALYTICAL/ROLLUP INDEXES
         index('idx_campaign_time').on(table.campaignId, table.date),
@@ -214,7 +205,7 @@ export const amsCmCampaigns = pgTable(
         fee: jsonb('fee'), // Mixed structure - third-party fee metadata
         flights: jsonb('flights'), // Mixed structure - flight scheduling and budgets
     },
-    table => [uniqueIndex('ams_cm_campaigns_campaign_id_idx').on(table.campaignId)]
+    table => [primaryKey({ columns: [table.campaignId] })]
 );
 
 export const amsCmAdgroups = pgTable(
@@ -250,12 +241,7 @@ export const amsCmAdgroups = pgTable(
         tags: jsonb('tags'), // Array of { key: string, value: string }
         fees: jsonb('fees'), // Fee metadata
     },
-    table => [
-        uniqueIndex('ams_cm_adgroups_ad_group_id_campaign_id_idx').on(
-            table.adGroupId,
-            table.campaignId
-        ),
-    ]
+    table => [primaryKey({ columns: [table.adGroupId, table.campaignId] })]
 );
 
 export const amsCmAds = pgTable(
@@ -281,7 +267,7 @@ export const amsCmAds = pgTable(
         creative: jsonb('creative'), // { product_creative: {...} } - Advertised product + headline + store settings
         tags: jsonb('tags'), // Array of { key: string, value: string }
     },
-    table => [uniqueIndex('ams_cm_ads_ad_id_idx').on(table.adId)]
+    table => [primaryKey({ columns: [table.adId] })]
 );
 
 export const amsCmTargets = pgTable(
@@ -309,7 +295,7 @@ export const amsCmTargets = pgTable(
         targetDetails: jsonb('target_details'), // { keyword_target: { match_type: enum, keyword: {...}, native_language_locale: enum } }
         tags: jsonb('tags'), // Array of { key: string, value: string }
     },
-    table => [uniqueIndex('ams_cm_targets_target_id_idx').on(table.targetId)]
+    table => [primaryKey({ columns: [table.targetId] })]
 );
 
 export const amsSpTraffic = pgTable(
@@ -335,7 +321,7 @@ export const amsSpTraffic = pgTable(
         impressions: bigint('impressions', { mode: 'number' }).notNull(),
         cost: doublePrecision('cost').notNull(),
     },
-    table => [uniqueIndex('ams_sp_traffic_idempotency_id_idx').on(table.idempotencyId)]
+    table => [primaryKey({ columns: [table.idempotencyId] })]
 );
 
 export const amsSpConversion = pgTable(
@@ -396,7 +382,7 @@ export const amsSpConversion = pgTable(
             mode: 'number',
         }),
     },
-    table => [uniqueIndex('ams_sp_conversion_idempotency_id_idx').on(table.idempotencyId)]
+    table => [primaryKey({ columns: [table.idempotencyId] })]
 );
 
 export const amsBudgetUsage = pgTable(
@@ -416,12 +402,14 @@ export const amsBudgetUsage = pgTable(
         }).notNull(),
     },
     table => [
-        uniqueIndex('ams_budget_usage_advertiser_marketplace_budget_scope_timestamp_idx').on(
-            table.advertiserId,
-            table.marketplaceId,
-            table.budgetScopeId,
-            table.usageUpdatedTimestamp
-        ),
+        primaryKey({
+            columns: [
+                table.advertiserId,
+                table.marketplaceId,
+                table.budgetScopeId,
+                table.usageUpdatedTimestamp,
+            ],
+        }),
     ]
 );
 

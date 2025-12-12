@@ -60,14 +60,29 @@ fastify.get('/api/health', async () => {
 // API routes
 fastify.register(async fastify => {
     // Register API routes
-    const { registerTestRoute } = await import('@/api/test.js');
-    await registerTestRoute(fastify);
+    const workerStatusModule = await import('@/api/worker/status.js');
+    await workerStatusModule.registerStatusRoute(fastify);
 
-    const { registerWorkerRoutes } = await import('@/api/worker.js');
-    await registerWorkerRoutes(fastify);
+    const { registerStartRoute } = await import('@/api/worker/start.js');
+    await registerStartRoute(fastify);
 
-    const { registerDashboardRoutes } = await import('@/api/dashboard.js');
-    await registerDashboardRoutes(fastify);
+    const { registerStopRoute } = await import('@/api/worker/stop.js');
+    await registerStopRoute(fastify);
+
+    const { registerSpeedRoute } = await import('@/api/worker/speed.js');
+    await registerSpeedRoute(fastify);
+
+    const { registerMetricsRoute } = await import('@/api/worker/metrics.js');
+    await registerMetricsRoute(fastify);
+
+    const { registerStatusRoute } = await import('@/api/dashboard/status.js');
+    await registerStatusRoute(fastify);
+
+    const { registerReprocessRoute } = await import('@/api/dashboard/reprocess.js');
+    await registerReprocessRoute(fastify);
+
+    const { registerTriggerUpdateRoute } = await import('@/api/dashboard/trigger-update.js');
+    await registerTriggerUpdateRoute(fastify);
 });
 
 // 404 handler
@@ -137,7 +152,6 @@ try {
     console.log(`✓ Database connected`);
     console.log(`✓ Server running on port ${port}`);
     console.log(`✓ Health check endpoint: /api/health`);
-    console.log(`✓ Test endpoint: /api/test`);
     console.log(
         `✓ Worker control endpoints: /api/worker/status, /api/worker/start, /api/worker/stop`
     );

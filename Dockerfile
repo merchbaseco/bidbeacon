@@ -8,7 +8,13 @@ RUN apk add --no-cache libc6-compat && corepack enable
 FROM base AS deps
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn ./.yarn
-RUN yarn install --immutable
+RUN --mount=type=secret,id=merchbase_npm_token \
+  set -eux; \
+  if [ -f /run/secrets/merchbase_npm_token ]; then \
+    printf "MERCHBASE_NPM_TOKEN=%s\n" "$(cat /run/secrets/merchbase_npm_token)" > .env; \
+  fi; \
+  yarn install --immutable; \
+  rm -f .env
 
 FROM deps AS build
 COPY . .

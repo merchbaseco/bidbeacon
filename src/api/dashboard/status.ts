@@ -3,14 +3,10 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { reportDatasetMetadata } from '@/db/schema.js';
-import {
-    reprocessReportDatasetMetadataJob,
-    updateReportDatasetMetadataJob,
-} from '@/jobs/update-report-dataset-metadata.js';
 
 const DEFAULT_ACCOUNT_ID = 'amzn1.ads-account.g.akzidxc3kemvnyklo33ht2mjm';
 
-export async function registerDashboardRoutes(fastify: FastifyInstance) {
+export function registerStatusRoute(fastify: FastifyInstance) {
     fastify.get('/api/dashboard/status', async (request, _reply) => {
         const querySchema = z.object({
             accountId: z.string().default(DEFAULT_ACCOUNT_ID),
@@ -41,37 +37,5 @@ export async function registerDashboardRoutes(fastify: FastifyInstance) {
             .orderBy(desc(reportDatasetMetadata.timestamp));
 
         return { success: true, data };
-    });
-
-    fastify.post('/api/dashboard/reprocess', async (request, _reply) => {
-        const bodySchema = z.object({
-            accountId: z.string().default(DEFAULT_ACCOUNT_ID),
-            timestamp: z.string(), // ISO string
-            aggregation: z.enum(['hourly', 'daily']),
-        });
-
-        const body = bodySchema.parse(request.body);
-
-        await reprocessReportDatasetMetadataJob.emit({
-            accountId: body.accountId,
-            timestamp: body.timestamp,
-            aggregation: body.aggregation,
-        });
-
-        return { success: true, message: 'Reprocess job queued' };
-    });
-
-    fastify.post('/api/dashboard/trigger-update', async (request, _reply) => {
-        const bodySchema = z.object({
-            accountId: z.string().default(DEFAULT_ACCOUNT_ID),
-        });
-
-        const body = bodySchema.parse(request.body);
-
-        await updateReportDatasetMetadataJob.emit({
-            accountId: body.accountId,
-        });
-
-        return { success: true, message: 'Update job queued' };
     });
 }
