@@ -11,10 +11,11 @@ export function registerTriggerUpdateRoute(fastify: FastifyInstance) {
         });
 
         const body = bodySchema.parse(request.body);
-
-        await updateReportDatasetMetadataJob.emit({
+        console.log(`[API] Trigger update request received for account: ${body.accountId}`);
+        const jobId = await updateReportDatasetMetadataJob.emit({
             accountId: body.accountId,
         });
+        console.log(`[API] Update job queued with ID: ${jobId}`);
 
         return { success: true, message: 'Update job queued' };
     });

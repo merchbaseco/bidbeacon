@@ -13,12 +13,15 @@ export function registerReprocessRoute(fastify: FastifyInstance) {
         });
 
         const body = bodySchema.parse(request.body);
-
-        await reprocessReportDatasetMetadataJob.emit({
+        console.log(
+            `[API] Reprocess request received: ${body.aggregation} for ${body.accountId} at ${body.timestamp}`
+        );
+        const jobId = await reprocessReportDatasetMetadataJob.emit({
             accountId: body.accountId,
             timestamp: body.timestamp,
             aggregation: body.aggregation,
         });
+        console.log(`[API] Reprocess job queued with ID: ${jobId}`);
 
         return { success: true, message: 'Reprocess job queued' };
     });

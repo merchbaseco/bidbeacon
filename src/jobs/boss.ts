@@ -34,7 +34,7 @@ interface WorkOptions {
     batchSize?: number;
 }
 
-type WorkHandler<T> = (jobs: Array<{ data: T }>) => void | Promise<void>;
+type WorkHandler<T> = (jobs: Array<{ id: string; data: T }>) => void | Promise<void>;
 
 // ============================================================================
 // Job Builder
@@ -145,7 +145,7 @@ class Job<T extends JobData> {
 
         // Register the worker
         await pgBoss.work<T>(this.jobName, workOptions ?? {}, async jobs => {
-            await this.workFn?.(jobs.map(j => ({ data: j.data })));
+            await this.workFn?.(jobs.map(j => ({ id: j.id, data: j.data })));
         });
 
         console.log(`[Jobs] Registered worker for ${this.jobName}`);
@@ -178,18 +178,22 @@ class Job<T extends JobData> {
             options.startAfter = this.delayOptions.seconds;
         }
 
+        let jobId: string | null;
         if (this.debounceOptions) {
             const key = this.debounceOptions.key?.(data) ?? this.jobName;
-            return pgBoss.sendDebounced(
+            jobId = await pgBoss.sendDebounced(
                 this.jobName,
                 data,
                 options,
                 this.debounceOptions.seconds,
                 key
             );
+        } else {
+            jobId = await pgBoss.send(this.jobName, data, options);
         }
 
-        return pgBoss.send(this.jobName, data, options);
+        console.log(`[Jobs] Emitted job ${this.jobName} with ID: ${jobId}`);
+        return jobId;
     }
 }
 

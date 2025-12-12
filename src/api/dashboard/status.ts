@@ -16,6 +16,7 @@ export function registerStatusRoute(fastify: FastifyInstance) {
         });
 
         const query = querySchema.parse(request.query);
+        console.log(`[API] Status request: ${query.aggregation} for ${query.accountId}`);
 
         // Default to last 30 days if no range provided
         const to = query.to ? new Date(query.to) : new Date();
@@ -36,6 +37,7 @@ export function registerStatusRoute(fastify: FastifyInstance) {
             )
             .orderBy(desc(reportDatasetMetadata.timestamp));
 
+        console.log(`[API] Returning ${data.length} status record(s)`);
         return { success: true, data };
     });
 }

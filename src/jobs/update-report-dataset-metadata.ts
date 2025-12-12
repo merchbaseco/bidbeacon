@@ -46,8 +46,11 @@ export const updateReportDatasetMetadataJob = boss
         data: { accountId: DEFAULT_ACCOUNT_ID },
     })
     .work(async jobs => {
-        for (const { data } of jobs) {
-            const accountId = data.accountId ?? DEFAULT_ACCOUNT_ID;
+        for (const job of jobs) {
+            const accountId = job.data.accountId ?? DEFAULT_ACCOUNT_ID;
+            console.log(
+                `[Update Report Dataset Metadata] Starting job (ID: ${job.id}) for account: ${accountId}`
+            );
             const now = utcNow();
             const hourStart = utcTopOfHour(now);
 
@@ -79,10 +82,14 @@ export const reprocessReportDatasetMetadataJob = boss
     .createJob('reprocess-report-dataset-metadata')
     .input(reprocessJobInputSchema)
     .work(async jobs => {
-        for (const { data } of jobs) {
-            const { accountId, timestamp, aggregation } = data;
+        for (const job of jobs) {
+            const { accountId, timestamp, aggregation } = job.data;
+            console.log(
+                `[Reprocess Report Dataset Metadata] Starting job (ID: ${job.id}): ${aggregation} for ${accountId} at ${timestamp}`
+            );
             const windowStart = new Date(timestamp);
             await updateForWindow(accountId, windowStart, aggregation);
+            console.log(`[Reprocess Report Dataset Metadata] Completed job (ID: ${job.id})`);
         }
     });
 

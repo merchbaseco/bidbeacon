@@ -20,10 +20,13 @@ export const requestReportForDateJob = boss
     .createJob('request-report-for-date')
     .input(jobInputSchema)
     .work(async jobs => {
-        for (const { data } of jobs) {
-            const { year, month, day } = data;
+        for (const job of jobs) {
+            const { year, month, day } = job.data;
+            console.log(
+                `[Request Report] Starting job (ID: ${job.id}) for date: ${year}-${month}-${day}`
+            );
 
             // TODO: Implement report request logic
-            console.log(`Requesting report for date: ${year}-${month}-${day}`);
+            console.log(`[Request Report] Requesting report for date: ${year}-${month}-${day}`);
         }
     });

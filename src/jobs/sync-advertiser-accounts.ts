@@ -19,7 +19,8 @@ export const syncAdvertiserAccountsJob = boss
     .createJob('sync-advertiser-accounts')
     .input(jobInputSchema)
     .work(async jobs => {
-        for (const _ of jobs) {
+        for (const job of jobs) {
+            console.log(`[Sync Advertiser Accounts] Starting job (ID: ${job.id})`);
             // Fetch accounts from Amazon Ads API
             const result = await listAdvertiserAccounts(undefined, 'na');
 
