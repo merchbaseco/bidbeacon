@@ -1,0 +1,173 @@
+/**
+ * Amazon Ads API - Create Report Bridge
+ * Handles creating reports via the Amazon Ads API
+ */
+
+import { z } from 'zod';
+import { refreshAccessToken } from './reauth.js';
+
+export type ApiRegion = 'na' | 'eu' | 'fe';
+
+function getApiBaseUrl(region: ApiRegion = 'na'): string {
+    const baseUrls: Record<ApiRegion, string> = {
+        na: 'https://advertising-api.amazon.com',
+        eu: 'https://advertising-api-eu.amazon.com',
+        fe: 'https://advertising-api-fe.amazon.com',
+    };
+    return baseUrls[region];
+}
+
+// ============================================================================
+// Schemas
+// ============================================================================
+
+const datePeriodSchema = z.object({
+    startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+    endDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/), // YYYY-MM-DD format
+});
+
+const periodSchema = z.object({
+    datePeriod: datePeriodSchema,
+});
+
+const reportQuerySchema = z.object({
+    fields: z.array(z.string()),
+    filter: z.unknown().nullable().optional(),
+});
+
+const reportRequestSchema = z.object({
+    format: z.string(), // e.g., "CSV"
+    periods: z.array(periodSchema),
+    query: reportQuerySchema,
+    formatOptions: z.unknown().optional(),
+});
+
+const accessRequestedAccountSchema = z.object({
+    advertiserAccountId: z.string(),
+});
+
+const createReportRequestSchema = z.object({
+    accessRequestedAccounts: z.array(accessRequestedAccountSchema),
+    reports: z.array(reportRequestSchema),
+});
+
+// Response schemas
+const linkedAccountSchema = z.object({
+    advertiserAccountId: z.string(),
+});
+
+const reportResponseSchema = z.object({
+    reportId: z.string(),
+    status: z.string(), // e.g., "PENDING"
+    creationDateTime: z.string(), // ISO datetime
+    lastUpdatedDateTime: z.string(), // ISO datetime
+    format: z.string(),
+    periods: z.array(periodSchema),
+    query: reportQuerySchema,
+    linkedAccounts: z.array(linkedAccountSchema),
+    completedDateTime: z.string().nullable().optional(),
+    completedReportParts: z.unknown().nullable().optional(),
+    currencyOfView: z.string().nullable().optional(),
+    failureCode: z.string().nullable().optional(),
+    failureReason: z.string().nullable().optional(),
+    formatOptions: z.unknown().nullable().optional(),
+    locale: z.string().nullable().optional(),
+    timeZoneMode: z.string().nullable().optional(),
+});
+
+const successItemSchema = z.object({
+    index: z.number().int(),
+    report: reportResponseSchema,
+});
+
+const createReportResponseSchema = z.object({
+    error: z.unknown().nullable(),
+    success: z.array(successItemSchema),
+});
+
+// ============================================================================
+// Types
+// ============================================================================
+
+export type CreateReportRequest = z.infer<typeof createReportRequestSchema>;
+export type CreateReportResponse = z.infer<typeof createReportResponseSchema>;
+export type ReportResponse = z.infer<typeof reportResponseSchema>;
+export type DatePeriod = z.infer<typeof datePeriodSchema>;
+export type ReportQuery = z.infer<typeof reportQuerySchema>;
+
+export interface CreateReportOptions {
+    profileId: number; // Required for Amazon-Advertising-API-Scope header
+    accessRequestedAccounts: Array<{ advertiserAccountId: string }>;
+    reports: Array<{
+        format: string;
+        periods: Array<{
+            datePeriod: {
+                startDate: string; // YYYY-MM-DD
+                endDate: string; // YYYY-MM-DD
+            };
+        }>;
+        query: {
+            fields: string[];
+            filter?: unknown;
+        };
+        formatOptions?: unknown;
+    }>;
+}
+
+// ============================================================================
+// API Bridge Function
+// ============================================================================
+
+/**
+ * Creates a report via the Amazon Ads API
+ * @param options - Request options including profileId, accessRequestedAccounts, and reports
+ * @param region - API region (default: 'na' for North America)
+ * @returns The created report response
+ */
+export async function createReport(
+    options: CreateReportOptions,
+    region: ApiRegion = 'na'
+): Promise<CreateReportResponse> {
+    const accessToken = await refreshAccessToken();
+    const clientId = process.env.ADS_API_CLIENT_ID;
+
+    if (!clientId) {
+        throw new Error('Missing ADS_API_CLIENT_ID environment variable');
+    }
+
+    const baseUrl = getApiBaseUrl(region);
+    const url = `${baseUrl}/adsApi/v1/create/reports`;
+
+    // Build request body
+    const requestBody: CreateReportRequest = {
+        accessRequestedAccounts: options.accessRequestedAccounts,
+        reports: options.reports,
+    };
+
+    // Validate request body
+    const validatedRequestBody = createReportRequestSchema.parse(requestBody);
+
+    const headers: Record<string, string> = {
+        'Amazon-Advertising-API-ClientId': clientId,
+        'Amazon-Advertising-API-Scope': String(options.profileId),
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
+    };
+
+    const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(validatedRequestBody),
+        signal: AbortSignal.timeout(30000),
+    });
+
+    if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(
+            `Failed to create report: ${response.status} ${response.statusText}. ${errorText}`
+        );
+    }
+
+    const jsonData = await response.json();
+    return createReportResponseSchema.parse(jsonData);
+}

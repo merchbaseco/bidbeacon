@@ -71,6 +71,13 @@
       "when": 1765506637715,
       "tag": "0009_talented_vin_gonzales",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1765574170047,
+      "tag": "0010_ambiguous_shocker",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ import {
     text,
     timestamp,
     uniqueIndex,
+    uuid,
 } from 'drizzle-orm/pg-core';
 
 /**
@@ -418,27 +419,30 @@ export const amsBudgetUsage = pgTable(
  * Amazon Ads API Authentication & Account Management
  * ----------------------------------------------------------------------------
  */
-export const advertiserProfile = pgTable('advertiser_profile', {
-    profileId: bigint('profile_id', { mode: 'number' }).primaryKey(),
-    countryCode: text('country_code').notNull(),
-    currencyCode: text('currency_code').notNull(),
-    dailyBudget: doublePrecision('daily_budget'), // Optional - some profiles don't have this
-    timezone: text('timezone').notNull(),
-    // Flattened accountInfo fields
-    marketplaceStringId: text('marketplace_string_id').notNull(),
-    accountId: text('account_id').notNull(), // The "id" field from accountInfo
-    accountType: text('account_type').notNull(), // The "type" field from accountInfo (e.g., "seller", "vendor")
-    accountName: text('account_name').notNull(), // The "name" field from accountInfo
-    validPaymentMethod: boolean('valid_payment_method').notNull(),
-});
-
-export const advertiserAccount = pgTable('advertiser_account', {
-    adsAccountId: text('ads_account_id').primaryKey(), // e.g., "amzn1.ads-account.g.38rle97xonvbq66bhw6gsyl4g"
-    accountName: text('account_name').notNull(),
-    status: text('status').notNull(), // e.g., "CREATED"
-    alternateIds: jsonb('alternate_ids').notNull(), // Array of { countryCode, profileId?, entityId? }
-    countryCodes: jsonb('country_codes').notNull(), // Array of country code strings
-});
+export const advertiserAccount = pgTable(
+    'advertiser_account',
+    {
+        id: uuid('id').primaryKey().defaultRandom(), // Random UUID primary key
+        adsAccountId: text('ads_account_id').notNull(), // e.g., "amzn1.ads-account.g.38rle97xonvbq66bhw6gsyl4g"
+        accountName: text('account_name').notNull(),
+        status: text('status').notNull(), // e.g., "CREATED"
+        countryCode: text('country_code').notNull(), // Individual country code (denormalized)
+        profileId: integer('profile_id'), // Optional profile ID from alternateIds
+        entityId: text('entity_id'), // Optional entity ID from alternateIds
+        enabled: boolean('enabled').notNull().default(true), // Whether this account is enabled
+    },
+    table => [
+        // Unique constraint to prevent duplicate entries for the same combination
+        uniqueIndex('advertiser_account_unique_idx').on(
+            table.adsAccountId,
+            table.countryCode,
+            table.profileId,
+            table.entityId
+        ),
+        // Index for querying by adsAccountId
+        index('advertiser_account_ads_account_id_idx').on(table.adsAccountId),
+    ]
+);
 
 /**
  * ----------------------------------------------------------------------------

@@ -72,28 +72,13 @@ export async function reprocessDataset(params: {
     return (await response.json()) as { message?: string };
 }
 
-export async function syncProfiles() {
-    const response = await fetch(`${apiBaseUrl}/api/dashboard/sync-profiles`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-    });
-
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Request failed (${response.status}): ${text}`);
-    }
-
-    return (await response.json()) as { message?: string };
-}
-
 export async function syncAdvertiserAccounts() {
     const response = await fetch(`${apiBaseUrl}/api/dashboard/sync-advertiser-accounts`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
+        body: JSON.stringify({}),
     });
 
     if (!response.ok) {
@@ -102,33 +87,6 @@ export async function syncAdvertiserAccounts() {
     }
 
     return (await response.json()) as { message?: string };
-}
-
-export async function fetchListProfiles() {
-    const response = await fetch(`${apiBaseUrl}/api/dashboard/list-profiles`);
-
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Failed to list profiles: ${response.status} ${text}`);
-    }
-
-    const body = (await response.json()) as {
-        success: boolean;
-        data: Array<{
-            profileId: number;
-            countryCode: string;
-            currencyCode: string;
-            dailyBudget: number | null;
-            timezone: string;
-            marketplaceStringId: string;
-            accountId: string;
-            accountType: string;
-            accountName: string;
-            validPaymentMethod: boolean;
-        }>;
-    };
-
-    return body.data;
 }
 
 export async function fetchListAdvertisingAccounts() {
@@ -142,17 +100,33 @@ export async function fetchListAdvertisingAccounts() {
     const body = (await response.json()) as {
         success: boolean;
         data: Array<{
+            id: string;
             adsAccountId: string;
             accountName: string;
             status: string;
-            alternateIds: Array<{
-                countryCode: string;
-                entityId?: string;
-                profileId?: number;
-            }>;
-            countryCodes: string[];
+            countryCode: string;
+            profileId: number | null;
+            entityId: string | null;
+            enabled: boolean;
         }>;
     };
 
     return body.data;
+}
+
+export async function toggleAdvertiserAccount(id: string, enabled: boolean) {
+    const response = await fetch(`${apiBaseUrl}/api/dashboard/toggle-advertiser-account`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ id, enabled }),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Request failed (${response.status}): ${text}`);
+    }
+
+    return (await response.json()) as { success: boolean; message?: string };
 }

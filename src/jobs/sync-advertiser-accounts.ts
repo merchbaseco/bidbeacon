@@ -24,25 +24,61 @@ export const syncAdvertiserAccountsJob = boss
             const result = await listAdvertiserAccounts(undefined, 'na');
 
             // Upsert each account into the database
+            // Denormalize: create one row per countryCode x profileId/entityId combination
             for (const account of result.adsAccounts) {
-                await db
-                    .insert(advertiserAccount)
-                    .values({
-                        adsAccountId: account.adsAccountId,
-                        accountName: account.accountName,
-                        status: account.status,
-                        alternateIds: account.alternateIds,
-                        countryCodes: account.countryCodes,
-                    })
-                    .onConflictDoUpdate({
-                        target: [advertiserAccount.adsAccountId],
-                        set: {
-                            accountName: account.accountName,
-                            status: account.status,
-                            alternateIds: account.alternateIds,
-                            countryCodes: account.countryCodes,
-                        },
-                    });
+                // If there are alternateIds, use those (they contain countryCode + profileId/entityId)
+                if (account.alternateIds && account.alternateIds.length > 0) {
+                    for (const alternateId of account.alternateIds) {
+                        await db
+                            .insert(advertiserAccount)
+                            .values({
+                                adsAccountId: account.adsAccountId,
+                                accountName: account.accountName,
+                                status: account.status,
+                                countryCode: alternateId.countryCode,
+                                profileId: alternateId.profileId ?? null,
+                                entityId: alternateId.entityId ?? null,
+                            })
+                            .onConflictDoUpdate({
+                                target: [
+                                    advertiserAccount.adsAccountId,
+                                    advertiserAccount.countryCode,
+                                    advertiserAccount.profileId,
+                                    advertiserAccount.entityId,
+                                ],
+                                set: {
+                                    accountName: account.accountName,
+                                    status: account.status,
+                                },
+                            });
+                    }
+                } else {
+                    // Fallback: if no alternateIds, create one row per countryCode
+                    for (const countryCode of account.countryCodes) {
+                        await db
+                            .insert(advertiserAccount)
+                            .values({
+                                adsAccountId: account.adsAccountId,
+                                accountName: account.accountName,
+                                status: account.status,
+                                countryCode: countryCode,
+                                profileId: null,
+                                entityId: null,
+                            })
+                            .onConflictDoUpdate({
+                                target: [
+                                    advertiserAccount.adsAccountId,
+                                    advertiserAccount.countryCode,
+                                    advertiserAccount.profileId,
+                                    advertiserAccount.entityId,
+                                ],
+                                set: {
+                                    accountName: account.accountName,
+                                    status: account.status,
+                                },
+                            });
+                    }
+                }
             }
 
             console.log(

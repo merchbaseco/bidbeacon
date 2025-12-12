@@ -4,8 +4,18 @@
  */
 
 import { z } from 'zod';
-import { type ApiRegion, getApiBaseUrl } from './config.js';
 import { refreshAccessToken } from './reauth.js';
+
+export type ApiRegion = 'na' | 'eu' | 'fe';
+
+function getApiBaseUrl(region: ApiRegion = 'na'): string {
+    const baseUrls: Record<ApiRegion, string> = {
+        na: 'https://advertising-api.amazon.com',
+        eu: 'https://advertising-api-eu.amazon.com',
+        fe: 'https://advertising-api-fe.amazon.com',
+    };
+    return baseUrls[region];
+}
 
 // ============================================================================
 // Schemas
