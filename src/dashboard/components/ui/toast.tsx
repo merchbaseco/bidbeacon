@@ -51,7 +51,7 @@ function Toasts({ position = 'bottom-right' }: { position: ToastPosition }) {
         <Toast.Portal data-slot="toast-portal">
             <Toast.Viewport
                 className={cn(
-                    'fixed z-50 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 [--toast-inset:--spacing(4)] sm:[--toast-inset:--spacing(8)]',
+                    'fixed z-50 mx-auto flex w-[calc(100%-var(--toast-inset)*2)] max-w-90 font-mono [--toast-inset:--spacing(4)] sm:[--toast-inset:--spacing(8)]',
                     // Vertical positioning
                     'data-[position*=top]:top-(--toast-inset)',
                     'data-[position*=bottom]:bottom-(--toast-inset)',
@@ -175,7 +175,7 @@ function AnchoredToasts() {
 
     return (
         <Toast.Portal data-slot="toast-portal-anchored">
-            <Toast.Viewport className="outline-none" data-slot="toast-viewport-anchored">
+            <Toast.Viewport className="outline-none font-mono" data-slot="toast-viewport-anchored">
                 {toasts.map(toast => {
                     const Icon = toast.type
                         ? TOAST_ICONS[toast.type as keyof typeof TOAST_ICONS]

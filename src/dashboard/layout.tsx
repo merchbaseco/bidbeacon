@@ -4,13 +4,13 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { RouterProvider } from 'react-router';
 import { router } from './router';
-import '@fontsource/aclonica';
 import '@fontsource/fira-code';
 import './global.css';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { LighthouseIcon } from '@merchbaseco/icons/core-solid-rounded';
 import { Outlet } from 'react-router';
 import { ThemeToggle } from './components/theme-toggle';
+import { ToastProvider } from './components/ui/toast';
 
 export function RootRoute() {
     return (
@@ -54,7 +54,9 @@ createRoot(rootElement).render(
     <StrictMode>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
             <QueryClientProvider client={queryClient}>
-                <RouterProvider router={router} />
+                <ToastProvider>
+                    <RouterProvider router={router} />
+                </ToastProvider>
             </QueryClientProvider>
         </ThemeProvider>
     </StrictMode>

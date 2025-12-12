@@ -5,6 +5,7 @@ import { boss } from './boss.js';
 
 // Import all job definitions (this registers them with the boss singleton)
 import './update-report-dataset-metadata.js';
+import './request-report-for-date.js';
 
 export async function startJobs(): Promise<void> {
     if (boss.isStarted) {

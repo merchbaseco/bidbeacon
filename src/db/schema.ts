@@ -415,6 +415,33 @@ export const amsBudgetUsage = pgTable(
 
 /**
  * ----------------------------------------------------------------------------
+ * Amazon Ads API Authentication & Account Management
+ * ----------------------------------------------------------------------------
+ */
+export const advertiserProfile = pgTable('advertiser_profile', {
+    profileId: bigint('profile_id', { mode: 'number' }).primaryKey(),
+    countryCode: text('country_code').notNull(),
+    currencyCode: text('currency_code').notNull(),
+    dailyBudget: doublePrecision('daily_budget'), // Optional - some profiles don't have this
+    timezone: text('timezone').notNull(),
+    // Flattened accountInfo fields
+    marketplaceStringId: text('marketplace_string_id').notNull(),
+    accountId: text('account_id').notNull(), // The "id" field from accountInfo
+    accountType: text('account_type').notNull(), // The "type" field from accountInfo (e.g., "seller", "vendor")
+    accountName: text('account_name').notNull(), // The "name" field from accountInfo
+    validPaymentMethod: boolean('valid_payment_method').notNull(),
+});
+
+export const advertiserAccount = pgTable('advertiser_account', {
+    adsAccountId: text('ads_account_id').primaryKey(), // e.g., "amzn1.ads-account.g.38rle97xonvbq66bhw6gsyl4g"
+    accountName: text('account_name').notNull(),
+    status: text('status').notNull(), // e.g., "CREATED"
+    alternateIds: jsonb('alternate_ids').notNull(), // Array of { countryCode, profileId?, entityId? }
+    countryCodes: jsonb('country_codes').notNull(), // Array of country code strings
+});
+
+/**
+ * ----------------------------------------------------------------------------
  * Worker Control
  * ----------------------------------------------------------------------------
  *

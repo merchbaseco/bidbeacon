@@ -840,6 +840,7 @@ __metadata:
     "@fastify/helmet": "npm:^13.0.1"
     "@fontsource/aclonica": "npm:^5.2.8"
     "@fontsource/fira-code": "npm:^5.2.7"
+    "@hugeicons/core-free-icons": "npm:^2.0.0"
     "@hugeicons/react": "npm:^1.1.1"
     "@merchbaseco/icons": "npm:^1.0.1"
     "@mui/base": "npm:5.0.0-beta.70"
@@ -1485,6 +1486,13 @@ __metadata:
   version: 5.2.7
   resolution: "@fontsource/fira-code@npm:5.2.7"
   checksum: 10c0/389d1356def9018da529bf6055af9d41d6f6ae9ee2ff804a9b0e3bd2f8cf2754967e2b4a25e267d21215278849fb13711b9fe9573c051a1e191ad737e55f125f
+  languageName: node
+  linkType: hard
+
+"@hugeicons/core-free-icons@npm:^2.0.0":
+  version: 2.0.0
+  resolution: "@hugeicons/core-free-icons@npm:2.0.0"
+  checksum: 10c0/d6b5236c508c17a0e7f612b598c85bbe2c3d17c7590dc3c44196479896cfa507dd1325de4140ba0f49293b3010d22cf865be4e42ade47b305e8b70e63e3a9913
   languageName: node
   linkType: hard
 

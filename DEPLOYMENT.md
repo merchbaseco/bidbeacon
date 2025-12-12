@@ -28,6 +28,9 @@ Store as repository secrets; workflow renders `stack/bidbeacon/.env` automatical
 - `AWS_REGION` – AWS region (defaults to `us-east-1`)
 - `AWS_ACCESS_KEY_ID` – AWS access key for SQS access
 - `AWS_SECRET_ACCESS_KEY` – AWS secret key for SQS access
+- `ADS_API_CLIENT_ID` – Amazon Ads API client ID
+- `ADS_API_CLIENT_SECRET` – Amazon Ads API client secret
+- `ADS_API_REFRESH_TOKEN` – Amazon Ads API refresh token
 
 ## Server Preparation
 

@@ -87,7 +87,6 @@ export const ReportsTable = () => {
                             <TableHead>Status</TableHead>
                             <TableHead>Last refreshed</TableHead>
                             <TableHead>Report ID</TableHead>
-                            <TableHead>Error</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
@@ -95,7 +94,7 @@ export const ReportsTable = () => {
                         {filteredRows.length === 0 ? (
                             <TableRow>
                                 <TableCell
-                                    colSpan={6}
+                                    colSpan={5}
                                     className="text-center text-muted-foreground"
                                 >
                                     No records found in this window.
@@ -116,7 +115,6 @@ export const ReportsTable = () => {
                                     <TableCell>
                                         <Badge variant="outline">{row.reportId}</Badge>
                                     </TableCell>
-                                    <TableCell>{row.error ?? '—'}</TableCell>
                                     <TableCell className="text-right">
                                         <Button
                                             variant="secondary"
