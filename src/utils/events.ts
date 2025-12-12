@@ -29,20 +29,11 @@ class EventEmitter {
 
     constructor() {
         // Clean up dead connections every 30 seconds
-        this.cleanupInterval = setInterval(() => {
-            const before = this.connections.size;
+        setInterval(() => {
             for (const socket of this.connections) {
                 if (socket.readyState !== 1) {
-                    // Connection is not OPEN, remove it
                     this.connections.delete(socket);
-                    console.log(
-                        `[Events] Cleanup: Removed dead connection. ReadyState: ${socket.readyState}`
-                    );
                 }
-            }
-            const after = this.connections.size;
-            if (before !== after) {
-                console.log(`[Events] Cleanup: ${before} -> ${after} connections`);
             }
         }, 30000);
     }
@@ -51,24 +42,17 @@ class EventEmitter {
      * Add a WebSocket connection to the emitter
      */
     addConnection(socket: WebSocket) {
-        // Attach handlers for cleanup
-        socket.on('close', (code, reason) => {
-            console.log(`[Events] Connection closed. Code: ${code}, Reason: ${reason}`);
+        socket.on('close', () => {
             this.connections.delete(socket);
-            console.log(`[Events] Removed. Total: ${this.connections.size}`);
         });
 
         socket.on('error', error => {
-            console.error('[Events] Connection error:', error);
+            console.error('[Events] WebSocket error:', error);
             this.connections.delete(socket);
         });
 
-        // Only add if connection is still open
         if (socket.readyState === 1) {
             this.connections.add(socket);
-            console.log(`[Events] Connected. Total: ${this.connections.size}`);
-        } else {
-            console.log(`[Events] Connection not open (${socket.readyState}), not adding`);
         }
     }
 
@@ -77,26 +61,18 @@ class EventEmitter {
      */
     emitEvent(event: Event) {
         const message = JSON.stringify(event);
-        let sentCount = 0;
 
         for (const socket of this.connections) {
             try {
                 if (socket.readyState === 1) {
-                    // WebSocket.OPEN = 1
                     socket.send(message);
-                    sentCount++;
                 } else {
-                    // Connection is not open, remove it
                     this.connections.delete(socket);
                 }
             } catch (error) {
-                console.error('[Events] Error sending message to client:', error);
+                console.error('[Events] Failed to send message:', error);
                 this.connections.delete(socket);
             }
-        }
-
-        if (sentCount > 0) {
-            console.log(`[Events] Emitted ${event.type} to ${sentCount} client(s)`);
         }
     }
 }

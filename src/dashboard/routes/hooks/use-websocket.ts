@@ -1,27 +1,68 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
-import type { ConnectionStatus } from './websocket-manager';
-import { websocketManager } from './websocket-manager';
+import { useCallback } from 'react';
+import useWebSocketLib, { ReadyState } from 'react-use-websocket';
+import { toastManager } from '../../components/ui/toast';
+import { apiBaseUrl } from '../../router';
+import { queryKeys } from './query-keys';
 
-export type { ConnectionStatus };
+type Event =
+    | { type: 'error'; message: string; details?: string; timestamp: string }
+    | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }
+    | { type: 'pong' };
+
+export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
+
+const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
 
 export function useWebSocket(): ConnectionStatus {
     const queryClient = useQueryClient();
-    const [status, setStatus] = useState<ConnectionStatus>('disconnected');
 
-    useEffect(() => {
-        console.log('[useWebSocket] Effect running');
-        // Set query client for event handling (use ref to avoid re-runs)
-        websocketManager.setQueryClient(queryClient);
+    const handleMessage = useCallback(
+        (event: MessageEvent) => {
+            try {
+                const data: Event = JSON.parse(event.data);
 
-        // Subscribe to status updates
-        const unsubscribe = websocketManager.subscribe(setStatus);
+                switch (data.type) {
+                    case 'error':
+                        toastManager.add({
+                            type: 'error',
+                            title: 'Error',
+                            description: data.message,
+                        });
+                        break;
+                    case 'account:updated':
+                        queryClient.invalidateQueries({
+                            queryKey: queryKeys.advertisingAccounts(),
+                        });
+                        break;
+                }
+            } catch {
+                // Ignore malformed messages
+            }
+        },
+        [queryClient]
+    );
 
-        return () => {
-            console.log('[useWebSocket] Effect cleanup running');
-            unsubscribe();
-        };
-    }, [queryClient]); // Empty deps - only run once on mount
+    const { readyState } = useWebSocketLib(WS_URL, {
+        onMessage: handleMessage,
+        shouldReconnect: () => true,
+        reconnectAttempts: 5,
+        reconnectInterval: attemptNumber => Math.min(1000 * 2 ** attemptNumber, 30000),
+        heartbeat: {
+            message: JSON.stringify({ type: 'ping' }),
+            returnMessage: JSON.stringify({ type: 'pong' }),
+            timeout: 60000,
+            interval: 30000,
+        },
+        share: true,
+    });
+
+    const status: ConnectionStatus =
+        readyState === ReadyState.OPEN
+            ? 'connected'
+            : readyState === ReadyState.CONNECTING
+              ? 'connecting'
+              : 'disconnected';
 
     return status;
 }
