@@ -1,9 +1,11 @@
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
+import websocket from '@fastify/websocket';
 import Fastify from 'fastify';
 import { testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
+import { emitEvent } from '@/utils/events.js';
 
 console.log('Starting BidBeacon Server...');
 
@@ -13,6 +15,7 @@ const fastify = Fastify({
 
 // Register Fastify plugins
 await fastify.register(helmet);
+await fastify.register(websocket);
 await fastify.register(cors, {
     origin: (origin, callback) => {
         const allowedOrigins = [
@@ -103,6 +106,9 @@ fastify.register(async fastify => {
         '@/api/dashboard/toggle-advertiser-account.js'
     );
     await registerToggleAdvertiserAccountRoute(fastify);
+
+    const { registerWebSocketRoute } = await import('@/api/events/websocket.js');
+    await registerWebSocketRoute(fastify);
 });
 
 // 404 handler
@@ -117,6 +123,14 @@ fastify.setNotFoundHandler(async (_request, reply) => {
 // Error handler
 fastify.setErrorHandler(async (error, _request, reply) => {
     console.error(`[${new Date().toISOString()}] Unhandled error:`, error);
+
+    // Emit error event to connected clients
+    emitEvent({
+        type: 'error',
+        message: error.message || 'Internal server error',
+        details: error.stack,
+    });
+
     reply.status(500);
     return {
         success: false,

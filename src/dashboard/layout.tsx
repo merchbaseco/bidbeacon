@@ -11,8 +11,12 @@ import LighthouseIcon from '@merchbaseco/icons/core-solid-rounded/LighthouseIcon
 import { Outlet } from 'react-router';
 import { ThemeToggle } from './components/theme-toggle';
 import { ToastProvider } from './components/ui/toast';
+import { useWebSocket } from './routes/hooks/use-websocket';
 
 export function RootRoute() {
+    // Initialize WebSocket connection for real-time events
+    useWebSocket();
+
     return (
         <div className="relative isolate min-h-screen bg-neutral-50/50 dark:bg-zinc-950">
             <div aria-hidden className="background-frame" />
