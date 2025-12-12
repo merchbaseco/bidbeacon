@@ -6,11 +6,6 @@ import tsconfigPaths from 'vite-tsconfig-paths';
 export default defineConfig({
     plugins: [react(), tailwindcss(), tsconfigPaths()],
     root: 'src/dashboard',
-    optimizeDeps: {
-        // `@merchbaseco/icons` root export is a huge barrel (re-exports all packs + manifest).
-        // Excluding it prevents Vite's dev dependency optimizer from trying to pre-bundle it.
-        exclude: ['@merchbaseco/icons'],
-    },
     build: {
         outDir: '../../dist/dashboard',
         emptyOutDir: true,

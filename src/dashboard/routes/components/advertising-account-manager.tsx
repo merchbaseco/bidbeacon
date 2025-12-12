@@ -1,17 +1,14 @@
+import { HugeiconsIcon } from '@hugeicons/react';
+import AlertCircleIcon from '@merchbaseco/icons/core-solid-rounded/AlertCircleIcon';
 import { useEffect, useMemo, useState } from 'react';
-import { Card } from '../../components/ui/card';
-import {
-    Select,
-    SelectItem,
-    SelectPopup,
-    SelectTrigger,
-    SelectValue,
-} from '../../components/ui/select';
+import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
 import { Switch } from '../../components/ui/switch';
 import {
     useAdvertisingAccounts,
     useToggleAdvertisingAccount,
 } from '../hooks/use-advertising-accounts';
+import { AccountIdSelect } from './account-id-select';
+import { CountryProfileSelect } from './country-profile-select';
 
 export function AdvertisingAccountManager() {
     const { data: accounts = [], isLoading, error } = useAdvertisingAccounts();
@@ -40,66 +37,33 @@ export function AdvertisingAccountManager() {
         setRowId(rows[0]?.id || '');
     }, [rows]);
 
-    const formatLabel = (a: {
-        countryCode: string;
-        profileId: number | null;
-        entityId: string | null;
-    }) =>
-        [
-            a.countryCode,
-            a.profileId && `Profile ${a.profileId}`,
-            a.entityId && `Entity ${a.entityId}`,
-        ]
-            .filter(Boolean)
-            .join(' - ');
-
     return (
-        <Card className="p-4">
+        <>
+            {error && (
+                <Alert variant="error">
+                    <HugeiconsIcon icon={AlertCircleIcon} size={20} color="currentColor" />
+                    <AlertTitle>Failed to load accounts</AlertTitle>
+                    <AlertDescription>
+                        {error instanceof Error
+                            ? error.message
+                            : 'Unable to fetch advertising accounts. Please try again later.'}
+                    </AlertDescription>
+                </Alert>
+            )}
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 flex-1">
-                    <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium mb-1">Account ID</div>
-                        <Select
-                            value={accountId}
-                            onValueChange={v => v && setAccountId(v)}
-                            disabled={isLoading || !accounts.length}
-                        >
-                            <SelectTrigger>
-                                <SelectValue>{v => v || 'Select an account'}</SelectValue>
-                            </SelectTrigger>
-                            <SelectPopup>
-                                {accountIds.map(id => (
-                                    <SelectItem key={id} value={id}>
-                                        {id}
-                                    </SelectItem>
-                                ))}
-                            </SelectPopup>
-                        </Select>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium mb-1">Country / Profile</div>
-                        <Select
-                            value={rowId}
-                            onValueChange={v => v && setRowId(v)}
-                            disabled={isLoading || !accountId || !rows.length}
-                        >
-                            <SelectTrigger>
-                                <SelectValue>
-                                    {v => {
-                                        const row = rows.find(r => r.id === v);
-                                        return row ? formatLabel(row) : 'Select country/profile';
-                                    }}
-                                </SelectValue>
-                            </SelectTrigger>
-                            <SelectPopup>
-                                {rows.map(row => (
-                                    <SelectItem key={row.id} value={row.id}>
-                                        {formatLabel(row)}
-                                    </SelectItem>
-                                ))}
-                            </SelectPopup>
-                        </Select>
-                    </div>
+                    <AccountIdSelect
+                        value={accountId}
+                        onValueChange={setAccountId}
+                        accountIds={accountIds}
+                        disabled={isLoading || !accounts.length}
+                    />
+                    <CountryProfileSelect
+                        value={rowId}
+                        onValueChange={setRowId}
+                        rows={rows}
+                        disabled={isLoading || !accountId || !rows.length}
+                    />
                 </div>
                 {selectedRow && (
                     <div className="flex items-center gap-3">
@@ -124,11 +88,6 @@ export function AdvertisingAccountManager() {
                     </div>
                 )}
             </div>
-            {error && (
-                <div className="text-red-600 text-sm mt-2">
-                    {error instanceof Error ? error.message : 'Failed to load accounts'}
-                </div>
-            )}
-        </Card>
+        </>
     );
 }

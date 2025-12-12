@@ -1,0 +1,1 @@
+ALTER TABLE "advertiser_account" ALTER COLUMN "profile_id" SET DATA TYPE bigint;

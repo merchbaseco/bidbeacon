@@ -105,7 +105,7 @@ export async function fetchListAdvertisingAccounts() {
             accountName: string;
             status: string;
             countryCode: string;
-            profileId: number | null;
+            profileId: string | null;
             entityId: string | null;
             enabled: boolean;
         }>;

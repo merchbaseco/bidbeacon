@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { ArrowReloadHorizontalSolidRounded } from '@merchbaseco/icons/core-solid-rounded';
+import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
 import {
     AlertCircleIcon,
     AlertTriangleIcon,
@@ -101,7 +101,7 @@ export const ReportsToolbar = ({
                     className="inline-flex items-center gap-2"
                 >
                     <HugeiconsIcon
-                        icon={ArrowReloadHorizontalSolidRounded}
+                        icon={ArrowReloadHorizontalIcon}
                         size={16}
                         color="currentColor"
                     />

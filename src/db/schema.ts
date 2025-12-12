@@ -427,7 +427,7 @@ export const advertiserAccount = pgTable(
         accountName: text('account_name').notNull(),
         status: text('status').notNull(), // e.g., "CREATED"
         countryCode: text('country_code').notNull(), // Individual country code (denormalized)
-        profileId: integer('profile_id'), // Optional profile ID from alternateIds
+        profileId: text('profile_id'), // Optional profile ID from alternateIds
         entityId: text('entity_id'), // Optional entity ID from alternateIds
         enabled: boolean('enabled').notNull().default(true), // Whether this account is enabled
     },

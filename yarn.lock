@@ -840,9 +840,7 @@ __metadata:
     "@fastify/helmet": "npm:^13.0.1"
     "@fontsource/aclonica": "npm:^5.2.8"
     "@fontsource/fira-code": "npm:^5.2.7"
-    "@hugeicons/core-free-icons": "npm:^2.0.0"
-    "@hugeicons/react": "npm:^1.1.1"
-    "@merchbaseco/icons": "npm:^1.0.1"
+    "@merchbaseco/icons": "npm:^1.1.0"
     "@mui/base": "npm:5.0.0-beta.70"
     "@tailwindcss/postcss": "npm:^4.1.17"
     "@tailwindcss/vite": "npm:^4.1.17"
@@ -1489,13 +1487,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@hugeicons/core-free-icons@npm:^2.0.0":
-  version: 2.0.0
-  resolution: "@hugeicons/core-free-icons@npm:2.0.0"
-  checksum: 10c0/d6b5236c508c17a0e7f612b598c85bbe2c3d17c7590dc3c44196479896cfa507dd1325de4140ba0f49293b3010d22cf865be4e42ade47b305e8b70e63e3a9913
-  languageName: node
-  linkType: hard
-
 "@hugeicons/react@npm:^1.1.1":
   version: 1.1.1
   resolution: "@hugeicons/react@npm:1.1.1"
@@ -1574,14 +1565,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@merchbaseco/icons@npm:^1.0.1":
-  version: 1.0.1
-  resolution: "@merchbaseco/icons@npm:1.0.1::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40merchbaseco%2Ficons%2F1.0.1%2Fc01808cf72059cd5c9e714861e56e364c51de6d8"
+"@merchbaseco/icons@npm:^1.1.0":
+  version: 1.1.0
+  resolution: "@merchbaseco/icons@npm:1.1.0::__archiveUrl=https%3A%2F%2Fnpm.pkg.github.com%2Fdownload%2F%40merchbaseco%2Ficons%2F1.1.0%2F5443c6f08588bd5820ab1d11613e11774115f899"
   dependencies:
     "@hugeicons/react": "npm:^1.1.1"
   peerDependencies:
     react: ">=18"
-  checksum: 10c0/b259046ac2fa5d756ccff62aabb065fa56fbfdc413ab06a33bfa956779521c1f5283a311ebab58ff231d8d8775eb622d840d8b4d73b9a5360c183a10ae971b50
+  checksum: 10c0/844fc5bc53ffda680afdb018706600d3aa98ff99250fb61993027be9c444dcd3c1e01354e9e8a494b6b5553b778537bd623f9f891b2bc472c7c21c9d75193c30
   languageName: node
   linkType: hard
 

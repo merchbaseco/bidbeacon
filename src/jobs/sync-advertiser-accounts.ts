@@ -37,7 +37,10 @@ export const syncAdvertiserAccountsJob = boss
                                 accountName: account.accountName,
                                 status: account.status,
                                 countryCode: alternateId.countryCode,
-                                profileId: alternateId.profileId ?? null,
+                                profileId:
+                                    alternateId.profileId != null
+                                        ? String(alternateId.profileId)
+                                        : null,
                                 entityId: alternateId.entityId ?? null,
                             })
                             .onConflictDoUpdate({

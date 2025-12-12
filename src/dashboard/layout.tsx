@@ -7,7 +7,7 @@ import { router } from './router';
 import '@fontsource/fira-code';
 import './global.css';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { LighthouseIcon } from '@merchbaseco/icons/core-solid-rounded';
+import LighthouseIcon from '@merchbaseco/icons/core-solid-rounded/LighthouseIcon';
 import { Outlet } from 'react-router';
 import { ThemeToggle } from './components/theme-toggle';
 import { ToastProvider } from './components/ui/toast';

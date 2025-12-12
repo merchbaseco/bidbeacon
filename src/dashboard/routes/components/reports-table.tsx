@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import { CircleArrowReload01SolidRounded } from '@merchbaseco/icons/core-solid-rounded';
+import CircleArrowReload01Icon from '@merchbaseco/icons/core-solid-rounded/CircleArrowReload01Icon';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -124,7 +124,7 @@ export const ReportsTable = () => {
                                             className="inline-flex items-center gap-2"
                                         >
                                             <HugeiconsIcon
-                                                icon={CircleArrowReload01SolidRounded}
+                                                icon={CircleArrowReload01Icon}
                                                 size={16}
                                                 color="currentColor"
                                             />
