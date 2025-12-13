@@ -862,6 +862,7 @@ __metadata:
     drizzle-kit: "npm:^0.31.7"
     drizzle-orm: "npm:^0.44.7"
     fastify: "npm:^5.5.0"
+    jotai: "npm:^2.16.0"
     lucide-react: "npm:^0.560.0"
     next-themes: "npm:^0.4.6"
     pg-boss: "npm:12.5.2"
@@ -3667,6 +3668,27 @@ __metadata:
   bin:
     jiti: lib/jiti-cli.mjs
   checksum: 10c0/79b2e96a8e623f66c1b703b98ec1b8be4500e1d217e09b09e343471bbb9c105381b83edbb979d01cef18318cc45ce6e153571b6c83122170eefa531c64b6789b
+  languageName: node
+  linkType: hard
+
+"jotai@npm:^2.16.0":
+  version: 2.16.0
+  resolution: "jotai@npm:2.16.0"
+  peerDependencies:
+    "@babel/core": ">=7.0.0"
+    "@babel/template": ">=7.0.0"
+    "@types/react": ">=17.0.0"
+    react: ">=17.0.0"
+  peerDependenciesMeta:
+    "@babel/core":
+      optional: true
+    "@babel/template":
+      optional: true
+    "@types/react":
+      optional: true
+    react:
+      optional: true
+  checksum: 10c0/7bf00184c284904eb7f7c1d56f753f06bb63d0425fd1515b78c7970773f51831647291ea0b7ec891f10796551e6ba79400c01465a5cdbfc76864f0102b52028d
   languageName: node
   linkType: hard
 

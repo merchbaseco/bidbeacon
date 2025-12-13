@@ -31,6 +31,11 @@ export function useWebSocket(): ConnectionStatus {
                         });
                         break;
                     case 'account:updated':
+                        toastManager.add({
+                            type: 'info',
+                            title: 'Account updated',
+                            description: `Account ${data.accountId} updated`,
+                        });
                         queryClient.invalidateQueries({
                             queryKey: queryKeys.advertisingAccounts(),
                         });

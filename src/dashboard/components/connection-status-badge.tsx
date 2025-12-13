@@ -12,7 +12,7 @@ export function ConnectionStatusBadge({ status }: { status: ConnectionStatus }) 
     const config = statusConfig[status];
 
     return (
-        <Badge variant={config.variant} size="lg" className="bg-transparent px-0">
+        <Badge variant={config.variant} size="lg">
             <span
                 className={cn(
                     'mr-0.5 h-1.5 w-1.5 rounded-full',

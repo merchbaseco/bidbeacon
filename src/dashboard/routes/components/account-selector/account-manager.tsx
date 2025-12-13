@@ -1,41 +1,38 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import AlertCircleIcon from '@merchbaseco/icons/core-solid-rounded/AlertCircleIcon';
-import { useEffect, useMemo, useState } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
-import { Switch } from '../../components/ui/switch';
+import { useAtom } from 'jotai';
+import { useEffect, useMemo } from 'react';
+import { Alert, AlertDescription, AlertTitle } from '../../../components/ui/alert';
+import { Switch } from '../../../components/ui/switch';
 import {
     useAdvertisingAccounts,
     useToggleAdvertisingAccount,
-} from '../hooks/use-advertising-accounts';
+} from '../../hooks/use-advertising-accounts';
 import { AccountIdSelect } from './account-id-select';
-import { CountryProfileSelect } from './country-profile-select';
+import { selectedAccountIdAtom, selectedProfileIdAtom } from './atoms';
+import { MarketplaceSelect } from './marketplace-select';
 
-export function AdvertisingAccountManager() {
+export function AccountManager() {
     const { data: accounts = [], isLoading, error } = useAdvertisingAccounts();
     const toggleMutation = useToggleAdvertisingAccount();
-    const [accountId, setAccountId] = useState<string>('');
-    const [rowId, setRowId] = useState<string>('');
-
-    const accountIds = useMemo(
-        () => [...new Set(accounts.map(a => a.adsAccountId))].sort(),
-        [accounts]
-    );
+    const [accountId] = useAtom(selectedAccountIdAtom);
+    const [profileId, setProfileId] = useAtom(selectedProfileIdAtom);
 
     const rows = useMemo(
         () =>
             accountId
                 ? accounts
-                      .filter(a => a.adsAccountId === accountId)
+                      .filter(a => a.adsAccountId === accountId && a.profileId !== null)
                       .sort((a, b) => a.countryCode.localeCompare(b.countryCode))
                 : [],
         [accounts, accountId]
     );
 
-    const selectedRow = accounts.find(a => a.id === rowId);
+    const selectedRow = accounts.find(a => a.profileId === profileId);
 
     useEffect(() => {
-        setRowId(rows[0]?.id || '');
-    }, [rows]);
+        setProfileId(rows[0]?.profileId || '');
+    }, [rows, setProfileId]);
 
     return (
         <>
@@ -52,18 +49,8 @@ export function AdvertisingAccountManager() {
             )}
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-4 flex-1">
-                    <AccountIdSelect
-                        value={accountId}
-                        onValueChange={setAccountId}
-                        accountIds={accountIds}
-                        disabled={isLoading || !accounts.length}
-                    />
-                    <CountryProfileSelect
-                        value={rowId}
-                        onValueChange={setRowId}
-                        rows={rows}
-                        disabled={isLoading || !accountId || !rows.length}
-                    />
+                    <AccountIdSelect />
+                    <MarketplaceSelect />
                 </div>
                 {selectedRow && (
                     <div className="flex items-center gap-3">

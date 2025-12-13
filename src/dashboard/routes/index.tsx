@@ -3,7 +3,7 @@ import ArrowExpandIcon from '@merchbaseco/icons/core-solid-rounded/ArrowExpandIc
 import { useState } from 'react';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { AdvertisingAccountManager } from './components/advertising-account-manager';
+import { AccountSelector } from './components/account-selector';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { ReportsTable } from './components/reports-table';
 import { syncAdvertiserAccounts } from './hooks/api';
@@ -31,7 +31,7 @@ export function IndexRoute() {
 
     return (
         <div className="space-y-6">
-            <AdvertisingAccountManager />
+            <AccountSelector />
 
             {/* Sync Accounts Card */}
             <Card className="p-4">
