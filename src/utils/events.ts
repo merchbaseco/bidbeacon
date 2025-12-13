@@ -1,6 +1,6 @@
 import type { WebSocket } from 'ws';
 
-export type EventType = 'error' | 'account:updated';
+export type EventType = 'error' | 'account:updated' | 'accounts:synced';
 
 export interface BaseEvent {
     type: EventType;
@@ -19,7 +19,11 @@ export interface AccountUpdatedEvent extends BaseEvent {
     enabled: boolean;
 }
 
-export type Event = ErrorEvent | AccountUpdatedEvent;
+export interface AccountsSyncedEvent extends BaseEvent {
+    type: 'accounts:synced';
+}
+
+export type Event = ErrorEvent | AccountUpdatedEvent | AccountsSyncedEvent;
 
 /**
  * Singleton event emitter for WebSocket connections

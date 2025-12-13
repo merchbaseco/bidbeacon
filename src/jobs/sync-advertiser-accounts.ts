@@ -23,59 +23,38 @@ export const syncAdvertiserAccountsJob = boss
     .work(async jobs => {
         for (const job of jobs) {
             console.log(`[Sync Advertiser Accounts] Starting job (ID: ${job.id})`);
-            // Fetch accounts from Amazon Ads API
+
             const result = await listAdvertiserAccounts(undefined, 'na');
 
-            // Sync each account into the database
-            // Denormalize: create one row per countryCode x profileId/entityId combination
             for (const account of result.adsAccounts) {
-                // Delete all existing rows for this account ID before inserting new ones
-                // This prevents duplicates and ensures we have fresh data
-                await db
-                    .delete(advertiserAccount)
-                    .where(eq(advertiserAccount.adsAccountId, account.adsAccountId));
+                await db.delete(advertiserAccount).where(eq(advertiserAccount.adsAccountId, account.adsAccountId));
 
-                // If there are alternateIds, use those (they contain countryCode + profileId/entityId)
-                if (account.alternateIds && account.alternateIds.length > 0) {
-                    for (const alternateId of account.alternateIds) {
-                        await db.insert(advertiserAccount).values({
-                            adsAccountId: account.adsAccountId,
-                            accountName: account.accountName,
-                            status: account.status,
-                            countryCode: alternateId.countryCode,
-                            profileId:
-                                alternateId.profileId != null
-                                    ? String(alternateId.profileId)
-                                    : null,
-                            entityId: alternateId.entityId ?? null,
-                        });
+                for (const countryCode of account.countryCodes) {
+                    const profileId = account.alternateIds.find(id => id.countryCode === countryCode)?.profileId;
+                    const entityId = account.alternateIds.find(id => id.countryCode === countryCode)?.entityId;
+
+                    if (!profileId || !entityId) {
+                        continue;
                     }
-                } else {
-                    // Fallback: if no alternateIds, create one row per countryCode
-                    for (const countryCode of account.countryCodes) {
-                        await db.insert(advertiserAccount).values({
-                            adsAccountId: account.adsAccountId,
-                            accountName: account.accountName,
-                            status: account.status,
-                            countryCode: countryCode,
-                            profileId: null,
-                            entityId: null,
-                        });
-                    }
+
+                    await db.insert(advertiserAccount).values({
+                        adsAccountId: account.adsAccountId,
+                        accountName: account.accountName,
+                        status: account.status,
+                        countryCode: countryCode,
+                        profileId: profileId.toString(),
+                        entityId: entityId,
+                    });
                 }
             }
 
-            console.log(
-                `[Sync Advertiser Accounts] Synced ${result.adsAccounts.length} account(s)`
-            );
+            console.log(`[Sync Advertiser Accounts] Synced ${result.adsAccounts.length} account(s)`);
 
-            // Emit event to notify clients that accounts were synced
+            // Emit event to notify clients that accounts table was synced
             // This triggers a refresh of the advertising accounts list
             if (result.adsAccounts.length > 0) {
                 emitEvent({
-                    type: 'account:updated',
-                    accountId: result.adsAccounts[0].adsAccountId,
-                    enabled: true, // Placeholder - sync doesn't change enabled status
+                    type: 'accounts:synced',
                 });
             }
         }

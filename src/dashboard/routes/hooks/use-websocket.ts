@@ -8,6 +8,7 @@ import { queryKeys } from './query-keys';
 type Event =
     | { type: 'error'; message: string; details?: string; timestamp: string }
     | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }
+    | { type: 'accounts:synced'; timestamp: string }
     | { type: 'pong' };
 
 export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
@@ -40,6 +41,16 @@ export function useWebSocket(): ConnectionStatus {
                             queryKey: queryKeys.advertisingAccounts(),
                         });
                         break;
+                    case 'accounts:synced':
+                        toastManager.add({
+                            type: 'info',
+                            title: 'Accounts synced',
+                            description: 'Advertising accounts table has been updated',
+                        });
+                        queryClient.invalidateQueries({
+                            queryKey: queryKeys.advertisingAccounts(),
+                        });
+                        break;
                 }
             } catch {
                 // Ignore malformed messages
@@ -62,12 +73,7 @@ export function useWebSocket(): ConnectionStatus {
         share: true,
     });
 
-    const status: ConnectionStatus =
-        readyState === ReadyState.OPEN
-            ? 'connected'
-            : readyState === ReadyState.CONNECTING
-              ? 'connecting'
-              : 'disconnected';
+    const status: ConnectionStatus = readyState === ReadyState.OPEN ? 'connected' : readyState === ReadyState.CONNECTING ? 'connecting' : 'disconnected';
 
     return status;
 }
