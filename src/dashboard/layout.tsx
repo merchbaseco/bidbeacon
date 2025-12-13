@@ -9,6 +9,7 @@ import './global.css';
 import { HugeiconsIcon } from '@hugeicons/react';
 import LighthouseIcon from '@merchbaseco/icons/core-solid-rounded/LighthouseIcon';
 import { Outlet } from 'react-router';
+import { MoreMenu } from './components/more-menu';
 import { ThemeToggle } from './components/theme-toggle';
 import { ToastProvider } from './components/ui/toast';
 import { AccountSelector } from './routes/components/account-selector/account-selector';
@@ -26,14 +27,16 @@ export function RootRoute() {
                 <header className="border-b border-border">
                     <div className="mx-auto max-w-background-frame-max p-4">
                         <div className="grid grid-cols-3 items-center">
-                            <div></div>
+                            <div className="flex items-center gap-4 justify-start">
+                                <AccountSelector />
+                            </div>
                             <div className="flex gap-2 items-center justify-center text-neutral-950 dark:text-neutral-50">
                                 <HugeiconsIcon icon={LighthouseIcon} size={28} />
                                 <p className="font-mono text-2xl font-bold">BidBeacon</p>
                             </div>
                             <div className="flex items-center gap-4 justify-end">
-                                <AccountSelector />
                                 <ThemeToggle />
+                                <MoreMenu />
                             </div>
                         </div>
                     </div>
@@ -60,7 +63,7 @@ createRoot(rootElement).render(
     <StrictMode>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
             <QueryClientProvider client={queryClient}>
-                <ToastProvider>
+                <ToastProvider position="bottom-center">
                     <RouterProvider router={router} />
                 </ToastProvider>
             </QueryClientProvider>

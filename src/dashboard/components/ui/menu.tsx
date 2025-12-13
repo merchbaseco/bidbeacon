@@ -32,25 +32,16 @@ function MenuPopup({
 
     return (
         <MenuPrimitive.Portal>
-            <MenuPrimitive.Positioner
-                align={align}
-                alignOffset={alignOffset ?? defaultAlignOffset}
-                className="z-50"
-                data-slot="menu-positioner"
-                side={side}
-                sideOffset={sideOffset}
-            >
+            <MenuPrimitive.Positioner align={align} alignOffset={alignOffset ?? defaultAlignOffset} className="z-50" data-slot="menu-positioner" side={side} sideOffset={sideOffset}>
                 <MenuPrimitive.Popup
                     className={cn(
-                        "relative flex not-[class*='w-']:min-w-32 origin-(--transform-origin) rounded-lg border bg-popover bg-clip-padding shadow-lg outline-none transition-[scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] focus:outline-none has-data-starting-style:scale-98 has-data-starting-style:opacity-0 dark:bg-clip-border dark:before:shadow-[0_-1px_--theme(--color-white/8%)]",
+                        'relative flex w-[200px] origin-(--transform-origin) rounded-lg border bg-popover bg-clip-padding shadow-lg outline-none transition-[scale,opacity] before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-lg)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] focus:outline-none has-data-starting-style:scale-98 has-data-starting-style:opacity-0 dark:bg-clip-border dark:before:shadow-[0_-1px_--theme(--color-white/8%)]',
                         className
                     )}
                     data-slot="menu-popup"
                     {...props}
                 >
-                    <div className="max-h-(--available-height) w-full overflow-y-auto p-1">
-                        {children}
-                    </div>
+                    <div className="max-h-(--available-height) w-full overflow-y-auto p-1">{children}</div>
                 </MenuPrimitive.Popup>
             </MenuPrimitive.Positioner>
         </MenuPrimitive.Portal>
@@ -84,12 +75,7 @@ function MenuItem({
     );
 }
 
-function MenuCheckboxItem({
-    className,
-    children,
-    checked,
-    ...props
-}: MenuPrimitive.CheckboxItem.Props) {
+function MenuCheckboxItem({ className, children, checked, ...props }: MenuPrimitive.CheckboxItem.Props) {
     return (
         <MenuPrimitive.CheckboxItem
             checked={checked}
@@ -139,10 +125,7 @@ function MenuGroupLabel({
 }) {
     return (
         <MenuPrimitive.GroupLabel
-            className={cn(
-                'px-2 py-1.5 font-medium text-muted-foreground text-xs data-inset:ps-9 sm:data-inset:ps-8',
-                className
-            )}
+            className={cn('px-2 py-1.5 font-medium text-muted-foreground text-xs data-inset:ps-9 sm:data-inset:ps-8', className)}
             data-inset={inset}
             data-slot="menu-label"
             {...props}
@@ -151,23 +134,11 @@ function MenuGroupLabel({
 }
 
 function MenuSeparator({ className, ...props }: MenuPrimitive.Separator.Props) {
-    return (
-        <MenuPrimitive.Separator
-            className={cn('mx-2 my-1 h-px bg-border', className)}
-            data-slot="menu-separator"
-            {...props}
-        />
-    );
+    return <MenuPrimitive.Separator className={cn('mx-2 my-1 h-px bg-border', className)} data-slot="menu-separator" {...props} />;
 }
 
 function MenuShortcut({ className, ...props }: React.ComponentProps<'span'>) {
-    return (
-        <span
-            className={cn('ms-auto text-muted-foreground/72 text-xs tracking-widest', className)}
-            data-slot="menu-shortcut"
-            {...props}
-        />
-    );
+    return <span className={cn('ms-auto text-muted-foreground/72 text-xs tracking-widest', className)} data-slot="menu-shortcut" {...props} />;
 }
 
 function MenuSub(props: MenuPrimitive.SubmenuRoot.Props) {
@@ -211,17 +182,7 @@ function MenuSubPopup({
 }) {
     const defaultAlignOffset = align !== 'center' ? -4 : undefined;
 
-    return (
-        <MenuPopup
-            align={align}
-            alignOffset={alignOffset ?? defaultAlignOffset}
-            className={className}
-            data-slot="menu-sub-content"
-            side="inline-end"
-            sideOffset={sideOffset}
-            {...props}
-        />
-    );
+    return <MenuPopup align={align} alignOffset={alignOffset ?? defaultAlignOffset} className={className} data-slot="menu-sub-content" side="inline-end" sideOffset={sideOffset} {...props} />;
 }
 
 export {

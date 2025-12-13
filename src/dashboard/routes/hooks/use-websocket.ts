@@ -1,11 +1,13 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useSetAtom } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import useWebSocketLib, { ReadyState } from 'react-use-websocket';
 import { toastManager } from '../../components/ui/toast';
 import { apiBaseUrl } from '../../router';
-import { type ConnectionStatus, connectionStatusAtom } from '../atoms';
+import { type ConnectionStatus, connectionStatusAtom, loadingToastsAtom, syncAccountsInProgressAtom } from '../atoms';
 import { queryKeys } from './query-keys';
+
+const SYNC_ACCOUNTS_TOAST_KEY = 'sync-accounts-toast';
 
 type Event =
     | { type: 'error'; message: string; details?: string; timestamp: string }
@@ -18,6 +20,9 @@ const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 
 export function useWebSocket(): ConnectionStatus {
     const queryClient = useQueryClient();
     const setConnectionStatus = useSetAtom(connectionStatusAtom);
+    const setSyncAccountsInProgress = useSetAtom(syncAccountsInProgressAtom);
+    const loadingToasts = useAtomValue(loadingToastsAtom);
+    const setLoadingToasts = useSetAtom(loadingToastsAtom);
 
     const handleMessage = useCallback(
         (event: MessageEvent) => {
@@ -42,22 +47,38 @@ export function useWebSocket(): ConnectionStatus {
                             queryKey: queryKeys.advertisingAccounts(),
                         });
                         break;
-                    case 'accounts:synced':
+                    case 'accounts:synced': {
+                        // Check if there's a loading toast for sync accounts and dismiss it
+                        const syncToastId = loadingToasts[SYNC_ACCOUNTS_TOAST_KEY];
+                        if (syncToastId) {
+                            // Dismiss the loading toast
+                            toastManager.close(syncToastId);
+                            // Remove toast ID from atom
+                            setLoadingToasts(prev => {
+                                const next = { ...prev };
+                                delete next[SYNC_ACCOUNTS_TOAST_KEY];
+                                return next;
+                            });
+                            setSyncAccountsInProgress(false);
+                        }
+                        // Show a new success toast
                         toastManager.add({
-                            type: 'info',
+                            type: 'success',
                             title: 'Accounts synced',
                             description: 'Advertising accounts table has been updated',
+                            timeout: 5000, // Auto-dismiss after 5 seconds
                         });
                         queryClient.invalidateQueries({
                             queryKey: queryKeys.advertisingAccounts(),
                         });
                         break;
+                    }
                 }
             } catch {
                 // Ignore malformed messages
             }
         },
-        [queryClient]
+        [queryClient, setSyncAccountsInProgress, loadingToasts, setLoadingToasts]
     );
 
     const { readyState } = useWebSocketLib(WS_URL, {
