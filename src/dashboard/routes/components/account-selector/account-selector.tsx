@@ -1,8 +1,5 @@
-import { HugeiconsIcon } from '@hugeicons/react';
-import AlertCircleIcon from '@merchbaseco/icons/core-solid-rounded/AlertCircleIcon';
 import { useAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
-import { Alert, AlertDescription, AlertTitle } from '../../../components/ui/alert';
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { useAdvertisingAccounts } from '../../hooks/use-advertising-accounts';
 import { selectedAccountIdAtom, selectedProfileIdAtom } from './atoms';
@@ -48,42 +45,33 @@ export function AccountSelector() {
     };
 
     return (
-        <>
-            {error && (
-                <Alert variant="error">
-                    <HugeiconsIcon icon={AlertCircleIcon} size={20} color="currentColor" />
-                    <AlertTitle>Failed to load accounts</AlertTitle>
-                    <AlertDescription>{error instanceof Error ? error.message : 'Unable to fetch advertising accounts. Please try again later.'}</AlertDescription>
-                </Alert>
-            )}
-            <div className="flex items-center justify-between gap-4">
-                <Select value={selectedValue} onValueChange={handleValueChange} disabled={isLoading || !selectOptions.length}>
-                    <SelectTrigger className="w-[300px]">
-                        <SelectValue>
-                            {_v =>
-                                selectedRow ? (
-                                    <span className="flex items-center gap-1 font-mono text-sm">
-                                        <span>{selectedRow.accountName}</span>
-                                        <span className="bg-muted rounded-sm px-1 py-0.5 inline-flex">{selectedRow.countryCode}</span>
-                                    </span>
-                                ) : (
-                                    'Select account / marketplace'
-                                )
-                            }
-                        </SelectValue>
-                    </SelectTrigger>
-                    <SelectPopup>
-                        {selectOptions.map(option => (
-                            <SelectItem key={option.value} value={option.value}>
+        <div className="flex items-center justify-between gap-4">
+            <Select value={selectedValue} onValueChange={handleValueChange} disabled={isLoading || !!error || !selectOptions.length}>
+                <SelectTrigger className="w-[300px]">
+                    <SelectValue>
+                        {_v =>
+                            selectedRow ? (
                                 <span className="flex items-center gap-1 font-mono text-sm">
-                                    <span>{option.accountName}</span>
-                                    <span className="bg-muted rounded-sm px-0.5 py-px inline-flex">{option.countryCode}</span>
+                                    <span>{selectedRow.accountName}</span>
+                                    <span className="bg-muted rounded-sm px-1 py-0.5 inline-flex">{selectedRow.countryCode}</span>
                                 </span>
-                            </SelectItem>
-                        ))}
-                    </SelectPopup>
-                </Select>
-            </div>
-        </>
+                            ) : (
+                                'Select account / marketplace'
+                            )
+                        }
+                    </SelectValue>
+                </SelectTrigger>
+                <SelectPopup>
+                    {selectOptions.map(option => (
+                        <SelectItem key={option.value} value={option.value}>
+                            <span className="flex items-center gap-1 font-mono text-sm">
+                                <span>{option.accountName}</span>
+                                <span className="bg-muted rounded-sm px-0.5 py-px inline-flex">{option.countryCode}</span>
+                            </span>
+                        </SelectItem>
+                    ))}
+                </SelectPopup>
+            </Select>
+        </div>
     );
 }
