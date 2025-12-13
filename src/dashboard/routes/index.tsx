@@ -1,14 +1,19 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import ArrowExpandIcon from '@merchbaseco/icons/core-solid-rounded/ArrowExpandIcon';
+import { useAtomValue } from 'jotai';
 import { useState } from 'react';
+import { ConnectionStatusBadge } from '../components/connection-status-badge';
 import { Button } from '../components/ui/button';
 import { Card } from '../components/ui/card';
-import { AccountSelector } from './components/account-selector';
+import { connectionStatusAtom } from './atoms';
+import { AccountEnabledSwitch } from './components/account-selector/account-enabled-switch';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { ReportsTable } from './components/reports-table';
 import { syncAdvertiserAccounts } from './hooks/api';
 
 export function IndexRoute() {
+    const connectionStatus = useAtomValue(connectionStatusAtom);
+
     const [syncAccountsLoading, setSyncAccountsLoading] = useState(false);
     const [syncAccountsError, setSyncAccountsError] = useState<string | null>(null);
     const [syncSuccess, setSyncSuccess] = useState<string | null>(null);
@@ -21,9 +26,7 @@ export function IndexRoute() {
             await syncAdvertiserAccounts();
             setSyncSuccess('Sync advertiser accounts job queued successfully');
         } catch (err) {
-            setSyncAccountsError(
-                err instanceof Error ? err.message : 'Failed to sync advertiser accounts'
-            );
+            setSyncAccountsError(err instanceof Error ? err.message : 'Failed to sync advertiser accounts');
         } finally {
             setSyncAccountsLoading(false);
         }
@@ -31,7 +34,10 @@ export function IndexRoute() {
 
     return (
         <div className="space-y-6">
-            <AccountSelector />
+            <div className="flex items-center justify-between gap-2 py-1">
+                <AccountEnabledSwitch />
+                <ConnectionStatusBadge status={connectionStatus} className="mt-0.5" />
+            </div>
 
             {/* Sync Accounts Card */}
             <Card className="p-4">
@@ -39,19 +45,13 @@ export function IndexRoute() {
                     <div className="flex items-center justify-between">
                         <h2 className="text-lg font-semibold">Amazon Ads Sync</h2>
                         <div className="flex gap-2">
-                            <Button
-                                onClick={handleSyncAdvertiserAccounts}
-                                disabled={syncAccountsLoading}
-                                variant="outline"
-                            >
+                            <Button onClick={handleSyncAdvertiserAccounts} disabled={syncAccountsLoading} variant="outline">
                                 {syncAccountsLoading ? 'Syncing...' : 'Sync Accounts'}
                             </Button>
                         </div>
                     </div>
                     {syncSuccess && <div className="text-green-600 text-sm">{syncSuccess}</div>}
-                    {syncAccountsError && (
-                        <div className="text-red-600 text-sm">{syncAccountsError}</div>
-                    )}
+                    {syncAccountsError && <div className="text-red-600 text-sm">{syncAccountsError}</div>}
                 </div>
             </Card>
             <div className="space-y-4">

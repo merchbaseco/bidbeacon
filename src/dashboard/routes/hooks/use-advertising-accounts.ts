@@ -24,24 +24,19 @@ export function useToggleAdvertisingAccount() {
     const queryClient = useQueryClient();
 
     return useMutation({
-        mutationFn: ({ id, enabled }: { id: string; enabled: boolean }) =>
-            toggleAdvertiserAccount(id, enabled),
-        onMutate: async ({ id, enabled }) => {
+        mutationFn: ({ adsAccountId, profileId, enabled }: { adsAccountId: string; profileId: string; enabled: boolean }) => toggleAdvertiserAccount(adsAccountId, profileId, enabled),
+        onMutate: async ({ adsAccountId, profileId, enabled }) => {
             // Cancel outgoing refetches
             await queryClient.cancelQueries({ queryKey: queryKeys.advertisingAccounts() });
 
             // Snapshot the previous value
-            const previousAccounts = queryClient.getQueryData<AdvertisingAccount[]>(
-                queryKeys.advertisingAccounts()
-            );
+            const previousAccounts = queryClient.getQueryData<AdvertisingAccount[]>(queryKeys.advertisingAccounts());
 
             // Optimistically update to the new value
             if (previousAccounts) {
                 queryClient.setQueryData<AdvertisingAccount[]>(
                     queryKeys.advertisingAccounts(),
-                    previousAccounts.map(account =>
-                        account.id === id ? { ...account, enabled } : account
-                    )
+                    previousAccounts.map(account => (account.adsAccountId === adsAccountId && account.profileId === profileId ? { ...account, enabled } : account))
                 );
             }
 

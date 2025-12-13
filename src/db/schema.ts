@@ -1,19 +1,4 @@
-import {
-    bigint,
-    boolean,
-    date,
-    doublePrecision,
-    index,
-    integer,
-    jsonb,
-    numeric,
-    pgTable,
-    primaryKey,
-    text,
-    timestamp,
-    uniqueIndex,
-    uuid,
-} from 'drizzle-orm/pg-core';
+import { bigint, boolean, date, doublePrecision, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 /**
  * ----------------------------------------------------------------------------
@@ -57,10 +42,7 @@ export const adGroup = pgTable(
         creationDateTime: timestamp('creation_date_time').notNull(),
         lastUpdatedDateTime: timestamp('last_updated_date_time').notNull(),
     },
-    table => [
-        uniqueIndex('ad_group_ad_group_id_idx').on(table.adGroupId),
-        index('ad_group_campaign_id_idx').on(table.campaignId),
-    ]
+    table => [uniqueIndex('ad_group_ad_group_id_idx').on(table.adGroupId), index('ad_group_campaign_id_idx').on(table.campaignId)]
 );
 
 export const ad = pgTable(
@@ -105,10 +87,7 @@ export const target = pgTable(
         creationDateTime: timestamp('creation_date_time').notNull(),
         lastUpdatedDateTime: timestamp('last_updated_date_time').notNull(),
     },
-    table => [
-        uniqueIndex('target_target_id_idx').on(table.targetId),
-        index('target_ad_group_id_idx').on(table.adGroupId),
-    ]
+    table => [uniqueIndex('target_target_id_idx').on(table.targetId), index('target_ad_group_id_idx').on(table.adGroupId)]
 );
 
 /**
@@ -404,12 +383,7 @@ export const amsBudgetUsage = pgTable(
     },
     table => [
         primaryKey({
-            columns: [
-                table.advertiserId,
-                table.marketplaceId,
-                table.budgetScopeId,
-                table.usageUpdatedTimestamp,
-            ],
+            columns: [table.advertiserId, table.marketplaceId, table.budgetScopeId, table.usageUpdatedTimestamp],
         }),
     ]
 );
@@ -433,12 +407,9 @@ export const advertiserAccount = pgTable(
     },
     table => [
         // Unique constraint to prevent duplicate entries for the same combination
-        uniqueIndex('advertiser_account_unique_idx').on(
-            table.adsAccountId,
-            table.countryCode,
-            table.profileId,
-            table.entityId
-        ),
+        uniqueIndex('advertiser_account_unique_idx').on(table.adsAccountId, table.countryCode, table.profileId, table.entityId),
+        // Unique constraint: adsAccountId + profileId should be unique
+        uniqueIndex('advertiser_account_ads_account_id_profile_id_idx').on(table.adsAccountId, table.profileId),
         // Index for querying by adsAccountId
         index('advertiser_account_ads_account_id_idx').on(table.adsAccountId),
     ]

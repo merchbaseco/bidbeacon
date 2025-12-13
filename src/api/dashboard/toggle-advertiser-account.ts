@@ -1,47 +1,27 @@
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { advertiserAccount } from '@/db/schema.js';
-import { emitEvent } from '@/utils/events.js';
 
 export function registerToggleAdvertiserAccountRoute(fastify: FastifyInstance) {
     fastify.post('/api/dashboard/toggle-advertiser-account', async (request, _reply) => {
         const bodySchema = z.object({
-            id: z.string().uuid(), // UUID of the advertiser account row
+            adsAccountId: z.string(), // adsAccountId (e.g., "amzn1.ads-account.g.38rle97xonvbq66bhw6gsyl4g")
+            profileId: z.string(), // profileId from alternateIds
             enabled: z.boolean(), // New enabled status
         });
 
         const body = bodySchema.parse(request.body);
-        console.log(
-            `[API] Toggle advertiser account request: ${body.id} -> ${body.enabled ? 'enabled' : 'disabled'}`
-        );
+        console.log(`[API] Toggle advertiser account request: ${body.adsAccountId}/${body.profileId} -> ${body.enabled ? 'enabled' : 'disabled'}`);
 
-        // Update the enabled status for the specific account row
+        // Update the enabled status for the specific account row identified by adsAccountId + profileId
         await db
             .update(advertiserAccount)
             .set({ enabled: body.enabled })
-            .where(eq(advertiserAccount.id, body.id));
+            .where(and(eq(advertiserAccount.adsAccountId, body.adsAccountId), eq(advertiserAccount.profileId, body.profileId)));
 
-        // Fetch the updated account to get adsAccountId
-        const updatedAccount = await db
-            .select()
-            .from(advertiserAccount)
-            .where(eq(advertiserAccount.id, body.id))
-            .limit(1);
-
-        console.log(
-            `[API] Account ${body.id} ${body.enabled ? 'enabled' : 'disabled'} successfully`
-        );
-
-        // Emit account update event
-        if (updatedAccount[0]) {
-            emitEvent({
-                type: 'account:updated',
-                accountId: updatedAccount[0].adsAccountId,
-                enabled: body.enabled,
-            });
-        }
+        console.log(`[API] Account ${body.adsAccountId}/${body.profileId} ${body.enabled ? 'enabled' : 'disabled'} successfully`);
 
         return { success: true, message: `Account ${body.enabled ? 'enabled' : 'disabled'}` };
     });

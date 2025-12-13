@@ -1,8 +1,10 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback } from 'react';
+import { useSetAtom } from 'jotai';
+import { useCallback, useEffect } from 'react';
 import useWebSocketLib, { ReadyState } from 'react-use-websocket';
 import { toastManager } from '../../components/ui/toast';
 import { apiBaseUrl } from '../../router';
+import { type ConnectionStatus, connectionStatusAtom } from '../atoms';
 import { queryKeys } from './query-keys';
 
 type Event =
@@ -11,12 +13,11 @@ type Event =
     | { type: 'accounts:synced'; timestamp: string }
     | { type: 'pong' };
 
-export type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
-
 const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
 
 export function useWebSocket(): ConnectionStatus {
     const queryClient = useQueryClient();
+    const setConnectionStatus = useSetAtom(connectionStatusAtom);
 
     const handleMessage = useCallback(
         (event: MessageEvent) => {
@@ -74,6 +75,10 @@ export function useWebSocket(): ConnectionStatus {
     });
 
     const status: ConnectionStatus = readyState === ReadyState.OPEN ? 'connected' : readyState === ReadyState.CONNECTING ? 'connecting' : 'disconnected';
+
+    useEffect(() => {
+        setConnectionStatus(status);
+    }, [status, setConnectionStatus]);
 
     return status;
 }

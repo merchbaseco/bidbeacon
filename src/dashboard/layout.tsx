@@ -9,14 +9,14 @@ import './global.css';
 import { HugeiconsIcon } from '@hugeicons/react';
 import LighthouseIcon from '@merchbaseco/icons/core-solid-rounded/LighthouseIcon';
 import { Outlet } from 'react-router';
-import { ConnectionStatusBadge } from './components/connection-status-badge';
 import { ThemeToggle } from './components/theme-toggle';
 import { ToastProvider } from './components/ui/toast';
+import { AccountSelector } from './routes/components/account-selector/account-selector';
 import { useWebSocket } from './routes/hooks/use-websocket';
 
 export function RootRoute() {
     // Initialize WebSocket connection for real-time events
-    const connectionStatus = useWebSocket();
+    useWebSocket();
 
     return (
         <div className="relative isolate min-h-screen bg-neutral-50/50 dark:bg-zinc-950">
@@ -25,13 +25,14 @@ export function RootRoute() {
             <div className="relative z-10">
                 <header className="border-b border-border">
                     <div className="mx-auto max-w-background-frame-max p-4">
-                        <div className="flex items-center justify-between">
+                        <div className="grid grid-cols-3 items-center">
                             <div></div>
-                            <div className="flex gap-2 items-center text-neutral-950 dark:text-neutral-50">
+                            <div className="flex gap-2 items-center justify-center text-neutral-950 dark:text-neutral-50">
                                 <HugeiconsIcon icon={LighthouseIcon} size={28} />
                                 <p className="font-mono text-2xl font-bold">BidBeacon</p>
                             </div>
-                            <div className="flex items-center gap-4">
+                            <div className="flex items-center gap-4 justify-end">
+                                <AccountSelector />
                                 <ThemeToggle />
                             </div>
                         </div>
@@ -40,9 +41,6 @@ export function RootRoute() {
 
                 <main>
                     <div className="mx-auto max-w-background-frame-max p-4 pt-2 font-mono">
-                        <div className="flex items-center justify-end gap-2">
-                            <ConnectionStatusBadge status={connectionStatus} />
-                        </div>
                         <Outlet />
                     </div>
                 </main>

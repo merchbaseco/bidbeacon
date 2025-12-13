@@ -1,11 +1,6 @@
 import { apiBaseUrl } from '../../router';
 
-export async function fetchDashboardStatus(params: {
-    accountId: string;
-    aggregation: string;
-    from: string;
-    to: string;
-}) {
+export async function fetchDashboardStatus(params: { accountId: string; aggregation: string; from: string; to: string }) {
     const statusUrl = new URL('/api/dashboard/status', apiBaseUrl);
     statusUrl.searchParams.set('accountId', params.accountId);
     statusUrl.searchParams.set('aggregation', params.aggregation);
@@ -51,11 +46,7 @@ export async function triggerUpdate(accountId: string) {
     return (await response.json()) as { message?: string };
 }
 
-export async function reprocessDataset(params: {
-    accountId: string;
-    timestamp: string;
-    aggregation: string;
-}) {
+export async function reprocessDataset(params: { accountId: string; timestamp: string; aggregation: string }) {
     const response = await fetch(`${apiBaseUrl}/api/dashboard/reprocess`, {
         method: 'POST',
         headers: {
@@ -114,13 +105,13 @@ export async function fetchListAdvertisingAccounts() {
     return body.data;
 }
 
-export async function toggleAdvertiserAccount(id: string, enabled: boolean) {
+export async function toggleAdvertiserAccount(adsAccountId: string, profileId: string, enabled: boolean) {
     const response = await fetch(`${apiBaseUrl}/api/dashboard/toggle-advertiser-account`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ id, enabled }),
+        body: JSON.stringify({ adsAccountId, profileId, enabled }),
     });
 
     if (!response.ok) {
