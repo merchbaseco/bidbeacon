@@ -47,6 +47,9 @@ export function useWebSocket(): ConnectionStatus {
                         queryClient.invalidateQueries({
                             queryKey: queryKeys.advertisingAccounts(),
                         });
+                        queryClient.invalidateQueries({
+                            queryKey: queryKeys.apiMetrics(),
+                        });
                         break;
                     case 'accounts:synced': {
                         // Check if there's a loading toast for sync accounts and dismiss it
@@ -72,12 +75,18 @@ export function useWebSocket(): ConnectionStatus {
                         queryClient.invalidateQueries({
                             queryKey: queryKeys.advertisingAccounts(),
                         });
+                        queryClient.invalidateQueries({
+                            queryKey: queryKeys.apiMetrics(),
+                        });
                         break;
                     }
                     case 'reports:refreshed':
                         // Invalidate dashboard status queries to refresh the table
                         queryClient.invalidateQueries({
                             queryKey: queryKeys.dashboardStatusAll(),
+                        });
+                        queryClient.invalidateQueries({
+                            queryKey: queryKeys.apiMetrics(),
                         });
                         toastManager.add({
                             type: 'success',

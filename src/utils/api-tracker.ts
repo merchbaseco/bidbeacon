@@ -15,7 +15,7 @@ export interface ApiCallOptions {
 
 /**
  * Tracks an API call by logging it to the database.
- * This function is fire-and-forget - it doesn't wait for the database write to complete.
+ * Awaits the database write to ensure metrics are persisted before events are emitted.
  *
  * @param options - API call options
  * @param startTime - When the API call started (performance.now() timestamp)
@@ -27,9 +27,8 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
     const durationMs = Math.round(performance.now() - startTime);
     const timestamp = new Date();
 
-    // Fire and forget - don't block on database write
-    db.insert(apiMetrics)
-        .values({
+    try {
+        await db.insert(apiMetrics).values({
             apiName: options.apiName,
             region: options.region,
             statusCode: statusCode ?? null,
@@ -37,11 +36,11 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
             durationMs,
             timestamp,
             error: error ?? null,
-        })
-        .catch(err => {
-            // Silently fail - we don't want tracking failures to break the app
-            console.error('Failed to track API call:', err);
         });
+    } catch (err) {
+        // Silently fail - we don't want tracking failures to break the app
+        console.error('Failed to track API call:', err);
+    }
 }
 
 /**
@@ -86,9 +85,7 @@ export async function withTracking<T>(options: ApiCallOptions, fn: () => Promise
 
         throw err;
     } finally {
-        // Track the call (fire and forget)
-        trackApiCall(options, startTime, success, statusCode, error).catch(() => {
-            // Already handled in trackApiCall
-        });
+        // Track the call - await to ensure metrics are written before events are emitted
+        await trackApiCall(options, startTime, success, statusCode, error);
     }
 }
