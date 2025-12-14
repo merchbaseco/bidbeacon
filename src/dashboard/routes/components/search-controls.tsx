@@ -4,8 +4,8 @@ import { Input } from '../../components/Input';
 import { Label } from '../../components/Label';
 import { Select } from '../../components/Select';
 import { queryKeys } from '../hooks/query-keys.js';
+import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useSearchParamsState } from '../hooks/use-search-params.js';
-import { useTriggerUpdate } from '../hooks/use-trigger-update.js';
 
 type Aggregation = 'daily' | 'hourly';
 
@@ -17,26 +17,18 @@ interface SearchControlsProps {
 
 export function SearchControls({ accountId, aggregation, days }: SearchControlsProps) {
     const { updateSearch } = useSearchParamsState();
-    const { triggerUpdate, pending } = useTriggerUpdate(accountId);
+    const { refreshReportsTable, pending } = useRefreshReportsTable(accountId);
     const queryClient = useQueryClient();
     return (
         <div>
             <Label>
                 Account ID
-                <Input
-                    value={accountId}
-                    onChange={event => updateSearch({ accountId: event.target.value })}
-                />
+                <Input value={accountId} onChange={event => updateSearch({ accountId: event.target.value })} />
             </Label>
 
             <Label>
                 Aggregation
-                <Select
-                    value={aggregation}
-                    onChange={event =>
-                        updateSearch({ aggregation: event.target.value as Aggregation })
-                    }
-                >
+                <Select value={aggregation} onChange={event => updateSearch({ aggregation: event.target.value as Aggregation })}>
                     <option value="daily">Daily</option>
                     <option value="hourly">Hourly</option>
                 </Select>
@@ -44,10 +36,7 @@ export function SearchControls({ accountId, aggregation, days }: SearchControlsP
 
             <Label>
                 Range
-                <Select
-                    value={String(days)}
-                    onChange={event => updateSearch({ days: Number(event.target.value) })}
-                >
+                <Select value={String(days)} onChange={event => updateSearch({ days: Number(event.target.value) })}>
                     <option value="7">Last 7 days</option>
                     <option value="30">Last 30 days</option>
                     <option value="60">Last 60 days</option>
@@ -56,17 +45,10 @@ export function SearchControls({ accountId, aggregation, days }: SearchControlsP
             </Label>
 
             <div>
-                <Button type="button" onClick={triggerUpdate} disabled={pending}>
+                <Button type="button" onClick={refreshReportsTable} disabled={pending}>
                     {pending ? 'Queuing…' : 'Trigger Update'}
                 </Button>
-                <Button
-                    variant="secondary"
-                    type="button"
-                    onClick={() =>
-                        queryClient.invalidateQueries({ queryKey: queryKeys.dashboardStatusAll() })
-                    }
-                    disabled={pending}
-                >
+                <Button variant="secondary" type="button" onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.dashboardStatusAll() })} disabled={pending}>
                     Refresh
                 </Button>
             </div>

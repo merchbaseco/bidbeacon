@@ -13,6 +13,7 @@ type Event =
     | { type: 'error'; message: string; details?: string; timestamp: string }
     | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }
     | { type: 'accounts:synced'; timestamp: string }
+    | { type: 'reports:refreshed'; accountId: string; timestamp: string }
     | { type: 'pong' };
 
 const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
@@ -73,6 +74,18 @@ export function useWebSocket(): ConnectionStatus {
                         });
                         break;
                     }
+                    case 'reports:refreshed':
+                        // Invalidate dashboard status queries to refresh the table
+                        queryClient.invalidateQueries({
+                            queryKey: queryKeys.dashboardStatusAll(),
+                        });
+                        toastManager.add({
+                            type: 'success',
+                            title: 'Reports refreshed',
+                            description: 'Report dataset metadata has been updated',
+                            timeout: 5000, // Auto-dismiss after 5 seconds
+                        });
+                        break;
                 }
             } catch {
                 // Ignore malformed messages

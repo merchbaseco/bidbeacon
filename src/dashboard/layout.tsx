@@ -34,9 +34,9 @@ export function RootRoute() {
                                 <HugeiconsIcon icon={LighthouseIcon} size={28} />
                                 <p className="font-mono text-2xl font-bold">BidBeacon</p>
                             </div>
-                            <div className="flex items-center gap-4 justify-end">
-                                <ThemeToggle />
+                            <div className="flex items-center gap-2 justify-end">
                                 <MoreMenu />
+                                <ThemeToggle />
                             </div>
                         </div>
                     </div>

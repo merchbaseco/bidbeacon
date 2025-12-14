@@ -4,14 +4,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Frame, FrameFooter } from '../../components/ui/frame';
-import {
-    Table,
-    TableBody,
-    TableCell,
-    TableHead,
-    TableHeader,
-    TableRow,
-} from '../../components/ui/table';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
+import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useReportDatasets } from '../hooks/use-report-datasets.js';
 import { useReprocess } from '../hooks/use-reprocess.js';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid.js';
@@ -25,10 +19,11 @@ const ITEMS_PER_PAGE = 10;
 
 export const ReportsTable = () => {
     const [aggregation, setAggregation] = useState<'daily' | 'hourly'>('daily');
-    const { data: rows = [], isLoading, refetch } = useReportDatasets(aggregation);
+    const { data: rows = [], isLoading } = useReportDatasets(aggregation);
     const accountId = useSelectedAccountId();
 
     const { reprocessAt, pending } = useReprocess(accountId, aggregation);
+    const { refreshReportsTable, pending: refreshPending } = useRefreshReportsTable(accountId);
 
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -66,7 +61,7 @@ export const ReportsTable = () => {
     };
 
     const handleRefresh = () => {
-        refetch();
+        refreshReportsTable();
     };
 
     return (
@@ -74,7 +69,7 @@ export const ReportsTable = () => {
             <ReportsToolbar
                 aggregation={aggregation}
                 statusFilter={statusFilter}
-                isLoading={isLoading}
+                isLoading={isLoading || refreshPending}
                 onAggregationChange={handleAggregationChange}
                 onStatusFilterChange={handleStatusFilterChange}
                 onRefresh={handleRefresh}
@@ -93,41 +88,24 @@ export const ReportsTable = () => {
                     <TableBody>
                         {filteredRows.length === 0 ? (
                             <TableRow>
-                                <TableCell
-                                    colSpan={5}
-                                    className="text-center text-muted-foreground"
-                                >
+                                <TableCell colSpan={5} className="text-center text-muted-foreground">
                                     No records found in this window.
                                 </TableCell>
                             </TableRow>
                         ) : (
                             paginatedRows.map(row => (
                                 <TableRow key={`${row.timestamp}-${row.aggregation}`}>
-                                    <TableCell className="font-medium">
-                                        {formatDate(row.timestamp)}
-                                    </TableCell>
+                                    <TableCell className="font-medium">{formatDate(row.timestamp)}</TableCell>
                                     <TableCell>
                                         <StatusBadge status={row.status} />
                                     </TableCell>
-                                    <TableCell>
-                                        {row.lastRefreshed ? formatDate(row.lastRefreshed) : '—'}
-                                    </TableCell>
+                                    <TableCell>{row.lastRefreshed ? formatDate(row.lastRefreshed) : '—'}</TableCell>
                                     <TableCell>
                                         <Badge variant="outline">{row.reportId}</Badge>
                                     </TableCell>
                                     <TableCell className="text-right">
-                                        <Button
-                                            variant="secondary"
-                                            type="button"
-                                            disabled={pending !== null}
-                                            onClick={() => reprocessAt(row.timestamp)}
-                                            className="inline-flex items-center gap-2"
-                                        >
-                                            <HugeiconsIcon
-                                                icon={CircleArrowReload01Icon}
-                                                size={16}
-                                                color="currentColor"
-                                            />
+                                        <Button variant="secondary" type="button" disabled={pending !== null} onClick={() => reprocessAt(row.timestamp)} className="inline-flex items-center gap-2">
+                                            <HugeiconsIcon icon={CircleArrowReload01Icon} size={16} color="currentColor" />
                                             {pending === row.timestamp ? 'Queuing…' : 'Reprocess'}
                                         </Button>
                                     </TableCell>
@@ -139,20 +117,8 @@ export const ReportsTable = () => {
                 {filteredRows.length > 0 && (
                     <FrameFooter className="p-2">
                         <div className="flex items-center justify-between gap-2">
-                            <TableResultsRange
-                                currentPage={currentPage}
-                                totalPages={totalPages}
-                                pageSize={ITEMS_PER_PAGE}
-                                totalResults={filteredRows.length}
-                                onPageChange={setCurrentPage}
-                            />
-                            {filteredRows.length > ITEMS_PER_PAGE && (
-                                <TablePagination
-                                    currentPage={currentPage}
-                                    totalPages={totalPages}
-                                    onPageChange={setCurrentPage}
-                                />
-                            )}
+                            <TableResultsRange currentPage={currentPage} totalPages={totalPages} pageSize={ITEMS_PER_PAGE} totalResults={filteredRows.length} onPageChange={setCurrentPage} />
+                            {filteredRows.length > ITEMS_PER_PAGE && <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />}
                         </div>
                     </FrameFooter>
                 )}
