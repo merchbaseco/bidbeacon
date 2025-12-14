@@ -20,7 +20,7 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
 
         // Look up advertiser account to get adsAccountId and profileId
         const account = await db.query.advertiserAccount.findFirst({
-            where: eq(advertiserAccount.id, body.accountId),
+            where: eq(advertiserAccount.adsAccountId, body.accountId),
             columns: {
                 adsAccountId: true,
                 profileId: true,

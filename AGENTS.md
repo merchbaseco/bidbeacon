@@ -163,6 +163,21 @@ The dashboard is a full-stack React application built with:
 - **Route loaders**: Use `loader` functions in route definitions to fetch data server-side
 - **Search params**: Use `validateSearch` with Zod schemas for type-safe URL search parameters
 - **Route invalidation**: Use `router.invalidate()` to refetch data after mutations
+- **Memoizing dates in React**: When using dates as query parameters or dependencies, always memoize them with `useMemo` to prevent infinite refetch loops. Creating new `Date` objects on every render causes React Query to treat them as new queries, triggering continuous refetches:
+  ```typescript
+  // ❌ Bad - creates new Date objects on every render
+  const to = new Date();
+  const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+  const { data } = useQuery({ queryKey: ['metrics', from, to], ... });
+  
+  // ✅ Good - memoized, stable reference
+  const dateRange = useMemo(() => {
+    const to = new Date();
+    const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+    return { from: from.toISOString(), to: to.toISOString() };
+  }, []);
+  const { data } = useQuery({ queryKey: ['metrics', dateRange.from, dateRange.to], ... });
+  ```
 
 ## Component Library: coss ui
 

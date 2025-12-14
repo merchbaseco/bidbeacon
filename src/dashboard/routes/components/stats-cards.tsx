@@ -16,22 +16,10 @@ export function StatsCards({ rows, range }: StatsCardsProps) {
     const stats = useStats(rows);
     return (
         <div>
-            <StatCard
-                title="Latest refresh"
-                value={stats.lastRefreshed ? formatDate(stats.lastRefreshed) : '—'}
-                subtitle={`Window ${formatDate(range.from)} → ${formatDate(range.to)}`}
-            />
-            <StatCard
-                title="Completed"
-                value={stats.completed}
-                subtitle={`${stats.total} rows total`}
-            />
-            <StatCard title="Failed" value={stats.failed} subtitle="Needs reprocessing" />
-            <StatCard
-                title="Fetching / Missing"
-                value={`${stats.fetching} / ${stats.missing}`}
-                subtitle="In-progress or waiting"
-            />
+            <StatCard title="Latest refresh" value={stats.lastRefreshed ? formatDate(stats.lastRefreshed) : '—'} subtitle={`Window ${formatDate(range.from)} → ${formatDate(range.to)}`} />
+            <StatCard title="Completed" value={stats.completed} subtitle={`${stats.total} rows total`} />
+            <StatCard title="Failed" value={stats.failed} subtitle="Failed datasets" />
+            <StatCard title="Fetching / Missing" value={`${stats.fetching} / ${stats.missing}`} subtitle="In-progress or waiting" />
         </div>
     );
 }

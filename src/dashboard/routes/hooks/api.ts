@@ -52,23 +52,6 @@ export async function triggerUpdate(accountId: string, countryCode: string) {
     return (await response.json()) as { message?: string };
 }
 
-export async function reprocessDataset(params: { accountId: string; countryCode: string; timestamp: string; aggregation: string }) {
-    const response = await fetch(`${apiBaseUrl}/api/dashboard/reprocess`, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(params),
-    });
-
-    if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Request failed (${response.status}): ${text}`);
-    }
-
-    return (await response.json()) as { message?: string };
-}
-
 export async function syncAdvertiserAccounts() {
     const response = await fetch(`${apiBaseUrl}/api/dashboard/sync-advertiser-accounts`, {
         method: 'POST',

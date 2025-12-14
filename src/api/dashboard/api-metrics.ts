@@ -66,7 +66,6 @@ export function registerApiMetricsRoute(fastify: FastifyInstance) {
         // Get list of unique API names
         const apiNames = Object.keys(chartData).sort();
 
-        console.log(`[API] Returning API metrics for ${apiNames.length} API(s) from ${from.toISOString()} to ${to.toISOString()}`);
         return {
             success: true,
             data: chartData,

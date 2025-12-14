@@ -8,7 +8,7 @@ import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { performance, reportDatasetMetadata } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
-import { zonedAddDays, zonedAddHours, zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
+import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
 
@@ -52,31 +52,11 @@ export const updateReportDatasetMetadataJob = boss
         }
     });
 
-const reprocessJobInputSchema = z.object({
-    accountId: z.string(),
-    countryCode: z.string(),
-    timestamp: z.string(), // ISO string
-    aggregation: z.enum(['hourly', 'daily']),
-});
-
-export const reprocessReportDatasetMetadataJob = boss
-    .createJob('reprocess-report-dataset-metadata')
-    .input(reprocessJobInputSchema)
-    .work(async jobs => {
-        for (const job of jobs) {
-            const { accountId, countryCode, timestamp, aggregation } = job.data;
-            console.log(`[Reprocess Report Dataset Metadata] Starting job (ID: ${job.id}): ${aggregation} for ${accountId}, country: ${countryCode} at ${timestamp}`);
-            const windowStart = new Date(timestamp);
-            await updateForWindow(accountId, countryCode, windowStart, aggregation);
-            console.log(`[Reprocess Report Dataset Metadata] Completed job (ID: ${job.id})`);
-        }
-    });
-
 // ============================================================================
 // Utility Functions
 // ============================================================================
 
-async function hasPerformanceData(accountId: string, windowStart: Date, windowEnd: Date, aggregation: 'hourly' | 'daily'): Promise<boolean> {
+async function _hasPerformanceData(accountId: string, windowStart: Date, windowEnd: Date, aggregation: 'hourly' | 'daily'): Promise<boolean> {
     const record = await db.query.performance.findFirst({
         where: and(eq(performance.accountId, accountId), eq(performance.aggregation, aggregation), gte(performance.date, windowStart), lt(performance.date, windowEnd)),
         columns: { accountId: true },
@@ -134,29 +114,6 @@ async function createMetadataRow(accountId: string, countryCode: string, timesta
         status: 'missing',
         lastRefreshed: zonedNow(timezone),
         error: null,
-    });
-}
-
-/**
- * Update metadata for a window based on whether performance data exists.
- * Used when reprocessing or updating existing rows.
- */
-async function updateForWindow(accountId: string, countryCode: string, windowStart: Date, aggregation: 'hourly' | 'daily'): Promise<void> {
-    const timezone = getTimezoneForCountry(countryCode);
-    const windowEnd = aggregation === 'hourly' ? zonedAddHours(windowStart, 1, timezone) : zonedAddDays(windowStart, 1, timezone);
-    const hasData = await hasPerformanceData(accountId, windowStart, windowEnd, aggregation);
-
-    const status = hasData ? 'completed' : 'missing';
-    const error = hasData ? null : 'No performance data found for this window';
-
-    await upsertMetadata({
-        accountId,
-        countryCode,
-        timestamp: windowStart,
-        aggregation,
-        status,
-        lastRefreshed: zonedNow(timezone),
-        error,
     });
 }
 

@@ -1,4 +1,5 @@
 import { format } from 'date-fns';
+import { useMemo } from 'react';
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApiMetrics } from '../hooks/use-api-metrics';
 
@@ -9,14 +10,17 @@ import { useApiMetrics } from '../hooks/use-api-metrics';
  * with a separate line for each API endpoint.
  */
 export function ApiMetricsChart() {
-    // Default to last 24 hours
-    const to = new Date();
-    const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+    // Memoize date range to prevent query key from changing on every render
+    const dateRange = useMemo(() => {
+        const to = new Date();
+        const from = new Date(to.getTime() - 24 * 60 * 60 * 1000);
+        return {
+            from: from.toISOString(),
+            to: to.toISOString(),
+        };
+    }, []); // Empty deps - only calculate once
 
-    const { data, isLoading, error } = useApiMetrics({
-        from: from.toISOString(),
-        to: to.toISOString(),
-    });
+    const { data, isLoading, error } = useApiMetrics(dateRange);
 
     if (isLoading) {
         return <div className="flex items-center justify-center h-64 text-sm text-muted-foreground">Loading API metrics...</div>;

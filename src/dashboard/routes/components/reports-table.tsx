@@ -1,5 +1,3 @@
-import { HugeiconsIcon } from '@hugeicons/react';
-import CircleArrowReload01Icon from '@merchbaseco/icons/core-solid-rounded/CircleArrowReload01Icon';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -8,7 +6,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { createReport, retrieveReport } from '../hooks/api.js';
 import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useReportDatasets } from '../hooks/use-report-datasets.js';
-import { useReprocess } from '../hooks/use-reprocess.js';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid.js';
 import { formatDate } from '../utils.js';
 import { ReportResponseDialog } from './report-response-dialog.js';
@@ -24,7 +21,6 @@ export const ReportsTable = () => {
     const { data: rows = [], isLoading } = useReportDatasets(aggregation);
     const accountId = useSelectedAccountId();
 
-    const { reprocessAt, pending } = useReprocess(accountId, aggregation);
     const { refreshReportsTable, pending: refreshPending } = useRefreshReportsTable(accountId);
 
     const [currentPage, setCurrentPage] = useState(1);
@@ -154,7 +150,7 @@ export const ReportsTable = () => {
                                 const retrieveActionKey = `retrieve-${row.timestamp}`;
                                 const isCreating = loadingAction === createActionKey;
                                 const isRetrieving = loadingAction === retrieveActionKey;
-                                const isActionPending = isCreating || isRetrieving || pending !== null;
+                                const isActionPending = isCreating || isRetrieving;
 
                                 return (
                                     <TableRow key={`${row.timestamp}-${row.aggregation}`}>
@@ -187,17 +183,6 @@ export const ReportsTable = () => {
                                                     className="inline-flex items-center gap-2"
                                                 >
                                                     {isRetrieving ? 'Retrieving…' : 'Retrieve Report'}
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    type="button"
-                                                    size="sm"
-                                                    disabled={isActionPending}
-                                                    onClick={() => reprocessAt(row.timestamp)}
-                                                    className="inline-flex items-center gap-2"
-                                                >
-                                                    <HugeiconsIcon icon={CircleArrowReload01Icon} size={16} color="currentColor" />
-                                                    {pending === row.timestamp ? 'Queuing…' : 'Reprocess'}
                                                 </Button>
                                             </div>
                                         </TableCell>

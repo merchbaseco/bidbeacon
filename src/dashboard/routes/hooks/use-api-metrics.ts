@@ -8,6 +8,7 @@ export function useApiMetrics(params?: { from?: string; to?: string; apiName?: s
         queryFn: async () => {
             return fetchApiMetrics(params ?? {});
         },
-        refetchInterval: 60000, // Refetch every minute
+        refetchInterval: 300000, // Refetch every 5 minutes
+        staleTime: 60000, // Consider data fresh for 1 minute
     });
 }

@@ -74,9 +74,6 @@ fastify.register(async fastify => {
     const { registerStatusRoute } = await import('@/api/dashboard/status.js');
     await registerStatusRoute(fastify);
 
-    const { registerReprocessRoute } = await import('@/api/dashboard/reprocess.js');
-    await registerReprocessRoute(fastify);
-
     const { registerTriggerUpdateRoute } = await import('@/api/dashboard/trigger-update.js');
     await registerTriggerUpdateRoute(fastify);
 
