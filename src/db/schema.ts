@@ -435,3 +435,34 @@ export const workerControl = pgTable('worker_control', {
         .notNull()
         .defaultNow(),
 });
+
+/**
+ * ----------------------------------------------------------------------------
+ * API Metrics Tracking
+ * ----------------------------------------------------------------------------
+ *
+ * Tracks invocations of external APIs (e.g., Amazon Ads API) for monitoring
+ * and analytics purposes. Aggregated by hour for efficient querying.
+ */
+export const apiMetrics = pgTable(
+    'api_metrics',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        apiName: text('api_name').notNull(), // e.g., 'createReport', 'retrieveReport', 'listAdvertiserAccounts'
+        region: text('region').notNull(), // e.g., 'na', 'eu', 'fe'
+        statusCode: integer('status_code'), // HTTP status code (null if request failed before response)
+        success: boolean('success').notNull(), // Whether the request succeeded
+        durationMs: integer('duration_ms').notNull(), // Request duration in milliseconds
+        timestamp: timestamp('timestamp', {
+            withTimezone: true,
+            mode: 'date',
+        }).notNull(), // When the API call was made
+        error: text('error'), // Error message if request failed
+    },
+    table => [
+        // Index for querying metrics by API name and time range
+        index('api_metrics_api_name_timestamp_idx').on(table.apiName, table.timestamp),
+        // Index for querying by timestamp (for time-series queries)
+        index('api_metrics_timestamp_idx').on(table.timestamp),
+    ]
+);

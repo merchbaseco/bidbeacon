@@ -5,6 +5,7 @@ import { ConnectionStatusBadge } from '../components/connection-status-badge';
 import { Card } from '../components/ui/card';
 import { connectionStatusAtom } from './atoms';
 import { AccountEnabledSwitch } from './components/account-selector/account-enabled-switch';
+import { ApiMetricsChart } from './components/api-metrics-chart';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { ReportsTable } from './components/reports-table';
 
@@ -18,6 +19,13 @@ export function IndexRoute() {
                 <ConnectionStatusBadge status={connectionStatus} className="mt-0.5" />
             </div>
             <div className="space-y-4">
+                <Card className="p-3 space-y-0 gap-3">
+                    <div className="flex items-start justify-between px-2">
+                        <div className="text-sm font-medium">Amazon Ads API Invocations</div>
+                        <HugeiconsIcon icon={ArrowExpandIcon} size={20} color="currentColor" />
+                    </div>
+                    <ApiMetricsChart />
+                </Card>
                 <Card className="p-3 space-y-0 gap-3">
                     <div className="flex items-start justify-between px-2">
                         <div className="text-sm font-medium">Daily Dataset Health</div>

@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { withTracking } from '@/utils/api-tracker.js';
 import { refreshAccessToken } from './reauth.js';
 
 export type ApiRegion = 'na' | 'eu' | 'fe';
@@ -105,43 +106,54 @@ export interface RetrieveReportOptions {
  * @returns The retrieved report response
  */
 export async function retrieveReport(options: RetrieveReportOptions, region: ApiRegion = 'na'): Promise<RetrieveReportResponse> {
-    const accessToken = await refreshAccessToken();
-    const clientId = process.env.ADS_API_CLIENT_ID;
+    return withTracking({ apiName: 'retrieveReport', region }, async () => {
+        const accessToken = await refreshAccessToken();
+        const clientId = process.env.ADS_API_CLIENT_ID;
 
-    if (!clientId) {
-        throw new Error('Missing ADS_API_CLIENT_ID environment variable');
-    }
+        if (!clientId) {
+            throw new Error('Missing ADS_API_CLIENT_ID environment variable');
+        }
 
-    const baseUrl = getApiBaseUrl(region);
-    const url = `${baseUrl}/adsApi/v1/retrieve/reports`;
+        const baseUrl = getApiBaseUrl(region);
+        const url = `${baseUrl}/adsApi/v1/retrieve/reports`;
 
-    // Build request body
-    const requestBody: RetrieveReportRequest = {
-        reportIds: options.reportIds,
-    };
+        // Build request body
+        const requestBody: RetrieveReportRequest = {
+            reportIds: options.reportIds,
+        };
 
-    // Validate request body
-    const validatedRequestBody = retrieveReportRequestSchema.parse(requestBody);
+        // Validate request body
+        const validatedRequestBody = retrieveReportRequestSchema.parse(requestBody);
 
-    const headers: Record<string, string> = {
-        'Amazon-Advertising-API-ClientId': clientId,
-        'Amazon-Advertising-API-Scope': String(options.profileId),
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-    };
+        const headers: Record<string, string> = {
+            'Amazon-Advertising-API-ClientId': clientId,
+            'Amazon-Advertising-API-Scope': String(options.profileId),
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/json',
+        };
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(validatedRequestBody),
-        signal: AbortSignal.timeout(30000),
+        const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(validatedRequestBody),
+            signal: AbortSignal.timeout(30000),
+        });
+
+        // Store status code for tracking (even if error)
+        const statusCode = response.status;
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            const error = new Error(`Failed to retrieve report: ${response.status} ${response.statusText}. ${errorText}`);
+            // Attach status code to error for tracking
+            (error as Error & { statusCode?: number }).statusCode = statusCode;
+            throw error;
+        }
+
+        const jsonData = await response.json();
+        const result = retrieveReportResponseSchema.parse(jsonData);
+        // Attach status code to result for tracking
+        (result as typeof result & { statusCode?: number }).statusCode = statusCode;
+        return result;
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(`Failed to retrieve report: ${response.status} ${response.statusText}. ${errorText}`);
-    }
-
-    const jsonData = await response.json();
-    return retrieveReportResponseSchema.parse(jsonData);
 }

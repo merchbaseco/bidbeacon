@@ -181,3 +181,40 @@ export async function retrieveReport(params: { accountId: string; timestamp: str
 
     return body.data;
 }
+
+export type ApiMetricsDataPoint = {
+    hour: string;
+    count: number;
+    avgDuration: number;
+    successCount: number;
+    errorCount: number;
+};
+
+export type ApiMetricsResponse = {
+    success: boolean;
+    data: Record<string, ApiMetricsDataPoint[]>;
+    apiNames: string[];
+    from: string;
+    to: string;
+};
+
+export async function fetchApiMetrics(params: { from?: string; to?: string; apiName?: string }): Promise<ApiMetricsResponse> {
+    const metricsUrl = new URL('/api/dashboard/api-metrics', apiBaseUrl);
+    if (params.from) {
+        metricsUrl.searchParams.set('from', params.from);
+    }
+    if (params.to) {
+        metricsUrl.searchParams.set('to', params.to);
+    }
+    if (params.apiName) {
+        metricsUrl.searchParams.set('apiName', params.apiName);
+    }
+
+    const response = await fetch(metricsUrl);
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(`Failed to load API metrics: ${response.status} ${message}`);
+    }
+
+    return (await response.json()) as ApiMetricsResponse;
+}

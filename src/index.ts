@@ -98,6 +98,9 @@ fastify.register(async fastify => {
     const { registerRetrieveReportRoute } = await import('@/api/dashboard/retrieve-report.js');
     await registerRetrieveReportRoute(fastify);
 
+    const { registerApiMetricsRoute } = await import('@/api/dashboard/api-metrics.js');
+    await registerApiMetricsRoute(fastify);
+
     const { registerWebSocketRoute } = await import('@/api/events/websocket.js');
     await registerWebSocketRoute(fastify);
 });

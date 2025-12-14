@@ -4,6 +4,7 @@
  */
 
 import { z } from 'zod';
+import { withTracking } from '@/utils/api-tracker.js';
 import { refreshAccessToken } from './reauth.js';
 
 export type ApiRegion = 'na' | 'eu' | 'fe';
@@ -76,48 +77,54 @@ export interface ListAdsAccountsOptions {
  * @param region - API region (default: 'na' for North America)
  * @returns Response with accounts and optional nextToken
  */
-export async function listAdvertiserAccounts(
-    options?: ListAdsAccountsOptions,
-    region: ApiRegion = 'na'
-): Promise<{ adsAccounts: AdsAccountWithMetadata[]; nextToken?: string }> {
-    const accessToken = await refreshAccessToken();
-    const clientId = process.env.ADS_API_CLIENT_ID;
+export async function listAdvertiserAccounts(options?: ListAdsAccountsOptions, region: ApiRegion = 'na'): Promise<{ adsAccounts: AdsAccountWithMetadata[]; nextToken?: string }> {
+    return withTracking({ apiName: 'listAdvertiserAccounts', region }, async () => {
+        const accessToken = await refreshAccessToken();
+        const clientId = process.env.ADS_API_CLIENT_ID;
 
-    if (!clientId) {
-        throw new Error('Missing ADS_API_CLIENT_ID environment variable');
-    }
+        if (!clientId) {
+            throw new Error('Missing ADS_API_CLIENT_ID environment variable');
+        }
 
-    const baseUrl = getApiBaseUrl(region);
-    const url = `${baseUrl}/adsAccounts/list`;
+        const baseUrl = getApiBaseUrl(region);
+        const url = `${baseUrl}/adsAccounts/list`;
 
-    const requestBody: Record<string, unknown> = {};
-    if (options?.maxResults !== undefined) {
-        requestBody.maxResults = options.maxResults;
-    }
-    if (options?.nextToken) {
-        requestBody.nextToken = options.nextToken;
-    }
+        const requestBody: Record<string, unknown> = {};
+        if (options?.maxResults !== undefined) {
+            requestBody.maxResults = options.maxResults;
+        }
+        if (options?.nextToken) {
+            requestBody.nextToken = options.nextToken;
+        }
 
-    const headers: Record<string, string> = {
-        'Amazon-Advertising-API-ClientId': clientId,
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/vnd.listaccountsresource.v1+json',
-    };
+        const headers: Record<string, string> = {
+            'Amazon-Advertising-API-ClientId': clientId,
+            Authorization: `Bearer ${accessToken}`,
+            'Content-Type': 'application/vnd.listaccountsresource.v1+json',
+        };
 
-    const response = await fetch(url, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(requestBody),
-        signal: AbortSignal.timeout(30000),
+        const response = await fetch(url, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify(requestBody),
+            signal: AbortSignal.timeout(30000),
+        });
+
+        // Store status code for tracking (even if error)
+        const statusCode = response.status;
+
+        if (!response.ok) {
+            const errorText = await response.text();
+            const error = new Error(`Failed to list advertiser accounts: ${response.status} ${response.statusText}. ${errorText}`);
+            // Attach status code to error for tracking
+            (error as Error & { statusCode?: number }).statusCode = statusCode;
+            throw error;
+        }
+
+        const jsonData = await response.json();
+        const result = listAdsAccountsResponseSchema.parse(jsonData);
+        // Attach status code to result for tracking
+        (result as typeof result & { statusCode?: number }).statusCode = statusCode;
+        return result;
     });
-
-    if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(
-            `Failed to list advertiser accounts: ${response.status} ${response.statusText}. ${errorText}`
-        );
-    }
-
-    const jsonData = await response.json();
-    return listAdsAccountsResponseSchema.parse(jsonData);
 }
