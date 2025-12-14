@@ -1,10 +1,17 @@
 import { useMutation } from '@tanstack/react-query';
 import { toastManager } from '../../components/ui/toast.js';
 import { triggerUpdate as triggerUpdateApi } from './api.js';
+import { useSelectedCountryCode } from './use-selected-country-code.js';
 
 export function useRefreshReportsTable(accountId: string) {
+    const countryCode = useSelectedCountryCode();
     const mutation = useMutation({
-        mutationFn: () => triggerUpdateApi(accountId),
+        mutationFn: () => {
+            if (!countryCode) {
+                throw new Error('Country code is required to trigger update');
+            }
+            return triggerUpdateApi(accountId, countryCode);
+        },
         onSuccess: () => {
             // Show success toast indicating the job was queued
             toastManager.add({

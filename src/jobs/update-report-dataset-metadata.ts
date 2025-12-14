@@ -8,23 +8,9 @@ import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { performance, reportDatasetMetadata } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
-import {
-    enumerateUtcDays,
-    enumerateUtcHours,
-    isUtcStartOfDay,
-    utcAddDays,
-    utcAddHours,
-    utcNow,
-    utcPreviousDayStart,
-    utcPreviousHourStart,
-    utcStartOfDay,
-    utcSubtractDays,
-    utcSubtractHours,
-    utcTopOfHour,
-} from '@/utils/date.js';
+import { zonedAddDays, zonedAddHours, zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
-
-const DEFAULT_ACCOUNT_ID = 'amzn1.ads-account.g.akzidxc3kemvnyklo33ht2mjm';
+import { getTimezoneForCountry } from '@/utils/timezones.js';
 
 // Amazon Ads API data retention periods
 const HOURLY_RETENTION_DAYS = 14;
@@ -36,50 +22,39 @@ const DAILY_RETENTION_DAYS = DAILY_RETENTION_MONTHS * 30; // Approximate: 15 mon
 // ============================================================================
 
 const jobInputSchema = z.object({
-    accountId: z.string().optional(),
+    accountId: z.string(),
+    countryCode: z.string(),
 });
 
 export const updateReportDatasetMetadataJob = boss
     .createJob('update-report-dataset-metadata')
     .input(jobInputSchema)
-    .schedule({
-        cron: '0 * * * *', // Top of every hour
-        data: { accountId: DEFAULT_ACCOUNT_ID },
-    })
     .work(async jobs => {
         for (const job of jobs) {
-            const accountId = job.data.accountId ?? DEFAULT_ACCOUNT_ID;
-            console.log(`[Update Report Dataset Metadata] Starting job (ID: ${job.id}) for account: ${accountId}`);
-            const now = utcNow();
-            const hourStart = utcTopOfHour(now);
+            const { accountId, countryCode } = job.data;
 
-            // Update the metadata for the most recent completed hour (the hour that just ended)
-            const previousHourStart = utcPreviousHourStart(now);
-            await updateForWindow(accountId, previousHourStart, 'hourly');
+            console.log(`[Update Report Dataset Metadata] Starting job (ID: ${job.id}) for account: ${accountId}, country: ${countryCode}`);
+            const timezone = getTimezoneForCountry(countryCode);
+            const now = zonedNow(timezone);
 
-            // Backfill missing hourly metadata within retention period
-            await backfillMissingMetadata(accountId, now, 'hourly');
+            // Update hourly metadata for the past 14 days
+            await updateMetadata(accountId, countryCode, now, 'hourly', timezone);
 
-            // Once per day (at 00:00 UTC) also update the previous day's daily aggregation
-            if (isUtcStartOfDay(hourStart)) {
-                const previousDayStart = utcPreviousDayStart(now);
-                await updateForWindow(accountId, previousDayStart, 'daily');
-
-                // Backfill missing daily metadata within retention period
-                await backfillMissingMetadata(accountId, now, 'daily');
-            }
+            // Update daily metadata for the past 15 months
+            await updateMetadata(accountId, countryCode, now, 'daily', timezone);
 
             // Emit event when job completes
             emitEvent({
                 type: 'reports:refreshed',
                 accountId,
             });
-            console.log(`[Update Report Dataset Metadata] Completed job (ID: ${job.id}) for account: ${accountId}`);
+            console.log(`[Update Report Dataset Metadata] Completed job (ID: ${job.id}) for account: ${accountId}, country: ${countryCode}`);
         }
     });
 
 const reprocessJobInputSchema = z.object({
     accountId: z.string(),
+    countryCode: z.string(),
     timestamp: z.string(), // ISO string
     aggregation: z.enum(['hourly', 'daily']),
 });
@@ -89,10 +64,10 @@ export const reprocessReportDatasetMetadataJob = boss
     .input(reprocessJobInputSchema)
     .work(async jobs => {
         for (const job of jobs) {
-            const { accountId, timestamp, aggregation } = job.data;
-            console.log(`[Reprocess Report Dataset Metadata] Starting job (ID: ${job.id}): ${aggregation} for ${accountId} at ${timestamp}`);
+            const { accountId, countryCode, timestamp, aggregation } = job.data;
+            console.log(`[Reprocess Report Dataset Metadata] Starting job (ID: ${job.id}): ${aggregation} for ${accountId}, country: ${countryCode} at ${timestamp}`);
             const windowStart = new Date(timestamp);
-            await updateForWindow(accountId, windowStart, aggregation);
+            await updateForWindow(accountId, countryCode, windowStart, aggregation);
             console.log(`[Reprocess Report Dataset Metadata] Completed job (ID: ${job.id})`);
         }
     });
@@ -112,6 +87,7 @@ async function hasPerformanceData(accountId: string, windowStart: Date, windowEn
 
 async function upsertMetadata(args: {
     accountId: string;
+    countryCode: string;
     timestamp: Date;
     aggregation: 'hourly' | 'daily';
     status: 'missing' | 'fetching' | 'completed' | 'failed';
@@ -119,12 +95,13 @@ async function upsertMetadata(args: {
     lastRefreshed: Date;
     error?: string | null;
 }): Promise<void> {
-    const { accountId, timestamp, aggregation, status, reportId, lastRefreshed, error } = args;
+    const { accountId, countryCode, timestamp, aggregation, status, reportId, lastRefreshed, error } = args;
 
     await db
         .insert(reportDatasetMetadata)
         .values({
             accountId,
+            countryCode,
             timestamp,
             aggregation,
             status,
@@ -135,6 +112,7 @@ async function upsertMetadata(args: {
         .onConflictDoUpdate({
             target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation],
             set: {
+                countryCode,
                 status,
                 lastRefreshed,
                 reportId,
@@ -143,8 +121,33 @@ async function upsertMetadata(args: {
         });
 }
 
-async function updateForWindow(accountId: string, windowStart: Date, aggregation: 'hourly' | 'daily'): Promise<void> {
-    const windowEnd = aggregation === 'hourly' ? utcAddHours(windowStart, 1) : utcAddDays(windowStart, 1);
+/**
+ * Create a new metadata row for a time period.
+ * Used when initially creating rows to maintain the time-based dataset.
+ */
+async function createMetadataRow(accountId: string, countryCode: string, timestamp: Date, aggregation: 'hourly' | 'daily'): Promise<void> {
+    const timezone = getTimezoneForCountry(countryCode);
+    const reportId = `${aggregation}-${timestamp.toISOString()}`;
+
+    await upsertMetadata({
+        accountId,
+        countryCode,
+        timestamp,
+        aggregation,
+        status: 'missing',
+        reportId,
+        lastRefreshed: zonedNow(timezone),
+        error: null,
+    });
+}
+
+/**
+ * Update metadata for a window based on whether performance data exists.
+ * Used when reprocessing or updating existing rows.
+ */
+async function updateForWindow(accountId: string, countryCode: string, windowStart: Date, aggregation: 'hourly' | 'daily'): Promise<void> {
+    const timezone = getTimezoneForCountry(countryCode);
+    const windowEnd = aggregation === 'hourly' ? zonedAddHours(windowStart, 1, timezone) : zonedAddDays(windowStart, 1, timezone);
     const hasData = await hasPerformanceData(accountId, windowStart, windowEnd, aggregation);
 
     const status = hasData ? 'completed' : 'missing';
@@ -153,21 +156,27 @@ async function updateForWindow(accountId: string, windowStart: Date, aggregation
 
     await upsertMetadata({
         accountId,
+        countryCode,
         timestamp: windowStart,
         aggregation,
         status,
         reportId,
-        lastRefreshed: utcNow(),
+        lastRefreshed: zonedNow(timezone),
         error,
     });
 }
 
 /**
- * Check if a metadata record exists for the given account, timestamp, and aggregation.
+ * Check if a metadata record exists for the given account, country code, timestamp, and aggregation.
  */
-async function metadataExists(accountId: string, timestamp: Date, aggregation: 'hourly' | 'daily'): Promise<boolean> {
+async function metadataExists(accountId: string, countryCode: string, timestamp: Date, aggregation: 'hourly' | 'daily'): Promise<boolean> {
     const record = await db.query.reportDatasetMetadata.findFirst({
-        where: and(eq(reportDatasetMetadata.accountId, accountId), eq(reportDatasetMetadata.timestamp, timestamp), eq(reportDatasetMetadata.aggregation, aggregation)),
+        where: and(
+            eq(reportDatasetMetadata.accountId, accountId),
+            eq(reportDatasetMetadata.countryCode, countryCode),
+            eq(reportDatasetMetadata.timestamp, timestamp),
+            eq(reportDatasetMetadata.aggregation, aggregation)
+        ),
         columns: { accountId: true },
     });
 
@@ -175,24 +184,30 @@ async function metadataExists(accountId: string, timestamp: Date, aggregation: '
 }
 
 /**
- * Backfill missing metadata records within the retention period.
- * Creates records for any missing hours/days that don't have metadata yet.
+ * Update metadata records within the retention period.
+ * Creates rows starting from the most recent period and working backwards,
+ * stopping when existing records are found or the retention limit is reached.
  */
-async function backfillMissingMetadata(accountId: string, now: Date, aggregation: 'hourly' | 'daily'): Promise<void> {
-    const currentPeriodStart = aggregation === 'hourly' ? utcTopOfHour(now) : utcStartOfDay(now);
+async function updateMetadata(accountId: string, countryCode: string, now: Date, aggregation: 'hourly' | 'daily', timezone: string): Promise<void> {
+    const currentPeriodStart = aggregation === 'hourly' ? zonedTopOfHour(now, timezone) : zonedStartOfDay(now, timezone);
     const retentionDays = aggregation === 'hourly' ? HOURLY_RETENTION_DAYS : DAILY_RETENTION_DAYS;
-    const earliestPeriodStart = aggregation === 'hourly' ? utcSubtractHours(currentPeriodStart, retentionDays * 24) : utcSubtractDays(currentPeriodStart, retentionDays);
+    const earliestPeriodStart = aggregation === 'hourly' ? zonedSubtractHours(currentPeriodStart, retentionDays * 24, timezone) : zonedSubtractDays(currentPeriodStart, retentionDays, timezone);
 
-    // Iterate through all periods in the retention window
-    const periods = aggregation === 'hourly' ? enumerateUtcHours(earliestPeriodStart, currentPeriodStart) : enumerateUtcDays(earliestPeriodStart, currentPeriodStart);
+    // Start from the most recent period and work backwards
+    let periodStart = currentPeriodStart;
+    const earliestTime = earliestPeriodStart.getTime();
 
-    for (const periodStart of periods) {
-        // Skip if metadata already exists
-        if (await metadataExists(accountId, periodStart, aggregation)) {
-            continue;
+    while (periodStart.getTime() >= earliestTime) {
+        // Check if metadata already exists
+        if (await metadataExists(accountId, countryCode, periodStart, aggregation)) {
+            // Found existing record - stop here since all earlier periods should also exist
+            break;
         }
 
-        // Create metadata record (will check for data and set status accordingly)
-        await updateForWindow(accountId, periodStart, aggregation);
+        // Create metadata row for this time period
+        await createMetadataRow(accountId, countryCode, periodStart, aggregation);
+
+        // Move to the previous period
+        periodStart = aggregation === 'hourly' ? zonedSubtractHours(periodStart, 1, timezone) : zonedSubtractDays(periodStart, 1, timezone);
     }
 }

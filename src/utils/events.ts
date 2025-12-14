@@ -91,8 +91,13 @@ const eventEmitter = new EventEmitter();
 
 /**
  * Utility function to emit events easily from anywhere in the codebase
+ * Uses function overloads to preserve discriminated union types
  */
-export function emitEvent(event: Omit<Event, 'timestamp'>) {
+export function emitEvent(event: Omit<ErrorEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<AccountUpdatedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<AccountsSyncedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<Event, 'timestamp'>): void {
     const eventWithTimestamp: Event = {
         ...event,
         timestamp: new Date().toISOString(),

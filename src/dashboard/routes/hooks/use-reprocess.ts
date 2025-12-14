@@ -2,15 +2,20 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toastManager } from '../../components/ui/toast.js';
 import { reprocessDataset } from './api.js';
 import { queryKeys } from './query-keys.js';
+import { useSelectedCountryCode } from './use-selected-country-code.js';
 
 type Aggregation = 'daily' | 'hourly';
 
 export function useReprocess(accountId: string, aggregation: Aggregation) {
     const queryClient = useQueryClient();
+    const countryCode = useSelectedCountryCode();
 
     const mutation = useMutation({
         mutationFn: async (timestamp: string) => {
-            return await reprocessDataset({ accountId, timestamp, aggregation });
+            if (!countryCode) {
+                throw new Error('Country code is required to reprocess');
+            }
+            return await reprocessDataset({ accountId, countryCode, timestamp, aggregation });
         },
         onSuccess: () => {
             // Invalidate and refetch queries

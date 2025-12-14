@@ -35,13 +35,13 @@ export async function fetchDashboardStatus(params: { accountId: string; countryC
     return body.data;
 }
 
-export async function triggerUpdate(accountId: string) {
+export async function triggerUpdate(accountId: string, countryCode: string) {
     const response = await fetch(`${apiBaseUrl}/api/dashboard/trigger-update`, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ accountId }),
+        body: JSON.stringify({ accountId, countryCode }),
     });
 
     if (!response.ok) {
@@ -52,7 +52,7 @@ export async function triggerUpdate(accountId: string) {
     return (await response.json()) as { message?: string };
 }
 
-export async function reprocessDataset(params: { accountId: string; timestamp: string; aggregation: string }) {
+export async function reprocessDataset(params: { accountId: string; countryCode: string; timestamp: string; aggregation: string }) {
     const response = await fetch(`${apiBaseUrl}/api/dashboard/reprocess`, {
         method: 'POST',
         headers: {
