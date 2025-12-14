@@ -10,31 +10,35 @@ export function registerStatusRoute(fastify: FastifyInstance) {
     fastify.get('/api/dashboard/status', async (request, _reply) => {
         const querySchema = z.object({
             accountId: z.string().default(DEFAULT_ACCOUNT_ID),
+            countryCode: z.string().optional(),
             aggregation: z.enum(['hourly', 'daily']).default('daily'),
             from: z.string().datetime().optional(), // ISO string
             to: z.string().datetime().optional(), // ISO string
         });
 
         const query = querySchema.parse(request.query);
-        console.log(`[API] Status request: ${query.aggregation} for ${query.accountId}`);
+        console.log(`[API] Status request: ${query.aggregation} for ${query.accountId}${query.countryCode ? ` (${query.countryCode})` : ''}`);
 
         // Default to last 30 days if no range provided
         const to = query.to ? new Date(query.to) : new Date();
-        const from = query.from
-            ? new Date(query.from)
-            : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+        const from = query.from ? new Date(query.from) : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
+
+        const conditions = [
+            eq(reportDatasetMetadata.accountId, query.accountId),
+            eq(reportDatasetMetadata.aggregation, query.aggregation),
+            gte(reportDatasetMetadata.timestamp, from),
+            lte(reportDatasetMetadata.timestamp, to),
+        ];
+
+        // Add countryCode filter if provided
+        if (query.countryCode) {
+            conditions.push(eq(reportDatasetMetadata.countryCode, query.countryCode));
+        }
 
         const data = await db
             .select()
             .from(reportDatasetMetadata)
-            .where(
-                and(
-                    eq(reportDatasetMetadata.accountId, query.accountId),
-                    eq(reportDatasetMetadata.aggregation, query.aggregation),
-                    gte(reportDatasetMetadata.timestamp, from),
-                    lte(reportDatasetMetadata.timestamp, to)
-                )
-            )
+            .where(and(...conditions))
             .orderBy(desc(reportDatasetMetadata.timestamp));
 
         console.log(`[API] Returning ${data.length} status record(s)`);

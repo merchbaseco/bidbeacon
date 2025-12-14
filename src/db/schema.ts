@@ -99,6 +99,7 @@ export const reportDatasetMetadata = pgTable(
     'report_dataset_metadata',
     {
         accountId: text('account_id').notNull(),
+        countryCode: text('country_code').notNull(),
         timestamp: timestamp('timestamp', { withTimezone: false, mode: 'date' }).notNull(), // utc
         aggregation: text('aggregation').notNull(), // daily or hourly
         status: text('status').notNull(), // enum: missing, fetching, completed, failed

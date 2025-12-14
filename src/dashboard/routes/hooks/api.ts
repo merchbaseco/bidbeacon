@@ -1,8 +1,22 @@
 import { apiBaseUrl } from '../../router';
 
-export async function fetchDashboardStatus(params: { accountId: string; aggregation: string; from: string; to: string }) {
+export type DashboardStatusResponse = {
+    accountId: string;
+    countryCode: string;
+    timestamp: string;
+    aggregation: 'daily' | 'hourly';
+    status: string;
+    lastRefreshed: string | null;
+    reportId: string;
+    error: string | null;
+};
+
+export async function fetchDashboardStatus(params: { accountId: string; countryCode?: string; aggregation: string; from: string; to: string }): Promise<DashboardStatusResponse[]> {
     const statusUrl = new URL('/api/dashboard/status', apiBaseUrl);
     statusUrl.searchParams.set('accountId', params.accountId);
+    if (params.countryCode) {
+        statusUrl.searchParams.set('countryCode', params.countryCode);
+    }
     statusUrl.searchParams.set('aggregation', params.aggregation);
     statusUrl.searchParams.set('from', params.from);
     statusUrl.searchParams.set('to', params.to);
@@ -15,15 +29,7 @@ export async function fetchDashboardStatus(params: { accountId: string; aggregat
 
     const body = (await response.json()) as {
         success: boolean;
-        data: Array<{
-            accountId: string;
-            timestamp: string;
-            aggregation: string;
-            status: string;
-            lastRefreshed: string | null;
-            reportId: string;
-            error: string | null;
-        }>;
+        data: DashboardStatusResponse[];
     };
 
     return body.data;
