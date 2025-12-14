@@ -127,3 +127,57 @@ export async function toggleAdvertiserAccount(adsAccountId: string, profileId: s
 
     return (await response.json()) as { success: boolean; message?: string };
 }
+
+export async function createReport(params: { accountId: string; countryCode: string; timestamp: string; aggregation: 'hourly' | 'daily' }) {
+    const response = await fetch(`${apiBaseUrl}/api/dashboard/create-report`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Request failed (${response.status}): ${text}`);
+    }
+
+    const body = (await response.json()) as {
+        success: boolean;
+        data?: unknown;
+        error?: string;
+    };
+
+    if (!body.success) {
+        throw new Error(body.error || 'Failed to create report');
+    }
+
+    return body.data;
+}
+
+export async function retrieveReport(params: { accountId: string; timestamp: string; aggregation: 'hourly' | 'daily' }) {
+    const response = await fetch(`${apiBaseUrl}/api/dashboard/retrieve-report`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Request failed (${response.status}): ${text}`);
+    }
+
+    const body = (await response.json()) as {
+        success: boolean;
+        data?: unknown;
+        error?: string;
+    };
+
+    if (!body.success) {
+        throw new Error(body.error || 'Failed to retrieve report');
+    }
+
+    return body.data;
+}

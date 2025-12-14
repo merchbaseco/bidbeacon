@@ -5,11 +5,13 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Frame, FrameFooter } from '../../components/ui/frame';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
+import { createReport, retrieveReport } from '../hooks/api.js';
 import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useReportDatasets } from '../hooks/use-report-datasets.js';
 import { useReprocess } from '../hooks/use-reprocess.js';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid.js';
 import { formatDate } from '../utils.js';
+import { ReportResponseDialog } from './report-response-dialog.js';
 import { ReportsToolbar } from './reports-toolbar.js';
 import { StatusBadge } from './status-badge.js';
 import { TablePagination } from './table-pagination.js';
@@ -27,6 +29,11 @@ export const ReportsTable = () => {
 
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<string>('all');
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [dialogTitle, setDialogTitle] = useState('');
+    const [dialogData, setDialogData] = useState<unknown>(null);
+    const [dialogError, setDialogError] = useState<string | null>(null);
+    const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
     // Filter rows by status
     const filteredRows = useMemo(() => {
@@ -64,6 +71,55 @@ export const ReportsTable = () => {
         refreshReportsTable();
     };
 
+    const handleCreateReport = async (row: (typeof rows)[0]) => {
+        if (!accountId || !row.countryCode) return;
+
+        setLoadingAction(`create-${row.timestamp}`);
+        setDialogTitle('Create Report Response');
+        setDialogError(null);
+        setDialogData(null);
+
+        try {
+            const response = await createReport({
+                accountId,
+                countryCode: row.countryCode,
+                timestamp: row.timestamp,
+                aggregation: row.aggregation,
+            });
+            setDialogData(response);
+            setDialogOpen(true);
+        } catch (error) {
+            setDialogError(error instanceof Error ? error.message : 'Unknown error');
+            setDialogOpen(true);
+        } finally {
+            setLoadingAction(null);
+        }
+    };
+
+    const handleRetrieveReport = async (row: (typeof rows)[0]) => {
+        if (!accountId) return;
+
+        setLoadingAction(`retrieve-${row.timestamp}`);
+        setDialogTitle('Retrieve Report Response');
+        setDialogError(null);
+        setDialogData(null);
+
+        try {
+            const response = await retrieveReport({
+                accountId,
+                timestamp: row.timestamp,
+                aggregation: row.aggregation,
+            });
+            setDialogData(response);
+            setDialogOpen(true);
+        } catch (error) {
+            setDialogError(error instanceof Error ? error.message : 'Unknown error');
+            setDialogOpen(true);
+        } finally {
+            setLoadingAction(null);
+        }
+    };
+
     return (
         <>
             <ReportsToolbar
@@ -93,24 +149,61 @@ export const ReportsTable = () => {
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            paginatedRows.map(row => (
-                                <TableRow key={`${row.timestamp}-${row.aggregation}`}>
-                                    <TableCell className="font-medium">{formatDate(row.timestamp)}</TableCell>
-                                    <TableCell>
-                                        <StatusBadge status={row.status} />
-                                    </TableCell>
-                                    <TableCell>{row.lastRefreshed ? formatDate(row.lastRefreshed) : '—'}</TableCell>
-                                    <TableCell>
-                                        <Badge variant="outline">{row.reportId}</Badge>
-                                    </TableCell>
-                                    <TableCell className="text-right">
-                                        <Button variant="secondary" type="button" disabled={pending !== null} onClick={() => reprocessAt(row.timestamp)} className="inline-flex items-center gap-2">
-                                            <HugeiconsIcon icon={CircleArrowReload01Icon} size={16} color="currentColor" />
-                                            {pending === row.timestamp ? 'Queuing…' : 'Reprocess'}
-                                        </Button>
-                                    </TableCell>
-                                </TableRow>
-                            ))
+                            paginatedRows.map(row => {
+                                const createActionKey = `create-${row.timestamp}`;
+                                const retrieveActionKey = `retrieve-${row.timestamp}`;
+                                const isCreating = loadingAction === createActionKey;
+                                const isRetrieving = loadingAction === retrieveActionKey;
+                                const isActionPending = isCreating || isRetrieving || pending !== null;
+
+                                return (
+                                    <TableRow key={`${row.timestamp}-${row.aggregation}`}>
+                                        <TableCell className="font-medium">{formatDate(row.timestamp)}</TableCell>
+                                        <TableCell>
+                                            <StatusBadge status={row.status} />
+                                        </TableCell>
+                                        <TableCell>{row.lastRefreshed ? formatDate(row.lastRefreshed) : '—'}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{row.reportId}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-right">
+                                            <div className="flex items-center justify-end gap-2">
+                                                <Button
+                                                    variant="secondary"
+                                                    type="button"
+                                                    size="sm"
+                                                    disabled={isActionPending}
+                                                    onClick={() => handleCreateReport(row)}
+                                                    className="inline-flex items-center gap-2"
+                                                >
+                                                    {isCreating ? 'Creating…' : 'Create Report'}
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    type="button"
+                                                    size="sm"
+                                                    disabled={isActionPending || !row.reportId}
+                                                    onClick={() => handleRetrieveReport(row)}
+                                                    className="inline-flex items-center gap-2"
+                                                >
+                                                    {isRetrieving ? 'Retrieving…' : 'Retrieve Report'}
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    type="button"
+                                                    size="sm"
+                                                    disabled={isActionPending}
+                                                    onClick={() => reprocessAt(row.timestamp)}
+                                                    className="inline-flex items-center gap-2"
+                                                >
+                                                    <HugeiconsIcon icon={CircleArrowReload01Icon} size={16} color="currentColor" />
+                                                    {pending === row.timestamp ? 'Queuing…' : 'Reprocess'}
+                                                </Button>
+                                            </div>
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
                         )}
                     </TableBody>
                 </Table>
@@ -123,6 +216,7 @@ export const ReportsTable = () => {
                     </FrameFooter>
                 )}
             </Frame>
+            <ReportResponseDialog open={dialogOpen} onOpenChange={setDialogOpen} title={dialogTitle} data={dialogData} error={dialogError} />
         </>
     );
 };

@@ -18,14 +18,7 @@ await fastify.register(helmet);
 await fastify.register(websocket);
 await fastify.register(cors, {
     origin: (origin, callback) => {
-        const allowedOrigins = [
-            'https://merchbase.co',
-            'https://admin.bidbeacon.merchbase.co',
-            'http://localhost:3000',
-            'http://localhost:5173',
-            'http://localhost:4173',
-            'http://localhost:4174',
-        ];
+        const allowedOrigins = ['https://merchbase.co', 'https://admin.bidbeacon.merchbase.co', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'http://localhost:4174'];
 
         // Allow requests with no origin (e.g., mobile apps, server-to-server)
         if (!origin) return callback(null, true);
@@ -87,25 +80,23 @@ fastify.register(async fastify => {
     const { registerTriggerUpdateRoute } = await import('@/api/dashboard/trigger-update.js');
     await registerTriggerUpdateRoute(fastify);
 
-    const { registerListAdvertiserAccountsRoute } = await import(
-        '@/api/dashboard/list-advertiser-accounts.js'
-    );
+    const { registerListAdvertiserAccountsRoute } = await import('@/api/dashboard/list-advertiser-accounts.js');
     await registerListAdvertiserAccountsRoute(fastify);
 
-    const { registerListAdvertisingAccountsRoute } = await import(
-        '@/api/dashboard/list-advertising-accounts.js'
-    );
+    const { registerListAdvertisingAccountsRoute } = await import('@/api/dashboard/list-advertising-accounts.js');
     await registerListAdvertisingAccountsRoute(fastify);
 
-    const { registerSyncAdvertiserAccountsRoute } = await import(
-        '@/api/dashboard/sync-advertiser-accounts.js'
-    );
+    const { registerSyncAdvertiserAccountsRoute } = await import('@/api/dashboard/sync-advertiser-accounts.js');
     await registerSyncAdvertiserAccountsRoute(fastify);
 
-    const { registerToggleAdvertiserAccountRoute } = await import(
-        '@/api/dashboard/toggle-advertiser-account.js'
-    );
+    const { registerToggleAdvertiserAccountRoute } = await import('@/api/dashboard/toggle-advertiser-account.js');
     await registerToggleAdvertiserAccountRoute(fastify);
+
+    const { registerCreateReportRoute } = await import('@/api/dashboard/create-report.js');
+    await registerCreateReportRoute(fastify);
+
+    const { registerRetrieveReportRoute } = await import('@/api/dashboard/retrieve-report.js');
+    await registerRetrieveReportRoute(fastify);
 
     const { registerWebSocketRoute } = await import('@/api/events/websocket.js');
     await registerWebSocketRoute(fastify);
@@ -186,9 +177,7 @@ try {
     console.log(`✓ Database connected`);
     console.log(`✓ Server running on port ${port}`);
     console.log(`✓ Health check endpoint: /api/health`);
-    console.log(
-        `✓ Worker control endpoints: /api/worker/status, /api/worker/start, /api/worker/stop`
-    );
+    console.log(`✓ Worker control endpoints: /api/worker/status, /api/worker/start, /api/worker/stop`);
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('');
 } catch (err) {
