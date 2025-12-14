@@ -99,6 +99,13 @@
       "when": 1765683973627,
       "tag": "0013_giant_cloak",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1765686421521,
+      "tag": "0014_friendly_killer_shrike",
+      "breakpoints": true
     }
   ]
 }

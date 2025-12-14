@@ -91,11 +91,10 @@ async function upsertMetadata(args: {
     timestamp: Date;
     aggregation: 'hourly' | 'daily';
     status: 'missing' | 'fetching' | 'completed' | 'failed';
-    reportId: string;
     lastRefreshed: Date;
     error?: string | null;
 }): Promise<void> {
-    const { accountId, countryCode, timestamp, aggregation, status, reportId, lastRefreshed, error } = args;
+    const { accountId, countryCode, timestamp, aggregation, status, lastRefreshed, error } = args;
 
     await db
         .insert(reportDatasetMetadata)
@@ -106,7 +105,7 @@ async function upsertMetadata(args: {
             aggregation,
             status,
             lastRefreshed,
-            reportId,
+            reportId: null,
             error: error ?? null,
         })
         .onConflictDoUpdate({
@@ -115,7 +114,6 @@ async function upsertMetadata(args: {
                 countryCode,
                 status,
                 lastRefreshed,
-                reportId,
                 error: error ?? null,
             },
         });
@@ -127,7 +125,6 @@ async function upsertMetadata(args: {
  */
 async function createMetadataRow(accountId: string, countryCode: string, timestamp: Date, aggregation: 'hourly' | 'daily'): Promise<void> {
     const timezone = getTimezoneForCountry(countryCode);
-    const reportId = `${aggregation}-${timestamp.toISOString()}`;
 
     await upsertMetadata({
         accountId,
@@ -135,7 +132,6 @@ async function createMetadataRow(accountId: string, countryCode: string, timesta
         timestamp,
         aggregation,
         status: 'missing',
-        reportId,
         lastRefreshed: zonedNow(timezone),
         error: null,
     });
@@ -152,7 +148,6 @@ async function updateForWindow(accountId: string, countryCode: string, windowSta
 
     const status = hasData ? 'completed' : 'missing';
     const error = hasData ? null : 'No performance data found for this window';
-    const reportId = `${aggregation}-${windowStart.toISOString()}`;
 
     await upsertMetadata({
         accountId,
@@ -160,7 +155,6 @@ async function updateForWindow(accountId: string, countryCode: string, windowSta
         timestamp: windowStart,
         aggregation,
         status,
-        reportId,
         lastRefreshed: zonedNow(timezone),
         error,
     });

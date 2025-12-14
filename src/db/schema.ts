@@ -104,7 +104,7 @@ export const reportDatasetMetadata = pgTable(
         aggregation: text('aggregation').notNull(), // daily or hourly
         status: text('status').notNull(), // enum: missing, fetching, completed, failed
         lastRefreshed: timestamp('last_refreshed', { withTimezone: false, mode: 'date' }), // utc
-        reportId: text('report_id').notNull(),
+        reportId: text('report_id'),
         error: text('error'),
     },
     table => [primaryKey({ columns: [table.accountId, table.timestamp, table.aggregation] })]
