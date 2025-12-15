@@ -18,9 +18,9 @@ export function registerApiMetricsRoute(fastify: FastifyInstance) {
 
         const query = querySchema.parse(request.query);
 
-        // Default to last 24 hours if no range provided
+        // Default to last 3 hours if no range provided
         const to = query.to ? new Date(query.to) : new Date();
-        const from = query.from ? new Date(query.from) : new Date(to.getTime() - 24 * 60 * 60 * 1000);
+        const from = query.from ? new Date(query.from) : new Date(to.getTime() - 3 * 60 * 60 * 1000);
 
         const conditions = [gte(apiMetrics.timestamp, from), lte(apiMetrics.timestamp, to)];
 
@@ -29,11 +29,11 @@ export function registerApiMetricsRoute(fastify: FastifyInstance) {
             conditions.push(eq(apiMetrics.apiName, query.apiName));
         }
 
-        // Aggregate metrics by hour and API name
-        // Using date_trunc to group by hour
+        // Aggregate metrics by 5-minute intervals and API name
+        // Round timestamp to nearest 5-minute interval
         const data = await db
             .select({
-                hour: sql<string>`date_trunc('hour', ${apiMetrics.timestamp})`.as('hour'),
+                interval: sql<string>`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`.as('interval'),
                 apiName: apiMetrics.apiName,
                 count: sql<number>`count(*)`.as('count'),
                 avgDuration: sql<number>`avg(${apiMetrics.durationMs})`.as('avg_duration'),
@@ -42,20 +42,20 @@ export function registerApiMetricsRoute(fastify: FastifyInstance) {
             })
             .from(apiMetrics)
             .where(and(...conditions))
-            .groupBy(sql`date_trunc('hour', ${apiMetrics.timestamp})`, apiMetrics.apiName)
-            .orderBy(sql`date_trunc('hour', ${apiMetrics.timestamp})`, sql`${apiMetrics.apiName}`);
+            .groupBy(sql`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`, apiMetrics.apiName)
+            .orderBy(sql`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`, sql`${apiMetrics.apiName}`);
 
         // Transform data for chart consumption
-        // Group by API name, then by hour
-        const chartData: Record<string, Array<{ hour: string; count: number; avgDuration: number; successCount: number; errorCount: number }>> = {};
+        // Group by API name, then by interval
+        const chartData: Record<string, Array<{ interval: string; count: number; avgDuration: number; successCount: number; errorCount: number }>> = {};
 
         for (const row of data) {
-            const hour = new Date(row.hour).toISOString();
+            const interval = new Date(row.interval).toISOString();
             if (!chartData[row.apiName]) {
                 chartData[row.apiName] = [];
             }
             chartData[row.apiName].push({
-                hour,
+                interval,
                 count: Number(row.count),
                 avgDuration: Math.round(Number(row.avgDuration)),
                 successCount: Number(row.successCount),

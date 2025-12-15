@@ -166,7 +166,7 @@ export async function retrieveReport(params: { accountId: string; timestamp: str
 }
 
 export type ApiMetricsDataPoint = {
-    hour: string;
+    interval: string;
     count: number;
     avgDuration: number;
     successCount: number;

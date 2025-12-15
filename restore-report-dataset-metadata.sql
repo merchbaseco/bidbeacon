@@ -13,3 +13,4 @@ CREATE TABLE "report_dataset_metadata" (
     CONSTRAINT "report_dataset_metadata_account_id_timestamp_aggregation_pk" 
         PRIMARY KEY("account_id","timestamp","aggregation")
 );
+

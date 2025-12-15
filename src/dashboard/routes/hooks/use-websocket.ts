@@ -48,7 +48,7 @@ export function useWebSocket(): ConnectionStatus {
                             queryKey: queryKeys.advertisingAccounts(),
                         });
                         queryClient.invalidateQueries({
-                            queryKey: queryKeys.apiMetrics(),
+                            queryKey: ['api-metrics'],
                         });
                         break;
                     case 'accounts:synced': {
@@ -76,7 +76,7 @@ export function useWebSocket(): ConnectionStatus {
                             queryKey: queryKeys.advertisingAccounts(),
                         });
                         queryClient.invalidateQueries({
-                            queryKey: queryKeys.apiMetrics(),
+                            queryKey: ['api-metrics'],
                         });
                         break;
                     }
@@ -86,7 +86,7 @@ export function useWebSocket(): ConnectionStatus {
                             queryKey: queryKeys.dashboardStatusAll(),
                         });
                         queryClient.invalidateQueries({
-                            queryKey: queryKeys.apiMetrics(),
+                            queryKey: ['api-metrics'],
                         });
                         toastManager.add({
                             type: 'success',
