@@ -5,8 +5,15 @@ import { db } from '@/db/index.js';
 import { apiMetrics } from '@/db/schema.js';
 
 /**
+ * All supported Amazon Ads API endpoints that we track.
+ * This ensures all APIs appear in charts even when they have no invocations.
+ */
+const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport'] as const;
+
+/**
  * Aggregates API metrics by hour and API name for charting.
  * Returns data grouped by hour and API name, suitable for line charts.
+ * Always includes all supported APIs, even those with no data.
  */
 export function registerApiMetricsRoute(fastify: FastifyInstance) {
     fastify.get('/api/dashboard/api-metrics', async (request, _reply) => {
@@ -49,6 +56,11 @@ export function registerApiMetricsRoute(fastify: FastifyInstance) {
         // Group by API name, then by interval
         const chartData: Record<string, Array<{ interval: string; count: number; avgDuration: number; successCount: number; errorCount: number }>> = {};
 
+        // Initialize all supported APIs with empty arrays
+        for (const apiName of SUPPORTED_APIS) {
+            chartData[apiName] = [];
+        }
+
         for (const row of data) {
             const interval = new Date(row.interval).toISOString();
             if (!chartData[row.apiName]) {
@@ -63,8 +75,8 @@ export function registerApiMetricsRoute(fastify: FastifyInstance) {
             });
         }
 
-        // Get list of unique API names
-        const apiNames = Object.keys(chartData).sort();
+        // Always return all supported APIs in consistent order
+        const apiNames = [...SUPPORTED_APIS];
 
         return {
             success: true,

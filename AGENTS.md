@@ -34,6 +34,30 @@ Both share the same PostgreSQL database.
 5. Unique index in `schema.ts` for idempotency
 6. Migration: `yarn db:generate`
 
+## Adding New Amazon Ads API
+
+When adding a new Amazon Ads API integration (e.g., a new endpoint in `src/amazon-ads/`):
+
+1. Create the API function in `src/amazon-ads/` (e.g., `get-campaigns.ts`)
+2. Wrap the API call with `withTracking` from `@/utils/api-tracker.js`:
+   ```typescript
+   import { withTracking } from '@/utils/api-tracker.js';
+   
+   return withTracking({ apiName: 'getCampaigns', region }, async () => {
+     // API call logic here
+   });
+   ```
+3. **Important**: Add the `apiName` to the `SUPPORTED_APIS` array in `src/api/dashboard/api-metrics.ts`:
+   ```typescript
+   const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'getCampaigns'] as const;
+   ```
+   This ensures the API appears in the dashboard metrics chart even when it has zero invocations.
+
+**Current tracked APIs:**
+- `listAdvertiserAccounts` - Lists advertiser accounts for a profile
+- `createReport` - Creates an async report request
+- `retrieveReport` - Retrieves a completed report
+
 ## DLQ Triage Workflow
 
 When messages fail validation, they're retried by SQS and eventually end up in the Dead Letter Queue (DLQ). Use this workflow to triage and fix DLQ issues.
