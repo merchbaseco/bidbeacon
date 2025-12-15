@@ -165,6 +165,33 @@ export async function retrieveReport(params: { accountId: string; timestamp: str
     return body.data;
 }
 
+export async function parseReport(params: { accountId: string; countryCode: string; timestamp: string; aggregation: 'hourly' | 'daily' }) {
+    const response = await fetch(`${apiBaseUrl}/api/dashboard/parse-report`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(params),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Request failed (${response.status}): ${text}`);
+    }
+
+    const body = (await response.json()) as {
+        success: boolean;
+        data?: { rowsProcessed: number };
+        error?: string;
+    };
+
+    if (!body.success) {
+        throw new Error(body.error || 'Failed to parse report');
+    }
+
+    return body.data;
+}
+
 export type ApiMetricsDataPoint = {
     interval: string;
     count: number;

@@ -3,7 +3,7 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Frame, FrameFooter } from '../../components/ui/frame';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { createReport, retrieveReport } from '../hooks/api.js';
+import { createReport, parseReport, retrieveReport } from '../hooks/api.js';
 import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useReportDatasets } from '../hooks/use-report-datasets.js';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid.js';
@@ -116,6 +116,31 @@ export const ReportsTable = () => {
         }
     };
 
+    const handleParseReport = async (row: (typeof rows)[0]) => {
+        if (!accountId || !row.countryCode) return;
+
+        setLoadingAction(`parse-${row.timestamp}`);
+        setDialogTitle('Parse Report Response');
+        setDialogError(null);
+        setDialogData(null);
+
+        try {
+            const response = await parseReport({
+                accountId,
+                countryCode: row.countryCode,
+                timestamp: row.timestamp,
+                aggregation: row.aggregation,
+            });
+            setDialogData(response);
+            setDialogOpen(true);
+        } catch (error) {
+            setDialogError(error instanceof Error ? error.message : 'Unknown error');
+            setDialogOpen(true);
+        } finally {
+            setLoadingAction(null);
+        }
+    };
+
     return (
         <>
             <ReportsToolbar
@@ -148,9 +173,11 @@ export const ReportsTable = () => {
                             paginatedRows.map(row => {
                                 const createActionKey = `create-${row.timestamp}`;
                                 const retrieveActionKey = `retrieve-${row.timestamp}`;
+                                const parseActionKey = `parse-${row.timestamp}`;
                                 const isCreating = loadingAction === createActionKey;
                                 const isRetrieving = loadingAction === retrieveActionKey;
-                                const isActionPending = isCreating || isRetrieving;
+                                const isParsing = loadingAction === parseActionKey;
+                                const isActionPending = isCreating || isRetrieving || isParsing;
 
                                 return (
                                     <TableRow key={`${row.timestamp}-${row.aggregation}`}>
@@ -183,6 +210,16 @@ export const ReportsTable = () => {
                                                     className="inline-flex items-center gap-2"
                                                 >
                                                     {isRetrieving ? 'Retrieving…' : 'Retrieve Report'}
+                                                </Button>
+                                                <Button
+                                                    variant="secondary"
+                                                    type="button"
+                                                    size="sm"
+                                                    disabled={isActionPending || !row.reportId}
+                                                    onClick={() => handleParseReport(row)}
+                                                    className="inline-flex items-center gap-2"
+                                                >
+                                                    {isParsing ? 'Parsing…' : 'Parse Report'}
                                                 </Button>
                                             </div>
                                         </TableCell>
