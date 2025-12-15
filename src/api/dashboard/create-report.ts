@@ -78,7 +78,6 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
             'metric.clicks',
             'metric.purchases',
             'metric.sales',
-            'timeZone.value',
         ];
 
         try {
