@@ -1,9 +1,10 @@
 /**
  * API: Parse a completed report into the performance table.
- * Downloads the report CSV and inserts rows into the performance table.
+ * Downloads the GZIP_JSON report and inserts rows into the performance table.
  */
 
-import { parse } from 'csv-parse/sync';
+import { promisify } from 'node:util';
+import { gunzip } from 'node:zlib';
 import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
@@ -11,29 +12,33 @@ import { retrieveReport } from '@/amazon-ads/retrieve-report.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, performance, reportDatasetMetadata, target } from '@/db/schema.js';
 
+const gunzipAsync = promisify(gunzip);
+
 // ============================================================================
-// Types
+// Schemas
 // ============================================================================
 
-interface ReportRow {
-    'dateRange.value': string;
-    'budgetCurrency.value': string;
-    'campaign.id': string;
-    'campaign.name': string;
-    'adGroup.id': string;
-    'ad.id': string;
-    'advertisedProduct.id': string;
-    'advertisedProduct.marketplace': string;
-    'target.value': string;
-    'target.matchType': string;
-    'searchTerm.value': string;
-    'matchedTarget.value': string;
-    'metric.impressions': string;
-    'metric.clicks': string;
-    'metric.purchases': string;
-    'metric.sales': string;
-    'metric.totalCost': string;
-}
+const reportRowSchema = z.object({
+    'dateRange.value': z.string(),
+    'budgetCurrency.value': z.string(),
+    'campaign.id': z.coerce.string(),
+    'campaign.name': z.string(),
+    'adGroup.id': z.coerce.string(),
+    'ad.id': z.coerce.string(),
+    'advertisedProduct.id': z.string().nullable().optional(),
+    'advertisedProduct.marketplace': z.string().nullable().optional(),
+    'target.value': z.string(),
+    'target.matchType': z.string(),
+    'searchTerm.value': z.string().nullable().optional(),
+    'matchedTarget.value': z.string().nullable().optional(),
+    'metric.impressions': z.number(),
+    'metric.clicks': z.number(),
+    'metric.purchases': z.number(),
+    'metric.sales': z.number(),
+    'metric.totalCost': z.number(),
+});
+
+const reportDataSchema = z.array(reportRowSchema);
 
 // ============================================================================
 // Route Registration
@@ -80,11 +85,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
 
         // Look up the report metadata to get the reportId
         const reportMetadata = await db.query.reportDatasetMetadata.findFirst({
-            where: and(
-                eq(reportDatasetMetadata.accountId, body.accountId),
-                eq(reportDatasetMetadata.timestamp, date),
-                eq(reportDatasetMetadata.aggregation, body.aggregation)
-            ),
+            where: and(eq(reportDatasetMetadata.accountId, body.accountId), eq(reportDatasetMetadata.timestamp, date), eq(reportDatasetMetadata.aggregation, body.aggregation)),
         });
 
         if (!reportMetadata) {
@@ -141,7 +142,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
 
             console.log(`[API] Downloading report from URL...`);
 
-            // Download the report CSV
+            // Download the gzipped report
             const response = await fetch(reportUrl, {
                 signal: AbortSignal.timeout(60000), // 60 second timeout
             });
@@ -150,29 +151,24 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                 throw new Error(`Failed to download report: ${response.status} ${response.statusText}`);
             }
 
-            const csvContent = await response.text();
+            // Decompress and parse JSON
+            const compressedData = await response.arrayBuffer();
+            const decompressedData = await gunzipAsync(Buffer.from(compressedData));
+            const rawJson = JSON.parse(decompressedData.toString());
 
-            // Parse CSV
-            const rows = parse(csvContent, {
-                columns: true,
-                skip_empty_lines: true,
-            }) as ReportRow[];
+            // Validate with Zod schema
+            const rows = reportDataSchema.parse(rawJson);
 
-            console.log(`[API] Parsed ${rows.length} rows from CSV`);
+            console.log(`[API] Parsed ${rows.length} rows from report`);
 
             // Process each row and insert into performance table
             let insertedCount = 0;
             for (const row of rows) {
-                // Validate required metrics exist
-                validateRequiredMetrics(row);
-
                 // Look up targetId based on match type
                 const targetId = await lookupTargetId(row['adGroup.id'], row['target.value'], row['target.matchType']);
 
                 if (!targetId) {
-                    throw new Error(
-                        `Could not find target for adGroupId: ${row['adGroup.id']}, targetValue: ${row['target.value']}, matchType: ${row['target.matchType']}`
-                    );
+                    throw new Error(`Could not find target for adGroupId: ${row['adGroup.id']}, targetValue: ${row['target.value']}, matchType: ${row['target.matchType']}`);
                 }
 
                 // Upsert into performance table
@@ -187,33 +183,27 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                         adId: row['ad.id'],
                         targetId,
                         targetMatchType: row['target.matchType'],
-                        searchTerm: row['searchTerm.value'],
-                        matchedTarget: row['matchedTarget.value'],
-                        impressions: parseInt(row['metric.impressions'], 10),
-                        clicks: parseInt(row['metric.clicks'], 10),
-                        spend: row['metric.totalCost'],
-                        sales: row['metric.sales'],
-                        orders: parseInt(row['metric.purchases'], 10),
+                        searchTerm: row['searchTerm.value'] ?? '',
+                        matchedTarget: row['matchedTarget.value'] ?? '',
+                        impressions: row['metric.impressions'],
+                        clicks: row['metric.clicks'],
+                        spend: String(row['metric.totalCost']),
+                        sales: String(row['metric.sales']),
+                        orders: row['metric.purchases'],
                     })
                     .onConflictDoUpdate({
-                        target: [
-                            performance.accountId,
-                            performance.date,
-                            performance.aggregation,
-                            performance.adId,
-                            performance.targetId,
-                        ],
+                        target: [performance.accountId, performance.date, performance.aggregation, performance.adId, performance.targetId],
                         set: {
                             campaignId: row['campaign.id'],
                             adGroupId: row['adGroup.id'],
                             targetMatchType: row['target.matchType'],
-                            searchTerm: row['searchTerm.value'],
-                            matchedTarget: row['matchedTarget.value'],
-                            impressions: parseInt(row['metric.impressions'], 10),
-                            clicks: parseInt(row['metric.clicks'], 10),
-                            spend: row['metric.totalCost'],
-                            sales: row['metric.sales'],
-                            orders: parseInt(row['metric.purchases'], 10),
+                            searchTerm: row['searchTerm.value'] ?? '',
+                            matchedTarget: row['matchedTarget.value'] ?? '',
+                            impressions: row['metric.impressions'],
+                            clicks: row['metric.clicks'],
+                            spend: String(row['metric.totalCost']),
+                            sales: String(row['metric.sales']),
+                            orders: row['metric.purchases'],
                         },
                     });
 
@@ -227,13 +217,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                     status: 'completed',
                     error: null,
                 })
-                .where(
-                    and(
-                        eq(reportDatasetMetadata.accountId, body.accountId),
-                        eq(reportDatasetMetadata.timestamp, date),
-                        eq(reportDatasetMetadata.aggregation, body.aggregation)
-                    )
-                );
+                .where(and(eq(reportDatasetMetadata.accountId, body.accountId), eq(reportDatasetMetadata.timestamp, date), eq(reportDatasetMetadata.aggregation, body.aggregation)));
 
             console.log(`[API] Parse report completed. Inserted/updated ${insertedCount} rows.`);
 
@@ -253,13 +237,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                     status: 'failed',
                     error: error instanceof Error ? error.message : 'Unknown error',
                 })
-                .where(
-                    and(
-                        eq(reportDatasetMetadata.accountId, body.accountId),
-                        eq(reportDatasetMetadata.timestamp, date),
-                        eq(reportDatasetMetadata.aggregation, body.aggregation)
-                    )
-                );
+                .where(and(eq(reportDatasetMetadata.accountId, body.accountId), eq(reportDatasetMetadata.timestamp, date), eq(reportDatasetMetadata.aggregation, body.aggregation)));
 
             reply.status(500);
             return {
@@ -275,52 +253,6 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
 // ============================================================================
 
 /**
- * Validates that all required metrics are present in the row.
- * Throws an error if any required metric is missing.
- */
-function validateRequiredMetrics(row: ReportRow): void {
-    const requiredMetrics = [
-        'metric.impressions',
-        'metric.clicks',
-        'metric.purchases',
-        'metric.sales',
-        'metric.totalCost',
-    ] as const;
-
-    for (const metric of requiredMetrics) {
-        if (row[metric] === undefined || row[metric] === null || row[metric] === '') {
-            throw new Error(`Missing required metric: ${metric}`);
-        }
-    }
-
-    // Also validate that the numeric values can be parsed
-    const impressions = parseInt(row['metric.impressions'], 10);
-    if (isNaN(impressions)) {
-        throw new Error(`Invalid impressions value: ${row['metric.impressions']}`);
-    }
-
-    const clicks = parseInt(row['metric.clicks'], 10);
-    if (isNaN(clicks)) {
-        throw new Error(`Invalid clicks value: ${row['metric.clicks']}`);
-    }
-
-    const purchases = parseInt(row['metric.purchases'], 10);
-    if (isNaN(purchases)) {
-        throw new Error(`Invalid purchases value: ${row['metric.purchases']}`);
-    }
-
-    const sales = parseFloat(row['metric.sales']);
-    if (isNaN(sales)) {
-        throw new Error(`Invalid sales value: ${row['metric.sales']}`);
-    }
-
-    const totalCost = parseFloat(row['metric.totalCost']);
-    if (isNaN(totalCost)) {
-        throw new Error(`Invalid totalCost value: ${row['metric.totalCost']}`);
-    }
-}
-
-/**
  * Looks up the targetId based on adGroupId and targetValue.
  *
  * For PHRASE, BROAD, or EXACT match types:
@@ -330,21 +262,14 @@ function validateRequiredMetrics(row: ReportRow): void {
  *   - Parse targetValue which looks like asin="..." or asin-expanded="..."
  *   - Match the extracted asin to targetAsin
  */
-async function lookupTargetId(
-    adGroupId: string,
-    targetValue: string,
-    matchType: string
-): Promise<string | null> {
+async function lookupTargetId(adGroupId: string, targetValue: string, matchType: string): Promise<string | null> {
     // Keyword match types: PHRASE, BROAD, EXACT
     const keywordMatchTypes = ['PHRASE', 'BROAD', 'EXACT'];
 
     if (keywordMatchTypes.includes(matchType)) {
         // Match targetValue to targetKeyword
         const result = await db.query.target.findFirst({
-            where: and(
-                eq(target.adGroupId, adGroupId),
-                eq(target.targetKeyword, targetValue)
-            ),
+            where: and(eq(target.adGroupId, adGroupId), eq(target.targetKeyword, targetValue)),
             columns: { targetId: true },
         });
 
@@ -361,10 +286,7 @@ async function lookupTargetId(
 
         // Match asin to targetAsin
         const result = await db.query.target.findFirst({
-            where: and(
-                eq(target.adGroupId, adGroupId),
-                eq(target.targetAsin, asin)
-            ),
+            where: and(eq(target.adGroupId, adGroupId), eq(target.targetAsin, asin)),
             columns: { targetId: true },
         });
 
@@ -388,4 +310,3 @@ function parseAsinFromTargetValue(targetValue: string): string | null {
     const match = targetValue.match(/asin(?:-expanded)?="([^"]+)"/);
     return match?.[1] ?? null;
 }
-

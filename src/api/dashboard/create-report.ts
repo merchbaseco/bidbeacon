@@ -92,7 +92,7 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
                     ],
                     reports: [
                         {
-                            format: 'CSV',
+                            format: 'GZIP_JSON',
                             periods: [
                                 {
                                     datePeriod: {
