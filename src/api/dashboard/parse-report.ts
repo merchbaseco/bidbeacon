@@ -10,7 +10,6 @@ import { z } from 'zod';
 import { retrieveReport } from '@/amazon-ads/retrieve-report.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, performance, reportDatasetMetadata, target } from '@/db/schema.js';
-import { emitEvent } from '@/utils/events.js';
 
 // ============================================================================
 // Types
@@ -236,12 +235,6 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                     )
                 );
 
-            // Emit event when complete
-            emitEvent({
-                type: 'reports:refreshed',
-                accountId: body.accountId,
-            });
-
             console.log(`[API] Parse report completed. Inserted/updated ${insertedCount} rows.`);
 
             return {
@@ -267,12 +260,6 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                         eq(reportDatasetMetadata.aggregation, body.aggregation)
                     )
                 );
-
-            // Emit event even on failure so UI updates
-            emitEvent({
-                type: 'reports:refreshed',
-                accountId: body.accountId,
-            });
 
             reply.status(500);
             return {

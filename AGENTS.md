@@ -204,6 +204,17 @@ The dashboard is a full-stack React application built with:
   const { data } = useQuery({ queryKey: ['metrics', dateRange.from, dateRange.to], ... });
   ```
 
+## Data Fetching & State Management
+
+### Sync vs Async Pattern
+
+- **Sync APIs**: Caller awaits response, then invalidates React Query directly. No WebSocket events.
+- **Async Jobs** (pg-boss): Emit WebSocket events on completion so UI can react to background changes.
+
+**Rule**: Use WebSocket events only for changes the caller didn't initiate (background jobs, worker processes, external triggers). If the caller made the request, they invalidate the query themselves.
+
+**Scope**: Single-tab focus. No multi-tab sync optimization.
+
 ## Component Library: coss ui
 
 **coss ui** is a collection of beautifully designed, accessible, and composable components for your React apps. Built on top of [Base UI](https://base-ui.com/) and styled with [Tailwind CSS](https://tailwindcss.com/), it's designed for you to copy, paste, and own.
