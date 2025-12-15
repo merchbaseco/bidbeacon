@@ -12,7 +12,7 @@ type Event =
     | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }
     | { type: 'reports:refreshed'; accountId: string; timestamp: string }
     | { type: 'api-metrics:updated'; apiName: string; timestamp: string }
-    | { type: 'ad-entities:synced'; accountId: string; timestamp: string }
+    | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | { type: 'pong' };
 
 const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
@@ -62,17 +62,13 @@ export function useWebSocket(): ConnectionStatus {
                             queryKey: ['api-metrics'],
                         });
                         break;
-                    case 'ad-entities:synced':
-                        // Invalidate all account dataset metadata queries to refresh the sync status
+                    case 'account-dataset-metadata:updated':
+                        // Invalidate account dataset metadata query to refresh the sync status
                         queryClient.invalidateQueries({
-                            queryKey: ['account-dataset-metadata'],
+                            queryKey: queryKeys.accountDatasetMetadata(data.accountId, data.countryCode),
                         });
-                        toastManager.add({
-                            type: 'success',
-                            title: 'Ad entities synced',
-                            description: `Campaigns, ad groups, ads, and targets have been synced for account ${data.accountId}`,
-                            timeout: 5000,
-                        });
+                        // Show success toast only when sync completes (status changes from syncing to completed)
+                        // Note: We can't determine this from the event alone, so we'll check in the component
                         break;
                 }
             } catch {

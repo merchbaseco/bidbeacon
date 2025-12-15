@@ -59,7 +59,6 @@ const campaignExportSchema = z.object({
     optimization: optimizationSchema.optional(),
     budgetCaps: budgetCapsSchema.optional(),
     targetingSettings: z.string(),
-    portfolioId: z.string().optional(),
     creationDateTime: z.string(),
     lastUpdatedDateTime: z.string(),
 });
@@ -206,6 +205,13 @@ export const syncAdEntitiesJob = boss
                         error: null,
                     },
                 });
+
+            // Emit event when metadata is updated
+            emitEvent({
+                type: 'account-dataset-metadata:updated',
+                accountId,
+                countryCode,
+            });
 
             try {
                 // Look up advertiser account to get profileId
@@ -393,7 +399,8 @@ export const syncAdEntitiesJob = boss
                         const campaignRecords: InferInsertModel<typeof campaign>[] = campaignsData.map(c => ({
                             id: c.campaignId,
                             campaignId: c.campaignId,
-                            portfolioId: c.portfolioId ?? null,
+                            accountId,
+                            countryCode,
                             name: c.name,
                             adProduct: c.adProduct,
                             state: c.state,
@@ -503,10 +510,11 @@ export const syncAdEntitiesJob = boss
                     })
                     .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
 
-                // Emit event when job completes
+                // Emit event when metadata is updated
                 emitEvent({
-                    type: 'ad-entities:synced',
+                    type: 'account-dataset-metadata:updated',
                     accountId,
+                    countryCode,
                 });
 
                 console.log(`[Sync Ad Entities] Completed job (ID: ${job.id}) for account: ${accountId}, country: ${countryCode}`);
@@ -519,6 +527,13 @@ export const syncAdEntitiesJob = boss
                         error: error instanceof Error ? error.message : 'Unknown error',
                     })
                     .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                // Emit event when metadata is updated
+                emitEvent({
+                    type: 'account-dataset-metadata:updated',
+                    accountId,
+                    countryCode,
+                });
 
                 console.error(`[Sync Ad Entities] Failed job (ID: ${job.id}) for account: ${accountId}, country: ${countryCode}:`, error);
                 throw error;

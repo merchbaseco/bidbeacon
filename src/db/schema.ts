@@ -10,7 +10,8 @@ export const campaign = pgTable(
     {
         id: text('id').primaryKey(),
         campaignId: text('campaign_id').notNull(),
-        portfolioId: text('portfolio_id'), // Optional
+        accountId: text('account_id'),
+        countryCode: text('country_code'),
         name: text('name').notNull(),
         adProduct: text('ad_product').notNull(),
         state: text('state').notNull(),

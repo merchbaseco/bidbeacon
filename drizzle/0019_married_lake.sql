@@ -1,0 +1,1 @@
+ALTER TABLE "campaign" DROP COLUMN "portfolio_id";

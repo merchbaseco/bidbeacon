@@ -1,6 +1,6 @@
 import type { WebSocket } from 'ws';
 
-export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'ad-entities:synced';
+export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'account-dataset-metadata:updated';
 
 export interface BaseEvent {
     type: EventType;
@@ -29,12 +29,13 @@ export interface ApiMetricsUpdatedEvent extends BaseEvent {
     apiName: string;
 }
 
-export interface AdEntitiesSyncedEvent extends BaseEvent {
-    type: 'ad-entities:synced';
+export interface AccountDatasetMetadataUpdatedEvent extends BaseEvent {
+    type: 'account-dataset-metadata:updated';
     accountId: string;
+    countryCode: string;
 }
 
-export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent | AdEntitiesSyncedEvent;
+export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent | AccountDatasetMetadataUpdatedEvent;
 
 /**
  * Singleton event emitter for WebSocket connections
@@ -103,7 +104,7 @@ export function emitEvent(event: Omit<ErrorEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<AdEntitiesSyncedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<Event, 'timestamp'>): void {
     const eventWithTimestamp: Event = {
         ...event,

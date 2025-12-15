@@ -17,6 +17,7 @@ Both share the same PostgreSQL database.
 3. **Idempotency via unique indexes** - `idempotency_id` for metrics, composite keys for campaign management. Retries are harmless.
 4. **Canonical SQS shutdown** - Set flag, finish current batch, exit. Visibility timeout handles in-flight messages.
 5. **No index re-exports** - Each API endpoint is in its own file. Import directly from individual files (e.g., `@/api/dashboard/status.js`), never create `index.ts` files that re-export. One file, one API endpoint.
+6. **Database-driven UI state** - UI components derive state from database tables (Single Source of Truth). Use a single `{table}:updated` event fired whenever the table changes. Components use optimistic updates for immediate feedback, then refetch on event. On load, components fetch the table; when the table updates, the event invalidates the query to trigger a refetch.
 
 ## Important Context
 

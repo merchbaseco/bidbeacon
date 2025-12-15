@@ -26,7 +26,6 @@ export function IndexRoute() {
                 <Card className="p-3 space-y-0 gap-3">
                     <div className="flex items-start justify-between px-2">
                         <div className="text-sm font-medium">Amazon Ads API Invocations</div>
-                        <HugeiconsIcon icon={ArrowExpandIcon} size={20} color="currentColor" />
                     </div>
                     <ApiMetricsChart />
                 </Card>

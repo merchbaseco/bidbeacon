@@ -1,19 +1,105 @@
 import { format, formatDistanceToNow } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useApiMetrics } from '../hooks/use-api-metrics';
 
 // Color palette for APIs
 const COLORS = [
-    '#3B82F6', // Blue
     '#F59E0B', // Amber/Orange
     '#10B981', // Green
+    '#14B8A6', // Teal
+    '#3B82F6', // Blue
     '#8B5CF6', // Purple
     '#EF4444', // Red
-    '#06B6D4', // Cyan
     '#EC4899', // Pink
     '#6366F1', // Indigo
 ];
+
+interface CustomTooltipProps {
+    active?: boolean;
+    payload?: Array<{
+        dataKey: string | number;
+        name?: string;
+        value?: number;
+        color?: string;
+    }>;
+    label?: string;
+    chartData: Record<string, string | number>[];
+}
+
+/**
+ * Custom tooltip component matching the design spec
+ */
+function CustomTooltip({ active, payload, label, chartData }: CustomTooltipProps) {
+    if (!active || !payload || payload.length === 0) return null;
+
+    const point = chartData.find(p => p.interval === label);
+    if (!point) return null;
+
+    const timestamp = new Date(point.timestamp as string);
+    const endTime = new Date(timestamp.getTime() + 5 * 60 * 1000); // 5 min interval
+
+    // Format local time range
+    const localStart = format(timestamp, 'h:mmaaa');
+    const localEnd = format(endTime, 'h:mmaaa');
+
+    // Format UTC time range
+    const utcStart = formatInTimeZone(timestamp, 'UTC', 'h:mmaaa');
+    const utcEnd = formatInTimeZone(endTime, 'UTC', 'h:mmaaa');
+
+    return (
+        <div
+            style={{
+                backgroundColor: '#fff',
+                border: '1px solid #E5E7EB',
+                borderRadius: '8px',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
+                padding: '12px 16px',
+                minWidth: '180px',
+            }}
+        >
+            {/* Series list */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+                {payload.map(entry => (
+                    <div
+                        key={entry.dataKey}
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '12px',
+                        }}
+                    >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <span
+                                style={{
+                                    width: '8px',
+                                    height: '8px',
+                                    borderRadius: '50%',
+                                    backgroundColor: entry.color,
+                                    flexShrink: 0,
+                                }}
+                            />
+                            <span style={{ fontSize: '14px', color: '#374151' }}>{entry.name}</span>
+                        </div>
+                        <span style={{ fontSize: '14px', color: '#374151', fontWeight: 500 }}>{entry.value}</span>
+                    </div>
+                ))}
+            </div>
+
+            {/* Time ranges */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                <span style={{ fontSize: '13px', color: '#6B7280' }}>
+                    {localStart} - {localEnd}
+                </span>
+                <span style={{ fontSize: '13px', color: '#9CA3AF' }}>
+                    {utcStart} - {utcEnd} UTC
+                </span>
+            </div>
+        </div>
+    );
+}
 
 /**
  * Format timestamp to relative time (e.g., "12h ago", "3h ago", "2m ago")
@@ -138,19 +224,7 @@ export function ApiMetricsChart() {
                         <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
                         <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} />
-                        <Tooltip
-                            contentStyle={{
-                                backgroundColor: '#fff',
-                                border: '1px solid #E5E7EB',
-                                borderRadius: '6px',
-                                boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-                            }}
-                            labelFormatter={value => {
-                                const point = chartData.find(p => p.interval === value);
-                                return point ? format(new Date(point.timestamp as string), 'MMM dd, yyyy HH:mm') : value;
-                            }}
-                            formatter={(value: number, name: string) => [value, name]}
-                        />
+                        <Tooltip content={<CustomTooltip chartData={chartData} />} />
                         {(data?.apiNames || []).map((apiName, index) => (
                             <Line key={apiName} type="monotone" dataKey={apiName} stroke={COLORS[index % COLORS.length]} strokeWidth={1.5} dot={false} name={apiName} />
                         ))}
