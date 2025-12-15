@@ -201,3 +201,52 @@ export async function fetchApiMetrics(params: { from?: string; to?: string; apiN
 
     return (await response.json()) as ApiMetricsResponse;
 }
+
+export type AccountDatasetMetadata = {
+    accountId: string;
+    countryCode: string;
+    status: 'idle' | 'syncing' | 'completed' | 'failed';
+    lastSyncStarted: string | null;
+    lastSyncCompleted: string | null;
+    campaignsCount: number | null;
+    adGroupsCount: number | null;
+    adsCount: number | null;
+    targetsCount: number | null;
+    error: string | null;
+};
+
+export async function fetchAccountDatasetMetadata(accountId: string, countryCode: string): Promise<AccountDatasetMetadata | null> {
+    const url = new URL('/api/dashboard/account-dataset-metadata', apiBaseUrl);
+    url.searchParams.set('accountId', accountId);
+    url.searchParams.set('countryCode', countryCode);
+
+    const response = await fetch(url);
+    if (!response.ok) {
+        const message = await response.text();
+        throw new Error(`Failed to load account dataset metadata: ${response.status} ${message}`);
+    }
+
+    const body = (await response.json()) as {
+        success: boolean;
+        data: AccountDatasetMetadata | null;
+    };
+
+    return body.data;
+}
+
+export async function triggerSyncAdEntities(accountId: string, countryCode: string) {
+    const response = await fetch(`${apiBaseUrl}/api/dashboard/trigger-sync-ad-entities`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ accountId, countryCode }),
+    });
+
+    if (!response.ok) {
+        const text = await response.text();
+        throw new Error(`Request failed (${response.status}): ${text}`);
+    }
+
+    return (await response.json()) as { success: boolean; message?: string };
+}

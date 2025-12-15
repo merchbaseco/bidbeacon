@@ -8,7 +8,16 @@ import { apiMetrics } from '@/db/schema.js';
  * All supported Amazon Ads API endpoints that we track.
  * This ensures all APIs appear in charts even when they have no invocations.
  */
-const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport'] as const;
+const SUPPORTED_APIS = [
+    'listAdvertiserAccounts',
+    'createReport',
+    'retrieveReport',
+    'exportCampaigns',
+    'exportAdGroups',
+    'exportAds',
+    'exportTargets',
+    'getExportStatus',
+] as const;
 
 /**
  * Aggregates API metrics by hour and API name for charting.

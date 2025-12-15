@@ -77,6 +77,12 @@ fastify.register(async fastify => {
     const { registerTriggerUpdateRoute } = await import('@/api/dashboard/trigger-update.js');
     await registerTriggerUpdateRoute(fastify);
 
+    const { registerTriggerSyncAdEntitiesRoute } = await import('@/api/dashboard/trigger-sync-ad-entities.js');
+    await registerTriggerSyncAdEntitiesRoute(fastify);
+
+    const { registerAccountDatasetMetadataRoute } = await import('@/api/dashboard/account-dataset-metadata.js');
+    await registerAccountDatasetMetadataRoute(fastify);
+
     const { registerListAdvertiserAccountsRoute } = await import('@/api/dashboard/list-advertiser-accounts.js');
     await registerListAdvertiserAccountsRoute(fastify);
 

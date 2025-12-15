@@ -3,4 +3,5 @@ export const queryKeys = {
     dashboardStatusAll: () => ['dashboard-status'] as const,
     advertisingAccounts: () => ['advertising-accounts'] as const,
     apiMetrics: (from?: string, to?: string, apiName?: string) => ['api-metrics', from, to, apiName] as const,
+    accountDatasetMetadata: (accountId: string, countryCode: string) => ['account-dataset-metadata', accountId, countryCode] as const,
 } as const;

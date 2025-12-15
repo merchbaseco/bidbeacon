@@ -1,6 +1,6 @@
 import type { WebSocket } from 'ws';
 
-export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated';
+export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'ad-entities:synced';
 
 export interface BaseEvent {
     type: EventType;
@@ -29,7 +29,12 @@ export interface ApiMetricsUpdatedEvent extends BaseEvent {
     apiName: string;
 }
 
-export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent;
+export interface AdEntitiesSyncedEvent extends BaseEvent {
+    type: 'ad-entities:synced';
+    accountId: string;
+}
+
+export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent | AdEntitiesSyncedEvent;
 
 /**
  * Singleton event emitter for WebSocket connections
@@ -98,6 +103,7 @@ export function emitEvent(event: Omit<ErrorEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<AdEntitiesSyncedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<Event, 'timestamp'>): void {
     const eventWithTimestamp: Event = {
         ...event,

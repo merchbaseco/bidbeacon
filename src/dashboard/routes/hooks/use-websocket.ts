@@ -5,13 +5,14 @@ import useWebSocketLib, { ReadyState } from 'react-use-websocket';
 import { toastManager } from '../../components/ui/toast';
 import { apiBaseUrl } from '../../router';
 import { type ConnectionStatus, connectionStatusAtom } from '../atoms';
-import { queryKeys } from './query-keys';
+import { queryKeys } from './query-keys.js';
 
 type Event =
     | { type: 'error'; message: string; details?: string; timestamp: string }
     | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }
     | { type: 'reports:refreshed'; accountId: string; timestamp: string }
     | { type: 'api-metrics:updated'; apiName: string; timestamp: string }
+    | { type: 'ad-entities:synced'; accountId: string; timestamp: string }
     | { type: 'pong' };
 
 const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
@@ -59,6 +60,18 @@ export function useWebSocket(): ConnectionStatus {
                         // Invalidate API metrics queries to refresh the chart
                         queryClient.invalidateQueries({
                             queryKey: ['api-metrics'],
+                        });
+                        break;
+                    case 'ad-entities:synced':
+                        // Invalidate all account dataset metadata queries to refresh the sync status
+                        queryClient.invalidateQueries({
+                            queryKey: ['account-dataset-metadata'],
+                        });
+                        toastManager.add({
+                            type: 'success',
+                            title: 'Ad entities synced',
+                            description: `Campaigns, ad groups, ads, and targets have been synced for account ${data.accountId}`,
+                            timeout: 5000,
                         });
                         break;
                 }

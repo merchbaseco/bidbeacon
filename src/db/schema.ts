@@ -92,6 +92,30 @@ export const target = pgTable(
 
 /**
  * ----------------------------------------------------------------------------
+ * Account Dataset Metadata
+ * ----------------------------------------------------------------------------
+ * Tracks when ad entity exports (campaigns, ad groups, ads, targets) were last
+ * synced for a given account+countryCode combination.
+ */
+export const accountDatasetMetadata = pgTable(
+    'account_dataset_metadata',
+    {
+        accountId: text('account_id').notNull(),
+        countryCode: text('country_code').notNull(),
+        status: text('status').notNull(), // enum: idle, syncing, completed, failed
+        lastSyncStarted: timestamp('last_sync_started', { withTimezone: false, mode: 'date' }), // utc
+        lastSyncCompleted: timestamp('last_sync_completed', { withTimezone: false, mode: 'date' }), // utc
+        campaignsCount: integer('campaigns_count'),
+        adGroupsCount: integer('ad_groups_count'),
+        adsCount: integer('ads_count'),
+        targetsCount: integer('targets_count'),
+        error: text('error'),
+    },
+    table => [primaryKey({ columns: [table.accountId, table.countryCode] })]
+);
+
+/**
+ * ----------------------------------------------------------------------------
  * Ad Performance
  * ----------------------------------------------------------------------------
  */

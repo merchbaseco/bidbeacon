@@ -8,6 +8,7 @@ import { AccountEnabledSwitch } from './components/account-selector/account-enab
 import { ApiMetricsChart } from './components/api-metrics-chart';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { ReportsTable } from './components/reports-table';
+import { SyncAdEntitiesButton } from './components/sync-ad-entities-button';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
@@ -15,7 +16,10 @@ export function IndexRoute() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between gap-2 py-1">
-                <AccountEnabledSwitch />
+                <div className="flex items-center gap-4">
+                    <AccountEnabledSwitch />
+                    <SyncAdEntitiesButton />
+                </div>
                 <ConnectionStatusBadge status={connectionStatus} className="mt-0.5" />
             </div>
             <div className="space-y-4">
