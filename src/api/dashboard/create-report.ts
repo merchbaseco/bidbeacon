@@ -5,6 +5,7 @@ import { createReport } from '@/amazon-ads/create-report.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
 import { utcAddDays, utcAddHours, utcNow } from '@/utils/date.js';
+import { emitEvent } from '@/utils/events.js';
 
 export function registerCreateReportRoute(fastify: FastifyInstance) {
     fastify.post('/api/dashboard/create-report', async (request, reply) => {
@@ -136,6 +137,12 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
                             },
                         });
                     console.log(`[API] Updated report metadata with reportId: ${reportId} for ${body.accountId} at ${body.timestamp}`);
+
+                    // Emit event to refresh the reports table in connected dashboards
+                    emitEvent({
+                        type: 'reports:refreshed',
+                        accountId: body.accountId,
+                    });
                 }
             }
 

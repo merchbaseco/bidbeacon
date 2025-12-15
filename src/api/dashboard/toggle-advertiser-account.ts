@@ -3,6 +3,7 @@ import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { advertiserAccount } from '@/db/schema.js';
+import { emitEvent } from '@/utils/events.js';
 
 export function registerToggleAdvertiserAccountRoute(fastify: FastifyInstance) {
     fastify.post('/api/dashboard/toggle-advertiser-account', async (request, _reply) => {
@@ -22,6 +23,13 @@ export function registerToggleAdvertiserAccountRoute(fastify: FastifyInstance) {
             .where(and(eq(advertiserAccount.adsAccountId, body.adsAccountId), eq(advertiserAccount.profileId, body.profileId)));
 
         console.log(`[API] Account ${body.adsAccountId}/${body.profileId} ${body.enabled ? 'enabled' : 'disabled'} successfully`);
+
+        // Emit event to refresh the accounts table in connected dashboards
+        emitEvent({
+            type: 'account:updated',
+            accountId: body.adsAccountId,
+            enabled: body.enabled,
+        });
 
         return { success: true, message: `Account ${body.enabled ? 'enabled' : 'disabled'}` };
     });
