@@ -93,36 +93,28 @@ jobs:
           ADS_API_CLIENT_SECRET: ${{ env.ADS_API_CLIENT_SECRET }}
           ADS_API_REFRESH_TOKEN: ${{ env.ADS_API_REFRESH_TOKEN }}
 
-      - name: Remove previous stack env artifact
+      - name: Encode stack env file
+        id: encode-env
+        run: |
+          STACK_ENV_B64=$(base64 < stack.env | tr -d '\n')
+          echo "STACK_ENV_B64<<EOF" >> $GITHUB_OUTPUT
+          echo "$STACK_ENV_B64" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Upload stack env and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DEPLOY_SSH_HOST }}
           username: ${{ secrets.DEPLOY_SSH_USER }}
           key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
           passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
-          script: rm -rf "${HOME}/stack.env"
-
-      - name: Upload stack env file
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.DEPLOY_SSH_HOST }}
-          username: ${{ secrets.DEPLOY_SSH_USER }}
-          key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
-          source: stack.env
-          target: .
-          overwrite: true
-
-      - name: Deploy BidBeacon stack
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.DEPLOY_SSH_HOST }}
-          username: ${{ secrets.DEPLOY_SSH_USER }}
-          key: ${{ secrets.DEPLOY_SSH_PRIVATE_KEY }}
-          passphrase: ${{ secrets.DEPLOY_SSH_PASSPHRASE }}
-          envs: IMAGE_TAG,GHCR_USERNAME,GHCR_TOKEN
+          envs: IMAGE_TAG,GHCR_USERNAME,GHCR_TOKEN,STACK_ENV_B64
           script: |
             set -euo pipefail
+            # Write stack.env file from base64 content
+            echo "$STACK_ENV_B64" | base64 -d > "${HOME}/stack.env" 2>/dev/null || echo "$STACK_ENV_B64" | base64 -D > "${HOME}/stack.env"
+            chmod 600 "${HOME}/stack.env"
+            
             REPO_DIR="${HOME}/merchbase-infra"
             mkdir -p "${HOME}/.ssh"
             chmod 700 "${HOME}/.ssh"
@@ -163,4 +155,6 @@ jobs:
               cd "/opt/caddy-proxy"
               docker compose restart caddy || docker compose up -d
             fi
+        env:
+          STACK_ENV_B64: ${{ steps.encode-env.outputs.STACK_ENV_B64 }}
 
