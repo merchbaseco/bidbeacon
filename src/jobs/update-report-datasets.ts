@@ -1,0 +1,49 @@
+/**
+ * Job: Update report datasets for all enabled accounts.
+ * Runs every 10 minutes and enqueues update-report-dataset-for-account jobs
+ * for each enabled accountId/countryCode combination.
+ */
+
+import { eq } from 'drizzle-orm';
+import { db } from '@/db/index.js';
+import { advertiserAccount } from '@/db/schema.js';
+import { boss } from '@/jobs/boss.js';
+import { updateReportDatasetForAccountJob } from './update-report-dataset-for-account.js';
+
+// ============================================================================
+// Job Definition
+// ============================================================================
+
+export const updateReportDatasetsJob = boss
+    .createJob('update-report-datasets')
+    .schedule({
+        cron: '*/10 * * * *', // Run every 10 minutes
+    })
+    .work(async () => {
+        console.log('[Update Report Datasets] Starting job - fetching enabled accounts');
+
+        // Query all enabled advertiser accounts
+        const enabledAccounts = await db
+            .select({
+                adsAccountId: advertiserAccount.adsAccountId,
+                countryCode: advertiserAccount.countryCode,
+            })
+            .from(advertiserAccount)
+            .where(eq(advertiserAccount.enabled, true));
+
+        console.log(`[Update Report Datasets] Found ${enabledAccounts.length} enabled account(s)`);
+
+        // Enqueue update-report-dataset-for-account job for each account
+        const jobPromises = enabledAccounts.map(async account => {
+            const jobId = await updateReportDatasetForAccountJob.emit({
+                accountId: account.adsAccountId,
+                countryCode: account.countryCode,
+            });
+            console.log(`[Update Report Datasets] Enqueued update job for account: ${account.adsAccountId}, country: ${account.countryCode} (job ID: ${jobId})`);
+            return jobId;
+        });
+
+        await Promise.all(jobPromises);
+
+        console.log(`[Update Report Datasets] Completed - enqueued ${enabledAccounts.length} job(s)`);
+    });

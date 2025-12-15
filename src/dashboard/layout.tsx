@@ -43,7 +43,7 @@ export function RootRoute() {
                 </header>
 
                 <main>
-                    <div className="mx-auto max-w-background-frame-max p-4 pt-2 font-mono">
+                    <div className="mx-auto max-w-background-frame-max p-4 pt-2 font-mono pb-24">
                         <Outlet />
                     </div>
                 </main>

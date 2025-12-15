@@ -1,24 +1,24 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import MoreVerticalIcon from '@merchbaseco/icons/core-solid-rounded/MoreVerticalIcon';
 import DatabaseSync01Icon from '@merchbaseco/icons/core-stroke-rounded/DatabaseSync01Icon';
+import { useQueryClient } from '@tanstack/react-query';
 import { useAtomValue, useSetAtom } from 'jotai';
-import { loadingToastsAtom, syncAccountsInProgressAtom } from '../routes/atoms';
+import { syncAccountsInProgressAtom } from '../routes/atoms';
 import { syncAdvertiserAccounts } from '../routes/hooks/api';
+import { queryKeys } from '../routes/hooks/query-keys';
 import { Button } from './ui/button';
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from './ui/menu';
 import { toastManager } from './ui/toast';
 
-const SYNC_ACCOUNTS_TOAST_KEY = 'sync-accounts-toast';
-
 export function MoreMenu() {
+    const queryClient = useQueryClient();
     const isSyncing = useAtomValue(syncAccountsInProgressAtom);
     const setIsSyncing = useSetAtom(syncAccountsInProgressAtom);
-    const setLoadingToasts = useSetAtom(loadingToastsAtom);
 
     const handleSyncAccounts = async () => {
         setIsSyncing(true);
 
-        // Show loading toast (timeout: 0 prevents auto-dismiss)
+        // Show loading toast
         const toastId = toastManager.add({
             type: 'loading',
             title: 'Syncing accounts',
@@ -26,15 +26,23 @@ export function MoreMenu() {
             timeout: 0, // Don't auto-dismiss loading toasts
         });
 
-        // Store toast ID in atom for WebSocket hook to access
-        setLoadingToasts(prev => ({
-            ...prev,
-            [SYNC_ACCOUNTS_TOAST_KEY]: toastId,
-        }));
-
         try {
             await syncAdvertiserAccounts();
-            // Toast will be updated by WebSocket hook when accounts:synced event arrives
+
+            // Close loading toast and show success toast
+            toastManager.close(toastId);
+            toastManager.add({
+                type: 'success',
+                title: 'Accounts synced',
+                description: 'Advertising accounts table has been updated',
+                timeout: 5000, // Auto-dismiss after 5 seconds
+            });
+
+            // Invalidate advertising accounts query to refresh the UI
+            // Note: API metrics chart will refresh automatically via the api-metrics:updated event
+            queryClient.invalidateQueries({
+                queryKey: queryKeys.advertisingAccounts(),
+            });
         } catch (err) {
             toastManager.close(toastId);
             toastManager.add({
@@ -42,12 +50,8 @@ export function MoreMenu() {
                 title: 'Sync failed',
                 description: err instanceof Error ? err.message : 'Failed to sync advertiser accounts',
             });
+        } finally {
             setIsSyncing(false);
-            setLoadingToasts(prev => {
-                const next = { ...prev };
-                delete next[SYNC_ACCOUNTS_TOAST_KEY];
-                return next;
-            });
         }
     };
 

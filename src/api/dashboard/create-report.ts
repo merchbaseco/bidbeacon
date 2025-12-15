@@ -79,6 +79,7 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
             'metric.clicks',
             'metric.purchases',
             'metric.sales',
+            'metric.totalCost',
         ];
 
         try {

@@ -14,3 +14,4 @@ CREATE TABLE "report_dataset_metadata" (
         PRIMARY KEY("account_id","timestamp","aggregation")
 );
 
+

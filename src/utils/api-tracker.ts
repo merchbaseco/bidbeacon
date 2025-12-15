@@ -7,6 +7,7 @@
 
 import { db } from '@/db/index.js';
 import { apiMetrics } from '@/db/schema.js';
+import { emitEvent } from '@/utils/events.js';
 
 export interface ApiCallOptions {
     apiName: string;
@@ -37,6 +38,9 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
             timestamp,
             error: error ?? null,
         });
+
+        // Notify connected clients that API metrics have been updated
+        emitEvent({ type: 'api-metrics:updated', apiName: options.apiName });
     } catch (err) {
         // Silently fail - we don't want tracking failures to break the app
         console.error('Failed to track API call:', err);

@@ -26,8 +26,8 @@ const jobInputSchema = z.object({
     countryCode: z.string(),
 });
 
-export const updateReportDatasetMetadataJob = boss
-    .createJob('update-report-dataset-metadata')
+export const updateReportDatasetForAccountJob = boss
+    .createJob('update-report-dataset-for-account')
     .input(jobInputSchema)
     .work(async jobs => {
         for (const job of jobs) {

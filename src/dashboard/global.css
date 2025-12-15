@@ -235,9 +235,6 @@ html.dark {
 
   /* Bottom horizontal + inner "content rails" */
   background:
-    /* bottom horizontal */
-    linear-gradient(to right, var(--background-frame-line), var(--background-frame-line))
-      0 calc(100% - var(--background-frame-inset)) / 100% 1px no-repeat,
     /* inner "rails" aligned to centered max width */
     linear-gradient(var(--background-frame-line), var(--background-frame-line))
       calc(

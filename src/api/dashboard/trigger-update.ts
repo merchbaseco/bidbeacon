@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { updateReportDatasetMetadataJob } from '@/jobs/update-report-dataset-metadata.js';
+import { updateReportDatasetForAccountJob } from '@/jobs/update-report-dataset-for-account.js';
 
 export function registerTriggerUpdateRoute(fastify: FastifyInstance) {
     fastify.post('/api/dashboard/trigger-update', async (request, _reply) => {
@@ -11,7 +11,7 @@ export function registerTriggerUpdateRoute(fastify: FastifyInstance) {
 
         const body = bodySchema.parse(request.body);
         console.log(`[API] Trigger update request received for account: ${body.accountId}, country: ${body.countryCode}`);
-        const jobId = await updateReportDatasetMetadataJob.emit({
+        const jobId = await updateReportDatasetForAccountJob.emit({
             accountId: body.accountId,
             countryCode: body.countryCode,
         });
