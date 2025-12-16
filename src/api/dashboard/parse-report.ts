@@ -231,48 +231,69 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
 // ============================================================================
 
 /**
- * Looks up the targetId based on adGroupId and targetValue.
+ * Looks up the targetId based on adGroupId, targetValue, and matchType.
  *
  * For PHRASE, BROAD, or EXACT match types:
  *   - Match targetValue to targetKeyword with exact match
  *
- * For TARGETING match type:
+ * For TARGETING_EXPRESSION match type:
  *   - Parse targetValue which looks like asin="..." or asin-expanded="..."
  *   - Match the extracted asin to targetAsin
+ *
+ * For TARGETING_EXPRESSION_PREDEFINED match type:
+ *   - targetValue is one of: "close-match", "loose-match", "substitutes", or "complements"
+ *   - Match targetValue to targetType and matchType
  */
 async function lookupTargetId(adGroupId: string, targetValue: string, matchType: string): Promise<string | null> {
-    // Keyword match types: PHRASE, BROAD, EXACT
-    const keywordMatchTypes = ['PHRASE', 'BROAD', 'EXACT'];
+    switch (matchType) {
+        case 'PHRASE':
+        case 'BROAD':
+        case 'EXACT': {
+            // Match targetValue to targetKeyword and matchType
+            const result = await db.query.target.findFirst({
+                where: and(eq(target.adGroupId, adGroupId), eq(target.targetKeyword, targetValue), eq(target.targetMatchType, matchType)),
+                columns: { targetId: true },
+            });
 
-    if (keywordMatchTypes.includes(matchType)) {
-        // Match targetValue to targetKeyword
-        const result = await db.query.target.findFirst({
-            where: and(eq(target.adGroupId, adGroupId), eq(target.targetKeyword, targetValue)),
-            columns: { targetId: true },
-        });
-
-        return result?.targetId ?? null;
-    }
-
-    if (matchType === 'TARGETING') {
-        // Parse ASIN from targetValue (e.g., asin="B0123ABC" or asin-expanded="B0123ABC")
-        const asin = parseAsinFromTargetValue(targetValue);
-
-        if (!asin) {
-            throw new Error(`Could not parse ASIN from targetValue: ${targetValue}`);
+            return result?.targetId ?? null;
         }
 
-        // Match asin to targetAsin
-        const result = await db.query.target.findFirst({
-            where: and(eq(target.adGroupId, adGroupId), eq(target.targetAsin, asin)),
-            columns: { targetId: true },
-        });
+        case 'TARGETING_EXPRESSION': {
+            // Parse ASIN from targetValue (e.g., asin="B0123ABC" or asin-expanded="B0123ABC")
+            const asin = parseAsinFromTargetValue(targetValue);
 
-        return result?.targetId ?? null;
+            if (!asin) {
+                throw new Error(`Could not parse ASIN from targetValue: ${targetValue}`);
+            }
+
+            // Match asin to targetAsin and matchType
+            const result = await db.query.target.findFirst({
+                where: and(eq(target.adGroupId, adGroupId), eq(target.targetAsin, asin), eq(target.targetMatchType, matchType)),
+                columns: { targetId: true },
+            });
+
+            return result?.targetId ?? null;
+        }
+
+        case 'TARGETING_EXPRESSION_PREDEFINED': {
+            // Validate that targetValue is one of the expected predefined expression types
+            const validPredefinedValues = ['close-match', 'loose-match', 'substitutes', 'complements'];
+            if (!validPredefinedValues.includes(targetValue)) {
+                throw new Error(`Invalid predefined expression value: ${targetValue}. Expected one of: ${validPredefinedValues.join(', ')}`);
+            }
+
+            // Match by matchType and targetType (predefined expression value is stored in targetType)
+            const result = await db.query.target.findFirst({
+                where: and(eq(target.adGroupId, adGroupId), eq(target.targetMatchType, matchType), eq(target.targetType, targetValue)),
+                columns: { targetId: true },
+            });
+
+            return result?.targetId ?? null;
+        }
+
+        default:
+            throw new Error(`Unknown match type: ${matchType}`);
     }
-
-    // Unknown match type
-    throw new Error(`Unknown match type: ${matchType}`);
 }
 
 /**

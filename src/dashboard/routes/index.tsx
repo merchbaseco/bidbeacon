@@ -24,7 +24,7 @@ export function IndexRoute() {
             </div>
             <div className="space-y-4">
                 <Card className="p-3 space-y-0 gap-3">
-                    <div className="flex items-start justify-between px-2">
+                    <div className="flex items-start justify-between px-2 pb-1">
                         <div className="text-sm font-medium">Amazon Ads API Invocations</div>
                     </div>
                     <ApiMetricsChart />

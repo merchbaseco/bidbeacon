@@ -148,8 +148,6 @@ export const performance = pgTable(
 
         targetId: text('target_id').notNull(),
         targetMatchType: text('target_match_type').notNull(),
-        searchTerm: text('search_term').notNull(),
-        matchedTarget: text('matched_target').notNull(),
 
         impressions: integer('impressions').notNull(),
         clicks: integer('clicks').notNull(),

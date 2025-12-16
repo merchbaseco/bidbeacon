@@ -20,8 +20,6 @@ const hourlyReportRowSchema = z.object({
     'advertisedProduct.marketplace': z.string().nullable().optional(),
     'target.value': z.string(),
     'target.matchType': z.string(),
-    'searchTerm.value': z.string().nullable().optional(),
-    'matchedTarget.value': z.string().nullable().optional(),
     'metric.impressions': z.number(),
     'metric.clicks': z.number(),
     'metric.purchases': z.number(),

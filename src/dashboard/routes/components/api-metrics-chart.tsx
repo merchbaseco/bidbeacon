@@ -2,6 +2,7 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { useApiMetrics } from '../hooks/use-api-metrics';
 
 // Color palette for APIs
@@ -49,51 +50,26 @@ function CustomTooltip({ active, payload, label, chartData }: CustomTooltipProps
     const utcEnd = formatInTimeZone(endTime, 'UTC', 'h:mmaaa');
 
     return (
-        <div
-            style={{
-                backgroundColor: '#fff',
-                border: '1px solid #E5E7EB',
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-                padding: '12px 16px',
-                minWidth: '180px',
-            }}
-        >
+        <div className="bg-card border border-border rounded-lg shadow-md p-3 min-w-[180px]">
             {/* Series list */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', marginBottom: '12px' }}>
+            <div className="flex flex-col gap-1.5 mb-3">
                 {payload.map(entry => (
-                    <div
-                        key={entry.dataKey}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            gap: '12px',
-                        }}
-                    >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <span
-                                style={{
-                                    width: '8px',
-                                    height: '8px',
-                                    borderRadius: '50%',
-                                    backgroundColor: entry.color,
-                                    flexShrink: 0,
-                                }}
-                            />
-                            <span style={{ fontSize: '14px', color: '#374151' }}>{entry.name}</span>
+                    <div key={entry.dataKey} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                            <span className="text-sm text-foreground">{entry.name}</span>
                         </div>
-                        <span style={{ fontSize: '14px', color: '#374151', fontWeight: 500 }}>{entry.value}</span>
+                        <span className="text-sm text-foreground font-medium">{entry.value}</span>
                     </div>
                 ))}
             </div>
 
             {/* Time ranges */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                <span style={{ fontSize: '13px', color: '#6B7280' }}>
+            <div className="flex flex-col gap-0.5">
+                <span className="text-[13px] text-muted-foreground">
                     {localStart} - {localEnd}
                 </span>
-                <span style={{ fontSize: '13px', color: '#9CA3AF' }}>
+                <span className="text-[13px] text-muted-foreground">
                     {utcStart} - {utcEnd} UTC
                 </span>
             </div>
@@ -189,16 +165,18 @@ export function ApiMetricsChart() {
             .sort((a, b) => b.total - a.total); // Sort by total descending
     }, [data]);
 
+    // Calculate max count for bar scaling
+    const maxCount = useMemo(() => {
+        if (apiTotals.length === 0) return 1;
+        return Math.max(...apiTotals.map(api => api.total));
+    }, [apiTotals]);
+
     if (isLoading) {
-        return <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: '#9CA3AF', fontSize: '14px' }}>Loading API metrics...</div>;
+        return <div className="flex items-center justify-center h-[400px] text-muted-foreground text-sm">Loading API metrics...</div>;
     }
 
     if (error) {
-        return (
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '400px', color: '#EF4444', fontSize: '14px' }}>
-                Error loading API metrics: {error instanceof Error ? error.message : 'Unknown error'}
-            </div>
-        );
+        return <div className="flex items-center justify-center h-[400px] text-destructive text-sm">Error loading API metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>;
     }
 
     // Custom tick formatter to show relative time at specific intervals
@@ -216,11 +194,11 @@ export function ApiMetricsChart() {
     };
 
     return (
-        <div style={{ width: '100%' }}>
+        <div className="w-full">
             {/* Chart */}
-            <div style={{ width: '100%', height: '250px', marginBottom: '24px' }}>
+            <div className="w-full h-[250px]">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 10, right: 10, left: 0, bottom: 10 }}>
+                    <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
                         <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
                         <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} />
@@ -233,36 +211,37 @@ export function ApiMetricsChart() {
             </div>
 
             {/* Table */}
-            <div style={{ width: '100%' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                    <thead>
-                        <tr style={{ borderBottom: '1px solid #E5E7EB' }}>
-                            <th style={{ textAlign: 'left', padding: '12px 16px', color: '#6B7280', fontWeight: 500, fontSize: '14px' }}>API Endpoint</th>
-                            <th style={{ textAlign: 'right', padding: '12px 16px', color: '#6B7280', fontWeight: 500, fontSize: '14px' }}>Count Sum</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {apiTotals.map(api => (
-                            <tr key={api.name} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                                <td style={{ padding: '12px 16px', fontSize: '14px', color: '#111827' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                        <span
-                                            style={{
-                                                width: '8px',
-                                                height: '8px',
-                                                borderRadius: '50%',
-                                                backgroundColor: api.color,
-                                                flexShrink: 0,
-                                            }}
-                                        />
-                                        {api.name}
-                                    </div>
-                                </td>
-                                <td style={{ textAlign: 'right', padding: '12px 16px', fontSize: '14px', color: '#111827' }}>{api.total.toLocaleString()}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+            <div className="w-full">
+                <Table>
+                    <TableHeader>
+                        <TableRow>
+                            <TableHead>API Endpoint</TableHead>
+                            <TableHead>Count</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {apiTotals.map(api => {
+                            const percentage = maxCount > 0 ? (api.total / maxCount) * 100 : 0;
+                            return (
+                                <TableRow key={api.name}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2">
+                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: api.color }} />
+                                            {api.name}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="relative w-full h-6 flex items-center">
+                                            <div className="h-full bg-muted rounded flex items-center px-2 min-w-fit" style={{ width: `${Math.max(percentage, 0)}%` }}>
+                                                <span className="text-sm text-foreground whitespace-nowrap">{api.total.toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })}
+                    </TableBody>
+                </Table>
             </div>
         </div>
     );
