@@ -74,8 +74,8 @@ CREATE TABLE "performance_monthly" (
 ALTER TABLE "performance" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
 DROP TABLE "performance" CASCADE;--> statement-breakpoint
 ALTER TABLE "report_dataset_metadata" DROP CONSTRAINT "report_dataset_metadata_account_id_timestamp_aggregation_pk";--> statement-breakpoint
-ALTER TABLE "report_dataset_metadata" ADD CONSTRAINT "report_dataset_metadata_account_id_timestamp_aggregation_entity_type_pk" PRIMARY KEY("account_id","timestamp","aggregation","entity_type");--> statement-breakpoint
 ALTER TABLE "report_dataset_metadata" ADD COLUMN "entity_type" text NOT NULL;--> statement-breakpoint
+ALTER TABLE "report_dataset_metadata" ADD CONSTRAINT "report_dataset_metadata_account_id_timestamp_aggregation_entity_type_pk" PRIMARY KEY("account_id","timestamp","aggregation","entity_type");--> statement-breakpoint
 CREATE INDEX "idx_perf_annual_campaign_year" ON "performance_annual" USING btree ("campaign_id","bucket_year");--> statement-breakpoint
 CREATE INDEX "idx_perf_annual_entity_year" ON "performance_annual" USING btree ("entity_type","entity_id","bucket_year");--> statement-breakpoint
 CREATE INDEX "idx_perf_daily_campaign_date" ON "performance_daily" USING btree ("campaign_id","bucket_date");--> statement-breakpoint
