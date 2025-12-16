@@ -13,6 +13,7 @@ import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, performanceDaily, performanceHourly, reportDatasetMetadata, target } from '@/db/schema.js';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
+import { keepOnlyAscii } from '@/utils/string.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
 
 const gunzipAsync = promisify(gunzip);
@@ -361,7 +362,7 @@ async function lookupTargetId(row: {
     const adGroupId = row['adGroup.id'];
     const targetValue = row['target.value'];
     const matchType = row['target.matchType'];
-    const matchedTargetValue = row['matchedTarget.value']?.trim(); // Noticed it sometimes has trailing whitespace.
+    const matchedTargetValue = keepOnlyAscii(row['matchedTarget.value']);
 
     // Fallback mode: use matchedTarget.value when target.value and target.matchType are empty
     if (!targetValue || !matchType) {
@@ -379,9 +380,9 @@ async function lookupTargetId(row: {
         });
 
         if (!result) {
-            console.error('matchedTargetValue:', row['matchedTarget.value']);
-            console.error('matchedTargetValue TRIMMED:', row['matchedTarget.value'].trim());
             console.error('[lookupTargetId] Failed to find target (fallback mode). Row:', JSON.stringify(row, null, 2));
+            console.error('[lookupTargetId] Original matchedTarget.value:', JSON.stringify(row['matchedTarget.value']));
+            console.error('[lookupTargetId] Cleaned matchedTargetValue:', JSON.stringify(matchedTargetValue));
             throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty)`);
         }
 
