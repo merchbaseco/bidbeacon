@@ -361,7 +361,7 @@ async function lookupTargetId(row: {
     const adGroupId = row['adGroup.id'];
     const targetValue = row['target.value'];
     const matchType = row['target.matchType'];
-    const matchedTargetValue = row['matchedTarget.value'];
+    const matchedTargetValue = row['matchedTarget.value']?.trim(); // Noticed it sometimes has trailing whitespace.
 
     // Fallback mode: use matchedTarget.value when target.value and target.matchType are empty
     if (!targetValue || !matchType) {
