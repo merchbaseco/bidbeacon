@@ -234,15 +234,15 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
  * Looks up the targetId based on adGroupId, targetValue, and matchType.
  *
  * For PHRASE, BROAD, or EXACT match types:
- *   - Match targetValue to targetKeyword with exact match
+ *   - Match targetValue to targetKeyword with exact match (using target export's match type values)
  *
  * For TARGETING_EXPRESSION match type:
  *   - Parse targetValue which looks like asin="..." or asin-expanded="..."
- *   - Match the extracted asin to targetAsin
+ *   - Match the extracted asin to targetAsin (using target export's match type values)
  *
  * For TARGETING_EXPRESSION_PREDEFINED match type:
  *   - targetValue is one of: "close-match", "loose-match", "substitutes", or "complements"
- *   - Match targetValue to targetType and matchType
+ *   - Match targetValue to targetType and matchType (using target export's match type vals)
  */
 async function lookupTargetId(adGroupId: string, targetValue: string, matchType: string): Promise<string | null> {
     switch (matchType) {
@@ -261,6 +261,7 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
         case 'TARGETING_EXPRESSION': {
             // Parse ASIN from targetValue (e.g., asin="B0123ABC" or asin-expanded="B0123ABC")
             const asin = parseAsinFromTargetValue(targetValue);
+            const targetExportMatchType = targetValue.includes('expanded') ? 'PRODUCT_SIMILAR' : 'PRODUCT_EXACT';
 
             if (!asin) {
                 throw new Error(`Could not parse ASIN from targetValue: ${targetValue}`);
@@ -268,7 +269,7 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
 
             // Match asin to targetAsin and matchType
             const result = await db.query.target.findFirst({
-                where: and(eq(target.adGroupId, adGroupId), eq(target.targetAsin, asin), eq(target.targetMatchType, matchType)),
+                where: and(eq(target.adGroupId, adGroupId), eq(target.targetAsin, asin), eq(target.targetMatchType, targetExportMatchType)),
                 columns: { targetId: true },
             });
 
@@ -282,9 +283,18 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
                 throw new Error(`Invalid predefined expression value: ${targetValue}. Expected one of: ${validPredefinedValues.join(', ')}`);
             }
 
+            const targetExportMatchType = (
+                {
+                    'close-match': 'SEARCH_CLOSE_MATCH',
+                    'loose-match': 'SEARCH_LOOSE_MATCH',
+                    substitutes: 'PRODUCT_SUBSTITUTES',
+                    complements: 'PRODUCT_COMPLEMENTS',
+                } as const
+            )[targetValue as 'close-match' | 'loose-match' | 'substitutes' | 'complements'];
+
             // Match by matchType and targetType (predefined expression value is stored in targetType)
             const result = await db.query.target.findFirst({
-                where: and(eq(target.adGroupId, adGroupId), eq(target.targetMatchType, matchType), eq(target.targetType, targetValue)),
+                where: and(eq(target.adGroupId, adGroupId), eq(target.targetMatchType, targetExportMatchType), eq(target.targetType, targetValue)),
                 columns: { targetId: true },
             });
 
