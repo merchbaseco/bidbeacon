@@ -152,14 +152,11 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
             let insertedCount = 0;
             for (const row of rows) {
                 // Look up targetId based on match type
-                const targetId = await lookupTargetId(row['adGroup.id'], row['target.value'], row['target.matchType']);
+                const targetId = await lookupTargetId(row['adGroup.id'], row['target.value'], row['target.matchType'], row['matchedTarget.value']);
 
-                if (!targetId) {
-                    const convertedMatchType = convertToTargetExportMatchType(row['target.matchType'], row['target.value']);
-                    throw new Error(
-                        `Could not find target for adGroupId: ${row['adGroup.id']}, targetValue: ${row['target.value']}, matchType: ${row['target.matchType']} (converted: ${convertedMatchType})`
-                    );
-                }
+                // Determine targetMatchType: use 'EXACT' in fallback mode, otherwise use the actual value (or undefined if empty)
+                const useFallback = !row['target.value'] || !row['target.matchType'];
+                const targetMatchType = useFallback ? 'EXACT' : row['target.matchType'] || undefined;
 
                 // Insert into the appropriate performance table based on aggregation
                 if (reportConfig.aggregation === 'hourly') {
@@ -179,7 +176,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             adId: row['ad.id'],
                             entityType: reportConfig.entityType,
                             entityId: targetId,
-                            targetMatchType: row['target.matchType'],
+                            targetMatchType,
                             impressions: row['metric.impressions'],
                             clicks: row['metric.clicks'],
                             spend: String(row['metric.totalCost']),
@@ -191,7 +188,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             set: {
                                 campaignId: row['campaign.id'],
                                 adGroupId: row['adGroup.id'],
-                                targetMatchType: row['target.matchType'],
+                                targetMatchType,
                                 impressions: row['metric.impressions'],
                                 clicks: row['metric.clicks'],
                                 spend: String(row['metric.totalCost']),
@@ -215,7 +212,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             adId: row['ad.id'],
                             entityType: reportConfig.entityType,
                             entityId: targetId,
-                            targetMatchType: row['target.matchType'],
+                            targetMatchType,
                             impressions: row['metric.impressions'],
                             clicks: row['metric.clicks'],
                             spend: String(row['metric.totalCost']),
@@ -227,7 +224,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             set: {
                                 campaignId: row['campaign.id'],
                                 adGroupId: row['adGroup.id'],
-                                targetMatchType: row['target.matchType'],
+                                targetMatchType,
                                 impressions: row['metric.impressions'],
                                 clicks: row['metric.clicks'],
                                 spend: String(row['metric.totalCost']),
@@ -351,8 +348,35 @@ function convertToTargetExportMatchType(matchType: string, targetValue: string):
  * For TARGETING_EXPRESSION_PREDEFINED match type:
  *   - targetValue is one of: "close-match", "loose-match", "substitutes", or "complements"
  *   - Match targetValue to targetType and matchType (using target export's match type vals)
+ *
+ * Fallback mode (when targetValue and matchType are empty):
+ *   - Use matchedTargetValue to match against targetKeyword assuming EXACT match type.
+ *      - This addresses a bug in the reporting beta API where the targetKeyword cell should have the value.
+ *
+ * @throws Error if targetId cannot be found
  */
-async function lookupTargetId(adGroupId: string, targetValue: string, matchType: string): Promise<string | null> {
+async function lookupTargetId(adGroupId: string, targetValue: string, matchType: string, matchedTargetValue: string): Promise<string> {
+    // Fallback mode: use matchedTarget.value when target.value and target.matchType are empty
+    if (!targetValue || !matchType) {
+        if (!matchedTargetValue) {
+            throw new Error(
+                `Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty, but matchedTarget.value is also empty)`
+            );
+        }
+
+        // Match matchedTargetValue to targetKeyword assuming EXACT match type
+        const result = await db.query.target.findFirst({
+            where: and(eq(target.adGroupId, adGroupId), eq(target.targetKeyword, matchedTargetValue), eq(target.targetMatchType, 'EXACT')),
+            columns: { targetId: true },
+        });
+
+        if (!result) {
+            throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty)`);
+        }
+
+        return result.targetId;
+    }
+
     const targetExportMatchType = convertToTargetExportMatchType(matchType, targetValue);
 
     switch (matchType) {
@@ -366,7 +390,11 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
                 columns: { targetId: true },
             });
 
-            return result?.targetId ?? null;
+            if (!result) {
+                throw new Error(`Could not find target for adGroupId: ${adGroupId}, targetValue: ${targetValue}, matchType: ${matchType} (converted: ${targetExportMatchType})`);
+            }
+
+            return result.targetId;
         }
 
         case 'TARGETING_EXPRESSION': {
@@ -384,7 +412,11 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
                 columns: { targetId: true },
             });
 
-            return result?.targetId ?? null;
+            if (!result) {
+                throw new Error(`Could not find target for adGroupId: ${adGroupId}, asin: ${asin}, matchType: ${matchType} (converted: ${targetExportMatchType})`);
+            }
+
+            return result.targetId;
         }
 
         case 'TARGETING_EXPRESSION_PREDEFINED': {
@@ -395,7 +427,11 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
                 columns: { targetId: true },
             });
 
-            return result?.targetId ?? null;
+            if (!result) {
+                throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchType: ${matchType} (converted: ${targetExportMatchType}), targetType: AUTO`);
+            }
+
+            return result.targetId;
         }
 
         default:

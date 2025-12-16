@@ -20,6 +20,7 @@ const dailyReportRowSchema = z.object({
     'advertisedProduct.marketplace': z.string().nullable().optional(),
     'target.value': z.string(),
     'target.matchType': z.string(),
+    'matchedTarget.value': z.string(),
     'metric.impressions': z.number(),
     'metric.clicks': z.number(),
     'metric.purchases': z.number(),

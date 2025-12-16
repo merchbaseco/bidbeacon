@@ -18,6 +18,7 @@ const hourlyReportRowSchema = z.object({
     'ad.id': z.coerce.string(),
     'target.value': z.string(),
     'target.matchType': z.string(),
+    'matchedTarget.value': z.string(),
     'metric.impressions': z.number(),
     'metric.clicks': z.number(),
     'metric.purchases': z.number(),
