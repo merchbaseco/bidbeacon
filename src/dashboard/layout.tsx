@@ -11,7 +11,7 @@ import LighthouseIcon from '@merchbaseco/icons/core-solid-rounded/LighthouseIcon
 import { Outlet } from 'react-router';
 import { MoreMenu } from './components/more-menu';
 import { ThemeToggle } from './components/theme-toggle';
-import { ToastProvider } from './components/ui/toast';
+import { Toaster } from './components/ui/toast';
 import { AccountSelector } from './routes/components/account-selector/account-selector';
 import { useWebSocket } from './routes/hooks/use-websocket';
 
@@ -63,9 +63,8 @@ createRoot(rootElement).render(
     <StrictMode>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
             <QueryClientProvider client={queryClient}>
-                <ToastProvider position="bottom-center">
-                    <RouterProvider router={router} />
-                </ToastProvider>
+                <RouterProvider router={router} />
+                <Toaster position="bottom-right" />
             </QueryClientProvider>
         </ThemeProvider>
     </StrictMode>

@@ -3,8 +3,8 @@ import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/Arr
 import { useAtom } from 'jotai';
 import { Loader2Icon } from 'lucide-react';
 import { useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
-import { toastManager } from '../../components/ui/toast';
 import { useAccountDatasetMetadata, useTriggerSyncAdEntities } from '../hooks/use-account-dataset-metadata';
 import { useSelectedCountryCode } from '../hooks/use-selected-country-code';
 import { selectedAccountIdAtom } from './account-selector/atoms';
@@ -22,11 +22,9 @@ export function SyncAdEntitiesButton() {
         const currentStatus = metadata?.status;
 
         if (previousStatus === 'syncing' && currentStatus === 'completed') {
-            toastManager.add({
-                type: 'success',
-                title: 'Ad entities synced',
+            toast.success('Ad entities synced', {
                 description: `Campaigns, ad groups, ads, and targets have been synced for account ${accountId}`,
-                timeout: 5000,
+                duration: 5000,
             });
         }
 

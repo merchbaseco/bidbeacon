@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import useWebSocketLib, { ReadyState } from 'react-use-websocket';
-import { toastManager } from '../../components/ui/toast';
+import { toast } from 'sonner';
 import { apiBaseUrl } from '../../router';
 import { type ConnectionStatus, connectionStatusAtom } from '../atoms';
 import { queryKeys } from './query-keys.js';
@@ -28,16 +28,12 @@ export function useWebSocket(): ConnectionStatus {
 
                 switch (data.type) {
                     case 'error':
-                        toastManager.add({
-                            type: 'error',
-                            title: 'Error',
+                        toast.error('Error', {
                             description: data.message,
                         });
                         break;
                     case 'account:updated':
-                        toastManager.add({
-                            type: 'info',
-                            title: 'Account updated',
+                        toast.info('Account updated', {
                             description: `Account ${data.accountId} updated`,
                         });
                         queryClient.invalidateQueries({
@@ -49,11 +45,9 @@ export function useWebSocket(): ConnectionStatus {
                         queryClient.invalidateQueries({
                             queryKey: queryKeys.dashboardStatusAll(),
                         });
-                        toastManager.add({
-                            type: 'success',
-                            title: 'Reports refreshed',
+                        toast.success('Reports refreshed', {
                             description: 'Report dataset metadata has been updated',
-                            timeout: 5000, // Auto-dismiss after 5 seconds
+                            duration: 5000, // Auto-dismiss after 5 seconds
                         });
                         break;
                     case 'api-metrics:updated':
