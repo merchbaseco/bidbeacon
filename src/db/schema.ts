@@ -1,4 +1,4 @@
-import { bigint, boolean, date, doublePrecision, index, integer, jsonb, numeric, pgTable, primaryKey, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { bigint, boolean, date, doublePrecision, index, integer, jsonb, numeric, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 /**
  * ----------------------------------------------------------------------------
@@ -117,8 +117,9 @@ export const accountDatasetMetadata = pgTable(
 
 /**
  * ----------------------------------------------------------------------------
- * Ad Performance
+ * Report Dataset Metadata
  * ----------------------------------------------------------------------------
+ * Tracks when report datasets were last synced for a given account+countryCode combination.
  */
 export const reportDatasetMetadata = pgTable(
     'report_dataset_metadata',
@@ -135,19 +136,70 @@ export const reportDatasetMetadata = pgTable(
     table => [primaryKey({ columns: [table.accountId, table.timestamp, table.aggregation] })]
 );
 
-export const performance = pgTable(
-    'performance',
+/**
+ * =====================================================================================
+ * Performance Tables
+ * =====================================================================================
+ *
+ * We use four performance tables, one per granularity:
+ *   - performance_hourly
+ *   - performance_daily
+ *   - performance_monthly
+ *   - performance_annual
+ *
+ * Each table stores performance data exactly as reported by Amazon at that resolution.
+ * We do not derive higher-level aggregates from lower-level data, since different
+ * reports can have different backfill windows and may not perfectly reconcile.
+ *
+ * Time columns:
+ *   - bucketStart (TIMESTAMPTZ, UTC)
+ *       Canonical bucket identity used for ordering, uniqueness, and Timescale
+ *       hypertables. This represents the actual start instant of the bucket.
+ *
+ *   - Local calendar labels
+ *       • Hourly:  bucketDate (DATE), bucketHour (0–23)
+ *       • Daily:   bucketDate (DATE)
+ *       • Monthly: bucketMonth (DATE, first of month)
+ *       • Annual:  bucketYear (INT)
+ *
+ * Local calendar labels match the account’s reporting timezone and are what most
+ * queries and UI views should use.
+ *
+ * DST handling:
+ *   - On DST fall-back days, the same local hour can occur twice.
+ *   - Hourly tables allow duplicate (bucketDate, bucketHour) values.
+ *   - bucketStart remains unique and unambiguous.
+ *   - To combine duplicate hours for display, group by bucketDate and bucketHour.
+ *
+ * Query patterns:
+ *   - Daily totals:        GROUP BY bucketDate
+ *   - Hourly breakdowns:  GROUP BY bucketDate, bucketHour
+ *   - Precise windows:    filter by bucketStart
+ *
+ * Entity model:
+ *   - entityType: 'target' | 'asin'
+ *   - entityId:   targetId or ASIN
+ *   - targetMatchType applies only to target rows and is nullable for ASIN rows.
+ *
+ * =====================================================================================
+ */
+
+export const performanceHourly = pgTable(
+    'performance_hourly',
     {
         accountId: text('account_id').notNull(),
-        date: timestamp('date', { withTimezone: false, mode: 'date' }).notNull(), // utc
-        aggregation: text('aggregation').notNull(), // daily or hourly
+
+        bucketStart: timestamp('bucket_start', { withTimezone: true, mode: 'date' }).notNull(), // UTC
+        bucketDate: date('bucket_date').notNull(), // account-local day label
+        bucketHour: smallint('bucket_hour').notNull(), // 0–23 (can duplicate on DST)
 
         campaignId: text('campaign_id').notNull(),
         adGroupId: text('ad_group_id').notNull(),
         adId: text('ad_id').notNull(),
 
-        targetId: text('target_id').notNull(),
-        targetMatchType: text('target_match_type').notNull(),
+        entityType: text('entity_type').notNull(), // 'target' | 'asin' | 'search_term'
+        entityId: text('entity_id').notNull(), // targetId, ASIN, or search term
+        targetMatchType: text('target_match_type'), // nullable for ASIN and search term rows
 
         impressions: integer('impressions').notNull(),
         clicks: integer('clicks').notNull(),
@@ -156,16 +208,113 @@ export const performance = pgTable(
         orders: integer('orders_14d').notNull(),
     },
     table => [
-        // 1. PRIMARY COMPOSITE KEY (Required for Timescale/Upsert)
         primaryKey({
-            columns: [table.accountId, table.date, table.aggregation, table.adId, table.targetId],
+            columns: [table.accountId, table.bucketStart, table.adId, table.entityType, table.entityId],
         }),
 
-        // 2. ANALYTICAL/ROLLUP INDEXES
-        index('idx_campaign_time').on(table.campaignId, table.date),
-        index('idx_ad_group_time').on(table.adGroupId, table.date),
-        index('idx_ad_time').on(table.adId, table.date),
-        index('idx_target_time').on(table.targetId, table.date),
+        index('idx_perf_hourly_campaign_time').on(table.campaignId, table.bucketStart),
+        index('idx_perf_hourly_adgroup_time').on(table.adGroupId, table.bucketStart),
+        index('idx_perf_hourly_ad_time').on(table.adId, table.bucketStart),
+        index('idx_perf_hourly_entity_time').on(table.entityType, table.entityId, table.bucketStart),
+        index('idx_perf_hourly_local').on(table.accountId, table.bucketDate, table.bucketHour),
+    ]
+);
+
+export const performanceDaily = pgTable(
+    'performance_daily',
+    {
+        accountId: text('account_id').notNull(),
+
+        bucketStart: timestamp('bucket_start', { withTimezone: true, mode: 'date' }).notNull(), // UTC start-of-day
+        bucketDate: date('bucket_date').notNull(), // account-local day label
+
+        campaignId: text('campaign_id').notNull(),
+        adGroupId: text('ad_group_id').notNull(),
+        adId: text('ad_id').notNull(),
+
+        entityType: text('entity_type').notNull(), // 'target' | 'asin' | 'search_term'
+        entityId: text('entity_id').notNull(), // targetId, ASIN, or search term
+        targetMatchType: text('target_match_type'), // nullable for ASIN and search term rows
+
+        impressions: integer('impressions').notNull(),
+        clicks: integer('clicks').notNull(),
+        spend: numeric('spend', { precision: 7, scale: 2 }).notNull(),
+        sales: numeric('sales', { precision: 10, scale: 2 }).notNull(),
+        orders: integer('orders_14d').notNull(),
+    },
+    table => [
+        primaryKey({
+            columns: [table.accountId, table.bucketDate, table.adId, table.entityType, table.entityId],
+        }),
+
+        index('idx_perf_daily_campaign_date').on(table.campaignId, table.bucketDate),
+        index('idx_perf_daily_adgroup_date').on(table.adGroupId, table.bucketDate),
+        index('idx_perf_daily_ad_date').on(table.adId, table.bucketDate),
+        index('idx_perf_daily_entity_date').on(table.entityType, table.entityId, table.bucketDate),
+    ]
+);
+
+export const performanceMonthly = pgTable(
+    'performance_monthly',
+    {
+        accountId: text('account_id').notNull(),
+
+        bucketStart: timestamp('bucket_start', { withTimezone: true, mode: 'date' }).notNull(), // UTC start-of-month
+        bucketMonth: date('bucket_month').notNull(), // e.g. 2023-12-01
+
+        campaignId: text('campaign_id').notNull(),
+        adGroupId: text('ad_group_id').notNull(),
+        adId: text('ad_id').notNull(),
+
+        entityType: text('entity_type').notNull(), // 'target' | 'asin' | 'search_term'
+        entityId: text('entity_id').notNull(), // targetId, ASIN, or search term
+        targetMatchType: text('target_match_type'), // nullable for ASIN and search term rows
+
+        impressions: integer('impressions').notNull(),
+        clicks: integer('clicks').notNull(),
+        spend: numeric('spend', { precision: 7, scale: 2 }).notNull(),
+        sales: numeric('sales', { precision: 10, scale: 2 }).notNull(),
+        orders: integer('orders_14d').notNull(),
+    },
+    table => [
+        primaryKey({
+            columns: [table.accountId, table.bucketMonth, table.adId, table.entityType, table.entityId],
+        }),
+
+        index('idx_perf_monthly_campaign_month').on(table.campaignId, table.bucketMonth),
+        index('idx_perf_monthly_entity_month').on(table.entityType, table.entityId, table.bucketMonth),
+    ]
+);
+
+export const performanceAnnual = pgTable(
+    'performance_annual',
+    {
+        accountId: text('account_id').notNull(),
+
+        bucketStart: timestamp('bucket_start', { withTimezone: true, mode: 'date' }).notNull(), // UTC Jan 1
+        bucketYear: integer('bucket_year').notNull(), // e.g. 2023
+
+        campaignId: text('campaign_id').notNull(),
+        adGroupId: text('ad_group_id').notNull(),
+        adId: text('ad_id').notNull(),
+
+        entityType: text('entity_type').notNull(), // 'target' | 'asin' | 'search_term'
+        entityId: text('entity_id').notNull(), // targetId, ASIN, or search term
+        targetMatchType: text('target_match_type'), // nullable for ASIN and search term rows
+
+        impressions: integer('impressions').notNull(),
+        clicks: integer('clicks').notNull(),
+        spend: numeric('spend', { precision: 7, scale: 2 }).notNull(),
+        sales: numeric('sales', { precision: 10, scale: 2 }).notNull(),
+        orders: integer('orders_14d').notNull(),
+    },
+    table => [
+        primaryKey({
+            columns: [table.accountId, table.bucketYear, table.adId, table.entityType, table.entityId],
+        }),
+
+        index('idx_perf_annual_campaign_year').on(table.campaignId, table.bucketYear),
+        index('idx_perf_annual_entity_year').on(table.entityType, table.entityId, table.bucketYear),
     ]
 );
 

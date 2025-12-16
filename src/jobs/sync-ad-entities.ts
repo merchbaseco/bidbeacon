@@ -125,7 +125,7 @@ const targetBidSchema = z.object({
 });
 
 const targetExportSchema = z.object({
-    adGroupId: z.string().optional(), // Optional because campaign-level targets don't have adGroupId
+    adGroupId: z.string().optional(), // Optional because campaign-level negative targets don't have adGroupId
     campaignId: z.string(),
     targetId: z.string(),
     adProduct: z.string(),

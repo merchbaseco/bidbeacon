@@ -1,12 +1,12 @@
 /**
  * Job: Update report_dataset_metadata at the top of every hour.
- * Uses performance table as a proxy for whether data has landed for the window.
+ * Creates metadata rows for time periods within the retention window.
  */
 
-import { and, eq, gte, lt } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
-import { performance, reportDatasetMetadata } from '@/db/schema.js';
+import { reportDatasetMetadata } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
@@ -55,15 +55,6 @@ export const updateReportDatasetForAccountJob = boss
 // ============================================================================
 // Utility Functions
 // ============================================================================
-
-async function _hasPerformanceData(accountId: string, windowStart: Date, windowEnd: Date, aggregation: 'hourly' | 'daily'): Promise<boolean> {
-    const record = await db.query.performance.findFirst({
-        where: and(eq(performance.accountId, accountId), eq(performance.aggregation, aggregation), gte(performance.date, windowStart), lt(performance.date, windowEnd)),
-        columns: { accountId: true },
-    });
-
-    return Boolean(record);
-}
 
 async function upsertMetadata(args: {
     accountId: string;
