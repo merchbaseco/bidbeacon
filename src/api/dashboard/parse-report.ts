@@ -379,6 +379,8 @@ async function lookupTargetId(row: {
         });
 
         if (!result) {
+            console.error('matchedTargetValue:', row['matchedTarget.value']);
+            console.error('matchedTargetValue TRIMMED:', row['matchedTarget.value'].trim());
             console.error('[lookupTargetId] Failed to find target (fallback mode). Row:', JSON.stringify(row, null, 2));
             throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty)`);
         }
