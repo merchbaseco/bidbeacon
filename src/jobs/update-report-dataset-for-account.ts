@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { reportDatasetMetadata } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
+import { AGGREGATION_TYPES, type AggregationType, ENTITY_TYPES, type EntityType } from '@/types/reports.js';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
@@ -37,11 +38,12 @@ export const updateReportDatasetForAccountJob = boss
             const timezone = getTimezoneForCountry(countryCode);
             const now = zonedNow(timezone);
 
-            // Update hourly metadata for the past 14 days
-            await updateMetadata(accountId, countryCode, now, 'hourly', timezone);
-
-            // Update daily metadata for the past 15 months
-            await updateMetadata(accountId, countryCode, now, 'daily', timezone);
+            // Update metadata for each combination of aggregation and entity type
+            for (const aggregation of AGGREGATION_TYPES) {
+                for (const entityType of ENTITY_TYPES) {
+                    await updateMetadata(accountId, countryCode, now, aggregation, entityType, timezone);
+                }
+            }
 
             // Emit event when job completes
             emitEvent({
@@ -60,12 +62,13 @@ async function upsertMetadata(args: {
     accountId: string;
     countryCode: string;
     timestamp: Date;
-    aggregation: 'hourly' | 'daily';
+    aggregation: AggregationType;
+    entityType: EntityType;
     status: 'missing' | 'fetching' | 'completed' | 'failed';
     lastRefreshed: Date;
     error?: string | null;
 }): Promise<void> {
-    const { accountId, countryCode, timestamp, aggregation, status, lastRefreshed, error } = args;
+    const { accountId, countryCode, timestamp, aggregation, entityType, status, lastRefreshed, error } = args;
 
     await db
         .insert(reportDatasetMetadata)
@@ -74,13 +77,14 @@ async function upsertMetadata(args: {
             countryCode,
             timestamp,
             aggregation,
+            entityType,
             status,
             lastRefreshed,
             reportId: null,
             error: error ?? null,
         })
         .onConflictDoUpdate({
-            target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation],
+            target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
             set: {
                 countryCode,
                 status,
@@ -94,7 +98,7 @@ async function upsertMetadata(args: {
  * Create a new metadata row for a time period.
  * Used when initially creating rows to maintain the time-based dataset.
  */
-async function createMetadataRow(accountId: string, countryCode: string, timestamp: Date, aggregation: 'hourly' | 'daily'): Promise<void> {
+async function createMetadataRow(accountId: string, countryCode: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
     const timezone = getTimezoneForCountry(countryCode);
 
     await upsertMetadata({
@@ -102,6 +106,7 @@ async function createMetadataRow(accountId: string, countryCode: string, timesta
         countryCode,
         timestamp,
         aggregation,
+        entityType,
         status: 'missing',
         lastRefreshed: zonedNow(timezone),
         error: null,
@@ -109,15 +114,16 @@ async function createMetadataRow(accountId: string, countryCode: string, timesta
 }
 
 /**
- * Check if a metadata record exists for the given account, country code, timestamp, and aggregation.
+ * Check if a metadata record exists for the given account, country code, timestamp, aggregation, and entity type.
  */
-async function metadataExists(accountId: string, countryCode: string, timestamp: Date, aggregation: 'hourly' | 'daily'): Promise<boolean> {
+async function metadataExists(accountId: string, countryCode: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<boolean> {
     const record = await db.query.reportDatasetMetadata.findFirst({
         where: and(
             eq(reportDatasetMetadata.accountId, accountId),
             eq(reportDatasetMetadata.countryCode, countryCode),
             eq(reportDatasetMetadata.timestamp, timestamp),
-            eq(reportDatasetMetadata.aggregation, aggregation)
+            eq(reportDatasetMetadata.aggregation, aggregation),
+            eq(reportDatasetMetadata.entityType, entityType)
         ),
         columns: { accountId: true },
     });
@@ -130,10 +136,11 @@ async function metadataExists(accountId: string, countryCode: string, timestamp:
  * Creates rows starting from the most recent period and working backwards,
  * stopping when existing records are found or the retention limit is reached.
  */
-async function updateMetadata(accountId: string, countryCode: string, now: Date, aggregation: 'hourly' | 'daily', timezone: string): Promise<void> {
-    const currentPeriodStart = aggregation === 'hourly' ? zonedTopOfHour(now, timezone) : zonedStartOfDay(now, timezone);
-    const retentionDays = aggregation === 'hourly' ? HOURLY_RETENTION_DAYS : DAILY_RETENTION_DAYS;
-    const earliestPeriodStart = aggregation === 'hourly' ? zonedSubtractHours(currentPeriodStart, retentionDays * 24, timezone) : zonedSubtractDays(currentPeriodStart, retentionDays, timezone);
+async function updateMetadata(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType, timezone: string): Promise<void> {
+    const isHourly = aggregation === 'hourly';
+    const currentPeriodStart = isHourly ? zonedTopOfHour(now, timezone) : zonedStartOfDay(now, timezone);
+    const retentionDays = isHourly ? HOURLY_RETENTION_DAYS : DAILY_RETENTION_DAYS;
+    const earliestPeriodStart = isHourly ? zonedSubtractHours(currentPeriodStart, retentionDays * 24, timezone) : zonedSubtractDays(currentPeriodStart, retentionDays, timezone);
 
     // Start from the most recent period and work backwards
     let periodStart = currentPeriodStart;
@@ -141,15 +148,15 @@ async function updateMetadata(accountId: string, countryCode: string, now: Date,
 
     while (periodStart.getTime() >= earliestTime) {
         // Check if metadata already exists
-        if (await metadataExists(accountId, countryCode, periodStart, aggregation)) {
+        if (await metadataExists(accountId, countryCode, periodStart, aggregation, entityType)) {
             // Found existing record - stop here since all earlier periods should also exist
             break;
         }
 
         // Create metadata row for this time period
-        await createMetadataRow(accountId, countryCode, periodStart, aggregation);
+        await createMetadataRow(accountId, countryCode, periodStart, aggregation, entityType);
 
         // Move to the previous period
-        periodStart = aggregation === 'hourly' ? zonedSubtractHours(periodStart, 1, timezone) : zonedSubtractDays(periodStart, 1, timezone);
+        periodStart = isHourly ? zonedSubtractHours(periodStart, 1, timezone) : zonedSubtractDays(periodStart, 1, timezone);
     }
 }

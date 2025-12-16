@@ -16,8 +16,6 @@ const dailyReportRowSchema = z.object({
     'campaign.name': z.string(),
     'adGroup.id': z.coerce.string(),
     'ad.id': z.coerce.string(),
-    'advertisedProduct.id': z.string().nullable().optional(),
-    'advertisedProduct.marketplace': z.string().nullable().optional(),
     'target.value': z.string(),
     'target.matchType': z.string(),
     'metric.impressions': z.number(),
@@ -30,8 +28,9 @@ const dailyReportRowSchema = z.object({
 // Derive fields array from schema keys
 const fields = Object.keys(dailyReportRowSchema.shape) as string[];
 
-export const dailyReportConfig: ReportConfig = {
+export const dailyTargetReportConfig: ReportConfig = {
     aggregation: 'daily',
+    entityType: 'target',
     fields,
     rowSchema: dailyReportRowSchema,
     format: 'GZIP_JSON',

@@ -120,6 +120,7 @@ export const accountDatasetMetadata = pgTable(
  * Report Dataset Metadata
  * ----------------------------------------------------------------------------
  * Tracks when report datasets were last synced for a given account+countryCode combination.
+ * Each row represents a specific aggregation + entityType combination at a timestamp.
  */
 export const reportDatasetMetadata = pgTable(
     'report_dataset_metadata',
@@ -127,13 +128,14 @@ export const reportDatasetMetadata = pgTable(
         accountId: text('account_id').notNull(),
         countryCode: text('country_code').notNull(),
         timestamp: timestamp('timestamp', { withTimezone: false, mode: 'date' }).notNull(), // utc
-        aggregation: text('aggregation').notNull(), // daily or hourly
+        aggregation: text('aggregation').notNull(), // hourly, daily
+        entityType: text('entity_type').notNull(), // target, product
         status: text('status').notNull(), // enum: missing, fetching, completed, failed
         lastRefreshed: timestamp('last_refreshed', { withTimezone: false, mode: 'date' }), // utc
         reportId: text('report_id'),
         error: text('error'),
     },
-    table => [primaryKey({ columns: [table.accountId, table.timestamp, table.aggregation] })]
+    table => [primaryKey({ columns: [table.accountId, table.timestamp, table.aggregation, table.entityType] })]
 );
 
 /**

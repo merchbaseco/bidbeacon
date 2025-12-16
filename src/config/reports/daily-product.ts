@@ -2,15 +2,15 @@ import { z } from 'zod';
 import type { ReportConfig } from '@/types/reports.js';
 
 /**
- * Hourly report configuration.
+ * Daily report configuration.
  *
- * Hourly reports capture performance data at an hourly granularity.
- * Uses 'hour.value' for time dimension.
+ * Daily reports capture performance data at a daily granularity.
+ * Uses 'date.value' for time dimension.
  */
 
-// Complete schema for hourly report rows
-const hourlyReportRowSchema = z.object({
-    'hour.value': z.string(),
+// Complete schema for daily report rows
+const dailyReportRowSchema = z.object({
+    'date.value': z.string(),
     'budgetCurrency.value': z.string(),
     'campaign.id': z.coerce.string(),
     'campaign.name': z.string(),
@@ -28,11 +28,12 @@ const hourlyReportRowSchema = z.object({
 });
 
 // Derive fields array from schema keys
-const fields = Object.keys(hourlyReportRowSchema.shape) as string[];
+const fields = Object.keys(dailyReportRowSchema.shape) as string[];
 
-export const hourlyReportConfig: ReportConfig = {
-    aggregation: 'hourly',
+export const dailyProductReportConfig: ReportConfig = {
+    aggregation: 'daily',
+    entityType: 'product',
     fields,
-    rowSchema: hourlyReportRowSchema,
+    rowSchema: dailyReportRowSchema,
     format: 'GZIP_JSON',
 };

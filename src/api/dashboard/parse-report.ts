@@ -9,9 +9,10 @@ import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { retrieveReport } from '@/amazon-ads/retrieve-report.js';
-import { getReportConfig } from '@/config/reports/index.js';
+import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, performanceDaily, performanceHourly, reportDatasetMetadata, target } from '@/db/schema.js';
+import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
 
 const gunzipAsync = promisify(gunzip);
@@ -26,16 +27,15 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
             accountId: z.string(),
             countryCode: z.string(),
             timestamp: z.string(), // ISO string
-            aggregation: z.enum(['hourly', 'daily']),
+            aggregation: z.enum(AGGREGATION_TYPES),
+            entityType: z.enum(ENTITY_TYPES),
         });
 
         const body = bodySchema.parse(request.body);
         const date = new Date(body.timestamp);
+        const reportConfig = reportConfigs[body.aggregation][body.entityType];
 
-        console.log(`[API] Parse report request received: ${body.aggregation} for ${body.accountId} at ${body.timestamp}`);
-
-        // Get report configuration based on aggregation type
-        const reportConfig = getReportConfig(body.aggregation);
+        console.log(`[API] Parse report request received: ${body.aggregation}/${body.entityType} for ${body.accountId} at ${body.timestamp}`);
 
         // Look up advertiser account to get profileId
         const account = await db.query.advertiserAccount.findFirst({
@@ -64,7 +64,12 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
 
         // Look up the report metadata to get the reportId
         const reportMetadata = await db.query.reportDatasetMetadata.findFirst({
-            where: and(eq(reportDatasetMetadata.accountId, body.accountId), eq(reportDatasetMetadata.timestamp, date), eq(reportDatasetMetadata.aggregation, body.aggregation)),
+            where: and(
+                eq(reportDatasetMetadata.accountId, body.accountId),
+                eq(reportDatasetMetadata.timestamp, date),
+                eq(reportDatasetMetadata.aggregation, body.aggregation),
+                eq(reportDatasetMetadata.entityType, body.entityType)
+            ),
         });
 
         if (!reportMetadata) {
@@ -157,7 +162,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                 }
 
                 // Insert into the appropriate performance table based on aggregation
-                if (body.aggregation === 'hourly') {
+                if (reportConfig.aggregation === 'hourly') {
                     // Parse hour.value (format: "2024-12-15T14:00:00")
                     const hourValue = (row as { 'hour.value': string })['hour.value'];
                     const { bucketStart, bucketDate, bucketHour } = parseHourlyTimestamp(hourValue, timezone);
@@ -172,7 +177,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             campaignId: row['campaign.id'],
                             adGroupId: row['adGroup.id'],
                             adId: row['ad.id'],
-                            entityType: 'target',
+                            entityType: reportConfig.entityType,
                             entityId: targetId,
                             targetMatchType: row['target.matchType'],
                             impressions: row['metric.impressions'],
@@ -208,7 +213,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             campaignId: row['campaign.id'],
                             adGroupId: row['adGroup.id'],
                             adId: row['ad.id'],
-                            entityType: 'target',
+                            entityType: reportConfig.entityType,
                             entityId: targetId,
                             targetMatchType: row['target.matchType'],
                             impressions: row['metric.impressions'],
@@ -242,7 +247,14 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                     status: 'completed',
                     error: null,
                 })
-                .where(and(eq(reportDatasetMetadata.accountId, body.accountId), eq(reportDatasetMetadata.timestamp, date), eq(reportDatasetMetadata.aggregation, body.aggregation)));
+                .where(
+                    and(
+                        eq(reportDatasetMetadata.accountId, body.accountId),
+                        eq(reportDatasetMetadata.timestamp, date),
+                        eq(reportDatasetMetadata.aggregation, body.aggregation),
+                        eq(reportDatasetMetadata.entityType, body.entityType)
+                    )
+                );
 
             console.log(`[API] Parse report completed. Inserted/updated ${insertedCount} rows.`);
 
@@ -262,7 +274,14 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                     status: 'failed',
                     error: error instanceof Error ? error.message : 'Unknown error',
                 })
-                .where(and(eq(reportDatasetMetadata.accountId, body.accountId), eq(reportDatasetMetadata.timestamp, date), eq(reportDatasetMetadata.aggregation, body.aggregation)));
+                .where(
+                    and(
+                        eq(reportDatasetMetadata.accountId, body.accountId),
+                        eq(reportDatasetMetadata.timestamp, date),
+                        eq(reportDatasetMetadata.aggregation, body.aggregation),
+                        eq(reportDatasetMetadata.entityType, body.entityType)
+                    )
+                );
 
             reply.status(500);
             return {
@@ -340,6 +359,7 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
         case 'PHRASE':
         case 'BROAD':
         case 'EXACT': {
+            // This is manual keyword targeting.
             // Match targetValue to targetKeyword and matchType
             const result = await db.query.target.findFirst({
                 where: and(eq(target.adGroupId, adGroupId), eq(target.targetKeyword, targetValue), eq(target.targetMatchType, targetExportMatchType)),
@@ -350,7 +370,8 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
         }
 
         case 'TARGETING_EXPRESSION': {
-            // Parse ASIN from targetValue (e.g., asin="B0123ABC" or asin-expanded="B0123ABC")
+            // This is manual product (ASIN) targeting.
+            // Parse ASIN from targetValue (i.e. asin="B0123ABC" or asin-expanded="B0123ABC")
             const asin = parseAsinFromTargetValue(targetValue);
 
             if (!asin) {
@@ -367,9 +388,10 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
         }
 
         case 'TARGETING_EXPRESSION_PREDEFINED': {
+            // This is auto targeting.
             // Match by matchType and targetType (predefined expression value is stored in targetType)
             const result = await db.query.target.findFirst({
-                where: and(eq(target.adGroupId, adGroupId), eq(target.targetMatchType, targetExportMatchType), eq(target.targetType, targetValue)),
+                where: and(eq(target.adGroupId, adGroupId), eq(target.targetMatchType, targetExportMatchType), eq(target.targetType, 'AUTO')),
                 columns: { targetId: true },
             });
 

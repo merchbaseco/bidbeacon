@@ -2,9 +2,10 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { createReport } from '@/amazon-ads/create-report.js';
-import { getReportConfig } from '@/config/reports/index.js';
+import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
+import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
 import { utcAddDays, utcAddHours, utcNow } from '@/utils/date.js';
 
 export function registerCreateReportRoute(fastify: FastifyInstance) {
@@ -13,11 +14,13 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
             accountId: z.string(),
             countryCode: z.string(),
             timestamp: z.string(), // ISO string
-            aggregation: z.enum(['hourly', 'daily']),
+            aggregation: z.enum(AGGREGATION_TYPES),
+            entityType: z.enum(ENTITY_TYPES),
         });
 
         const body = bodySchema.parse(request.body);
-        console.log(`[API] Create report request received: ${body.aggregation} for ${body.accountId}, country: ${body.countryCode} at ${body.timestamp}`);
+        const reportConfig = reportConfigs[body.aggregation][body.entityType];
+        console.log(`[API] Create report request received: ${body.aggregation}/${body.entityType} for ${body.accountId}, country: ${body.countryCode} at ${body.timestamp}`);
 
         // Look up advertiser account to get adsAccountId and profileId
         const account = await db.query.advertiserAccount.findFirst({
@@ -61,9 +64,6 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
         const startDate = formatDate(windowStart);
         const endDate = formatDate(windowEnd);
 
-        // Get report configuration based on aggregation type
-        const reportConfig = getReportConfig(body.aggregation);
-
         try {
             const response = await createReport(
                 {
@@ -105,13 +105,14 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
                             countryCode: body.countryCode,
                             timestamp: windowStart,
                             aggregation: body.aggregation,
+                            entityType: body.entityType,
                             status: 'fetching',
                             lastRefreshed: utcNow(),
                             reportId,
                             error: null,
                         })
                         .onConflictDoUpdate({
-                            target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation],
+                            target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
                             set: {
                                 reportId,
                                 status: 'fetching',

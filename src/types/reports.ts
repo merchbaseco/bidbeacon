@@ -4,12 +4,21 @@ import type { z } from 'zod';
 // Report Configuration Types
 // ============================================================================
 
+export const AGGREGATION_TYPES = ['hourly', 'daily'] as const;
+export type AggregationType = (typeof AGGREGATION_TYPES)[number];
+
+export const ENTITY_TYPES = ['target', 'product'] as const;
+export type EntityType = (typeof ENTITY_TYPES)[number];
+
 /**
- * Configuration for a report type (hourly or daily).
+ * Configuration for a report type.
  */
 export interface ReportConfig {
     /** The aggregation type */
-    aggregation: 'hourly' | 'daily';
+    aggregation: AggregationType;
+
+    /** The entity type */
+    entityType: EntityType;
 
     /** Fields to request from the Amazon Ads API (derived from schema keys) */
     fields: string[];
@@ -22,9 +31,6 @@ export interface ReportConfig {
 }
 
 /**
- * Map of aggregation type to report configuration.
+ * Map of aggregation -> entityType -> report configuration.
  */
-export type ReportConfigMap = {
-    hourly: ReportConfig;
-    daily: ReportConfig;
-};
+export type ReportConfigMap = Record<AggregationType, Record<EntityType, ReportConfig>>;
