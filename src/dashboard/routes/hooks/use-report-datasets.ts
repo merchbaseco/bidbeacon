@@ -12,6 +12,7 @@ export type ReportDatasetMetadata = {
     countryCode: string;
     timestamp: string;
     aggregation: Aggregation;
+    entityType: 'target' | 'product';
     status: string;
     lastRefreshed: string | null;
     reportId: string;

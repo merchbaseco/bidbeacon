@@ -5,6 +5,7 @@ export type DashboardStatusResponse = {
     countryCode: string;
     timestamp: string;
     aggregation: 'daily' | 'hourly';
+    entityType: 'target' | 'product';
     status: string;
     lastRefreshed: string | null;
     reportId: string;
@@ -111,7 +112,7 @@ export async function toggleAdvertiserAccount(adsAccountId: string, profileId: s
     return (await response.json()) as { success: boolean; message?: string };
 }
 
-export async function createReport(params: { accountId: string; countryCode: string; timestamp: string; aggregation: 'hourly' | 'daily' }) {
+export async function createReport(params: { accountId: string; countryCode: string; timestamp: string; aggregation: 'hourly' | 'daily'; entityType: 'target' | 'product' }) {
     const response = await fetch(`${apiBaseUrl}/api/dashboard/create-report`, {
         method: 'POST',
         headers: {
@@ -138,7 +139,7 @@ export async function createReport(params: { accountId: string; countryCode: str
     return body.data;
 }
 
-export async function retrieveReport(params: { accountId: string; timestamp: string; aggregation: 'hourly' | 'daily' }) {
+export async function retrieveReport(params: { accountId: string; timestamp: string; aggregation: 'hourly' | 'daily'; entityType: 'target' | 'product' }) {
     const response = await fetch(`${apiBaseUrl}/api/dashboard/retrieve-report`, {
         method: 'POST',
         headers: {
@@ -165,7 +166,7 @@ export async function retrieveReport(params: { accountId: string; timestamp: str
     return body.data;
 }
 
-export async function parseReport(params: { accountId: string; countryCode: string; timestamp: string; aggregation: 'hourly' | 'daily' }) {
+export async function parseReport(params: { accountId: string; countryCode: string; timestamp: string; aggregation: 'hourly' | 'daily'; entityType: 'target' | 'product' }) {
     const response = await fetch(`${apiBaseUrl}/api/dashboard/parse-report`, {
         method: 'POST',
         headers: {

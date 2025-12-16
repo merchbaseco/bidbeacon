@@ -1,21 +1,9 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
-import {
-    AlertCircleIcon,
-    AlertTriangleIcon,
-    CheckCircleIcon,
-    FilterIcon,
-    Loader2Icon,
-} from 'lucide-react';
+import { AlertCircleIcon, AlertTriangleIcon, CheckCircleIcon, FilterIcon, Loader2Icon } from 'lucide-react';
 import { Button } from '../../components/ui/button';
 import { ButtonGroup, ButtonGroupSeparator } from '../../components/ui/button-group';
-import {
-    Select,
-    SelectItem,
-    SelectPopup,
-    SelectTrigger,
-    SelectValue,
-} from '../../components/ui/select';
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '../../components/ui/select';
 
 const STATUS_OPTIONS = [
     { icon: FilterIcon, label: 'All Statuses', value: 'all' },
@@ -27,35 +15,36 @@ const STATUS_OPTIONS = [
 
 interface ReportsToolbarProps {
     aggregation: 'daily' | 'hourly';
+    entityType: 'target' | 'product' | 'all';
     statusFilter: string;
     isLoading: boolean;
     onAggregationChange: (value: 'daily' | 'hourly') => void;
+    onEntityTypeChange: (value: 'target' | 'product' | 'all') => void;
     onStatusFilterChange: (value: string) => void;
     onRefresh: () => void;
 }
 
-export const ReportsToolbar = ({
-    aggregation,
-    statusFilter,
-    isLoading,
-    onAggregationChange,
-    onStatusFilterChange,
-    onRefresh,
-}: ReportsToolbarProps) => {
+export const ReportsToolbar = ({ aggregation, entityType, statusFilter, isLoading, onAggregationChange, onEntityTypeChange, onStatusFilterChange, onRefresh }: ReportsToolbarProps) => {
     return (
         <div className="mb-4 flex items-center gap-2">
             <ButtonGroup>
-                <Button
-                    variant={aggregation === 'daily' ? 'default' : 'outline'}
-                    onClick={() => onAggregationChange('daily')}
-                >
+                <Button variant={aggregation === 'daily' ? 'default' : 'outline'} onClick={() => onAggregationChange('daily')}>
                     Daily
                 </Button>
-                <Button
-                    variant={aggregation === 'hourly' ? 'default' : 'outline'}
-                    onClick={() => onAggregationChange('hourly')}
-                >
+                <Button variant={aggregation === 'hourly' ? 'default' : 'outline'} onClick={() => onAggregationChange('hourly')}>
                     Hourly
+                </Button>
+            </ButtonGroup>
+            <ButtonGroupSeparator />
+            <ButtonGroup>
+                <Button variant={entityType === 'all' ? 'default' : 'outline'} onClick={() => onEntityTypeChange('all')}>
+                    All Types
+                </Button>
+                <Button variant={entityType === 'target' ? 'default' : 'outline'} onClick={() => onEntityTypeChange('target')}>
+                    Target
+                </Button>
+                <Button variant={entityType === 'product' ? 'default' : 'outline'} onClick={() => onEntityTypeChange('product')}>
+                    Product
                 </Button>
             </ButtonGroup>
             <ButtonGroupSeparator />
@@ -94,17 +83,8 @@ export const ReportsToolbar = ({
                 </SelectPopup>
             </Select>
             <ButtonGroup className="ml-auto">
-                <Button
-                    variant="ghost"
-                    onClick={onRefresh}
-                    disabled={isLoading}
-                    className="inline-flex items-center gap-2"
-                >
-                    <HugeiconsIcon
-                        icon={ArrowReloadHorizontalIcon}
-                        size={16}
-                        color="currentColor"
-                    />
+                <Button variant="ghost" onClick={onRefresh} disabled={isLoading} className="inline-flex items-center gap-2">
+                    <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} color="currentColor" />
                 </Button>
             </ButtonGroup>
         </div>

@@ -11,14 +11,20 @@ export function registerRetrieveReportRoute(fastify: FastifyInstance) {
             accountId: z.string(),
             timestamp: z.string(), // ISO string
             aggregation: z.enum(['hourly', 'daily']),
+            entityType: z.enum(['target', 'product']),
         });
 
         const body = bodySchema.parse(request.body);
-        console.log(`[API] Retrieve report request received: ${body.aggregation} for ${body.accountId} at ${body.timestamp}`);
+        console.log(`[API] Retrieve report request received: ${body.aggregation}/${body.entityType} for ${body.accountId} at ${body.timestamp}`);
 
         // Look up report metadata to get reportId
         const metadata = await db.query.reportDatasetMetadata.findFirst({
-            where: and(eq(reportDatasetMetadata.accountId, body.accountId), eq(reportDatasetMetadata.timestamp, new Date(body.timestamp)), eq(reportDatasetMetadata.aggregation, body.aggregation)),
+            where: and(
+                eq(reportDatasetMetadata.accountId, body.accountId),
+                eq(reportDatasetMetadata.timestamp, new Date(body.timestamp)),
+                eq(reportDatasetMetadata.aggregation, body.aggregation),
+                eq(reportDatasetMetadata.entityType, body.entityType)
+            ),
             columns: {
                 reportId: true,
             },

@@ -21,6 +21,7 @@ const ITEMS_PER_PAGE = 10;
 export const ReportsTable = () => {
     const queryClient = useQueryClient();
     const [aggregation, setAggregation] = useState<'daily' | 'hourly'>('daily');
+    const [entityType, setEntityType] = useState<'target' | 'product' | 'all'>('all');
     const { data: rows = [], isLoading } = useReportDatasets(aggregation);
     const accountId = useSelectedAccountId();
 
@@ -34,13 +35,22 @@ export const ReportsTable = () => {
     const [dialogError, setDialogError] = useState<string | null>(null);
     const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
-    // Filter rows by status
+    // Filter rows by status and entity type
     const filteredRows = useMemo(() => {
-        if (statusFilter === 'all') {
-            return rows;
+        let filtered = rows;
+
+        // Filter by entity type
+        if (entityType !== 'all') {
+            filtered = filtered.filter(row => row.entityType === entityType);
         }
-        return rows.filter(row => row.status === statusFilter);
-    }, [rows, statusFilter]);
+
+        // Filter by status
+        if (statusFilter !== 'all') {
+            filtered = filtered.filter(row => row.status === statusFilter);
+        }
+
+        return filtered;
+    }, [rows, entityType, statusFilter]);
 
     const totalPages = Math.ceil(filteredRows.length / ITEMS_PER_PAGE);
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -61,6 +71,11 @@ export const ReportsTable = () => {
         setCurrentPage(1);
     };
 
+    const handleEntityTypeChange = (value: 'target' | 'product' | 'all') => {
+        setEntityType(value);
+        setCurrentPage(1);
+    };
+
     const handleStatusFilterChange = (value: string) => {
         setStatusFilter(value);
         setCurrentPage(1);
@@ -73,7 +88,7 @@ export const ReportsTable = () => {
     const handleCreateReport = async (row: (typeof rows)[0]) => {
         if (!accountId || !row.countryCode) return;
 
-        setLoadingAction(`create-${row.timestamp}`);
+        setLoadingAction(`create-${row.timestamp}-${row.entityType}`);
         setDialogTitle('Create Report Response');
         setDialogError(null);
         setDialogData(null);
@@ -84,6 +99,7 @@ export const ReportsTable = () => {
                 countryCode: row.countryCode,
                 timestamp: row.timestamp,
                 aggregation: row.aggregation,
+                entityType: row.entityType,
             });
             // Invalidate the table data to show updated status
             await queryClient.invalidateQueries({
@@ -102,7 +118,7 @@ export const ReportsTable = () => {
     const handleRetrieveReport = async (row: (typeof rows)[0]) => {
         if (!accountId) return;
 
-        setLoadingAction(`retrieve-${row.timestamp}`);
+        setLoadingAction(`retrieve-${row.timestamp}-${row.entityType}`);
         setDialogTitle('Retrieve Report Response');
         setDialogError(null);
         setDialogData(null);
@@ -112,6 +128,7 @@ export const ReportsTable = () => {
                 accountId,
                 timestamp: row.timestamp,
                 aggregation: row.aggregation,
+                entityType: row.entityType,
             });
             setDialogData(response);
             setDialogOpen(true);
@@ -126,7 +143,7 @@ export const ReportsTable = () => {
     const handleParseReport = async (row: (typeof rows)[0]) => {
         if (!accountId || !row.countryCode) return;
 
-        setLoadingAction(`parse-${row.timestamp}`);
+        setLoadingAction(`parse-${row.timestamp}-${row.entityType}`);
         setDialogTitle('Parse Report Response');
         setDialogError(null);
         setDialogData(null);
@@ -137,6 +154,7 @@ export const ReportsTable = () => {
                 countryCode: row.countryCode,
                 timestamp: row.timestamp,
                 aggregation: row.aggregation,
+                entityType: row.entityType,
             });
             // Invalidate the table data to show updated status
             await queryClient.invalidateQueries({
@@ -160,9 +178,11 @@ export const ReportsTable = () => {
         <>
             <ReportsToolbar
                 aggregation={aggregation}
+                entityType={entityType}
                 statusFilter={statusFilter}
                 isLoading={isLoading || refreshPending}
                 onAggregationChange={handleAggregationChange}
+                onEntityTypeChange={handleEntityTypeChange}
                 onStatusFilterChange={handleStatusFilterChange}
                 onRefresh={handleRefresh}
             />
@@ -171,6 +191,8 @@ export const ReportsTable = () => {
                     <TableHeader>
                         <TableRow>
                             <TableHead>Timestamp</TableHead>
+                            <TableHead>Aggregation</TableHead>
+                            <TableHead>Entity Type</TableHead>
                             <TableHead>Status</TableHead>
                             <TableHead>Last refreshed</TableHead>
                             <TableHead>Report ID</TableHead>
@@ -180,23 +202,29 @@ export const ReportsTable = () => {
                     <TableBody>
                         {filteredRows.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                <TableCell colSpan={7} className="text-center text-muted-foreground">
                                     No records found in this window.
                                 </TableCell>
                             </TableRow>
                         ) : (
                             paginatedRows.map(row => {
-                                const createActionKey = `create-${row.timestamp}`;
-                                const retrieveActionKey = `retrieve-${row.timestamp}`;
-                                const parseActionKey = `parse-${row.timestamp}`;
+                                const createActionKey = `create-${row.timestamp}-${row.entityType}`;
+                                const retrieveActionKey = `retrieve-${row.timestamp}-${row.entityType}`;
+                                const parseActionKey = `parse-${row.timestamp}-${row.entityType}`;
                                 const isCreating = loadingAction === createActionKey;
                                 const isRetrieving = loadingAction === retrieveActionKey;
                                 const isParsing = loadingAction === parseActionKey;
                                 const isActionPending = isCreating || isRetrieving || isParsing;
 
                                 return (
-                                    <TableRow key={`${row.timestamp}-${row.aggregation}`}>
+                                    <TableRow key={`${row.timestamp}-${row.aggregation}-${row.entityType}`}>
                                         <TableCell className="font-medium">{formatDate(row.timestamp)}</TableCell>
+                                        <TableCell>
+                                            <Badge variant="outline">{row.aggregation}</Badge>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge variant="secondary">{row.entityType}</Badge>
+                                        </TableCell>
                                         <TableCell>
                                             <StatusBadge status={row.status} />
                                         </TableCell>
