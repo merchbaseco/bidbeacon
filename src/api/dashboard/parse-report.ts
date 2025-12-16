@@ -151,12 +151,8 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
             // Process each row and insert into performance table
             let insertedCount = 0;
             for (const row of rows) {
-                // Look up targetId based on match type
-                const targetId = await lookupTargetId(row['adGroup.id'], row['target.value'], row['target.matchType'], row['matchedTarget.value']);
-
-                // Determine targetMatchType: use 'EXACT' in fallback mode, otherwise use the actual value (or undefined if empty)
-                const useFallback = !row['target.value'] || !row['target.matchType'];
-                const targetMatchType = useFallback ? 'EXACT' : row['target.matchType'] || undefined;
+                // Look up targetId and get entity info
+                const { entityId, matchType } = await lookupTargetId(row);
 
                 // Insert into the appropriate performance table based on aggregation
                 if (reportConfig.aggregation === 'hourly') {
@@ -175,8 +171,8 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             adGroupId: row['adGroup.id'],
                             adId: row['ad.id'],
                             entityType: reportConfig.entityType,
-                            entityId: targetId,
-                            targetMatchType,
+                            entityId,
+                            targetMatchType: matchType,
                             impressions: row['metric.impressions'],
                             clicks: row['metric.clicks'],
                             spend: String(row['metric.totalCost']),
@@ -188,7 +184,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             set: {
                                 campaignId: row['campaign.id'],
                                 adGroupId: row['adGroup.id'],
-                                targetMatchType,
+                                targetMatchType: matchType,
                                 impressions: row['metric.impressions'],
                                 clicks: row['metric.clicks'],
                                 spend: String(row['metric.totalCost']),
@@ -211,8 +207,8 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             adGroupId: row['adGroup.id'],
                             adId: row['ad.id'],
                             entityType: reportConfig.entityType,
-                            entityId: targetId,
-                            targetMatchType,
+                            entityId,
+                            targetMatchType: matchType,
                             impressions: row['metric.impressions'],
                             clicks: row['metric.clicks'],
                             spend: String(row['metric.totalCost']),
@@ -224,7 +220,7 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
                             set: {
                                 campaignId: row['campaign.id'],
                                 adGroupId: row['adGroup.id'],
-                                targetMatchType,
+                                targetMatchType: matchType,
                                 impressions: row['metric.impressions'],
                                 clicks: row['metric.clicks'],
                                 spend: String(row['metric.totalCost']),
@@ -336,29 +332,41 @@ function convertToTargetExportMatchType(matchType: string, targetValue: string):
 }
 
 /**
- * Looks up the targetId based on adGroupId, targetValue, and matchType.
+ * Looks up the targetId based on row data and returns entity information.
  *
  * For PHRASE, BROAD, or EXACT match types:
- *   - Match targetValue to targetKeyword with exact match (using target export's match type values)
+ *   - Match target.value to targetKeyword with exact match (using target export's match type values)
  *
  * For TARGETING_EXPRESSION match type:
- *   - Parse targetValue which looks like asin="..." or asin-expanded="..."
+ *   - Parse target.value which looks like asin="..." or asin-expanded="..."
  *   - Match the extracted asin to targetAsin (using target export's match type values)
  *
  * For TARGETING_EXPRESSION_PREDEFINED match type:
- *   - targetValue is one of: "close-match", "loose-match", "substitutes", or "complements"
- *   - Match targetValue to targetType and matchType (using target export's match type vals)
+ *   - target.value is one of: "close-match", "loose-match", "substitutes", or "complements"
+ *   - Match target.value to targetType and matchType (using target export's match type vals)
  *
- * Fallback mode (when targetValue and matchType are empty):
- *   - Use matchedTargetValue to match against targetKeyword assuming EXACT match type.
+ * Fallback mode (when target.value and target.matchType are empty):
+ *   - Use matchedTarget.value to match against targetKeyword assuming EXACT match type.
  *      - This addresses a bug in the reporting beta API where the targetKeyword cell should have the value.
  *
+ * @returns Object with entityType (target value or matchedTarget value), entityId (targetId), and matchType
  * @throws Error if targetId cannot be found
  */
-async function lookupTargetId(adGroupId: string, targetValue: string, matchType: string, matchedTargetValue: string): Promise<string> {
+async function lookupTargetId(row: {
+    'adGroup.id': string;
+    'target.value': string;
+    'target.matchType': string;
+    'matchedTarget.value': string;
+}): Promise<{ entityType: string; entityId: string; matchType: string | undefined }> {
+    const adGroupId = row['adGroup.id'];
+    const targetValue = row['target.value'];
+    const matchType = row['target.matchType'];
+    const matchedTargetValue = row['matchedTarget.value'];
+
     // Fallback mode: use matchedTarget.value when target.value and target.matchType are empty
     if (!targetValue || !matchType) {
         if (!matchedTargetValue) {
+            console.error('[lookupTargetId] Failed to find target (fallback mode - all values empty). Row:', JSON.stringify(row, null, 2));
             throw new Error(
                 `Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty, but matchedTarget.value is also empty)`
             );
@@ -371,10 +379,15 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
         });
 
         if (!result) {
+            console.error('[lookupTargetId] Failed to find target (fallback mode). Row:', JSON.stringify(row, null, 2));
             throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty)`);
         }
 
-        return result.targetId;
+        return {
+            entityType: matchedTargetValue,
+            entityId: result.targetId,
+            matchType: 'EXACT',
+        };
     }
 
     const targetExportMatchType = convertToTargetExportMatchType(matchType, targetValue);
@@ -391,10 +404,15 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
             });
 
             if (!result) {
+                console.error('[lookupTargetId] Failed to find target (PHRASE/BROAD/EXACT). Row:', JSON.stringify(row, null, 2));
                 throw new Error(`Could not find target for adGroupId: ${adGroupId}, targetValue: ${targetValue}, matchType: ${matchType} (converted: ${targetExportMatchType})`);
             }
 
-            return result.targetId;
+            return {
+                entityType: targetValue,
+                entityId: result.targetId,
+                matchType: targetExportMatchType,
+            };
         }
 
         case 'TARGETING_EXPRESSION': {
@@ -403,6 +421,7 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
             const asin = parseAsinFromTargetValue(targetValue);
 
             if (!asin) {
+                console.error('[lookupTargetId] Failed to parse ASIN from targetValue. Row:', JSON.stringify(row, null, 2));
                 throw new Error(`Could not parse ASIN from targetValue: ${targetValue}`);
             }
 
@@ -413,10 +432,15 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
             });
 
             if (!result) {
+                console.error('[lookupTargetId] Failed to find target (TARGETING_EXPRESSION). Row:', JSON.stringify(row, null, 2));
                 throw new Error(`Could not find target for adGroupId: ${adGroupId}, asin: ${asin}, matchType: ${matchType} (converted: ${targetExportMatchType})`);
             }
 
-            return result.targetId;
+            return {
+                entityType: targetValue,
+                entityId: result.targetId,
+                matchType: targetExportMatchType,
+            };
         }
 
         case 'TARGETING_EXPRESSION_PREDEFINED': {
@@ -428,13 +452,19 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
             });
 
             if (!result) {
+                console.error('[lookupTargetId] Failed to find target (TARGETING_EXPRESSION_PREDEFINED). Row:', JSON.stringify(row, null, 2));
                 throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchType: ${matchType} (converted: ${targetExportMatchType}), targetType: AUTO`);
             }
 
-            return result.targetId;
+            return {
+                entityType: targetValue,
+                entityId: result.targetId,
+                matchType: targetExportMatchType,
+            };
         }
 
         default:
+            console.error('[lookupTargetId] Unknown matchType. Row:', JSON.stringify(row, null, 2));
             throw new Error(`Failed to find targetId for matchType: ${matchType}`);
     }
 }
