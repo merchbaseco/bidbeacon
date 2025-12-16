@@ -26,6 +26,10 @@ RUN --mount=type=secret,id=merchbase_npm_token \
   yarn build; \
   rm -f .env
 
+# Production dependencies only - prune dev deps from node_modules
+FROM deps AS prod-deps
+RUN npm prune --omit=dev
+
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
@@ -34,11 +38,8 @@ RUN apk add --no-cache dumb-init && corepack enable \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nodejs
 
-COPY --from=deps /app/package.json ./package.json
-COPY --from=deps /app/yarn.lock ./yarn.lock
-COPY --from=deps /app/.yarn ./.yarn
-COPY --from=deps /app/.yarnrc.yml ./.yarnrc.yml
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=prod-deps /app/package.json ./package.json
+COPY --from=prod-deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/drizzle ./drizzle
 
