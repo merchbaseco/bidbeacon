@@ -9,36 +9,11 @@ import { and, eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { retrieveReport } from '@/amazon-ads/retrieve-report.js';
+import { getReportConfig } from '@/config/reports/index.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, performance, reportDatasetMetadata, target } from '@/db/schema.js';
 
 const gunzipAsync = promisify(gunzip);
-
-// ============================================================================
-// Schemas
-// ============================================================================
-
-const reportRowSchema = z.object({
-    'dateRange.value': z.string(),
-    'budgetCurrency.value': z.string(),
-    'campaign.id': z.coerce.string(),
-    'campaign.name': z.string(),
-    'adGroup.id': z.coerce.string(),
-    'ad.id': z.coerce.string(),
-    'advertisedProduct.id': z.string().nullable().optional(),
-    'advertisedProduct.marketplace': z.string().nullable().optional(),
-    'target.value': z.string(),
-    'target.matchType': z.string(),
-    'searchTerm.value': z.string().nullable().optional(),
-    'matchedTarget.value': z.string().nullable().optional(),
-    'metric.impressions': z.number(),
-    'metric.clicks': z.number(),
-    'metric.purchases': z.number(),
-    'metric.sales': z.number(),
-    'metric.totalCost': z.number(),
-});
-
-const reportDataSchema = z.array(reportRowSchema);
 
 // ============================================================================
 // Route Registration
@@ -57,6 +32,9 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
         const date = new Date(body.timestamp);
 
         console.log(`[API] Parse report request received: ${body.aggregation} for ${body.accountId} at ${body.timestamp}`);
+
+        // Get report configuration based on aggregation type
+        const reportConfig = getReportConfig(body.aggregation);
 
         // Look up advertiser account to get profileId
         const account = await db.query.advertiserAccount.findFirst({
@@ -156,8 +134,8 @@ export function registerParseReportRoute(fastify: FastifyInstance) {
             const decompressedData = await gunzipAsync(Buffer.from(compressedData));
             const rawJson = JSON.parse(decompressedData.toString());
 
-            // Validate with Zod schema
-            const rows = reportDataSchema.parse(rawJson);
+            // Validate with Zod schema from report config
+            const rows = z.array(reportConfig.rowSchema).parse(rawJson);
 
             console.log(`[API] Parsed ${rows.length} rows from report`);
 

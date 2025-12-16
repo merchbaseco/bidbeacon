@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { createReport } from '@/amazon-ads/create-report.js';
+import { getReportConfig } from '@/config/reports/index.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
 import { utcAddDays, utcAddHours, utcNow } from '@/utils/date.js';
@@ -60,26 +61,8 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
         const startDate = formatDate(windowStart);
         const endDate = formatDate(windowEnd);
 
-        // Default fields for the report (matching the example)
-        const fields = [
-            'dateRange.value',
-            'budgetCurrency.value',
-            'campaign.id',
-            'campaign.name',
-            'adGroup.id',
-            'ad.id',
-            'advertisedProduct.id',
-            'advertisedProduct.marketplace',
-            'target.value',
-            'target.matchType',
-            'searchTerm.value',
-            'matchedTarget.value',
-            'metric.impressions',
-            'metric.clicks',
-            'metric.purchases',
-            'metric.sales',
-            'metric.totalCost',
-        ];
+        // Get report configuration based on aggregation type
+        const reportConfig = getReportConfig(body.aggregation);
 
         try {
             const response = await createReport(
@@ -92,7 +75,7 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
                     ],
                     reports: [
                         {
-                            format: 'GZIP_JSON',
+                            format: reportConfig.format,
                             periods: [
                                 {
                                     datePeriod: {
@@ -102,7 +85,7 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
                                 },
                             ],
                             query: {
-                                fields,
+                                fields: reportConfig.fields,
                             },
                         },
                     ],
