@@ -334,7 +334,7 @@ function convertToTargetExportMatchType(matchType: string, targetValue: string):
         }
 
         default:
-            throw new Error(`Unknown match type: ${matchType}`);
+            throw new Error(`Failed to convert target ${matchType} in convertToTargetExportMatchType. targetValue: ${targetValue}`);
     }
 }
 
@@ -399,7 +399,7 @@ async function lookupTargetId(adGroupId: string, targetValue: string, matchType:
         }
 
         default:
-            throw new Error(`Unknown match type: ${matchType}`);
+            throw new Error(`Failed to find targetId for matchType: ${matchType}`);
     }
 }
 

@@ -15,11 +15,11 @@ const STATUS_OPTIONS = [
 
 interface ReportsToolbarProps {
     aggregation: 'daily' | 'hourly';
-    entityType: 'target' | 'product' | 'all';
+    entityType: 'target' | 'product';
     statusFilter: string;
     isLoading: boolean;
     onAggregationChange: (value: 'daily' | 'hourly') => void;
-    onEntityTypeChange: (value: 'target' | 'product' | 'all') => void;
+    onEntityTypeChange: (value: 'target' | 'product') => void;
     onStatusFilterChange: (value: string) => void;
     onRefresh: () => void;
 }
@@ -37,9 +37,6 @@ export const ReportsToolbar = ({ aggregation, entityType, statusFilter, isLoadin
             </ButtonGroup>
             <ButtonGroupSeparator />
             <ButtonGroup>
-                <Button variant={entityType === 'all' ? 'default' : 'outline'} onClick={() => onEntityTypeChange('all')}>
-                    All Types
-                </Button>
                 <Button variant={entityType === 'target' ? 'default' : 'outline'} onClick={() => onEntityTypeChange('target')}>
                     Target
                 </Button>

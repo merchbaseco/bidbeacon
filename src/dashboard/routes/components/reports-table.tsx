@@ -21,7 +21,7 @@ const ITEMS_PER_PAGE = 10;
 export const ReportsTable = () => {
     const queryClient = useQueryClient();
     const [aggregation, setAggregation] = useState<'daily' | 'hourly'>('daily');
-    const [entityType, setEntityType] = useState<'target' | 'product' | 'all'>('all');
+    const [entityType, setEntityType] = useState<'target' | 'product'>('target');
     const { data: rows = [], isLoading } = useReportDatasets(aggregation);
     const accountId = useSelectedAccountId();
 
@@ -40,9 +40,7 @@ export const ReportsTable = () => {
         let filtered = rows;
 
         // Filter by entity type
-        if (entityType !== 'all') {
-            filtered = filtered.filter(row => row.entityType === entityType);
-        }
+        filtered = filtered.filter(row => row.entityType === entityType);
 
         // Filter by status
         if (statusFilter !== 'all') {
@@ -71,7 +69,7 @@ export const ReportsTable = () => {
         setCurrentPage(1);
     };
 
-    const handleEntityTypeChange = (value: 'target' | 'product' | 'all') => {
+    const handleEntityTypeChange = (value: 'target' | 'product') => {
         setEntityType(value);
         setCurrentPage(1);
     };
