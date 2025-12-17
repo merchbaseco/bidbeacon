@@ -6,6 +6,7 @@ import type { ParseReportInput } from './index';
 
 export interface ReportMetadata {
     accountId: string;
+    countryCode: string;
     profileId: string;
     reportId: string;
     reportUrl: string;
@@ -81,6 +82,7 @@ export async function validateReportReady(input: ParseReportInput): Promise<Repo
 
     return {
         accountId: input.accountId,
+        countryCode: metadata.countryCode,
         profileId: account.profileId,
         reportId: metadata.reportId,
         reportUrl,

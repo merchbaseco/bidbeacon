@@ -234,7 +234,12 @@ export const reportsRouter = router({
         .mutation(async ({ input }) => {
             console.log(`[API] Parse report request received: ${input.aggregation}/${input.entityType} for ${input.accountId} at ${input.timestamp}`);
 
-            const result = await parseReport(input);
+            const result = await parseReport({
+                accountId: input.accountId,
+                timestamp: input.timestamp,
+                aggregation: input.aggregation,
+                entityType: input.entityType,
+            });
 
             console.log(`[API] Parse report completed. Inserted/updated ${result.rowsProcessed} rows.`);
 

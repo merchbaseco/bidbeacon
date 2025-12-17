@@ -4,19 +4,16 @@
  * report creation, parsing, and status updates.
  */
 
-import { toZonedTime } from 'date-fns-tz';
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { createReport } from '@/amazon-ads/create-report.js';
-import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
-import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
+import { reportDatasetMetadata } from '@/db/schema.js';
+import { createReportForDataset } from '@/lib/create-report/index.js';
 import { parseReport } from '@/lib/parse-report/index';
 import { getNextAction } from '@/lib/report-datum-state-machine';
+import type { AggregationType, EntityType } from '@/types/reports.js';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
-import { utcAddHours, utcNow } from '@/utils/date.js';
 import { emitReportDatasetMetadataUpdated } from '@/utils/emit-report-dataset-metadata-updated.js';
-import { getTimezoneForCountry } from '@/utils/timezones.js';
 import { boss } from './boss.js';
 
 // ============================================================================
@@ -42,18 +39,8 @@ export const refreshReportDatumJob = boss
             console.log(`[Refresh Report Datum] Starting job (ID: ${job.id}) for ${aggregation}/${entityType} at ${timestamp}`);
 
             try {
-                // Set refreshing=true in database
-                await setRefreshing(true, accountId, date, aggregation, entityType);
-
-                // Verify report datum exists
-                const reportDatum = await db.query.reportDatasetMetadata.findFirst({
-                    where: and(
-                        eq(reportDatasetMetadata.accountId, accountId),
-                        eq(reportDatasetMetadata.timestamp, date),
-                        eq(reportDatasetMetadata.aggregation, aggregation),
-                        eq(reportDatasetMetadata.entityType, entityType)
-                    ),
-                });
+                // Set refreshing=true in database and get the report datum
+                const reportDatum = await setRefreshing(true, accountId, date, aggregation, entityType);
 
                 if (!reportDatum) {
                     console.log(`[Refresh Report Datum] Report datum not found`);
@@ -66,128 +53,24 @@ export const refreshReportDatumJob = boss
                 const action = await getNextAction(reportDatum.timestamp, reportDatum.aggregation as 'hourly' | 'daily', reportDatum.lastReportCreatedAt, reportDatum.reportId, countryCode);
                 console.log(`[Refresh Report Datum] State machine returned action: ${action}`);
 
-                if (action === 'none') {
-                    console.log(`[Refresh Report Datum] Action is 'none'`);
-                    await setRefreshing(false, accountId, date, aggregation, entityType);
-                    return;
-                }
-
-                if (action === 'process') {
-                    // Process the report
-                    console.log(`[Refresh Report Datum] Action is 'process', parsing report`);
-                    await parseReport({
-                        accountId,
-                        countryCode,
-                        timestamp,
-                        aggregation,
-                        entityType,
-                    });
-                    console.log(`[Refresh Report Datum] Report parsed successfully`);
-
-                    await setRefreshing(false, accountId, date, aggregation, entityType);
-                    return;
-                }
-
-                if (action === 'create') {
-                    // Create a new report
-                    console.log(`[Refresh Report Datum] Action is 'create', creating new report`);
-                    const reportConfig = reportConfigs[aggregation][entityType];
-                    const account = await db.query.advertiserAccount.findFirst({
-                        where: eq(advertiserAccount.adsAccountId, accountId),
-                        columns: {
-                            adsAccountId: true,
-                        },
-                    });
-
-                    if (!account) {
-                        await setRefreshing(false, accountId, date, aggregation, entityType, 'Advertiser account not found');
+                switch (action) {
+                    case 'none':
+                        await handleNoneAction(accountId, date, aggregation, entityType);
                         return;
-                    }
 
-                    const windowStart = new Date(timestamp);
-                    const windowEnd = aggregation === 'hourly' ? utcAddHours(windowStart, 1) : windowStart;
+                    case 'process':
+                        await handleProcessAction(accountId, timestamp, date, aggregation, entityType);
+                        return;
 
-                    const formatDate = (date: Date): string => {
-                        const isoString = date.toISOString();
-                        const datePart = isoString.split('T')[0];
-                        if (!datePart) {
-                            throw new Error('Failed to format date');
-                        }
-                        return datePart;
-                    };
+                    case 'create':
+                        await handleCreateAction(accountId, countryCode, timestamp, date, aggregation, entityType);
+                        return;
 
-                    const startDate = formatDate(windowStart);
-                    const endDate = formatDate(windowEnd);
-
-                    const response = await createReport(
-                        {
-                            accessRequestedAccounts: [
-                                {
-                                    advertiserAccountId: account.adsAccountId,
-                                },
-                            ],
-                            reports: [
-                                {
-                                    format: reportConfig.format,
-                                    periods: [
-                                        {
-                                            datePeriod: {
-                                                startDate,
-                                                endDate,
-                                            },
-                                        },
-                                    ],
-                                    query: {
-                                        fields: reportConfig.fields,
-                                    },
-                                },
-                            ],
-                        },
-                        'na'
-                    );
-
-                    if (response.success && response.success.length > 0) {
-                        const reportId = response.success[0]?.report?.reportId;
-                        if (reportId) {
-                            // Convert current UTC time to country's timezone and store as timezone-less timestamp
-                            const timezone = getTimezoneForCountry(countryCode);
-                            const nowUtc = utcNow();
-                            const zonedTime = toZonedTime(nowUtc, timezone);
-                            const lastReportCreatedAt = new Date(
-                                zonedTime.getFullYear(),
-                                zonedTime.getMonth(),
-                                zonedTime.getDate(),
-                                zonedTime.getHours(),
-                                zonedTime.getMinutes(),
-                                zonedTime.getSeconds()
-                            );
-
-                            await db
-                                .update(reportDatasetMetadata)
-                                .set({
-                                    reportId,
-                                    status: 'fetching',
-                                    lastRefreshed: utcNow(),
-                                    lastReportCreatedAt,
-                                    error: null,
-                                })
-                                .where(
-                                    and(
-                                        eq(reportDatasetMetadata.accountId, accountId),
-                                        eq(reportDatasetMetadata.timestamp, date),
-                                        eq(reportDatasetMetadata.aggregation, aggregation),
-                                        eq(reportDatasetMetadata.entityType, entityType)
-                                    )
-                                );
-                        }
-                    }
-
-                    await setRefreshing(false, accountId, date, aggregation, entityType);
-                    return;
+                    default:
+                        // Set refreshing=false in database for unknown action
+                        await setRefreshing(false, accountId, date, aggregation, entityType, `Unknown action: ${action}`);
+                        return;
                 }
-
-                // Set refreshing=false in database for unknown action
-                await setRefreshing(false, accountId, date, aggregation, entityType, `Unknown action: ${action}`);
             } catch (error) {
                 console.error(`[Refresh Report Datum] Error during refresh processing:`, error);
                 // Set refreshing=false in database on error
@@ -205,9 +88,17 @@ export const refreshReportDatumJob = boss
 // ============================================================================
 
 /**
- * Sets the refreshing state for a report datum and emits the update event
+ * Sets the refreshing state for a report datum and emits the update event.
+ * Returns the updated report datum row, or null if it doesn't exist.
  */
-async function setRefreshing(refreshing: boolean, accountId: string, timestamp: Date, aggregation: string, entityType: string, error?: string | null): Promise<void> {
+async function setRefreshing(
+    refreshing: boolean,
+    accountId: string,
+    timestamp: Date,
+    aggregation: AggregationType,
+    entityType: EntityType,
+    error?: string | null
+): Promise<typeof reportDatasetMetadata.$inferSelect | null> {
     const updateData: { refreshing: boolean; error?: string | null } = { refreshing };
     if (error !== undefined) {
         updateData.error = error;
@@ -228,5 +119,115 @@ async function setRefreshing(refreshing: boolean, accountId: string, timestamp: 
 
     if (updatedRow) {
         emitReportDatasetMetadataUpdated(updatedRow);
+        return updatedRow;
     }
+
+    // If update didn't return a row, check if it exists (maybe it wasn't updated for some reason)
+    const existingRow = await db.query.reportDatasetMetadata.findFirst({
+        where: and(
+            eq(reportDatasetMetadata.accountId, accountId),
+            eq(reportDatasetMetadata.timestamp, timestamp),
+            eq(reportDatasetMetadata.aggregation, aggregation),
+            eq(reportDatasetMetadata.entityType, entityType)
+        ),
+    });
+
+    return existingRow ?? null;
+}
+
+/**
+ * Updates the status for a report datum and emits the update event
+ */
+async function updateStatus(status: string, error: string | null, accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
+    const [updatedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({
+            status,
+            error,
+        })
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, accountId),
+                eq(reportDatasetMetadata.timestamp, timestamp),
+                eq(reportDatasetMetadata.aggregation, aggregation),
+                eq(reportDatasetMetadata.entityType, entityType)
+            )
+        )
+        .returning();
+
+    if (updatedRow) {
+        emitReportDatasetMetadataUpdated(updatedRow);
+    }
+}
+
+// ============================================================================
+// Action Handlers
+// ============================================================================
+
+/**
+ * Handles the 'none' action - no work needed, just clear refreshing state
+ */
+async function handleNoneAction(accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
+    console.log(`[Refresh Report Datum] Action is 'none'`);
+    await setRefreshing(false, accountId, timestamp, aggregation, entityType);
+}
+
+/**
+ * Handles the 'process' action - parses an existing report
+ */
+async function handleProcessAction(accountId: string, timestamp: string, date: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
+    console.log(`[Refresh Report Datum] Action is 'process', parsing report`);
+
+    // Set status to 'parsing' at the start of parsing
+    await updateStatus('parsing', null, accountId, date, aggregation, entityType);
+
+    try {
+        await parseReport({
+            accountId,
+            timestamp,
+            aggregation,
+            entityType,
+        });
+        console.log(`[Refresh Report Datum] Report parsed successfully`);
+
+        // Update status to 'completed' after successful parsing
+        await updateStatus('completed', null, accountId, date, aggregation, entityType);
+    } catch (error) {
+        console.error(`[Refresh Report Datum] Error parsing report:`, error);
+        // Update status to 'failed' on error
+        await updateStatus('failed', error instanceof Error ? error.message : 'Unknown error', accountId, date, aggregation, entityType);
+        throw error;
+    }
+
+    await setRefreshing(false, accountId, date, aggregation, entityType);
+}
+
+/**
+ * Handles the 'create' action - creates a new report
+ */
+async function handleCreateAction(accountId: string, countryCode: string, timestamp: string, date: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
+    console.log(`[Refresh Report Datum] Action is 'create', creating new report`);
+    try {
+        const reportId = await createReportForDataset({
+            accountId,
+            countryCode,
+            timestamp,
+            aggregation,
+            entityType,
+        });
+
+        if (!reportId) {
+            console.log(`[Refresh Report Datum] Failed to create report - no reportId returned`);
+            await setRefreshing(false, accountId, date, aggregation, entityType, 'Failed to create report');
+            return;
+        }
+
+        console.log(`[Refresh Report Datum] Report created successfully with reportId: ${reportId}`);
+    } catch (error) {
+        console.error(`[Refresh Report Datum] Error creating report:`, error);
+        await setRefreshing(false, accountId, date, aggregation, entityType, error instanceof Error ? error.message : 'Unknown error');
+        return;
+    }
+
+    await setRefreshing(false, accountId, date, aggregation, entityType);
 }

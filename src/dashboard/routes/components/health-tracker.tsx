@@ -1,12 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import {
-    Tooltip,
-    TooltipPopup,
-    TooltipProvider,
-    TooltipTrigger,
-} from '../../components/ui/tooltip';
+import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { cn } from '../../lib/utils';
 import type { ReportDatasetMetadata } from '../hooks/use-report-datasets';
 import { useReportDatasets } from '../hooks/use-report-datasets';
@@ -39,9 +34,7 @@ function normalizeToSlotStart(date: Date, aggregation: Aggregation): Date {
         return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
     }
 
-    return new Date(
-        Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), date.getUTCHours())
-    );
+    return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), date.getUTCHours()));
 }
 
 function slotTimes(aggregation: Aggregation, count: number, now: Date): Date[] {
@@ -69,18 +62,8 @@ const COLOR_CLASS: Record<HealthColor, string> = {
     missing: 'bg-muted',
 };
 
-export function HealthTracker({
-    children,
-    className,
-}: {
-    children: React.ReactNode;
-    className?: string;
-}) {
-    return (
-        <div className={cn('flex gap-0.5 h-10 rounded-lg overflow-hidden', className)}>
-            {children}
-        </div>
-    );
+export function HealthTracker({ children, className }: { children: React.ReactNode; className?: string }) {
+    return <div className={cn('flex gap-0.5 h-10 rounded-lg overflow-hidden', className)}>{children}</div>;
 }
 
 function SlotPopup({ slot, dataset }: { slot: Date; dataset?: ReportDatasetMetadata }) {
@@ -129,17 +112,7 @@ function SlotPopup({ slot, dataset }: { slot: Date; dataset?: ReportDatasetMetad
     );
 }
 
-function TrackerSlot({
-    slot,
-    dataset,
-    index,
-    length,
-}: {
-    slot: Date;
-    dataset?: ReportDatasetMetadata;
-    index: number;
-    length: number;
-}) {
+function TrackerSlot({ slot, dataset, index, length }: { slot: Date; dataset?: ReportDatasetMetadata; index: number; length: number }) {
     const color: HealthColor = dataset ? statusToColor(dataset.status) : 'missing';
     const rounding = cornerClass(index, length);
 
@@ -164,10 +137,12 @@ export function DatasetHealthTracker({
     aggregation,
     className,
     slotCount = SLOT_COUNT,
+    entityType = 'target',
 }: {
     aggregation: Aggregation;
     className?: string;
     slotCount?: number;
+    entityType?: 'target' | 'product';
 }) {
     const { data: datasets = [], isLoading } = useReportDatasets(aggregation);
 
@@ -175,14 +150,17 @@ export function DatasetHealthTracker({
         const now = new Date();
         const slots = slotTimes(aggregation, slotCount, now);
 
+        // Filter datasets by entity type to match the table filter
+        const filteredDatasets = datasets.filter(d => d.entityType === entityType);
+
         const map = new Map<string, ReportDatasetMetadata>();
-        for (const d of datasets) {
+        for (const d of filteredDatasets) {
             const key = normalizeToSlotStart(new Date(d.timestamp), aggregation).toISOString();
             map.set(key, d);
         }
 
         return slots.map(slot => ({ slot, dataset: map.get(slot.toISOString()) }));
-    }, [aggregation, datasets, slotCount]);
+    }, [aggregation, datasets, slotCount, entityType]);
 
     if (isLoading) {
         const now = new Date();
@@ -191,13 +169,7 @@ export function DatasetHealthTracker({
         return (
             <HealthTracker className={className}>
                 {slots.map((slot, index) => (
-                    <div
-                        key={`skeleton-${aggregation}-${slot.toISOString()}`}
-                        className={cn(
-                            'flex-1 h-full bg-muted animate-pulse',
-                            cornerClass(index, slots.length)
-                        )}
-                    />
+                    <div key={`skeleton-${aggregation}-${slot.toISOString()}`} className={cn('flex-1 h-full bg-muted animate-pulse', cornerClass(index, slots.length))} />
                 ))}
             </HealthTracker>
         );

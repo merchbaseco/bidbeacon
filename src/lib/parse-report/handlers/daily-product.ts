@@ -12,7 +12,7 @@ const gunzipAsync = promisify(gunzip);
 
 export async function handleDailyProduct(input: ParseReportInput, metadata: ReportMetadata): Promise<{ rowsProcessed: number }> {
     const reportConfig = reportConfigs[input.aggregation][input.entityType];
-    const timezone = getTimezoneForCountry(input.countryCode);
+    const timezone = getTimezoneForCountry(metadata.countryCode);
 
     console.log(`[API] Downloading report from URL...`);
 
