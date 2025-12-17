@@ -3,7 +3,7 @@ import type { WebSocket } from 'ws';
 import { registerWebSocketConnection } from '@/utils/events.js';
 
 export function registerWebSocketRoute(fastify: FastifyInstance) {
-    fastify.get('/api/events', { websocket: true }, (socket: WebSocket, _req) => {
+    fastify.get('/events', { websocket: true }, (socket: WebSocket, _req) => {
         socket.on('error', error => {
             console.error('[WebSocket] Connection error:', error);
         });

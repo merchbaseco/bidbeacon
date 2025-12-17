@@ -47,15 +47,6 @@ await fastify.register(cors, {
     credentials: true,
 });
 
-// Register tRPC
-await fastify.register(fastifyTRPCPlugin, {
-    prefix: '/api',
-    trpcOptions: {
-        router: appRouter,
-        createContext,
-    },
-});
-
 // Health check endpoint
 fastify.get('/api/health', async () => {
     return {
@@ -65,9 +56,18 @@ fastify.get('/api/health', async () => {
     };
 });
 
-// WebSocket events endpoint
+// WebSocket events endpoint (register BEFORE tRPC to avoid route conflicts)
 const { registerWebSocketRoute } = await import('@/api/events/websocket.js');
 await registerWebSocketRoute(fastify);
+
+// Register tRPC (after WebSocket to ensure WebSocket route is matched first)
+await fastify.register(fastifyTRPCPlugin, {
+    prefix: '/api',
+    trpcOptions: {
+        router: appRouter,
+        createContext,
+    },
+});
 
 // 404 handler
 fastify.setNotFoundHandler(async (_request, reply) => {
@@ -79,14 +79,20 @@ fastify.setNotFoundHandler(async (_request, reply) => {
 });
 
 // Error handler
-fastify.setErrorHandler(async (error, _request, reply) => {
-    console.error(`[${new Date().toISOString()}] Unhandled error:`, error);
+fastify.setErrorHandler(async (error: unknown, _request, reply) => {
+    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+    const errorStack = error instanceof Error ? error.stack : undefined;
+
+    console.error(`[${new Date().toISOString()}] Unhandled error:`, errorMessage);
+    if (errorStack) {
+        console.error('[Error] Stack trace:', errorStack);
+    }
 
     // Emit error event to connected clients
     emitEvent({
         type: 'error',
-        message: error.message || 'Internal server error',
-        details: error.stack,
+        message: errorMessage,
+        details: errorStack,
     });
 
     reply.status(500);
@@ -144,7 +150,7 @@ try {
     console.log(`✓ Database connected`);
     console.log(`✓ Server running on port ${port}`);
     console.log(`✓ Health check endpoint: /api/health`);
-    console.log(`✓ WebSocket events: /api/events`);
+    console.log(`✓ WebSocket events: /events`);
     console.log(`✓ tRPC endpoints: /api/*`);
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('');
