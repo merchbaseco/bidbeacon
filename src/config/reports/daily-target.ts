@@ -20,7 +20,6 @@ const dailyReportRowSchema = z.object({
     'target.value': z.string(),
     'target.matchType': z.string(),
     'searchTerm.value': z.string(),
-    'matchedTarget.value': z.string(),
     'metric.impressions': z.number(),
     'metric.clicks': z.number(),
     'metric.purchases': z.number(),

@@ -347,29 +347,29 @@ function convertToTargetExportMatchType(matchType: string, targetValue: string):
  *   - Match target.value to targetType and matchType (using target export's match type vals)
  *
  * Fallback mode (when target.value and target.matchType are empty):
- *   - Use matchedTarget.value to match against targetKeyword assuming EXACT match type.
+ *   - Use searchTerm.value to match against targetKeyword assuming EXACT match type.
  *      - This addresses a bug in the reporting beta API where the targetKeyword cell should have the value.
  *
- * @returns Object with entityType (target value or matchedTarget value), entityId (targetId), and matchType
+ * @returns Object with entityType (target value or searchTerm value), entityId (targetId), and matchType
  * @throws Error if targetId cannot be found
  */
 async function lookupTargetId(row: {
     'adGroup.id': string;
     'target.value': string;
     'target.matchType': string;
-    'matchedTarget.value': string;
+    'searchTerm.value': string;
 }): Promise<{ entityType: string; entityId: string; matchType: string | undefined }> {
     const adGroupId = row['adGroup.id'];
     const targetValue = row['target.value'];
     const matchType = row['target.matchType'];
-    const matchedTargetValue = keepOnlyAscii(row['matchedTarget.value']);
+    const matchedTargetValue = keepOnlyAscii(row['searchTerm.value']);
 
-    // Fallback mode: use matchedTarget.value when target.value and target.matchType are empty
+    // Fallback mode: use searchTerm.value when target.value and target.matchType are empty
     if (!targetValue || !matchType) {
         if (!matchedTargetValue) {
             console.error('[lookupTargetId] Failed to find target (fallback mode - all values empty). Row:', JSON.stringify(row, null, 2));
             throw new Error(
-                `Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty, but matchedTarget.value is also empty)`
+                `Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty, but searchTerm.value is also empty)`
             );
         }
 
@@ -381,7 +381,7 @@ async function lookupTargetId(row: {
 
         if (!result) {
             console.error('[lookupTargetId] Failed to find target (fallback mode). Row:', JSON.stringify(row, null, 2));
-            console.error('[lookupTargetId] Original matchedTarget.value:', JSON.stringify(row['matchedTarget.value']));
+            console.error('[lookupTargetId] Original searchTerm.value:', JSON.stringify(row['searchTerm.value']));
             console.error('[lookupTargetId] Cleaned matchedTargetValue:', JSON.stringify(matchedTargetValue));
             throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty)`);
         }
