@@ -10,6 +10,7 @@ const STATUS_OPTIONS = [
     { icon: CheckCircleIcon, label: 'Completed', value: 'completed' },
     { icon: AlertCircleIcon, label: 'Failed', value: 'failed' },
     { icon: Loader2Icon, label: 'Fetching', value: 'fetching' },
+    { icon: Loader2Icon, label: 'Parsing', value: 'parsing' },
     { icon: AlertTriangleIcon, label: 'Missing', value: 'missing' },
 ] as const;
 

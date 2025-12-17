@@ -64,7 +64,7 @@ async function upsertMetadata(args: {
     timestamp: Date;
     aggregation: AggregationType;
     entityType: EntityType;
-    status: 'missing' | 'fetching' | 'completed' | 'failed';
+    status: 'missing' | 'fetching' | 'parsing' | 'completed' | 'failed';
     lastRefreshed: Date;
     error?: string | null;
 }): Promise<void> {

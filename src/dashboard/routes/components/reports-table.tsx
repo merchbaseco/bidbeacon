@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import RefreshIcon from '@merchbaseco/icons/core-solid-rounded/RefreshIcon';
+import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -162,7 +162,7 @@ export const ReportsTable = () => {
                         ) : (
                             paginatedRows.map(row => {
                                 const rowKey = `${row.timestamp}-${row.aggregation}-${row.entityType}`;
-                                const isRefreshing = loadingRefreshes.has(rowKey) || refreshReportMutation.isPending;
+                                const isRefreshing = loadingRefreshes.has(rowKey);
 
                                 return (
                                     <TableRow key={rowKey}>
@@ -188,7 +188,7 @@ export const ReportsTable = () => {
                                         </TableCell>
                                         <TableCell className="text-right">
                                             <Button variant="secondary" size="icon" onClick={() => handleRefreshReport(row)} disabled={isRefreshing}>
-                                                <HugeiconsIcon icon={RefreshIcon} size={20} />
+                                                <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={20} />
                                             </Button>
                                         </TableCell>
                                     </TableRow>

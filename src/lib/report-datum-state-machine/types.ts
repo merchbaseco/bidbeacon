@@ -10,7 +10,7 @@ export interface ReportDatum {
     timestamp: Date; // timezone-less, represents local time in country's timezone
     aggregation: AggregationType;
     entityType: EntityType;
-    status: string; // missing, fetching, completed, failed
+    status: string; // missing, fetching, parsing, completed, failed
     lastRefreshed: Date | null;
     lastReportCreatedAt: Date | null; // timezone-less, represents local time in country's timezone
     reportId: string | null;

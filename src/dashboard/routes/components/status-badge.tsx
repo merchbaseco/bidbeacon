@@ -12,6 +12,8 @@ function getStatusVariant(status: string): 'success' | 'error' | 'warning' | 'ou
             return 'error';
         case 'fetching':
             return 'warning';
+        case 'parsing':
+            return 'warning';
         case 'missing':
             return 'warning';
         default:

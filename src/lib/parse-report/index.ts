@@ -17,19 +17,13 @@ export type ParseReportInput = {
 };
 
 export async function parseReport(input: ParseReportInput): Promise<{ rowsProcessed: number }> {
-    // Validate report is ready to be processed
-    const reportMetadata = await validateReportReady(input);
-
-    // Farm out processing to the appropriate handler
-    const handler = getHandler(input.aggregation, input.entityType);
-    const result = await handler(input, reportMetadata);
-
-    // Update report metadata status
     const date = new Date(input.timestamp);
+
+    // Set status to 'parsing' at the start of parsing
     await db
         .update(reportDatasetMetadata)
         .set({
-            status: 'completed',
+            status: 'parsing',
             error: null,
         })
         .where(
@@ -41,7 +35,50 @@ export async function parseReport(input: ParseReportInput): Promise<{ rowsProces
             )
         );
 
-    return result;
+    try {
+        // Validate report is ready to be processed
+        const reportMetadata = await validateReportReady(input);
+
+        // Farm out processing to the appropriate handler
+        const handler = getHandler(input.aggregation, input.entityType);
+        const result = await handler(input, reportMetadata);
+
+        // Update report metadata status to completed after successful parsing
+        await db
+            .update(reportDatasetMetadata)
+            .set({
+                status: 'completed',
+                error: null,
+            })
+            .where(
+                and(
+                    eq(reportDatasetMetadata.accountId, input.accountId),
+                    eq(reportDatasetMetadata.timestamp, date),
+                    eq(reportDatasetMetadata.aggregation, input.aggregation),
+                    eq(reportDatasetMetadata.entityType, input.entityType)
+                )
+            );
+
+        return result;
+    } catch (error) {
+        // Update report metadata status to failed on error
+        await db
+            .update(reportDatasetMetadata)
+            .set({
+                status: 'failed',
+                error: error instanceof Error ? error.message : 'Unknown error',
+            })
+            .where(
+                and(
+                    eq(reportDatasetMetadata.accountId, input.accountId),
+                    eq(reportDatasetMetadata.timestamp, date),
+                    eq(reportDatasetMetadata.aggregation, input.aggregation),
+                    eq(reportDatasetMetadata.entityType, input.entityType)
+                )
+            );
+
+        throw error;
+    }
 }
 
 function getHandler(aggregation: 'hourly' | 'daily', entityType: 'target' | 'product') {
