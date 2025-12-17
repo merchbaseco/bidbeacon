@@ -100,40 +100,12 @@ export function useWebSocket(): ConnectionStatus {
                         // No action needed here
                         break;
                     case 'report-refresh:completed': {
-                        // Update individual row using setQueryData
-                        const queryCache = utils.reports.status.getQueryCache();
-                        const matchingQueries = queryCache.findAll({
-                            queryKey: ['reports', 'status'],
-                            predicate: query => {
-                                const [, params] = query.queryKey as [string, unknown];
-                                const queryParams = params as {
-                                    accountId?: string;
-                                    countryCode?: string;
-                                    aggregation?: string;
-                                };
-                                return queryParams?.accountId === data.accountId && queryParams?.countryCode === data.countryCode && queryParams?.aggregation === data.aggregation;
-                            },
-                        });
-
-                        // Update each matching query
-                        matchingQueries.forEach(query => {
-                            utils.reports.status.setQueryData(query.queryKey[1] as unknown, (oldData: { success: boolean; data?: unknown[] } | undefined) => {
-                                if (!oldData?.data || !Array.isArray(oldData.data)) return oldData;
-                                return {
-                                    ...oldData,
-                                    data: oldData.data.map((row: unknown) => {
-                                        const r = row as {
-                                            timestamp: string;
-                                            aggregation: string;
-                                            entityType: string;
-                                        };
-                                        if (r.timestamp === data.rowTimestamp && r.aggregation === data.aggregation && r.entityType === data.entityType) {
-                                            return data.data;
-                                        }
-                                        return row;
-                                    }),
-                                };
-                            });
+                        // Invalidate all queries matching this account/country/aggregation
+                        // Components will refetch and get the updated data
+                        utils.reports.status.invalidate({
+                            accountId: data.accountId,
+                            countryCode: data.countryCode,
+                            aggregation: data.aggregation,
                         });
                         break;
                     }
