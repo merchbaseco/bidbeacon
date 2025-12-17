@@ -284,6 +284,7 @@ export const reportsRouter = router({
             console.log(`[API] Refresh report request received: ${input.aggregation}/${input.entityType} for ${input.accountId} at ${input.timestamp}`);
 
             // Emit started event immediately
+            console.log(`[API] Emitting report-refresh:started event`);
             emitEvent({
                 type: 'report-refresh:started',
                 accountId: input.accountId,
@@ -292,13 +293,16 @@ export const reportsRouter = router({
                 aggregation: input.aggregation as 'hourly' | 'daily',
                 entityType: input.entityType as 'target' | 'product',
             });
+            console.log(`[API] Event emitted, starting async processing`);
 
             // Process refresh asynchronously without blocking
             (async () => {
                 try {
+                    console.log(`[API] Starting refresh processing for ${input.aggregation}/${input.entityType} at ${input.timestamp}`);
                     const date = new Date(input.timestamp);
 
                     // Fetch report datum from database
+                    console.log(`[API] Fetching report datum from database`);
                     const datum = await db.query.reportDatasetMetadata.findFirst({
                         where: and(
                             eq(reportDatasetMetadata.accountId, input.accountId),
@@ -309,6 +313,7 @@ export const reportsRouter = router({
                     });
 
                     if (!datum) {
+                        console.log(`[API] Report metadata not found, emitting failed event`);
                         emitEvent({
                             type: 'report-refresh:failed',
                             accountId: input.accountId,
@@ -320,6 +325,7 @@ export const reportsRouter = router({
                         });
                         return;
                     }
+                    console.log(`[API] Report datum found: status=${datum.status}, reportId=${datum.reportId ?? 'null'}`);
 
                     // Convert to ReportDatum type
                     const reportDatum: ReportDatum = {
@@ -365,9 +371,12 @@ export const reportsRouter = router({
                     }
 
                     // Determine next action using state machine
+                    console.log(`[API] Determining next action using state machine`);
                     const action = getNextAction(reportDatum, reportStatus, input.countryCode);
+                    console.log(`[API] State machine returned action: ${action}`);
 
                     if (action === 'none') {
+                        console.log(`[API] Action is 'none', emitting completed event`);
                         // Fetch updated row to emit completed event
                         const updatedDatum = await db.query.reportDatasetMetadata.findFirst({
                             where: and(
@@ -406,6 +415,7 @@ export const reportsRouter = router({
 
                     if (action === 'process') {
                         // Process the report
+                        console.log(`[API] Action is 'process', parsing report`);
                         await parseReport({
                             accountId: input.accountId,
                             countryCode: input.countryCode,
@@ -413,6 +423,7 @@ export const reportsRouter = router({
                             aggregation: input.aggregation,
                             entityType: input.entityType,
                         });
+                        console.log(`[API] Report parsed successfully`);
 
                         // Fetch updated row after processing
                         const updatedDatum = await db.query.reportDatasetMetadata.findFirst({
@@ -452,6 +463,7 @@ export const reportsRouter = router({
 
                     if (action === 'create') {
                         // Create a new report
+                        console.log(`[API] Action is 'create', creating new report`);
                         const reportConfig = reportConfigs[input.aggregation][input.entityType];
                         const account = await db.query.advertiserAccount.findFirst({
                             where: eq(advertiserAccount.adsAccountId, input.accountId),
@@ -612,6 +624,7 @@ export const reportsRouter = router({
                         error: `Unknown action: ${action}`,
                     });
                 } catch (error) {
+                    console.error(`[API] Error during refresh processing:`, error);
                     emitEvent({
                         type: 'report-refresh:failed',
                         accountId: input.accountId,

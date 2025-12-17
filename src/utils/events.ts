@@ -133,11 +133,15 @@ class EventEmitter {
      */
     emitEvent(event: Event) {
         const message = JSON.stringify(event);
+        const connectionCount = this.connections.size;
+        console.log(`[Events] Emitting event ${event.type} to ${connectionCount} connected client(s)`);
 
+        let sentCount = 0;
         for (const socket of this.connections) {
             try {
                 if (socket.readyState === 1) {
                     socket.send(message);
+                    sentCount++;
                 } else {
                     this.connections.delete(socket);
                 }
@@ -146,6 +150,7 @@ class EventEmitter {
                 this.connections.delete(socket);
             }
         }
+        console.log(`[Events] Event ${event.type} sent to ${sentCount} client(s)`);
     }
 }
 

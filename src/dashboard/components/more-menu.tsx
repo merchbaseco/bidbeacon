@@ -4,8 +4,9 @@ import DatabaseSync01Icon from '@merchbaseco/icons/core-stroke-rounded/DatabaseS
 import { useAtomValue, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { api } from '../lib/trpc';
+import { cn } from '../lib/utils';
 import { syncAccountsInProgressAtom } from '../routes/atoms';
-import { Button } from './ui/button';
+import { buttonVariants } from './ui/button';
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from './ui/menu';
 
 export function MoreMenu() {
@@ -50,10 +51,8 @@ export function MoreMenu() {
 
     return (
         <Menu>
-            <MenuTrigger>
-                <Button variant="secondary" size="icon" disabled={isSyncing}>
-                    <HugeiconsIcon icon={MoreVerticalIcon} size={24} />
-                </Button>
+            <MenuTrigger className={cn(buttonVariants({ variant: 'secondary', size: 'icon' }))} disabled={isSyncing}>
+                <HugeiconsIcon icon={MoreVerticalIcon} size={24} />
             </MenuTrigger>
             <MenuPopup>
                 <MenuItem onClick={handleSyncAccounts} disabled={isSyncing}>
