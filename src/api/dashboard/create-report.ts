@@ -6,7 +6,7 @@ import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
-import { utcAddDays, utcAddHours, utcNow } from '@/utils/date.js';
+import { utcAddHours, utcNow } from '@/utils/date.js';
 
 export function registerCreateReportRoute(fastify: FastifyInstance) {
     fastify.post('/api/dashboard/create-report', async (request, reply) => {
@@ -49,7 +49,7 @@ export function registerCreateReportRoute(fastify: FastifyInstance) {
 
         // Parse timestamp and calculate date period
         const windowStart = new Date(body.timestamp);
-        const windowEnd = body.aggregation === 'hourly' ? utcAddHours(windowStart, 1) : utcAddDays(windowStart, 1);
+        const windowEnd = body.aggregation === 'hourly' ? utcAddHours(windowStart, 1) : windowStart;
 
         // Format dates as YYYY-MM-DD
         const formatDate = (date: Date): string => {
