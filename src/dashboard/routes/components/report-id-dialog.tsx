@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from '../../components/ui/dialog';
 import { api } from '../../lib/trpc.js';
 import type { ReportDatasetMetadata } from '../hooks/use-report-datasets.js';
 
@@ -44,9 +44,11 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <Badge variant="outline" className="cursor-pointer hover:bg-accent" onClick={() => setOpen(true)}>
-                {row.reportId}
-            </Badge>
+            <DialogTrigger asChild>
+                <Badge variant="outline" className="cursor-pointer hover:bg-accent">
+                    {row.reportId}
+                </Badge>
+            </DialogTrigger>
             <DialogPopup className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Retrieve Report Response</DialogTitle>

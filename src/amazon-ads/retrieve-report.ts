@@ -30,6 +30,12 @@ const linkedAccountSchema = z.object({
     advertiserAccountId: z.string(),
 });
 
+const completedReportPartSchema = z.object({
+    sizeInBytes: z.number().int(),
+    url: z.string().url(),
+    urlExpirationDateTime: z.string(), // ISO datetime
+});
+
 const reportResponseSchema = z.object({
     reportId: z.string(),
     status: z.string(), // e.g., "PENDING", "COMPLETED"
@@ -40,7 +46,8 @@ const reportResponseSchema = z.object({
     query: reportQuerySchema,
     linkedAccounts: z.array(linkedAccountSchema),
     completedDateTime: z.string().nullable().optional(),
-    url: z.string().url().nullable().optional(),
+    completedReportParts: z.array(completedReportPartSchema).optional(),
+    url: z.string().url().nullable().optional(), // Legacy field, kept for backward compatibility
     currencyOfView: z.string().nullable().optional(),
     failureCode: z.string().nullable().optional(),
     failureReason: z.string().nullable().optional(),
@@ -70,6 +77,7 @@ const retrieveReportResponseSchema = z.object({
 export type RetrieveReportRequest = z.infer<typeof retrieveReportRequestSchema>;
 export type RetrieveReportResponse = z.infer<typeof retrieveReportResponseSchema>;
 export type ReportResponse = z.infer<typeof reportResponseSchema>;
+export type CompletedReportPart = z.infer<typeof completedReportPartSchema>;
 export type DatePeriod = z.infer<typeof datePeriodSchema>;
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
 

@@ -66,7 +66,15 @@ export async function validateReportReady(input: ParseReportInput): Promise<Repo
         throw new Error(`Report is not ready. Current status: ${report.status}`);
     }
 
-    const reportUrl = report.url;
+    // Extract URL from completedReportParts array (even if there's only 1 part)
+    let reportUrl: string | null | undefined;
+    if (report.completedReportParts && report.completedReportParts.length > 0) {
+        reportUrl = report.completedReportParts[0].url;
+    } else {
+        // Fallback to legacy url field for backward compatibility
+        reportUrl = report.url;
+    }
+
     if (!reportUrl) {
         throw new Error('No URL found in report');
     }
