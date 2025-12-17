@@ -14,7 +14,7 @@ type Event =
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | { type: 'pong' };
 
-const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/events`;
+const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
 
 export function useWebSocket(): ConnectionStatus {
     const utils = api.useUtils();

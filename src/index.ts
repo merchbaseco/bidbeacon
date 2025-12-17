@@ -150,7 +150,7 @@ try {
     console.log(`✓ Database connected`);
     console.log(`✓ Server running on port ${port}`);
     console.log(`✓ Health check endpoint: /api/health`);
-    console.log(`✓ WebSocket events: /events`);
+    console.log(`✓ WebSocket events: /api/events`);
     console.log(`✓ tRPC endpoints: /api/*`);
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('');
