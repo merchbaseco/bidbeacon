@@ -14,7 +14,7 @@ export interface ReportMetadata {
 export async function validateReportReady(input: ParseReportInput): Promise<ReportMetadata> {
     const date = new Date(input.timestamp);
 
-    // Validate account exists and has profileId
+    // Validate account exists
     const account = await db.query.advertiserAccount.findFirst({
         where: eq(advertiserAccount.adsAccountId, input.accountId),
         columns: {
@@ -52,7 +52,6 @@ export async function validateReportReady(input: ParseReportInput): Promise<Repo
     // Retrieve report and validate it's ready
     const retrieveResponse = await retrieveReport(
         {
-            profileId: Number(account.profileId),
             reportIds: [metadata.reportId],
         },
         'na'
@@ -67,14 +66,9 @@ export async function validateReportReady(input: ParseReportInput): Promise<Repo
         throw new Error(`Report is not ready. Current status: ${report.status}`);
     }
 
-    const reportParts = report.completedReportParts;
-    if (!reportParts || reportParts.length === 0) {
-        throw new Error('No completed report parts found');
-    }
-
-    const reportUrl = reportParts[0]?.url;
+    const reportUrl = report.url;
     if (!reportUrl) {
-        throw new Error('No URL found in report parts');
+        throw new Error('No URL found in report');
     }
 
     return {

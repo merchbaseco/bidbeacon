@@ -162,6 +162,13 @@
       "when": 1766005904566,
       "tag": "0022_spotty_black_tarantula",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1766009344598,
+      "tag": "0023_familiar_jane_foster",
+      "breakpoints": true
     }
   ]
 }

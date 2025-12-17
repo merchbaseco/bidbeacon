@@ -1,6 +1,7 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Frame, FrameFooter } from '../../components/ui/frame';
@@ -8,10 +9,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { api } from '../../lib/trpc.js';
 import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useReportDatasets } from '../hooks/use-report-datasets.js';
-import { useReportRefreshLoading } from '../hooks/use-report-refresh-loading.js';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid.js';
 import { formatDate } from '../utils.js';
-import { ReportResponseDialog } from './report-response-dialog.js';
+import { ReportIdDialog } from './report-id-dialog.js';
 import { ReportsToolbar } from './reports-toolbar.js';
 import { StatusBadge } from './status-badge.js';
 import { TablePagination } from './table-pagination.js';
@@ -27,15 +27,16 @@ export const ReportsTable = () => {
 
     const { refreshReportsTable, pending: refreshPending } = useRefreshReportsTable(accountId);
 
-    const refreshReportMutation = api.reports.refresh.useMutation();
-    const retrieveReportMutation = api.reports.retrieve.useMutation();
-    const loadingRefreshes = useReportRefreshLoading();
+    const refreshReportMutation = api.reports.refresh.useMutation({
+        onError: error => {
+            toast.error('Report refresh failed', {
+                description: error.message,
+            });
+        },
+    });
 
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [dialogData, setDialogData] = useState<unknown>(null);
-    const [dialogError, setDialogError] = useState<string | null>(null);
 
     // Filter rows by status and entity type
     const filteredRows = useMemo(() => {
@@ -85,48 +86,6 @@ export const ReportsTable = () => {
         refreshReportsTable();
     };
 
-    const handleRefreshReport = async (row: (typeof rows)[0]) => {
-        if (!accountId || !row.countryCode) return;
-
-        const rowKey = `${row.timestamp}-${row.aggregation}-${row.entityType}`;
-        console.log(`[ReportsTable] Starting refresh for row: ${rowKey}`);
-
-        try {
-            await refreshReportMutation.mutateAsync({
-                accountId,
-                countryCode: row.countryCode,
-                timestamp: row.timestamp,
-                aggregation: row.aggregation,
-                entityType: row.entityType,
-            });
-            console.log(`[ReportsTable] Refresh mutation completed for row: ${rowKey}`);
-            // Loading state will be managed by WebSocket events
-        } catch (error) {
-            console.error(`[ReportsTable] Refresh mutation failed for row: ${rowKey}`, error);
-            // Error handling is done via WebSocket events
-        }
-    };
-
-    const handleReportIdClick = async (row: (typeof rows)[0]) => {
-        if (!accountId || !row.reportId) return;
-
-        setDialogOpen(true);
-        setDialogError(null);
-        setDialogData(null);
-
-        try {
-            const response = await retrieveReportMutation.mutateAsync({
-                accountId,
-                timestamp: row.timestamp,
-                aggregation: row.aggregation,
-                entityType: row.entityType,
-            });
-            setDialogData(response.data);
-        } catch (error) {
-            setDialogError(error instanceof Error ? error.message : 'Unknown error');
-        }
-    };
-
     return (
         <>
             <ReportsToolbar
@@ -162,7 +121,6 @@ export const ReportsTable = () => {
                         ) : (
                             paginatedRows.map(row => {
                                 const rowKey = `${row.timestamp}-${row.aggregation}-${row.entityType}`;
-                                const isRefreshing = loadingRefreshes.has(rowKey);
 
                                 return (
                                     <TableRow key={rowKey}>
@@ -177,17 +135,23 @@ export const ReportsTable = () => {
                                             <StatusBadge status={row.status} />
                                         </TableCell>
                                         <TableCell>{row.lastRefreshed ? formatDate(row.lastRefreshed) : '—'}</TableCell>
-                                        <TableCell>
-                                            {row.reportId ? (
-                                                <Badge variant="outline" className="cursor-pointer hover:bg-accent" onClick={() => handleReportIdClick(row)}>
-                                                    {row.reportId}
-                                                </Badge>
-                                            ) : (
-                                                <Badge variant="outline">—</Badge>
-                                            )}
-                                        </TableCell>
+                                        <TableCell>{row.reportId ? <ReportIdDialog row={row} accountId={accountId} /> : <Badge variant="outline">—</Badge>}</TableCell>
                                         <TableCell className="text-right">
-                                            <Button variant="secondary" size="icon" onClick={() => handleRefreshReport(row)} disabled={isRefreshing}>
+                                            <Button
+                                                variant="secondary"
+                                                size="icon"
+                                                onClick={() => {
+                                                    if (!accountId || !row.countryCode) return;
+                                                    refreshReportMutation.mutate({
+                                                        accountId,
+                                                        countryCode: row.countryCode,
+                                                        timestamp: row.timestamp,
+                                                        aggregation: row.aggregation,
+                                                        entityType: row.entityType,
+                                                    });
+                                                }}
+                                                disabled={row.refreshing}
+                                            >
                                                 <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={20} />
                                             </Button>
                                         </TableCell>
@@ -206,7 +170,6 @@ export const ReportsTable = () => {
                     </FrameFooter>
                 )}
             </Frame>
-            <ReportResponseDialog open={dialogOpen} onOpenChange={setDialogOpen} title="Retrieve Report Response" data={dialogData} error={dialogError} />
         </>
     );
 };

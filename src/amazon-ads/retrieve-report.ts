@@ -26,12 +26,6 @@ const reportQuerySchema = z.object({
     filter: z.unknown().nullable().optional(),
 });
 
-const completedReportPartSchema = z.object({
-    sizeInBytes: z.number().int(),
-    url: z.string().url(),
-    urlExpirationDateTime: z.string(), // ISO datetime
-});
-
 const linkedAccountSchema = z.object({
     advertiserAccountId: z.string(),
 });
@@ -46,7 +40,7 @@ const reportResponseSchema = z.object({
     query: reportQuerySchema,
     linkedAccounts: z.array(linkedAccountSchema),
     completedDateTime: z.string().nullable().optional(),
-    completedReportParts: z.array(completedReportPartSchema).nullable().optional(),
+    url: z.string().url().nullable().optional(),
     currencyOfView: z.string().nullable().optional(),
     failureCode: z.string().nullable().optional(),
     failureReason: z.string().nullable().optional(),
@@ -76,12 +70,10 @@ const retrieveReportResponseSchema = z.object({
 export type RetrieveReportRequest = z.infer<typeof retrieveReportRequestSchema>;
 export type RetrieveReportResponse = z.infer<typeof retrieveReportResponseSchema>;
 export type ReportResponse = z.infer<typeof reportResponseSchema>;
-export type CompletedReportPart = z.infer<typeof completedReportPartSchema>;
 export type DatePeriod = z.infer<typeof datePeriodSchema>;
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
 
 export interface RetrieveReportOptions {
-    profileId: number; // Required for Amazon-Advertising-API-Scope header
     reportIds: string[];
 }
 
@@ -91,7 +83,7 @@ export interface RetrieveReportOptions {
 
 /**
  * Retrieves reports via the Amazon Ads API
- * @param options - Request options including profileId and reportIds
+ * @param options - Request options including reportIds
  * @param region - API region (default: 'na' for North America)
  * @returns The retrieved report response
  */
@@ -117,7 +109,6 @@ export async function retrieveReport(options: RetrieveReportOptions, region: Api
 
         const headers: Record<string, string> = {
             'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': String(options.profileId),
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         };

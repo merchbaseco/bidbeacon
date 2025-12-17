@@ -1,5 +1,4 @@
 import type { AggregationType } from '@/types/reports';
-import type { ReportDatum } from './types';
 
 /**
  * Eligible time offsets for report refresh (in hours).
@@ -21,28 +20,28 @@ export function getEligibleOffsets(aggregation: AggregationType): readonly numbe
  * Check if a report datum is eligible for a new report creation.
  *
  * A datum is eligible if:
- * 1. The age (NOW - datum.timestamp) has reached or exceeded one of the eligible offsets
+ * 1. The age (NOW - timestamp) has reached or exceeded one of the eligible offsets
  * 2. No report was already created at this offset (lastReportCreatedAt was set before reaching this offset, or is null)
  *
  * The eligible offsets represent thresholds where the ads server likely has updated report data.
  * If we already fetched data at a threshold, we don't fetch it again.
  */
-export function isEligibleForReport(datum: ReportDatum, _countryCode: string, now: Date = new Date()): boolean {
+export function isEligibleForReport(timestamp: Date, aggregation: AggregationType, lastReportCreatedAt: Date | null, _countryCode: string, now: Date = new Date()): boolean {
     // Calculate age in hours - timezone doesn't matter for relative comparisons
-    const ageMs = now.getTime() - datum.timestamp.getTime();
+    const ageMs = now.getTime() - timestamp.getTime();
     const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
 
-    console.log(`[Eligibility] Checking eligibility for ${datum.aggregation} report:`, {
-        timestamp: datum.timestamp.toISOString(),
+    console.log(`[Eligibility] Checking eligibility for ${aggregation} report:`, {
+        timestamp: timestamp.toISOString(),
         now: now.toISOString(),
         ageMs,
         ageHours,
-        lastReportCreatedAt: datum.lastReportCreatedAt?.toISOString() ?? null,
+        lastReportCreatedAt: lastReportCreatedAt?.toISOString() ?? null,
     });
 
     // Check if age matches any eligible offset
-    const eligibleOffsets = getEligibleOffsets(datum.aggregation);
-    console.log(`[Eligibility] Eligible offsets for ${datum.aggregation}:`, eligibleOffsets);
+    const eligibleOffsets = getEligibleOffsets(aggregation);
+    console.log(`[Eligibility] Eligible offsets for ${aggregation}:`, eligibleOffsets);
 
     // Find the highest eligible offset that the report age has reached or exceeded
     const sortedOffsets = [...eligibleOffsets].sort((a, b) => a - b);
@@ -66,7 +65,7 @@ export function isEligibleForReport(datum: ReportDatum, _countryCode: string, no
     }
 
     // Check if a report was already created at this offset
-    if (!datum.lastReportCreatedAt) {
+    if (!lastReportCreatedAt) {
         // No report created yet, so eligible (age is past threshold and no previous report)
         console.log(`[Eligibility] No lastReportCreatedAt, eligible for creation at ${matchingOffset}h offset`);
         return true;
@@ -74,7 +73,7 @@ export function isEligibleForReport(datum: ReportDatum, _countryCode: string, no
 
     // Calculate when the last report was created relative to the datum timestamp
     // Timezone doesn't matter for relative comparisons
-    const lastCreatedAgeMs = datum.lastReportCreatedAt.getTime() - datum.timestamp.getTime();
+    const lastCreatedAgeMs = lastReportCreatedAt.getTime() - timestamp.getTime();
     const lastCreatedAgeHours = Math.floor(lastCreatedAgeMs / (1000 * 60 * 60));
 
     console.log(`[Eligibility] Last report created age:`, {

@@ -13,6 +13,7 @@ export type ReportDatasetMetadata = {
     aggregation: Aggregation;
     entityType: 'target' | 'product';
     status: string;
+    refreshing: boolean;
     lastRefreshed: string | null;
     reportId: string;
     error: string | null;

@@ -4,9 +4,9 @@
 import { boss } from './boss.js';
 
 // Import all job definitions (this registers them with the boss singleton)
+import './refresh-report-datum.js';
 import './update-report-dataset-for-account.js';
 import './update-report-datasets.js';
-import './request-report-for-date.js';
 import './sync-ad-entities.js';
 
 export async function startJobs(): Promise<void> {

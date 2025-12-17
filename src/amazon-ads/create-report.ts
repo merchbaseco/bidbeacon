@@ -57,7 +57,7 @@ const reportResponseSchema = z.object({
     query: reportQuerySchema,
     linkedAccounts: z.array(linkedAccountSchema),
     completedDateTime: z.string().nullable().optional(),
-    completedReportParts: z.unknown().nullable().optional(),
+    url: z.string().url().nullable().optional(),
     currencyOfView: z.string().nullable().optional(),
     failureCode: z.string().nullable().optional(),
     failureReason: z.string().nullable().optional(),
@@ -87,7 +87,6 @@ export type DatePeriod = z.infer<typeof datePeriodSchema>;
 export type ReportQuery = z.infer<typeof reportQuerySchema>;
 
 export interface CreateReportOptions {
-    profileId: number; // Required for Amazon-Advertising-API-Scope header
     accessRequestedAccounts: Array<{ advertiserAccountId: string }>;
     reports: Array<{
         format: string;
@@ -111,7 +110,7 @@ export interface CreateReportOptions {
 
 /**
  * Creates a report via the Amazon Ads API
- * @param options - Request options including profileId, accessRequestedAccounts, and reports
+ * @param options - Request options including accessRequestedAccounts and reports
  * @param region - API region (default: 'na' for North America)
  * @returns The created report response
  */
@@ -138,7 +137,6 @@ export async function createReport(options: CreateReportOptions, region: ApiRegi
 
         const headers: Record<string, string> = {
             'Amazon-Advertising-API-ClientId': clientId,
-            'Amazon-Advertising-API-Scope': String(options.profileId),
             Authorization: `Bearer ${accessToken}`,
             'Content-Type': 'application/json',
         };

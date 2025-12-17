@@ -22,7 +22,6 @@ export interface ReportDatum {
  */
 export interface ReportStatus {
     status: string; // e.g., 'COMPLETED', 'IN_PROGRESS', 'FAILED'
-    completedReportParts?: Array<{ url?: string }> | null;
 }
 
 /**

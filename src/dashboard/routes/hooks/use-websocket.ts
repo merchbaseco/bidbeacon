@@ -13,20 +13,7 @@ type Event =
     | { type: 'api-metrics:updated'; apiName: string; timestamp: string }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | {
-          type: 'report-refresh:started';
-          accountId: string;
-          countryCode: string;
-          rowTimestamp: string;
-          aggregation: 'hourly' | 'daily';
-          entityType: 'target' | 'product';
-      }
-    | {
-          type: 'report-refresh:completed';
-          accountId: string;
-          countryCode: string;
-          rowTimestamp: string;
-          aggregation: 'hourly' | 'daily';
-          entityType: 'target' | 'product';
+          type: 'report-dataset-metadata:updated';
           data: {
               accountId: string;
               countryCode: string;
@@ -34,20 +21,13 @@ type Event =
               aggregation: 'hourly' | 'daily';
               entityType: 'target' | 'product';
               status: string;
+              refreshing: boolean;
               lastRefreshed: string | null;
               lastReportCreatedAt: string | null;
               reportId: string | null;
               error: string | null;
           };
-      }
-    | {
-          type: 'report-refresh:failed';
-          accountId: string;
-          countryCode: string;
-          rowTimestamp: string;
-          aggregation: 'hourly' | 'daily';
-          entityType: 'target' | 'product';
-          error: string;
+          timestamp: string;
       }
     | { type: 'pong' };
 
@@ -95,24 +75,19 @@ export function useWebSocket(): ConnectionStatus {
                         // Show success toast only when sync completes (status changes from syncing to completed)
                         // Note: We can't determine this from the event alone, so we'll check in the component
                         break;
-                    case 'report-refresh:started':
-                        // Loading state will be handled by component
-                        // No action needed here
-                        break;
-                    case 'report-refresh:completed': {
-                        // Invalidate all queries matching this account/country/aggregation
-                        // Components will refetch and get the updated data
+                    case 'report-dataset-metadata:updated':
+                        // Invalidate queries to refresh the report status with updated data
                         utils.reports.status.invalidate({
-                            accountId: data.accountId,
-                            countryCode: data.countryCode,
-                            aggregation: data.aggregation,
+                            accountId: data.data.accountId,
+                            countryCode: data.data.countryCode,
+                            aggregation: data.data.aggregation,
                         });
-                        break;
-                    }
-                    case 'report-refresh:failed':
-                        toast.error('Report refresh failed', {
-                            description: data.error,
-                        });
+                        // Show error toast if there's an error
+                        if (data.data.error) {
+                            toast.error('Report refresh failed', {
+                                description: data.data.error,
+                            });
+                        }
                         break;
                 }
             } catch {

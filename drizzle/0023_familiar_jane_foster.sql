@@ -1,0 +1,1 @@
+ALTER TABLE "report_dataset_metadata" ADD COLUMN "refreshing" boolean DEFAULT false NOT NULL;

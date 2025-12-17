@@ -131,6 +131,7 @@ export const reportDatasetMetadata = pgTable(
         aggregation: text('aggregation').notNull(), // hourly, daily
         entityType: text('entity_type').notNull(), // target, product
         status: text('status').notNull(), // enum: missing, fetching, parsing, completed, failed
+        refreshing: boolean('refreshing').notNull().default(false), // whether a refresh is currently in progress
         lastRefreshed: timestamp('last_refreshed', { withTimezone: false, mode: 'date' }), // utc
         lastReportCreatedAt: timestamp('last_report_created_at', { withTimezone: false, mode: 'date' }), // timezone-less, represents local time in country's timezone
         reportId: text('report_id'),
