@@ -12,6 +12,43 @@ type Event =
     | { type: 'reports:refreshed'; accountId: string; timestamp: string }
     | { type: 'api-metrics:updated'; apiName: string; timestamp: string }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
+    | {
+          type: 'report-refresh:started';
+          accountId: string;
+          countryCode: string;
+          rowTimestamp: string;
+          aggregation: 'hourly' | 'daily';
+          entityType: 'target' | 'product';
+      }
+    | {
+          type: 'report-refresh:completed';
+          accountId: string;
+          countryCode: string;
+          rowTimestamp: string;
+          aggregation: 'hourly' | 'daily';
+          entityType: 'target' | 'product';
+          data: {
+              accountId: string;
+              countryCode: string;
+              timestamp: string;
+              aggregation: 'hourly' | 'daily';
+              entityType: 'target' | 'product';
+              status: string;
+              lastRefreshed: string | null;
+              lastReportCreatedAt: string | null;
+              reportId: string | null;
+              error: string | null;
+          };
+      }
+    | {
+          type: 'report-refresh:failed';
+          accountId: string;
+          countryCode: string;
+          rowTimestamp: string;
+          aggregation: 'hourly' | 'daily';
+          entityType: 'target' | 'product';
+          error: string;
+      }
     | { type: 'pong' };
 
 const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
@@ -57,6 +94,53 @@ export function useWebSocket(): ConnectionStatus {
                         });
                         // Show success toast only when sync completes (status changes from syncing to completed)
                         // Note: We can't determine this from the event alone, so we'll check in the component
+                        break;
+                    case 'report-refresh:started':
+                        // Loading state will be handled by component
+                        // No action needed here
+                        break;
+                    case 'report-refresh:completed': {
+                        // Update individual row using setQueryData
+                        const queryCache = utils.reports.status.getQueryCache();
+                        const matchingQueries = queryCache.findAll({
+                            queryKey: ['reports', 'status'],
+                            predicate: query => {
+                                const [, params] = query.queryKey as [string, unknown];
+                                const queryParams = params as {
+                                    accountId?: string;
+                                    countryCode?: string;
+                                    aggregation?: string;
+                                };
+                                return queryParams?.accountId === data.accountId && queryParams?.countryCode === data.countryCode && queryParams?.aggregation === data.aggregation;
+                            },
+                        });
+
+                        // Update each matching query
+                        matchingQueries.forEach(query => {
+                            utils.reports.status.setQueryData(query.queryKey[1] as unknown, (oldData: { success: boolean; data?: unknown[] } | undefined) => {
+                                if (!oldData?.data || !Array.isArray(oldData.data)) return oldData;
+                                return {
+                                    ...oldData,
+                                    data: oldData.data.map((row: unknown) => {
+                                        const r = row as {
+                                            timestamp: string;
+                                            aggregation: string;
+                                            entityType: string;
+                                        };
+                                        if (r.timestamp === data.rowTimestamp && r.aggregation === data.aggregation && r.entityType === data.entityType) {
+                                            return data.data;
+                                        }
+                                        return row;
+                                    }),
+                                };
+                            });
+                        });
+                        break;
+                    }
+                    case 'report-refresh:failed':
+                        toast.error('Report refresh failed', {
+                            description: data.error,
+                        });
                         break;
                 }
             } catch {

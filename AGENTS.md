@@ -159,6 +159,35 @@ Worker needs `AMS_QUEUE_URL` and AWS credentials. See [INFRA.md](./INFRA.md) for
 
 ---
 
+# Report Datum State Machine
+
+Context and principles for the report datum state machine that determines when reports should be created, processed, or left alone.
+
+## Architecture
+
+The report datum state machine is isolated in `src/lib/report-datum-state-machine/` separate from parsing logic. This separation keeps decision-making logic distinct from execution logic.
+
+## Key Design Decisions
+
+1. **State machine module separation** - Report datum state machine logic is isolated in `src/lib/report-datum-state-machine/` separate from parsing logic. The state machine determines what action to take, while parse-report handles the actual processing.
+
+2. **Timezone handling** - Report timestamps and `lastReportCreatedAt` are stored as timezone-less but represent local time in the country's timezone. All eligibility comparisons happen in local timezone to avoid conversion complexity. When storing `lastReportCreatedAt`, convert UTC now to the country's timezone using `getTimezoneForCountry(countryCode)`.
+
+3. **Eligibility rules** - Reports are eligible for refresh at specific time offsets (T-1, T-3, T-5, T-7, T-14, T-30, T-60 days for daily; T-24, T-72, T-312 hours for hourly) only if no report was already created at that offset. This prevents duplicate report creation while ensuring data freshness.
+
+4. **State machine flow** - Determines next action (process/create/none) based on report existence and status from retrieve API, not just database status. The state machine checks the actual report status via the retrieve API to ensure accuracy.
+
+## State Machine Logic
+
+The state machine follows this flow:
+
+1. If report exists AND status is COMPLETED → 'process'
+2. If report exists AND status is NOT COMPLETED → 'none'
+3. If no report AND eligible → 'create'
+4. If no report AND not eligible → 'none'
+
+---
+
 # BidBeacon Dashboard
 
 Context and tribal knowledge for working with the BidBeacon Dashboard, a TanStack Start application.

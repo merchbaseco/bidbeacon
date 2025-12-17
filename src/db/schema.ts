@@ -132,6 +132,7 @@ export const reportDatasetMetadata = pgTable(
         entityType: text('entity_type').notNull(), // target, product
         status: text('status').notNull(), // enum: missing, fetching, completed, failed
         lastRefreshed: timestamp('last_refreshed', { withTimezone: false, mode: 'date' }), // utc
+        lastReportCreatedAt: timestamp('last_report_created_at', { withTimezone: false, mode: 'date' }), // timezone-less, represents local time in country's timezone
         reportId: text('report_id'),
         error: text('error'),
     },

@@ -6,9 +6,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { api } from '../../lib/trpc.js';
 import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useReportDatasets } from '../hooks/use-report-datasets.js';
+import { useReportRefreshLoading } from '../hooks/use-report-refresh-loading.js';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid.js';
 import { formatDate } from '../utils.js';
-import { ReportResponseDialog } from './report-response-dialog.js';
 import { ReportsToolbar } from './reports-toolbar.js';
 import { StatusBadge } from './status-badge.js';
 import { TablePagination } from './table-pagination.js';
@@ -17,7 +17,6 @@ import { TableResultsRange } from './table-results-range.js';
 const ITEMS_PER_PAGE = 10;
 
 export const ReportsTable = () => {
-    const utils = api.useUtils();
     const [aggregation, setAggregation] = useState<'daily' | 'hourly'>('daily');
     const [entityType, setEntityType] = useState<'target' | 'product'>('target');
     const { data: rows = [], isLoading } = useReportDatasets(aggregation);
@@ -25,17 +24,11 @@ export const ReportsTable = () => {
 
     const { refreshReportsTable, pending: refreshPending } = useRefreshReportsTable(accountId);
 
-    const createReportMutation = api.reports.create.useMutation();
-    const retrieveReportMutation = api.reports.retrieve.useMutation();
-    const parseReportMutation = api.reports.parse.useMutation();
+    const refreshReportMutation = api.reports.refresh.useMutation();
+    const loadingRefreshes = useReportRefreshLoading();
 
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<string>('all');
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [dialogTitle, setDialogTitle] = useState('');
-    const [dialogData, setDialogData] = useState<unknown>(null);
-    const [dialogError, setDialogError] = useState<string | null>(null);
-    const [loadingAction, setLoadingAction] = useState<string | null>(null);
 
     // Filter rows by status and entity type
     const filteredRows = useMemo(() => {
@@ -85,86 +78,20 @@ export const ReportsTable = () => {
         refreshReportsTable();
     };
 
-    const handleCreateReport = async (row: (typeof rows)[0]) => {
+    const handleRefreshReport = async (row: (typeof rows)[0]) => {
         if (!accountId || !row.countryCode) return;
 
-        setLoadingAction(`create-${row.timestamp}-${row.entityType}`);
-        setDialogTitle('Create Report Response');
-        setDialogError(null);
-        setDialogData(null);
-
         try {
-            const response = await createReportMutation.mutateAsync({
+            await refreshReportMutation.mutateAsync({
                 accountId,
                 countryCode: row.countryCode,
                 timestamp: row.timestamp,
                 aggregation: row.aggregation,
                 entityType: row.entityType,
             });
-            // Invalidate the table data to show updated status
-            await utils.reports.status.invalidate();
-            setDialogData(response.data);
-            setDialogOpen(true);
-        } catch (error) {
-            setDialogError(error instanceof Error ? error.message : 'Unknown error');
-            setDialogOpen(true);
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    const handleRetrieveReport = async (row: (typeof rows)[0]) => {
-        if (!accountId) return;
-
-        setLoadingAction(`retrieve-${row.timestamp}-${row.entityType}`);
-        setDialogTitle('Retrieve Report Response');
-        setDialogError(null);
-        setDialogData(null);
-
-        try {
-            const response = await retrieveReportMutation.mutateAsync({
-                accountId,
-                timestamp: row.timestamp,
-                aggregation: row.aggregation,
-                entityType: row.entityType,
-            });
-            setDialogData(response.data);
-            setDialogOpen(true);
-        } catch (error) {
-            setDialogError(error instanceof Error ? error.message : 'Unknown error');
-            setDialogOpen(true);
-        } finally {
-            setLoadingAction(null);
-        }
-    };
-
-    const handleParseReport = async (row: (typeof rows)[0]) => {
-        if (!accountId || !row.countryCode) return;
-
-        setLoadingAction(`parse-${row.timestamp}-${row.entityType}`);
-        setDialogTitle('Parse Report Response');
-        setDialogError(null);
-        setDialogData(null);
-
-        try {
-            const response = await parseReportMutation.mutateAsync({
-                accountId,
-                countryCode: row.countryCode,
-                timestamp: row.timestamp,
-                aggregation: row.aggregation,
-                entityType: row.entityType,
-            });
-            // Invalidate the table data to show updated status
-            await utils.reports.status.invalidate();
-            setDialogData(response.data);
-            setDialogOpen(true);
-        } catch (error) {
-            // Still invalidate on error since the status may have changed to 'failed'
-            await utils.reports.status.invalidate();
-            setDialogError(error instanceof Error ? error.message : 'Unknown error');
-            setDialogOpen(true);
-        } finally {
-            setLoadingAction(null);
+            // Loading state will be managed by WebSocket events
+        } catch {
+            // Error handling is done via WebSocket events
         }
     };
 
@@ -202,16 +129,11 @@ export const ReportsTable = () => {
                             </TableRow>
                         ) : (
                             paginatedRows.map(row => {
-                                const createActionKey = `create-${row.timestamp}-${row.entityType}`;
-                                const retrieveActionKey = `retrieve-${row.timestamp}-${row.entityType}`;
-                                const parseActionKey = `parse-${row.timestamp}-${row.entityType}`;
-                                const isCreating = loadingAction === createActionKey;
-                                const isRetrieving = loadingAction === retrieveActionKey;
-                                const isParsing = loadingAction === parseActionKey;
-                                const isActionPending = isCreating || isRetrieving || isParsing;
+                                const rowKey = `${row.timestamp}-${row.aggregation}-${row.entityType}`;
+                                const isRefreshing = loadingRefreshes.has(rowKey);
 
                                 return (
-                                    <TableRow key={`${row.timestamp}-${row.aggregation}-${row.entityType}`}>
+                                    <TableRow key={rowKey}>
                                         <TableCell className="font-medium">{formatDate(row.timestamp)}</TableCell>
                                         <TableCell>
                                             <Badge variant="outline">{row.aggregation}</Badge>
@@ -227,38 +149,9 @@ export const ReportsTable = () => {
                                             <Badge variant="outline">{row.reportId}</Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex items-center justify-end gap-2">
-                                                <Button
-                                                    variant="secondary"
-                                                    type="button"
-                                                    size="sm"
-                                                    disabled={isActionPending}
-                                                    onClick={() => handleCreateReport(row)}
-                                                    className="inline-flex items-center gap-2"
-                                                >
-                                                    {isCreating ? 'Creating…' : 'Create Report'}
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    type="button"
-                                                    size="sm"
-                                                    disabled={isActionPending || !row.reportId}
-                                                    onClick={() => handleRetrieveReport(row)}
-                                                    className="inline-flex items-center gap-2"
-                                                >
-                                                    {isRetrieving ? 'Retrieving…' : 'Retrieve Report'}
-                                                </Button>
-                                                <Button
-                                                    variant="secondary"
-                                                    type="button"
-                                                    size="sm"
-                                                    disabled={isActionPending || !row.reportId}
-                                                    onClick={() => handleParseReport(row)}
-                                                    className="inline-flex items-center gap-2"
-                                                >
-                                                    {isParsing ? 'Parsing…' : 'Parse Report'}
-                                                </Button>
-                                            </div>
+                                            <Button variant="secondary" size="sm" onClick={() => handleRefreshReport(row)} disabled={isRefreshing}>
+                                                {isRefreshing ? 'Refreshing…' : 'Refresh'}
+                                            </Button>
                                         </TableCell>
                                     </TableRow>
                                 );
@@ -275,7 +168,6 @@ export const ReportsTable = () => {
                     </FrameFooter>
                 )}
             </Frame>
-            <ReportResponseDialog open={dialogOpen} onOpenChange={setDialogOpen} title={dialogTitle} data={dialogData} error={dialogError} />
         </>
     );
 };

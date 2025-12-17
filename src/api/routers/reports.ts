@@ -1,3 +1,4 @@
+import { toZonedTime } from 'date-fns-tz';
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { createReport } from '@/amazon-ads/create-report.js';
@@ -6,10 +7,14 @@ import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
 import { updateReportDatasetForAccountJob } from '@/jobs/update-report-dataset-for-account.js';
+import { parseReport } from '@/lib/parse-report/index';
+import { getNextAction } from '@/lib/report-datum-state-machine';
+import type { ReportDatum } from '@/lib/report-datum-state-machine/types';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
 import { utcAddHours, utcNow } from '@/utils/date.js';
+import { emitEvent } from '@/utils/events.js';
+import { getTimezoneForCountry } from '@/utils/timezones.js';
 import { publicProcedure, router } from '../trpc.js';
-import { parseReportHandler } from './reports/parse-report.js';
 
 const DEFAULT_ACCOUNT_ID = 'amzn1.ads-account.g.akzidxc3kemvnyklo33ht2mjm';
 
@@ -141,6 +146,14 @@ export const reportsRouter = router({
             if (response.success && response.success.length > 0) {
                 const reportId = response.success[0]?.report?.reportId;
                 if (reportId) {
+                    // Convert current UTC time to country's timezone and store as timezone-less timestamp
+                    // This represents the local time in the country's timezone (stored without timezone info)
+                    const timezone = getTimezoneForCountry(input.countryCode);
+                    const nowUtc = utcNow();
+                    const zonedTime = toZonedTime(nowUtc, timezone);
+                    // Create a new Date from the zoned time components (interpreted as local time)
+                    const lastReportCreatedAt = new Date(zonedTime.getFullYear(), zonedTime.getMonth(), zonedTime.getDate(), zonedTime.getHours(), zonedTime.getMinutes(), zonedTime.getSeconds());
+
                     await db
                         .insert(reportDatasetMetadata)
                         .values({
@@ -151,6 +164,7 @@ export const reportsRouter = router({
                             entityType: input.entityType,
                             status: 'fetching',
                             lastRefreshed: utcNow(),
+                            lastReportCreatedAt,
                             reportId,
                             error: null,
                         })
@@ -160,6 +174,7 @@ export const reportsRouter = router({
                                 reportId,
                                 status: 'fetching',
                                 lastRefreshed: utcNow(),
+                                lastReportCreatedAt,
                                 error: null,
                             },
                         });
@@ -241,6 +256,381 @@ export const reportsRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            return await parseReportHandler(input);
+            console.log(`[API] Parse report request received: ${input.aggregation}/${input.entityType} for ${input.accountId} at ${input.timestamp}`);
+
+            const result = await parseReport(input);
+
+            console.log(`[API] Parse report completed. Inserted/updated ${result.rowsProcessed} rows.`);
+
+            return {
+                success: true,
+                data: {
+                    rowsProcessed: result.rowsProcessed,
+                },
+            };
+        }),
+
+    refresh: publicProcedure
+        .input(
+            z.object({
+                accountId: z.string(),
+                countryCode: z.string(),
+                timestamp: z.string(),
+                aggregation: z.enum(AGGREGATION_TYPES),
+                entityType: z.enum(ENTITY_TYPES),
+            })
+        )
+        .mutation(async ({ input }) => {
+            console.log(`[API] Refresh report request received: ${input.aggregation}/${input.entityType} for ${input.accountId} at ${input.timestamp}`);
+
+            // Emit started event immediately
+            emitEvent({
+                type: 'report-refresh:started',
+                accountId: input.accountId,
+                countryCode: input.countryCode,
+                rowTimestamp: input.timestamp,
+                aggregation: input.aggregation as 'hourly' | 'daily',
+                entityType: input.entityType as 'target' | 'product',
+            });
+
+            // Process refresh asynchronously without blocking
+            (async () => {
+                try {
+                    const date = new Date(input.timestamp);
+
+                    // Fetch report datum from database
+                    const datum = await db.query.reportDatasetMetadata.findFirst({
+                        where: and(
+                            eq(reportDatasetMetadata.accountId, input.accountId),
+                            eq(reportDatasetMetadata.timestamp, date),
+                            eq(reportDatasetMetadata.aggregation, input.aggregation),
+                            eq(reportDatasetMetadata.entityType, input.entityType)
+                        ),
+                    });
+
+                    if (!datum) {
+                        emitEvent({
+                            type: 'report-refresh:failed',
+                            accountId: input.accountId,
+                            countryCode: input.countryCode,
+                            rowTimestamp: input.timestamp,
+                            aggregation: input.aggregation as 'hourly' | 'daily',
+                            entityType: input.entityType as 'target' | 'product',
+                            error: 'Report metadata not found',
+                        });
+                        return;
+                    }
+
+                    // Convert to ReportDatum type
+                    const reportDatum: ReportDatum = {
+                        accountId: datum.accountId,
+                        countryCode: datum.countryCode,
+                        timestamp: datum.timestamp,
+                        aggregation: datum.aggregation as 'hourly' | 'daily',
+                        entityType: datum.entityType as 'target' | 'product',
+                        status: datum.status,
+                        lastRefreshed: datum.lastRefreshed,
+                        lastReportCreatedAt: datum.lastReportCreatedAt,
+                        reportId: datum.reportId,
+                        error: datum.error,
+                    };
+
+                    // If reportId exists, check actual report status via retrieve API
+                    let reportStatus: { status: string; completedReportParts?: Array<{ url?: string }> | null } | null = null;
+                    if (reportDatum.reportId) {
+                        const account = await db.query.advertiserAccount.findFirst({
+                            where: eq(advertiserAccount.adsAccountId, input.accountId),
+                            columns: {
+                                profileId: true,
+                            },
+                        });
+
+                        if (account?.profileId) {
+                            const retrieveResponse = await retrieveReport(
+                                {
+                                    profileId: Number(account.profileId),
+                                    reportIds: [reportDatum.reportId],
+                                },
+                                'na'
+                            );
+
+                            const report = retrieveResponse.success?.[0]?.report;
+                            if (report) {
+                                reportStatus = {
+                                    status: report.status,
+                                    completedReportParts: report.completedReportParts,
+                                };
+                            }
+                        }
+                    }
+
+                    // Determine next action using state machine
+                    const action = getNextAction(reportDatum, reportStatus, input.countryCode);
+
+                    if (action === 'none') {
+                        // Fetch updated row to emit completed event
+                        const updatedDatum = await db.query.reportDatasetMetadata.findFirst({
+                            where: and(
+                                eq(reportDatasetMetadata.accountId, input.accountId),
+                                eq(reportDatasetMetadata.timestamp, date),
+                                eq(reportDatasetMetadata.aggregation, input.aggregation),
+                                eq(reportDatasetMetadata.entityType, input.entityType)
+                            ),
+                        });
+
+                        if (updatedDatum) {
+                            const event: Omit<import('@/utils/events.js').ReportRefreshCompletedEvent, 'timestamp'> = {
+                                type: 'report-refresh:completed' as const,
+                                accountId: input.accountId,
+                                countryCode: input.countryCode,
+                                rowTimestamp: input.timestamp,
+                                aggregation: input.aggregation as 'hourly' | 'daily',
+                                entityType: input.entityType as 'target' | 'product',
+                                data: {
+                                    accountId: updatedDatum.accountId,
+                                    countryCode: updatedDatum.countryCode,
+                                    timestamp: updatedDatum.timestamp.toISOString(),
+                                    aggregation: updatedDatum.aggregation as 'hourly' | 'daily',
+                                    entityType: updatedDatum.entityType as 'target' | 'product',
+                                    status: updatedDatum.status,
+                                    lastRefreshed: updatedDatum.lastRefreshed?.toISOString() ?? null,
+                                    lastReportCreatedAt: updatedDatum.lastReportCreatedAt?.toISOString() ?? null,
+                                    reportId: updatedDatum.reportId ?? null,
+                                    error: updatedDatum.error ?? null,
+                                },
+                            };
+                            emitEvent(event);
+                        }
+                        return;
+                    }
+
+                    if (action === 'process') {
+                        // Process the report
+                        await parseReport({
+                            accountId: input.accountId,
+                            countryCode: input.countryCode,
+                            timestamp: input.timestamp,
+                            aggregation: input.aggregation,
+                            entityType: input.entityType,
+                        });
+
+                        // Fetch updated row after processing
+                        const updatedDatum = await db.query.reportDatasetMetadata.findFirst({
+                            where: and(
+                                eq(reportDatasetMetadata.accountId, input.accountId),
+                                eq(reportDatasetMetadata.timestamp, date),
+                                eq(reportDatasetMetadata.aggregation, input.aggregation),
+                                eq(reportDatasetMetadata.entityType, input.entityType)
+                            ),
+                        });
+
+                        if (updatedDatum) {
+                            const event: Omit<import('@/utils/events.js').ReportRefreshCompletedEvent, 'timestamp'> = {
+                                type: 'report-refresh:completed' as const,
+                                accountId: input.accountId,
+                                countryCode: input.countryCode,
+                                rowTimestamp: input.timestamp,
+                                aggregation: input.aggregation as 'hourly' | 'daily',
+                                entityType: input.entityType as 'target' | 'product',
+                                data: {
+                                    accountId: updatedDatum.accountId,
+                                    countryCode: updatedDatum.countryCode,
+                                    timestamp: updatedDatum.timestamp.toISOString(),
+                                    aggregation: updatedDatum.aggregation as 'hourly' | 'daily',
+                                    entityType: updatedDatum.entityType as 'target' | 'product',
+                                    status: updatedDatum.status,
+                                    lastRefreshed: updatedDatum.lastRefreshed?.toISOString() ?? null,
+                                    lastReportCreatedAt: updatedDatum.lastReportCreatedAt?.toISOString() ?? null,
+                                    reportId: updatedDatum.reportId ?? null,
+                                    error: updatedDatum.error ?? null,
+                                },
+                            };
+                            emitEvent(event);
+                        }
+                        return;
+                    }
+
+                    if (action === 'create') {
+                        // Create a new report
+                        const reportConfig = reportConfigs[input.aggregation][input.entityType];
+                        const account = await db.query.advertiserAccount.findFirst({
+                            where: eq(advertiserAccount.adsAccountId, input.accountId),
+                            columns: {
+                                adsAccountId: true,
+                                profileId: true,
+                            },
+                        });
+
+                        if (!account) {
+                            emitEvent({
+                                type: 'report-refresh:failed',
+                                accountId: input.accountId,
+                                countryCode: input.countryCode,
+                                rowTimestamp: input.timestamp,
+                                aggregation: input.aggregation as 'hourly' | 'daily',
+                                entityType: input.entityType as 'target' | 'product',
+                                error: 'Advertiser account not found',
+                            });
+                            return;
+                        }
+
+                        if (!account.profileId) {
+                            emitEvent({
+                                type: 'report-refresh:failed',
+                                accountId: input.accountId,
+                                countryCode: input.countryCode,
+                                rowTimestamp: input.timestamp,
+                                aggregation: input.aggregation as 'hourly' | 'daily',
+                                entityType: input.entityType as 'target' | 'product',
+                                error: 'Profile ID not found for this account',
+                            });
+                            return;
+                        }
+
+                        const windowStart = new Date(input.timestamp);
+                        const windowEnd = input.aggregation === 'hourly' ? utcAddHours(windowStart, 1) : windowStart;
+
+                        const formatDate = (date: Date): string => {
+                            const isoString = date.toISOString();
+                            const datePart = isoString.split('T')[0];
+                            if (!datePart) {
+                                throw new Error('Failed to format date');
+                            }
+                            return datePart;
+                        };
+
+                        const startDate = formatDate(windowStart);
+                        const endDate = formatDate(windowEnd);
+
+                        const response = await createReport(
+                            {
+                                profileId: Number(account.profileId),
+                                accessRequestedAccounts: [
+                                    {
+                                        advertiserAccountId: account.adsAccountId,
+                                    },
+                                ],
+                                reports: [
+                                    {
+                                        format: reportConfig.format,
+                                        periods: [
+                                            {
+                                                datePeriod: {
+                                                    startDate,
+                                                    endDate,
+                                                },
+                                            },
+                                        ],
+                                        query: {
+                                            fields: reportConfig.fields,
+                                        },
+                                    },
+                                ],
+                            },
+                            'na'
+                        );
+
+                        if (response.success && response.success.length > 0) {
+                            const reportId = response.success[0]?.report?.reportId;
+                            if (reportId) {
+                                // Convert current UTC time to country's timezone and store as timezone-less timestamp
+                                const timezone = getTimezoneForCountry(input.countryCode);
+                                const nowUtc = utcNow();
+                                const zonedTime = toZonedTime(nowUtc, timezone);
+                                const lastReportCreatedAt = new Date(
+                                    zonedTime.getFullYear(),
+                                    zonedTime.getMonth(),
+                                    zonedTime.getDate(),
+                                    zonedTime.getHours(),
+                                    zonedTime.getMinutes(),
+                                    zonedTime.getSeconds()
+                                );
+
+                                await db
+                                    .update(reportDatasetMetadata)
+                                    .set({
+                                        reportId,
+                                        status: 'fetching',
+                                        lastRefreshed: utcNow(),
+                                        lastReportCreatedAt,
+                                        error: null,
+                                    })
+                                    .where(
+                                        and(
+                                            eq(reportDatasetMetadata.accountId, input.accountId),
+                                            eq(reportDatasetMetadata.timestamp, date),
+                                            eq(reportDatasetMetadata.aggregation, input.aggregation),
+                                            eq(reportDatasetMetadata.entityType, input.entityType)
+                                        )
+                                    );
+                            }
+                        }
+
+                        // Fetch updated row after creating
+                        const updatedDatum = await db.query.reportDatasetMetadata.findFirst({
+                            where: and(
+                                eq(reportDatasetMetadata.accountId, input.accountId),
+                                eq(reportDatasetMetadata.timestamp, date),
+                                eq(reportDatasetMetadata.aggregation, input.aggregation),
+                                eq(reportDatasetMetadata.entityType, input.entityType)
+                            ),
+                        });
+
+                        if (updatedDatum) {
+                            const event: Omit<import('@/utils/events.js').ReportRefreshCompletedEvent, 'timestamp'> = {
+                                type: 'report-refresh:completed' as const,
+                                accountId: input.accountId,
+                                countryCode: input.countryCode,
+                                rowTimestamp: input.timestamp,
+                                aggregation: input.aggregation as 'hourly' | 'daily',
+                                entityType: input.entityType as 'target' | 'product',
+                                data: {
+                                    accountId: updatedDatum.accountId,
+                                    countryCode: updatedDatum.countryCode,
+                                    timestamp: updatedDatum.timestamp.toISOString(),
+                                    aggregation: updatedDatum.aggregation as 'hourly' | 'daily',
+                                    entityType: updatedDatum.entityType as 'target' | 'product',
+                                    status: updatedDatum.status,
+                                    lastRefreshed: updatedDatum.lastRefreshed?.toISOString() ?? null,
+                                    lastReportCreatedAt: updatedDatum.lastReportCreatedAt?.toISOString() ?? null,
+                                    reportId: updatedDatum.reportId ?? null,
+                                    error: updatedDatum.error ?? null,
+                                },
+                            };
+                            emitEvent(event);
+                        }
+                        return;
+                    }
+
+                    emitEvent({
+                        type: 'report-refresh:failed',
+                        accountId: input.accountId,
+                        countryCode: input.countryCode,
+                        rowTimestamp: input.timestamp,
+                        aggregation: input.aggregation as 'hourly' | 'daily',
+                        entityType: input.entityType as 'target' | 'product',
+                        error: `Unknown action: ${action}`,
+                    });
+                } catch (error) {
+                    emitEvent({
+                        type: 'report-refresh:failed',
+                        accountId: input.accountId,
+                        countryCode: input.countryCode,
+                        rowTimestamp: input.timestamp,
+                        aggregation: input.aggregation as 'hourly' | 'daily',
+                        entityType: input.entityType as 'target' | 'product',
+                        error: error instanceof Error ? error.message : 'Unknown error',
+                    });
+                }
+            })();
+
+            // Return immediately
+            return {
+                success: true,
+                data: {
+                    action: 'refresh',
+                    message: 'Refresh started',
+                },
+            };
         }),
 });

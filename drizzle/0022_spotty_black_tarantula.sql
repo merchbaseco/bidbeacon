@@ -1,0 +1,1 @@
+ALTER TABLE "report_dataset_metadata" ADD COLUMN "last_report_created_at" timestamp;

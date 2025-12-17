@@ -1,6 +1,14 @@
 import type { WebSocket } from 'ws';
 
-export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'account-dataset-metadata:updated';
+export type EventType =
+    | 'error'
+    | 'account:updated'
+    | 'reports:refreshed'
+    | 'api-metrics:updated'
+    | 'account-dataset-metadata:updated'
+    | 'report-refresh:started'
+    | 'report-refresh:completed'
+    | 'report-refresh:failed';
 
 export interface BaseEvent {
     type: EventType;
@@ -35,7 +43,55 @@ export interface AccountDatasetMetadataUpdatedEvent extends BaseEvent {
     countryCode: string;
 }
 
-export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent | AccountDatasetMetadataUpdatedEvent;
+export interface ReportRefreshStartedEvent extends BaseEvent {
+    type: 'report-refresh:started';
+    accountId: string;
+    countryCode: string;
+    rowTimestamp: string; // row timestamp (ISO string)
+    aggregation: 'hourly' | 'daily';
+    entityType: 'target' | 'product';
+}
+
+export interface ReportRefreshCompletedEvent extends BaseEvent {
+    type: 'report-refresh:completed';
+    accountId: string;
+    countryCode: string;
+    rowTimestamp: string; // row timestamp (ISO string)
+    aggregation: 'hourly' | 'daily';
+    entityType: 'target' | 'product';
+    data: {
+        accountId: string;
+        countryCode: string;
+        timestamp: string;
+        aggregation: 'hourly' | 'daily';
+        entityType: 'target' | 'product';
+        status: string;
+        lastRefreshed: string | null;
+        lastReportCreatedAt: string | null;
+        reportId: string | null;
+        error: string | null;
+    };
+}
+
+export interface ReportRefreshFailedEvent extends BaseEvent {
+    type: 'report-refresh:failed';
+    accountId: string;
+    countryCode: string;
+    rowTimestamp: string;
+    aggregation: 'hourly' | 'daily';
+    entityType: 'target' | 'product';
+    error: string;
+}
+
+export type Event =
+    | ErrorEvent
+    | AccountUpdatedEvent
+    | ReportsRefreshedEvent
+    | ApiMetricsUpdatedEvent
+    | AccountDatasetMetadataUpdatedEvent
+    | ReportRefreshStartedEvent
+    | ReportRefreshCompletedEvent
+    | ReportRefreshFailedEvent;
 
 /**
  * Singleton event emitter for WebSocket connections
@@ -105,6 +161,9 @@ export function emitEvent(event: Omit<AccountUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<ReportRefreshStartedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<ReportRefreshCompletedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<ReportRefreshFailedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<Event, 'timestamp'>): void {
     const eventWithTimestamp: Event = {
         ...event,
