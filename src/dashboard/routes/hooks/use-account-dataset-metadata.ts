@@ -1,36 +1,51 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { type AccountDatasetMetadata, fetchAccountDatasetMetadata, triggerSyncAdEntities } from './api.js';
-import { queryKeys } from './query-keys.js';
+import { api } from '../../lib/trpc.js';
+
+export type AccountDatasetMetadata = {
+    accountId: string;
+    countryCode: string;
+    status: 'idle' | 'syncing' | 'completed' | 'failed';
+    lastSyncStarted: string | null;
+    lastSyncCompleted: string | null;
+    campaignsCount: number | null;
+    adGroupsCount: number | null;
+    adsCount: number | null;
+    targetsCount: number | null;
+    error: string | null;
+};
 
 export function useAccountDatasetMetadata(accountId: string | null, countryCode: string | null) {
-    return useQuery<AccountDatasetMetadata | null>({
-        queryKey: queryKeys.accountDatasetMetadata(accountId ?? '', countryCode ?? ''),
-        queryFn: () => {
-            if (!accountId || !countryCode) {
-                return Promise.resolve(null);
-            }
-            return fetchAccountDatasetMetadata(accountId, countryCode);
+    return api.accounts.datasetMetadata.useQuery(
+        {
+            accountId: accountId ?? '',
+            countryCode: countryCode ?? '',
         },
-        enabled: Boolean(accountId && countryCode),
-    });
+        {
+            enabled: Boolean(accountId && countryCode),
+            select: response => response.data,
+        }
+    );
 }
 
 export function useTriggerSyncAdEntities() {
-    const queryClient = useQueryClient();
+    const utils = api.useUtils();
 
-    return useMutation({
-        mutationFn: ({ accountId, countryCode }: { accountId: string; countryCode: string }) => triggerSyncAdEntities(accountId, countryCode),
+    return api.sync.triggerAdEntities.useMutation({
         onMutate: async ({ accountId, countryCode }) => {
             // Cancel outgoing refetches to avoid overwriting optimistic update
-            await queryClient.cancelQueries({
-                queryKey: queryKeys.accountDatasetMetadata(accountId, countryCode),
+            await utils.accounts.datasetMetadata.cancel({
+                accountId,
+                countryCode,
             });
 
-            // Snapshot the previous value
-            const previousMetadata = queryClient.getQueryData<AccountDatasetMetadata | null>(queryKeys.accountDatasetMetadata(accountId, countryCode));
+            // Snapshot the previous value (already selected, so it's just the metadata object or null)
+            const previousMetadata = utils.accounts.datasetMetadata.getData({
+                accountId,
+                countryCode,
+            });
 
             // Optimistically update to 'syncing' state immediately
-            queryClient.setQueryData<AccountDatasetMetadata | null>(queryKeys.accountDatasetMetadata(accountId, countryCode), old => {
+            // Since we use select, setData receives the selected data (metadata object), not the full response
+            utils.accounts.datasetMetadata.setData({ accountId, countryCode }, old => {
                 if (!old) {
                     return {
                         accountId,
@@ -59,13 +74,14 @@ export function useTriggerSyncAdEntities() {
         onError: (_err, variables, context) => {
             // Rollback optimistic update on error
             if (context?.previousMetadata !== undefined) {
-                queryClient.setQueryData(queryKeys.accountDatasetMetadata(variables.accountId, variables.countryCode), context.previousMetadata);
+                utils.accounts.datasetMetadata.setData({ accountId: variables.accountId, countryCode: variables.countryCode }, context.previousMetadata);
             }
         },
         onSuccess: (_data, variables) => {
             // Refetch to get the actual server state (in case optimistic update was slightly off)
-            queryClient.invalidateQueries({
-                queryKey: queryKeys.accountDatasetMetadata(variables.accountId, variables.countryCode),
+            utils.accounts.datasetMetadata.invalidate({
+                accountId: variables.accountId,
+                countryCode: variables.countryCode,
             });
         },
     });

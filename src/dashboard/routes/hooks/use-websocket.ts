@@ -1,11 +1,10 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useSetAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import useWebSocketLib, { ReadyState } from 'react-use-websocket';
 import { toast } from 'sonner';
+import { api } from '../../lib/trpc.js';
 import { apiBaseUrl } from '../../router';
 import { type ConnectionStatus, connectionStatusAtom } from '../atoms';
-import { queryKeys } from './query-keys.js';
 
 type Event =
     | { type: 'error'; message: string; details?: string; timestamp: string }
@@ -18,7 +17,7 @@ type Event =
 const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
 
 export function useWebSocket(): ConnectionStatus {
-    const queryClient = useQueryClient();
+    const utils = api.useUtils();
     const setConnectionStatus = useSetAtom(connectionStatusAtom);
 
     const handleMessage = useCallback(
@@ -36,15 +35,11 @@ export function useWebSocket(): ConnectionStatus {
                         toast.info('Account updated', {
                             description: `Account ${data.accountId} updated`,
                         });
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.advertisingAccounts(),
-                        });
+                        utils.accounts.list.invalidate();
                         break;
                     case 'reports:refreshed':
                         // Invalidate dashboard status queries to refresh the table
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.dashboardStatusAll(),
-                        });
+                        utils.reports.status.invalidate();
                         toast.success('Reports refreshed', {
                             description: 'Report dataset metadata has been updated',
                             duration: 5000, // Auto-dismiss after 5 seconds
@@ -52,14 +47,13 @@ export function useWebSocket(): ConnectionStatus {
                         break;
                     case 'api-metrics:updated':
                         // Invalidate API metrics queries to refresh the chart
-                        queryClient.invalidateQueries({
-                            queryKey: ['api-metrics'],
-                        });
+                        utils.metrics.api.invalidate();
                         break;
                     case 'account-dataset-metadata:updated':
                         // Invalidate account dataset metadata query to refresh the sync status
-                        queryClient.invalidateQueries({
-                            queryKey: queryKeys.accountDatasetMetadata(data.accountId, data.countryCode),
+                        utils.accounts.datasetMetadata.invalidate({
+                            accountId: data.accountId,
+                            countryCode: data.countryCode,
                         });
                         // Show success toast only when sync completes (status changes from syncing to completed)
                         // Note: We can't determine this from the event alone, so we'll check in the component
@@ -69,7 +63,7 @@ export function useWebSocket(): ConnectionStatus {
                 // Ignore malformed messages
             }
         },
-        [queryClient]
+        [utils]
     );
 
     const { readyState } = useWebSocketLib(WS_URL, {

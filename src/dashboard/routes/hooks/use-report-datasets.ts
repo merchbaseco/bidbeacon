@@ -1,7 +1,6 @@
-import { type UseQueryResult, useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { fetchDashboardStatus } from './api.js';
-import { queryKeys } from './query-keys.js';
+import { api } from '../../lib/trpc.js';
 import { useSelectedAccountId } from './use-selected-accountid.js';
 import { useSelectedCountryCode } from './use-selected-country-code.js';
 
@@ -19,28 +18,34 @@ export type ReportDatasetMetadata = {
     error: string | null;
 };
 
-export function useReportDatasets(aggregation: Aggregation = 'daily'): UseQueryResult<ReportDatasetMetadata[]> {
+export function useReportDatasets(aggregation: Aggregation = 'daily') {
     const [searchParams] = useSearchParams();
     const accountId = useSelectedAccountId();
     const countryCode = useSelectedCountryCode();
     const days = Number(searchParams.get('days')) || 30;
 
-    return useQuery({
-        queryKey: queryKeys.dashboardStatus(accountId, aggregation, days, countryCode),
-        queryFn: async (): Promise<ReportDatasetMetadata[]> => {
-            const now = new Date();
-            const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const dateRange = useMemo(() => {
+        const now = new Date();
+        const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+        return { from: from.toISOString(), to: now.toISOString() };
+    }, [days]);
 
-            const rows = await fetchDashboardStatus({
-                accountId,
-                countryCode,
-                aggregation,
-                from: from.toISOString(),
-                to: now.toISOString(),
-            });
-
-            return rows;
+    const { data, ...rest } = api.reports.status.useQuery(
+        {
+            accountId,
+            countryCode,
+            aggregation,
+            from: dateRange.from,
+            to: dateRange.to,
         },
-        enabled: !!countryCode, // Only fetch when country code is available
-    });
+        {
+            enabled: !!countryCode,
+            select: response => response.data,
+        }
+    );
+
+    return {
+        ...rest,
+        data: data as ReportDatasetMetadata[] | undefined,
+    };
 }

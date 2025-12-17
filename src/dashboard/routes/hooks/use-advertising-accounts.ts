@@ -1,6 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { fetchListAdvertisingAccounts, toggleAdvertiserAccount } from './api.js';
-import { queryKeys } from './query-keys.js';
+import { api } from '../../lib/trpc.js';
 
 export type AdvertisingAccount = {
     id: string;
@@ -14,28 +12,32 @@ export type AdvertisingAccount = {
 };
 
 export function useAdvertisingAccounts() {
-    return useQuery<AdvertisingAccount[]>({
-        queryKey: queryKeys.advertisingAccounts(),
-        queryFn: fetchListAdvertisingAccounts,
+    const { data, ...rest } = api.accounts.list.useQuery(undefined, {
+        select: response => response.data,
     });
+
+    return {
+        ...rest,
+        data: data as AdvertisingAccount[] | undefined,
+    };
 }
 
 export function useToggleAdvertisingAccount() {
-    const queryClient = useQueryClient();
+    const utils = api.useUtils();
 
-    return useMutation({
-        mutationFn: ({ adsAccountId, profileId, enabled }: { adsAccountId: string; profileId: string; enabled: boolean }) => toggleAdvertiserAccount(adsAccountId, profileId, enabled),
+    return api.accounts.toggle.useMutation({
         onMutate: async ({ adsAccountId, profileId, enabled }) => {
             // Cancel outgoing refetches
-            await queryClient.cancelQueries({ queryKey: queryKeys.advertisingAccounts() });
+            await utils.accounts.list.cancel();
 
-            // Snapshot the previous value
-            const previousAccounts = queryClient.getQueryData<AdvertisingAccount[]>(queryKeys.advertisingAccounts());
+            // Snapshot the previous value (already selected, so it's just the array)
+            const previousAccounts = utils.accounts.list.getData();
 
             // Optimistically update to the new value
+            // Since we use select, setData receives the selected data (array), not the full response
             if (previousAccounts) {
-                queryClient.setQueryData<AdvertisingAccount[]>(
-                    queryKeys.advertisingAccounts(),
+                utils.accounts.list.setData(
+                    undefined,
                     previousAccounts.map(account => (account.adsAccountId === adsAccountId && account.profileId === profileId ? { ...account, enabled } : account))
                 );
             }
@@ -45,13 +47,14 @@ export function useToggleAdvertisingAccount() {
         },
         onError: (_err, _variables, context) => {
             // If the mutation fails, use the context returned from onMutate to roll back
-            if (context?.previousAccounts) {
-                queryClient.setQueryData(queryKeys.advertisingAccounts(), context.previousAccounts);
+            // previousAccounts is already the selected data (array)
+            if (context?.previousAccounts !== undefined) {
+                utils.accounts.list.setData(undefined, context.previousAccounts);
             }
         },
         onSettled: () => {
             // Always refetch after error or success to ensure we have the latest data
-            queryClient.invalidateQueries({ queryKey: queryKeys.advertisingAccounts() });
+            utils.accounts.list.invalidate();
         },
     });
 }

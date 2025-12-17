@@ -1,17 +1,10 @@
-import { useMutation } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { triggerUpdate as triggerUpdateApi } from './api.js';
+import { api } from '../../lib/trpc.js';
 import { useSelectedCountryCode } from './use-selected-country-code.js';
 
 export function useRefreshReportsTable(accountId: string) {
     const countryCode = useSelectedCountryCode();
-    const mutation = useMutation({
-        mutationFn: () => {
-            if (!countryCode) {
-                throw new Error('Country code is required to trigger update');
-            }
-            return triggerUpdateApi(accountId, countryCode);
-        },
+    const mutation = api.reports.triggerUpdate.useMutation({
         onSuccess: () => {
             // Show success toast indicating the job was queued
             toast.success('Refresh queued', {
@@ -20,12 +13,23 @@ export function useRefreshReportsTable(accountId: string) {
             });
             // Note: We don't invalidate queries here - the WebSocket event will handle that
         },
-        onError: (error: Error) => {
+        onError: error => {
             toast.error('Failed to queue refresh', {
                 description: error.message || 'An error occurred while queuing the refresh job.',
             });
         },
     });
 
-    return { refreshReportsTable: mutation.mutate, pending: mutation.isPending };
+    return {
+        refreshReportsTable: () => {
+            if (!countryCode) {
+                toast.error('Country code required', {
+                    description: 'Country code is required to trigger update',
+                });
+                return;
+            }
+            mutation.mutate({ accountId, countryCode });
+        },
+        pending: mutation.isPending,
+    };
 }

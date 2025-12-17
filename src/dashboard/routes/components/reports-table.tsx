@@ -1,11 +1,9 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Frame, FrameFooter } from '../../components/ui/frame';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { createReport, parseReport, retrieveReport } from '../hooks/api.js';
-import { queryKeys } from '../hooks/query-keys.js';
+import { api } from '../../lib/trpc.js';
 import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useReportDatasets } from '../hooks/use-report-datasets.js';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid.js';
@@ -19,13 +17,17 @@ import { TableResultsRange } from './table-results-range.js';
 const ITEMS_PER_PAGE = 10;
 
 export const ReportsTable = () => {
-    const queryClient = useQueryClient();
+    const utils = api.useUtils();
     const [aggregation, setAggregation] = useState<'daily' | 'hourly'>('daily');
     const [entityType, setEntityType] = useState<'target' | 'product'>('target');
     const { data: rows = [], isLoading } = useReportDatasets(aggregation);
     const accountId = useSelectedAccountId();
 
     const { refreshReportsTable, pending: refreshPending } = useRefreshReportsTable(accountId);
+
+    const createReportMutation = api.reports.create.useMutation();
+    const retrieveReportMutation = api.reports.retrieve.useMutation();
+    const parseReportMutation = api.reports.parse.useMutation();
 
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -92,7 +94,7 @@ export const ReportsTable = () => {
         setDialogData(null);
 
         try {
-            const response = await createReport({
+            const response = await createReportMutation.mutateAsync({
                 accountId,
                 countryCode: row.countryCode,
                 timestamp: row.timestamp,
@@ -100,10 +102,8 @@ export const ReportsTable = () => {
                 entityType: row.entityType,
             });
             // Invalidate the table data to show updated status
-            await queryClient.invalidateQueries({
-                queryKey: queryKeys.dashboardStatusAll(),
-            });
-            setDialogData(response);
+            await utils.reports.status.invalidate();
+            setDialogData(response.data);
             setDialogOpen(true);
         } catch (error) {
             setDialogError(error instanceof Error ? error.message : 'Unknown error');
@@ -122,13 +122,13 @@ export const ReportsTable = () => {
         setDialogData(null);
 
         try {
-            const response = await retrieveReport({
+            const response = await retrieveReportMutation.mutateAsync({
                 accountId,
                 timestamp: row.timestamp,
                 aggregation: row.aggregation,
                 entityType: row.entityType,
             });
-            setDialogData(response);
+            setDialogData(response.data);
             setDialogOpen(true);
         } catch (error) {
             setDialogError(error instanceof Error ? error.message : 'Unknown error');
@@ -147,7 +147,7 @@ export const ReportsTable = () => {
         setDialogData(null);
 
         try {
-            const response = await parseReport({
+            const response = await parseReportMutation.mutateAsync({
                 accountId,
                 countryCode: row.countryCode,
                 timestamp: row.timestamp,
@@ -155,16 +155,12 @@ export const ReportsTable = () => {
                 entityType: row.entityType,
             });
             // Invalidate the table data to show updated status
-            await queryClient.invalidateQueries({
-                queryKey: queryKeys.dashboardStatusAll(),
-            });
-            setDialogData(response);
+            await utils.reports.status.invalidate();
+            setDialogData(response.data);
             setDialogOpen(true);
         } catch (error) {
             // Still invalidate on error since the status may have changed to 'failed'
-            await queryClient.invalidateQueries({
-                queryKey: queryKeys.dashboardStatusAll(),
-            });
+            await utils.reports.status.invalidate();
             setDialogError(error instanceof Error ? error.message : 'Unknown error');
             setDialogOpen(true);
         } finally {

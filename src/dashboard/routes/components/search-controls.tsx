@@ -1,9 +1,8 @@
-import { useQueryClient } from '@tanstack/react-query';
 import { Button } from '../../components/Button';
 import { Input } from '../../components/Input';
 import { Label } from '../../components/Label';
 import { Select } from '../../components/Select';
-import { queryKeys } from '../hooks/query-keys.js';
+import { api } from '../../lib/trpc.js';
 import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useSearchParamsState } from '../hooks/use-search-params.js';
 
@@ -16,9 +15,9 @@ interface SearchControlsProps {
 }
 
 export function SearchControls({ accountId, aggregation, days }: SearchControlsProps) {
+    const utils = api.useUtils();
     const { updateSearch } = useSearchParamsState();
     const { refreshReportsTable, pending } = useRefreshReportsTable(accountId);
-    const queryClient = useQueryClient();
     return (
         <div>
             <Label>
@@ -48,7 +47,7 @@ export function SearchControls({ accountId, aggregation, days }: SearchControlsP
                 <Button type="button" onClick={refreshReportsTable} disabled={pending}>
                     {pending ? 'Queuing…' : 'Trigger Update'}
                 </Button>
-                <Button variant="secondary" type="button" onClick={() => queryClient.invalidateQueries({ queryKey: queryKeys.dashboardStatusAll() })} disabled={pending}>
+                <Button variant="secondary" type="button" onClick={() => utils.reports.status.invalidate()} disabled={pending}>
                     Refresh
                 </Button>
             </div>

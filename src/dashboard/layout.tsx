@@ -12,6 +12,8 @@ import { Outlet } from 'react-router';
 import { MoreMenu } from './components/more-menu';
 import { ThemeToggle } from './components/theme-toggle';
 import { Toaster } from './components/ui/toast';
+import { api } from './lib/trpc';
+import { createTRPCClient } from './lib/trpc-client';
 import { AccountSelector } from './routes/components/account-selector/account-selector';
 import { useWebSocket } from './routes/hooks/use-websocket';
 
@@ -53,6 +55,7 @@ export function RootRoute() {
 }
 
 const queryClient = new QueryClient();
+const apiClient = api.createClient(createTRPCClient());
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -62,10 +65,12 @@ if (!rootElement) {
 createRoot(rootElement).render(
     <StrictMode>
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-            <QueryClientProvider client={queryClient}>
-                <RouterProvider router={router} />
-                <Toaster position="bottom-right" />
-            </QueryClientProvider>
+            <api.Provider client={apiClient} queryClient={queryClient}>
+                <QueryClientProvider client={queryClient}>
+                    <RouterProvider router={router} />
+                    <Toaster position="bottom-right" />
+                </QueryClientProvider>
+            </api.Provider>
         </ThemeProvider>
     </StrictMode>
 );

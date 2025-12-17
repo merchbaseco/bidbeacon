@@ -1,7 +1,10 @@
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import websocket from '@fastify/websocket';
+import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import Fastify from 'fastify';
+import { createContext } from '@/api/context.js';
+import { appRouter } from '@/api/router.js';
 import { testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
@@ -44,6 +47,15 @@ await fastify.register(cors, {
     credentials: true,
 });
 
+// Register tRPC
+await fastify.register(fastifyTRPCPlugin, {
+    prefix: '/api',
+    trpcOptions: {
+        router: appRouter,
+        createContext,
+    },
+});
+
 // Health check endpoint
 fastify.get('/api/health', async () => {
     return {
@@ -53,63 +65,9 @@ fastify.get('/api/health', async () => {
     };
 });
 
-// API routes
-fastify.register(async fastify => {
-    // Register API routes
-    const workerStatusModule = await import('@/api/worker/status.js');
-    await workerStatusModule.registerStatusRoute(fastify);
-
-    const { registerStartRoute } = await import('@/api/worker/start.js');
-    await registerStartRoute(fastify);
-
-    const { registerStopRoute } = await import('@/api/worker/stop.js');
-    await registerStopRoute(fastify);
-
-    const { registerSpeedRoute } = await import('@/api/worker/speed.js');
-    await registerSpeedRoute(fastify);
-
-    const { registerMetricsRoute } = await import('@/api/worker/metrics.js');
-    await registerMetricsRoute(fastify);
-
-    const { registerStatusRoute } = await import('@/api/dashboard/status.js');
-    await registerStatusRoute(fastify);
-
-    const { registerTriggerUpdateRoute } = await import('@/api/dashboard/trigger-update.js');
-    await registerTriggerUpdateRoute(fastify);
-
-    const { registerTriggerSyncAdEntitiesRoute } = await import('@/api/dashboard/trigger-sync-ad-entities.js');
-    await registerTriggerSyncAdEntitiesRoute(fastify);
-
-    const { registerAccountDatasetMetadataRoute } = await import('@/api/dashboard/account-dataset-metadata.js');
-    await registerAccountDatasetMetadataRoute(fastify);
-
-    const { registerListAdvertiserAccountsRoute } = await import('@/api/dashboard/list-advertiser-accounts.js');
-    await registerListAdvertiserAccountsRoute(fastify);
-
-    const { registerListAdvertisingAccountsRoute } = await import('@/api/dashboard/list-advertising-accounts.js');
-    await registerListAdvertisingAccountsRoute(fastify);
-
-    const { registerSyncAdvertiserAccountsRoute } = await import('@/api/dashboard/sync-advertiser-accounts.js');
-    await registerSyncAdvertiserAccountsRoute(fastify);
-
-    const { registerToggleAdvertiserAccountRoute } = await import('@/api/dashboard/toggle-advertiser-account.js');
-    await registerToggleAdvertiserAccountRoute(fastify);
-
-    const { registerCreateReportRoute } = await import('@/api/dashboard/create-report.js');
-    await registerCreateReportRoute(fastify);
-
-    const { registerRetrieveReportRoute } = await import('@/api/dashboard/retrieve-report.js');
-    await registerRetrieveReportRoute(fastify);
-
-    const { registerParseReportRoute } = await import('@/api/dashboard/parse-report.js');
-    await registerParseReportRoute(fastify);
-
-    const { registerApiMetricsRoute } = await import('@/api/dashboard/api-metrics.js');
-    await registerApiMetricsRoute(fastify);
-
-    const { registerWebSocketRoute } = await import('@/api/events/websocket.js');
-    await registerWebSocketRoute(fastify);
-});
+// WebSocket events endpoint
+const { registerWebSocketRoute } = await import('@/api/events/websocket.js');
+await registerWebSocketRoute(fastify);
 
 // 404 handler
 fastify.setNotFoundHandler(async (_request, reply) => {
@@ -186,7 +144,8 @@ try {
     console.log(`✓ Database connected`);
     console.log(`✓ Server running on port ${port}`);
     console.log(`✓ Health check endpoint: /api/health`);
-    console.log(`✓ Worker control endpoints: /api/worker/status, /api/worker/start, /api/worker/stop`);
+    console.log(`✓ WebSocket events: /api/events`);
+    console.log(`✓ tRPC endpoints: /api/*`);
     console.log('═══════════════════════════════════════════════════════════════');
     console.log('');
 } catch (err) {

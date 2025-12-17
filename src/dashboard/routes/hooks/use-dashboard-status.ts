@@ -1,7 +1,6 @@
-import { type UseQueryResult, useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
-import { fetchDashboardStatus } from './api.js';
-import { queryKeys } from './query-keys.js';
+import { api } from '../../lib/trpc.js';
 import { useSelectedAccountId } from './use-selected-accountid.js';
 import { useSelectedCountryCode } from './use-selected-country-code.js';
 
@@ -26,35 +25,42 @@ export type DashboardStatus = {
     days: number;
 };
 
-export function useDashboardStatus(): UseQueryResult<DashboardStatus> {
+export function useDashboardStatus() {
     const [searchParams] = useSearchParams();
     const accountId = useSelectedAccountId();
     const countryCode = useSelectedCountryCode();
     const aggregation = (searchParams.get('aggregation') as Aggregation) ?? 'daily';
     const days = Number(searchParams.get('days')) || 30;
 
-    return useQuery<DashboardStatus>({
-        queryKey: queryKeys.dashboardStatus(accountId, aggregation, days, countryCode),
-        queryFn: async () => {
-            const now = new Date();
-            const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    const dateRange = useMemo(() => {
+        const now = new Date();
+        const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+        return { from: from.toISOString(), to: now.toISOString() };
+    }, [days]);
 
-            const rows = await fetchDashboardStatus({
-                accountId,
-                countryCode,
-                aggregation,
-                from: from.toISOString(),
-                to: now.toISOString(),
-            });
-
-            return {
-                rows,
-                accountId,
-                aggregation,
-                range: { from: from.toISOString(), to: now.toISOString() },
-                days,
-            };
+    const { data, ...rest } = api.reports.status.useQuery(
+        {
+            accountId,
+            countryCode,
+            aggregation,
+            from: dateRange.from,
+            to: dateRange.to,
         },
-        enabled: !!countryCode, // Only fetch when country code is available
-    });
+        {
+            enabled: !!countryCode,
+        }
+    );
+
+    return {
+        ...rest,
+        data: data
+            ? {
+                  rows: data.data,
+                  accountId,
+                  aggregation,
+                  range: dateRange,
+                  days,
+              }
+            : undefined,
+    };
 }
