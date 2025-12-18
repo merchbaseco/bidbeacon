@@ -51,15 +51,27 @@ export const refreshReportDatumJob = boss
 
             try {
                 // Set refreshing=true in database and get the report datum
-                const reportDatum = await setRefreshing(true, accountId, date, aggregation, entityType);
+                const reportDatum = await setRefreshing(true, accountId, date, aggregation, entityType, null);
 
                 if (!reportDatum) {
-                    logger.warn('Report datum not found');
+                    logger.warn('Report datum not found - clearing refreshing state');
+                    await setRefreshing(false, accountId, date, aggregation, entityType, 'Report datum not found');
                     return;
                 }
 
                 // Determine next action using state machine
                 // The state machine will fetch report status if reportId exists
+                logger.info(
+                    {
+                        timestamp: reportDatum.timestamp.toISOString(),
+                        aggregation: reportDatum.aggregation,
+                        lastReportCreatedAt: reportDatum.lastReportCreatedAt?.toISOString() ?? null,
+                        reportId: reportDatum.reportId,
+                        countryCode,
+                    },
+                    'State machine inputs'
+                );
+
                 const action = await getNextAction(reportDatum.timestamp, reportDatum.aggregation as 'hourly' | 'daily', reportDatum.lastReportCreatedAt, reportDatum.reportId, countryCode);
                 logger.info({ action }, 'State machine determined action');
 
@@ -78,17 +90,30 @@ export const refreshReportDatumJob = boss
 
                     default:
                         // Set refreshing=false in database for unknown action
-                        await setRefreshing(false, accountId, date, aggregation, entityType, `Unknown action: ${action}`);
                         logger.error({ action }, 'Unknown action received');
+                        await setRefreshing(false, accountId, date, aggregation, entityType, `Unknown action: ${action}`);
                         return;
                 }
             } catch (error) {
-                logger.error({ err: error }, 'Error during refresh processing');
+                logger.error(
+                    {
+                        err: error,
+                        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+                        errorStack: error instanceof Error ? error.stack : undefined,
+                    },
+                    'Error during refresh processing'
+                );
                 // Set refreshing=false in database on error
                 try {
                     await setRefreshing(false, accountId, date, aggregation, entityType, error instanceof Error ? error.message : 'Unknown error');
                 } catch (updateError) {
-                    logger.error({ err: updateError }, 'Failed to update refreshing state on error');
+                    logger.error(
+                        {
+                            err: updateError,
+                            originalError: error instanceof Error ? error.message : 'Unknown error',
+                        },
+                        'Failed to update refreshing state on error'
+                    );
                 }
             }
         }
@@ -179,7 +204,7 @@ async function updateStatus(status: string, error: string | null, accountId: str
  * Handles the 'none' action - no work needed, just clear refreshing state
  */
 async function handleNoneAction(accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
-    await setRefreshing(false, accountId, timestamp, aggregation, entityType);
+    await setRefreshing(false, accountId, timestamp, aggregation, entityType, null);
 }
 
 /**
@@ -196,18 +221,24 @@ async function handleProcessAction(logger: pino.Logger, accountId: string, times
             aggregation,
             entityType,
         });
-        logger.info('Report parsed successfully');
 
         // Update status to 'completed' after successful parsing
         await updateStatus('completed', null, accountId, date, aggregation, entityType);
     } catch (error) {
-        logger.error({ err: error }, 'Error parsing report');
+        logger.error(
+            {
+                err: error,
+                errorMessage: error instanceof Error ? error.message : 'Unknown error',
+                errorStack: error instanceof Error ? error.stack : undefined,
+            },
+            'Error parsing report'
+        );
         // Update status to 'failed' on error
         await updateStatus('failed', error instanceof Error ? error.message : 'Unknown error', accountId, date, aggregation, entityType);
         throw error;
     }
 
-    await setRefreshing(false, accountId, date, aggregation, entityType);
+    await setRefreshing(false, accountId, date, aggregation, entityType, null);
 }
 
 /**
@@ -231,10 +262,17 @@ async function handleCreateAction(logger: pino.Logger, accountId: string, countr
 
         logger.info({ reportId }, 'Report created successfully');
     } catch (error) {
-        logger.error({ err: error }, 'Error creating report');
+        logger.error(
+            {
+                err: error,
+                errorMessage: error instanceof Error ? error.message : 'Unknown error',
+                errorStack: error instanceof Error ? error.stack : undefined,
+            },
+            'Error creating report'
+        );
         await setRefreshing(false, accountId, date, aggregation, entityType, error instanceof Error ? error.message : 'Unknown error');
         return;
     }
 
-    await setRefreshing(false, accountId, date, aggregation, entityType);
+    await setRefreshing(false, accountId, date, aggregation, entityType, null);
 }
