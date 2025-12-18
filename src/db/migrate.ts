@@ -1,9 +1,10 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
+import { logger } from '@/utils/logger';
 
 export async function runMigrations() {
-    console.log('[Migration] Starting database migrations...');
+    logger.info('Starting database migrations');
 
     try {
         // Create a dedicated connection for migrations
@@ -25,12 +26,12 @@ export async function runMigrations() {
             migrationsTable: '__drizzle_migrations',
         });
 
-        console.log('[Migration] All migrations completed successfully');
+        logger.info('All migrations completed successfully');
 
         // Close the migration connection
         await migrationClient.end();
     } catch (error) {
-        console.error('[Migration] Migration failed:', error);
+        logger.error({ err: error }, 'Migration failed');
         throw error; // Fail fast if migrations fail
     }
 }

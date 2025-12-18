@@ -2,13 +2,12 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { advertiserAccount } from '@/db/schema.js';
+import { logger } from '@/utils/logger';
 import { publicProcedure, router } from '../trpc.js';
 
 export const accountsRouter = router({
     list: publicProcedure.query(async () => {
-        console.log('[API] List advertising accounts request received');
         const data = await db.select().from(advertiserAccount);
-        console.log(`[API] Returning ${data.length} advertising account(s)`);
         return { success: true, data };
     }),
 
@@ -21,8 +20,6 @@ export const accountsRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            console.log(`[API] Toggle advertiser account request: ${input.adsAccountId}/${input.profileId} -> ${input.enabled ? 'enabled' : 'disabled'}`);
-
             await db
                 .update(advertiserAccount)
                 .set({ enabled: input.enabled })
@@ -40,7 +37,6 @@ export const accountsRouter = router({
 
     sync: publicProcedure.mutation(async () => {
         const { listAdvertiserAccounts } = await import('@/amazon-ads/list-advertiser-accounts.js');
-        console.log('[API] Sync advertiser accounts request received');
 
         const result = await listAdvertiserAccounts(undefined, 'na');
 
@@ -74,7 +70,7 @@ export const accountsRouter = router({
             }
         }
 
-        console.log(`[API] Synced ${result.adsAccounts.length} account(s)`);
+        logger.info({ accountCount: result.adsAccounts.length }, 'Synced advertiser accounts');
         return { success: true, message: 'Advertiser accounts synced successfully' };
     }),
 
@@ -86,13 +82,10 @@ export const accountsRouter = router({
             })
         )
         .query(async ({ input }) => {
-            console.log(`[API] Account dataset metadata request for account: ${input.accountId}, country: ${input.countryCode}`);
-
             const data = await db.query.accountDatasetMetadata.findFirst({
                 where: (metadata, { and, eq }) => and(eq(metadata.accountId, input.accountId), eq(metadata.countryCode, input.countryCode)),
             });
 
-            console.log(`[API] Returning account dataset metadata: ${data ? 'found' : 'not found'}`);
             return { success: true, data };
         }),
 });

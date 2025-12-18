@@ -1,5 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { logger } from '@/utils/logger';
 import * as schema from './schema.js';
 
 // Create postgres connection
@@ -18,7 +19,7 @@ const queryClient = postgres({
 // Create Drizzle database instance
 export const db = drizzle(queryClient, {
     schema,
-    logger: process.env.NODE_ENV === 'development'
+    logger: process.env.NODE_ENV === 'development',
 });
 
 export type Database = typeof db;
@@ -28,11 +29,10 @@ export const testConnection = async () => {
     try {
         // Simple query to test connection
         await db.execute('SELECT 1');
-        console.log('[Database] Connection established successfully.');
+        logger.info('Database connection established');
         return true;
     } catch (error) {
-        console.error('[Database] Unable to connect:', error);
+        logger.error({ err: error }, 'Unable to connect to database');
         throw error;
     }
 };
-

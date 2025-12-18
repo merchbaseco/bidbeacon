@@ -1,5 +1,6 @@
 import { db } from '@/db/index.js';
 import { amsSpTraffic } from '@/db/schema.js';
+import { createContextLogger } from '@/utils/logger';
 import { spTrafficSchema } from '../schemas.js';
 
 /**
@@ -9,14 +10,9 @@ export async function handleSpTraffic(payload: unknown): Promise<void> {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = spTrafficSchema.safeParse(payload);
     if (!validationResult.success) {
-        const datasetId =
-            typeof payload === 'object' && payload !== null && 'dataset_id' in payload
-                ? String(payload.dataset_id)
-                : 'unknown';
-        console.error(
-            `[handleSpTraffic] Validation failed for datasetId ${datasetId}:`,
-            validationResult.error.format()
-        );
+        const datasetId = typeof payload === 'object' && payload !== null && 'dataset_id' in payload ? String(payload.dataset_id) : 'unknown';
+        const logger = createContextLogger({ component: 'handler', handler: 'spTraffic', datasetId });
+        logger.error({ err: validationResult.error, validationErrors: validationResult.error.format() }, 'Validation failed');
         throw new Error(`Invalid sp-traffic payload: ${validationResult.error.message}`);
     }
 

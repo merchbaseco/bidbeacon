@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { syncAdEntitiesJob } from '@/jobs/sync-ad-entities.js';
+import { logger } from '@/utils/logger';
 import { publicProcedure, router } from '../trpc.js';
 
 export const syncRouter = router({
@@ -15,7 +16,7 @@ export const syncRouter = router({
                 accountId: input.accountId,
                 countryCode: input.countryCode,
             });
-            console.log(`[API] Sync ad entities job queued with ID: ${jobId}`);
+            logger.info({ accountId: input.accountId, countryCode: input.countryCode, jobId }, 'Sync ad entities job queued');
             return { success: true, message: 'Sync job queued' };
         }),
 });

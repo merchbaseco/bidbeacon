@@ -1,5 +1,6 @@
 import { db } from '@/db/index.js';
 import { amsSpConversion } from '@/db/schema.js';
+import { createContextLogger } from '@/utils/logger';
 import { spConversionSchema } from '../schemas.js';
 
 /**
@@ -9,14 +10,9 @@ export async function handleSpConversion(payload: unknown): Promise<void> {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = spConversionSchema.safeParse(payload);
     if (!validationResult.success) {
-        const datasetId =
-            typeof payload === 'object' && payload !== null && 'dataset_id' in payload
-                ? String(payload.dataset_id)
-                : 'unknown';
-        console.error(
-            `[handleSpConversion] Validation failed for datasetId ${datasetId}:`,
-            validationResult.error.format()
-        );
+        const datasetId = typeof payload === 'object' && payload !== null && 'dataset_id' in payload ? String(payload.dataset_id) : 'unknown';
+        const logger = createContextLogger({ component: 'handler', handler: 'spConversion', datasetId });
+        logger.error({ err: validationResult.error, validationErrors: validationResult.error.format() }, 'Validation failed');
         throw new Error(`Invalid sp-conversion payload: ${validationResult.error.message}`);
     }
 

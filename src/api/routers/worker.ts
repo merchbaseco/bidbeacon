@@ -2,6 +2,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { workerControl } from '@/db/schema.js';
+import { logger } from '@/utils/logger';
 import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqsClient.js';
 import { publicProcedure, router } from '../trpc.js';
 
@@ -61,12 +62,8 @@ export const workerRouter = router({
                 updatedAt: result[0].updatedAt,
             };
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('[API] Error starting queue:', errorMessage);
-            if (error instanceof Error && error.stack) {
-                console.error('[API] Stack trace:', error.stack);
-            }
-            throw new Error(errorMessage);
+            logger.error({ err: error }, 'Error starting queue');
+            throw error;
         }
     }),
 
@@ -92,12 +89,8 @@ export const workerRouter = router({
                 updatedAt: result[0].updatedAt,
             };
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('[API] Error stopping queue:', errorMessage);
-            if (error instanceof Error && error.stack) {
-                console.error('[API] Stack trace:', error.stack);
-            }
-            throw new Error(errorMessage);
+            logger.error({ err: error }, 'Error stopping queue');
+            throw error;
         }
     }),
 
@@ -129,12 +122,8 @@ export const workerRouter = router({
                     updatedAt: result[0].updatedAt,
                 };
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                console.error('[API] Error setting rate limit:', errorMessage);
-                if (error instanceof Error && error.stack) {
-                    console.error('[API] Stack trace:', error.stack);
-                }
-                throw new Error(errorMessage);
+                logger.error({ err: error }, 'Error setting rate limit');
+                throw error;
             }
         }),
 
@@ -161,16 +150,16 @@ export const workerRouter = router({
                     const isAccessDenied = errorMessage.includes('not authorized') || errorMessage.includes('AccessDenied');
 
                     if (isAccessDenied) {
-                        console.error('[API] ⚠️  DLQ access denied - IAM permissions missing');
-                        console.error('[API] The IAM user needs sqs:GetQueueAttributes permission on the DLQ');
-                        console.error('[API] DLQ URL:', dlqUrlFromPolicy);
-                        console.error('[API] See INFRA.md for required IAM permissions');
+                        logger.error(
+                            {
+                                dlqUrl: dlqUrlFromPolicy,
+                                message: 'DLQ access denied - IAM permissions missing',
+                                fix: 'The IAM user needs sqs:GetQueueAttributes permission on the DLQ. See INFRA.md for required IAM permissions',
+                            },
+                            'DLQ access denied'
+                        );
                     } else {
-                        console.error('[API] Error fetching DLQ metrics:', errorMessage);
-                    }
-
-                    if (error instanceof Error && error.stack && !isAccessDenied) {
-                        console.error('[API] DLQ error stack:', error.stack);
+                        logger.error({ err: error }, 'Error fetching DLQ metrics');
                     }
 
                     dlqMetrics = {

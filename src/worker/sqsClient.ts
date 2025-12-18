@@ -1,11 +1,9 @@
 import { CloudWatchClient, GetMetricStatisticsCommand } from '@aws-sdk/client-cloudwatch';
 import type { Message } from '@aws-sdk/client-sqs';
-import {
-    DeleteMessageCommand,
-    GetQueueAttributesCommand,
-    ReceiveMessageCommand,
-    SQSClient,
-} from '@aws-sdk/client-sqs';
+import { DeleteMessageCommand, GetQueueAttributesCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
+import { createContextLogger } from '@/utils/logger';
+
+const logger = createContextLogger({ component: 'sqs' });
 
 // Create SQS client singleton
 const sqsClient = new SQSClient({
@@ -37,9 +35,7 @@ export async function testAwsConnection(): Promise<void> {
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (errorMessage.includes('Credentials') || errorMessage.includes('credentials')) {
-            throw new Error(
-                `AWS credentials not found. Provide credentials via IAM role, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars, or ~/.aws/credentials file. Error: ${errorMessage}`
-            );
+            throw new Error(`AWS credentials not found. Provide credentials via IAM role, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars, or ~/.aws/credentials file. Error: ${errorMessage}`);
         }
         throw error;
     }
@@ -114,13 +110,8 @@ export async function getDlqUrlFromMainQueue(mainQueueUrl: string): Promise<stri
         // ARN format: arn:aws:sqs:REGION:ACCOUNT_ID:QUEUE_NAME
         // URL format: https://sqs.REGION.amazonaws.com/ACCOUNT_ID/QUEUE_NAME
         const arnParts = dlqArn.split(':');
-        if (
-            arnParts.length !== 6 ||
-            arnParts[0] !== 'arn' ||
-            arnParts[1] !== 'aws' ||
-            arnParts[2] !== 'sqs'
-        ) {
-            console.warn('[SQS] Invalid DLQ ARN format:', dlqArn);
+        if (arnParts.length !== 6 || arnParts[0] !== 'arn' || arnParts[1] !== 'aws' || arnParts[2] !== 'sqs') {
+            logger.warn({ dlqArn }, 'Invalid DLQ ARN format');
             return null;
         }
 
@@ -130,8 +121,7 @@ export async function getDlqUrlFromMainQueue(mainQueueUrl: string): Promise<stri
 
         return `https://sqs.${region}.amazonaws.com/${accountId}/${queueName}`;
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.warn('[SQS] Error getting DLQ URL from RedrivePolicy:', errorMessage);
+        logger.warn({ err: error }, 'Error getting DLQ URL from RedrivePolicy');
         return null;
     }
 }
@@ -144,12 +134,7 @@ export async function getDlqUrlFromMainQueue(mainQueueUrl: string): Promise<stri
  * @param endTime - End time for metrics query
  * @returns Array of metric values (one per minute)
  */
-async function getQueueMetric(
-    queueUrl: string,
-    metricName: string,
-    startTime: Date,
-    endTime: Date
-): Promise<number[]> {
+async function getQueueMetric(queueUrl: string, metricName: string, startTime: Date, endTime: Date): Promise<number[]> {
     const queueName = extractQueueName(queueUrl);
 
     const command = new GetMetricStatisticsCommand({
@@ -168,9 +153,7 @@ async function getQueueMetric(
     });
 
     const response = await cloudWatchClient.send(command);
-    const datapoints = (response.Datapoints || []).sort(
-        (a, b) => (a.Timestamp?.getTime() || 0) - (b.Timestamp?.getTime() || 0)
-    );
+    const datapoints = (response.Datapoints || []).sort((a, b) => (a.Timestamp?.getTime() || 0) - (b.Timestamp?.getTime() || 0));
 
     // Fill in missing minutes with 0
     const values: number[] = [];
@@ -242,9 +225,7 @@ async function getOldestMessageAge(queueUrl: string): Promise<number> {
         }
 
         // Get the most recent datapoint
-        const sorted = datapoints.sort(
-            (a, b) => (b.Timestamp?.getTime() || 0) - (a.Timestamp?.getTime() || 0)
-        );
+        const sorted = datapoints.sort((a, b) => (b.Timestamp?.getTime() || 0) - (a.Timestamp?.getTime() || 0));
         const latest = sorted[0];
         return latest.Average ? Math.round(latest.Average) : 0;
     } catch {
@@ -257,12 +238,7 @@ async function getOldestMessageAge(queueUrl: string): Promise<number> {
 /**
  * Get total count of a metric over a time period
  */
-async function getMetricTotal(
-    queueUrl: string,
-    metricName: string,
-    startTime: Date,
-    endTime: Date
-): Promise<number> {
+async function getMetricTotal(queueUrl: string, metricName: string, startTime: Date, endTime: Date): Promise<number> {
     const queueName = extractQueueName(queueUrl);
 
     const command = new GetMetricStatisticsCommand({
@@ -326,28 +302,25 @@ export async function getQueueMetrics(queueUrl: string): Promise<{
     const sparkline = sparklineReceived;
 
     // Get last 60 seconds totals (most recent minute)
-    const [messagesReceivedLast60s, messagesSentLast60s, messagesDeletedLast60s] =
-        await Promise.all([
-            getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneMinuteAgo, now),
-            getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneMinuteAgo, now),
-            getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneMinuteAgo, now),
-        ]);
+    const [messagesReceivedLast60s, messagesSentLast60s, messagesDeletedLast60s] = await Promise.all([
+        getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneMinuteAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneMinuteAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneMinuteAgo, now),
+    ]);
 
     // Get last hour totals for all metrics
-    const [messagesReceivedLastHour, messagesSentLastHour, messagesDeletedLastHour] =
-        await Promise.all([
-            getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneHourAgo, now),
-            getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneHourAgo, now),
-            getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneHourAgo, now),
-        ]);
+    const [messagesReceivedLastHour, messagesSentLastHour, messagesDeletedLastHour] = await Promise.all([
+        getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneHourAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneHourAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneHourAgo, now),
+    ]);
 
     // Get last 24 hours totals
-    const [messagesReceivedLast24h, messagesSentLast24h, messagesDeletedLast24h] =
-        await Promise.all([
-            getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneDayAgo, now),
-            getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneDayAgo, now),
-            getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneDayAgo, now),
-        ]);
+    const [messagesReceivedLast24h, messagesSentLast24h, messagesDeletedLast24h] = await Promise.all([
+        getMetricTotal(queueUrl, 'NumberOfMessagesReceived', oneDayAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesSent', oneDayAgo, now),
+        getMetricTotal(queueUrl, 'NumberOfMessagesDeleted', oneDayAgo, now),
+    ]);
 
     // Get current queue state
     const approximateVisible = await getApproximateVisibleMessages(queueUrl);

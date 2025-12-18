@@ -1,6 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { target } from '@/db/schema';
+import { createContextLogger } from '@/utils/logger';
 import { keepOnlyAscii } from '@/utils/string';
 
 const PREDEFINED_MATCH_TYPE_MAP = {
@@ -51,9 +52,11 @@ export async function lookupTargetId(row: {
     const matchType = row['target.matchType'];
     const matchedTargetValue = keepOnlyAscii(row['searchTerm.value']);
 
+    const logger = createContextLogger({ component: 'parse-report', utility: 'lookup-target-id' });
+
     if (!targetValue || !matchType) {
         if (!matchedTargetValue) {
-            console.error('[lookupTargetId] Failed to find target (fallback mode - all values empty). Row:', JSON.stringify(row, null, 2));
+            logger.error({ adGroupId, matchedTargetValue, row }, 'Failed to find target (fallback mode - all values empty)');
             throw new Error(
                 `Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty, but searchTerm.value is also empty)`
             );
@@ -65,7 +68,7 @@ export async function lookupTargetId(row: {
         });
 
         if (!result) {
-            console.error('[lookupTargetId] Failed to find target (fallback mode). Row:', JSON.stringify(row, null, 2));
+            logger.error({ adGroupId, matchedTargetValue, row }, 'Failed to find target (fallback mode)');
             throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty)`);
         }
 
@@ -88,7 +91,7 @@ export async function lookupTargetId(row: {
             });
 
             if (!result) {
-                console.error('[lookupTargetId] Failed to find target (PHRASE/BROAD/EXACT). Row:', JSON.stringify(row, null, 2));
+                logger.error({ adGroupId, targetValue, matchType, targetExportMatchType, row }, 'Failed to find target (PHRASE/BROAD/EXACT)');
                 throw new Error(`Could not find target for adGroupId: ${adGroupId}, targetValue: ${targetValue}, matchType: ${matchType} (converted: ${targetExportMatchType})`);
             }
 
@@ -103,7 +106,7 @@ export async function lookupTargetId(row: {
             const asin = parseAsinFromTargetValue(targetValue);
 
             if (!asin) {
-                console.error('[lookupTargetId] Failed to parse ASIN from targetValue. Row:', JSON.stringify(row, null, 2));
+                logger.error({ adGroupId, targetValue, row }, 'Failed to parse ASIN from targetValue');
                 throw new Error(`Could not parse ASIN from targetValue: ${targetValue}`);
             }
 
@@ -113,7 +116,7 @@ export async function lookupTargetId(row: {
             });
 
             if (!result) {
-                console.error('[lookupTargetId] Failed to find target (TARGETING_EXPRESSION). Row:', JSON.stringify(row, null, 2));
+                logger.error({ adGroupId, asin, matchType, targetExportMatchType, row }, 'Failed to find target (TARGETING_EXPRESSION)');
                 throw new Error(`Could not find target for adGroupId: ${adGroupId}, asin: ${asin}, matchType: ${matchType} (converted: ${targetExportMatchType})`);
             }
 
@@ -131,7 +134,7 @@ export async function lookupTargetId(row: {
             });
 
             if (!result) {
-                console.error('[lookupTargetId] Failed to find target (TARGETING_EXPRESSION_PREDEFINED). Row:', JSON.stringify(row, null, 2));
+                logger.error({ adGroupId, matchType, targetExportMatchType, row }, 'Failed to find target (TARGETING_EXPRESSION_PREDEFINED)');
                 throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchType: ${matchType} (converted: ${targetExportMatchType}), targetType: AUTO`);
             }
 
@@ -143,7 +146,7 @@ export async function lookupTargetId(row: {
         }
 
         default:
-            console.error('[lookupTargetId] Unknown matchType. Row:', JSON.stringify(row, null, 2));
+            logger.error({ adGroupId, matchType, row }, 'Unknown matchType');
             throw new Error(`Failed to find targetId for matchType: ${matchType}`);
     }
 }

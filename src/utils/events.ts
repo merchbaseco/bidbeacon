@@ -1,4 +1,7 @@
 import type { WebSocket } from 'ws';
+import { createContextLogger } from './logger';
+
+const logger = createContextLogger({ component: 'events' });
 
 export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'account-dataset-metadata:updated' | 'report-dataset-metadata:updated';
 
@@ -80,7 +83,7 @@ class EventEmitter {
         });
 
         socket.on('error', error => {
-            console.error('[Events] WebSocket error:', error);
+            logger.error({ err: error }, 'WebSocket error');
             this.connections.delete(socket);
         });
 
@@ -94,24 +97,21 @@ class EventEmitter {
      */
     emitEvent(event: Event) {
         const message = JSON.stringify(event);
-        const connectionCount = this.connections.size;
-        console.log(`[Events] Emitting event ${event.type} to ${connectionCount} connected client(s)`);
 
-        let sentCount = 0;
+        let _sentCount = 0;
         for (const socket of this.connections) {
             try {
                 if (socket.readyState === 1) {
                     socket.send(message);
-                    sentCount++;
+                    _sentCount++;
                 } else {
                     this.connections.delete(socket);
                 }
             } catch (error) {
-                console.error('[Events] Failed to send message:', error);
+                logger.error({ err: error, eventType: event.type }, 'Failed to send message');
                 this.connections.delete(socket);
             }
         }
-        console.log(`[Events] Event ${event.type} sent to ${sentCount} client(s)`);
     }
 }
 

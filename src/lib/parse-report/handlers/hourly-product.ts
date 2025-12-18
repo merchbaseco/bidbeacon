@@ -3,6 +3,7 @@ import { gunzip } from 'node:zlib';
 import { reportConfigs } from '@/config/reports/configs';
 import { db } from '@/db/index';
 import { performanceHourly } from '@/db/schema';
+import { createContextLogger } from '@/utils/logger';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import type { ParseReportInput } from '../index';
 import { parseHourlyTimestamp } from '../utils/parse-timestamps';
@@ -14,7 +15,12 @@ export async function handleHourlyProduct(input: ParseReportInput, metadata: Rep
     const reportConfig = reportConfigs[input.aggregation][input.entityType];
     const timezone = getTimezoneForCountry(metadata.countryCode);
 
-    console.log(`[API] Downloading report from URL...`);
+    const logger = createContextLogger({
+        component: 'parse-report',
+        handler: 'hourly-product',
+        accountId: input.accountId,
+        timestamp: input.timestamp,
+    });
 
     const response = await fetch(metadata.reportUrl, {
         signal: AbortSignal.timeout(60000),
@@ -31,14 +37,12 @@ export async function handleHourlyProduct(input: ParseReportInput, metadata: Rep
     const { z } = await import('zod');
     const rows = z.array(reportConfig.rowSchema).parse(rawJson);
 
-    console.log(`[API] Parsed ${rows.length} rows from report`);
-
     let insertedCount = 0;
     for (const row of rows) {
         // For product reports, entityId is the advertised product ID
         const entityId = (row as { 'advertisedProduct.id': string | null })['advertisedProduct.id'];
         if (!entityId) {
-            console.warn('[handleHourlyProduct] Skipping row with null advertisedProduct.id:', row);
+            logger.warn({ row }, 'Skipping row with null advertisedProduct.id');
             continue;
         }
 

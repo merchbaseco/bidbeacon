@@ -15,8 +15,6 @@ export async function handleDailyTarget(input: ParseReportInput, metadata: Repor
     const reportConfig = reportConfigs[input.aggregation][input.entityType];
     const timezone = getTimezoneForCountry(metadata.countryCode);
 
-    console.log(`[API] Downloading report from URL...`);
-
     const response = await fetch(metadata.reportUrl, {
         signal: AbortSignal.timeout(60000),
     });
@@ -31,8 +29,6 @@ export async function handleDailyTarget(input: ParseReportInput, metadata: Repor
 
     const { z } = await import('zod');
     const rows = z.array(reportConfig.rowSchema).parse(rawJson);
-
-    console.log(`[API] Parsed ${rows.length} rows from report`);
 
     let insertedCount = 0;
     for (const row of rows) {

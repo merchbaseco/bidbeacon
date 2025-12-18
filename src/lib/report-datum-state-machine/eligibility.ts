@@ -31,17 +31,8 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
     const ageMs = now.getTime() - timestamp.getTime();
     const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
 
-    console.log(`[Eligibility] Checking eligibility for ${aggregation} report:`, {
-        timestamp: timestamp.toISOString(),
-        now: now.toISOString(),
-        ageMs,
-        ageHours,
-        lastReportCreatedAt: lastReportCreatedAt?.toISOString() ?? null,
-    });
-
     // Check if age matches any eligible offset
     const eligibleOffsets = getEligibleOffsets(aggregation);
-    console.log(`[Eligibility] Eligible offsets for ${aggregation}:`, eligibleOffsets);
 
     // Find the highest eligible offset that the report age has reached or exceeded
     const sortedOffsets = [...eligibleOffsets].sort((a, b) => a - b);
@@ -57,17 +48,13 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
         }
     }
 
-    console.log(`[Eligibility] Matching offset:`, matchingOffset, `(ageHours=${ageHours})`);
-
     if (!matchingOffset) {
-        console.log(`[Eligibility] No matching offset found (age ${ageHours}h is less than minimum offset ${sortedOffsets[0]}h), not eligible`);
         return false;
     }
 
     // Check if a report was already created at this offset
     if (!lastReportCreatedAt) {
         // No report created yet, so eligible (age is past threshold and no previous report)
-        console.log(`[Eligibility] No lastReportCreatedAt, eligible for creation at ${matchingOffset}h offset`);
         return true;
     }
 
@@ -76,17 +63,9 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
     const lastCreatedAgeMs = lastReportCreatedAt.getTime() - timestamp.getTime();
     const lastCreatedAgeHours = Math.floor(lastCreatedAgeMs / (1000 * 60 * 60));
 
-    console.log(`[Eligibility] Last report created age:`, {
-        lastCreatedAgeMs,
-        lastCreatedAgeHours,
-        matchingOffset,
-    });
-
     // Check if lastReportCreatedAt was set before reaching the matching offset
     // If lastCreatedAgeHours < matchingOffset, it means we created a report when the datum
     // was younger than the threshold, so we haven't created one at this threshold yet
     // If lastCreatedAgeHours >= matchingOffset, we already created a report at this or a later threshold
-    const eligible = lastCreatedAgeHours < matchingOffset;
-    console.log(`[Eligibility] Eligibility result: ${eligible} (lastCreatedAgeHours=${lastCreatedAgeHours} < matchingOffset=${matchingOffset})`);
-    return eligible;
+    return lastCreatedAgeHours < matchingOffset;
 }

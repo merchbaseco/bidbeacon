@@ -2,10 +2,13 @@ import Bottleneck from 'bottleneck';
 import { eq } from 'drizzle-orm';
 import { db, testConnection } from '@/db/index.js';
 import { workerControl } from '@/db/schema.js';
+import { createContextLogger } from '@/utils/logger';
 import { routePayload } from './router.js';
 import { deleteMessage, receiveMessages, testAwsConnection } from './sqsClient.js';
 
-console.log('[Worker] Starting Amazon Marketing Stream worker...');
+const logger = createContextLogger({ component: 'worker' });
+
+logger.info('Starting Amazon Marketing Stream worker');
 
 // Graceful shutdown flag
 let shuttingDown = false;
@@ -33,52 +36,41 @@ function parseAmsPayload(body: string | undefined): unknown {
     } catch (error) {
         // Log the actual body for debugging
         const bodyPreview = body.length > 500 ? `${body.substring(0, 500)}...` : body;
-        console.error(`[Worker] Failed to parse message body. Preview: ${bodyPreview}`);
-        throw new Error(
-            `Failed to parse AMS payload: ${error instanceof Error ? error.message : String(error)}`
-        );
+        logger.error({ err: error, bodyPreview }, 'Failed to parse message body');
+        throw new Error(`Failed to parse AMS payload: ${error instanceof Error ? error.message : String(error)}`);
     }
 }
 
 /**
  * Process a single SQS message
  */
-async function processMessage(message: {
-    Body?: string;
-    ReceiptHandle?: string;
-    MessageId?: string;
-}): Promise<void> {
+async function processMessage(message: { Body?: string; ReceiptHandle?: string; MessageId?: string }): Promise<void> {
     if (!message.ReceiptHandle) {
         throw new Error('Message missing ReceiptHandle');
     }
 
     const messageId = message.MessageId || 'unknown';
 
+    const messageLogger = logger.child({ messageId });
+
     try {
         // Parse AMS payload directly (AMS uses Raw Message Delivery, no SNS envelope)
         const payload = parseAmsPayload(message.Body);
 
         // Extract datasetId for logging (AMS uses snake_case: dataset_id)
-        const datasetId =
-            typeof payload === 'object' && payload !== null && 'dataset_id' in payload
-                ? String(payload.dataset_id)
-                : 'unknown';
+        const datasetId = typeof payload === 'object' && payload !== null && 'dataset_id' in payload ? String(payload.dataset_id) : 'unknown';
 
-        console.log(`[Worker] Processing message ${messageId} (dataset: ${datasetId})`);
+        messageLogger.info({ datasetId }, 'Processing message');
 
         // Route to appropriate handler
         await routePayload(payload);
 
         // Success - delete message from queue
         await deleteMessage(message.ReceiptHandle);
-        console.log(`[Worker] ✓ Successfully processed message ${messageId}`);
+        messageLogger.info('Successfully processed message');
     } catch (error) {
         // Log error but don't delete message - SQS will retry
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`[Worker] ✗ Failed to process message ${messageId}: ${errorMessage}`);
-        if (error instanceof Error && error.stack) {
-            console.error(`[Worker] Stack trace:`, error.stack);
-        }
+        messageLogger.error({ err: error }, 'Failed to process message');
         // Don't delete - let SQS handle retries and DLQ routing
         throw error;
     }
@@ -89,19 +81,13 @@ async function processMessage(message: {
  */
 async function getWorkerConfig(): Promise<{ enabled: boolean; messagesPerSecond: number }> {
     try {
-        const control = await db
-            .select()
-            .from(workerControl)
-            .where(eq(workerControl.id, 'main'))
-            .limit(1);
+        const control = await db.select().from(workerControl).where(eq(workerControl.id, 'main')).limit(1);
 
         // If no row exists, default to enabled with unlimited speed (backward compatibility)
         if (control.length === 0) {
             // Initialize the row with enabled = true and messagesPerSecond = 0 (unlimited)
             try {
-                await db
-                    .insert(workerControl)
-                    .values({ id: 'main', enabled: true, messagesPerSecond: 0 });
+                await db.insert(workerControl).values({ id: 'main', enabled: true, messagesPerSecond: 0 });
             } catch {
                 // Row might have been created by another process, ignore
             }
@@ -114,7 +100,7 @@ async function getWorkerConfig(): Promise<{ enabled: boolean; messagesPerSecond:
         };
     } catch (error) {
         // On error, default to enabled with unlimited speed to avoid breaking existing behavior
-        console.error('[Worker] Error checking worker control state:', error);
+        logger.error({ err: error }, 'Error checking worker control state');
         return { enabled: true, messagesPerSecond: 0 };
     }
 }
@@ -130,9 +116,7 @@ async function runWorker(): Promise<void> {
             // Get worker configuration
             const config = await getWorkerConfig();
             if (!config.enabled) {
-                console.log(
-                    '[Worker] Queue processing is disabled. Waiting 5 seconds before checking again...'
-                );
+                logger.info('Queue processing is disabled. Waiting 5 seconds before checking again');
                 await new Promise(resolve => setTimeout(resolve, 5000));
                 continue;
             }
@@ -152,7 +136,6 @@ async function runWorker(): Promise<void> {
 
             // Always use 10 second long polling
             const waitTimeSeconds = 10;
-            console.log(`[Worker] Polling SQS queue (waitTimeSeconds: ${waitTimeSeconds})...`);
             const messages = await receiveMessages(waitTimeSeconds);
 
             // If shutting down, exit immediately without processing
@@ -162,14 +145,9 @@ async function runWorker(): Promise<void> {
 
             if (messages.length === 0) {
                 // No messages - wait 60 seconds before polling again
-                console.log(
-                    '[Worker] No messages received. Waiting 60 seconds before next poll...'
-                );
                 await new Promise(resolve => setTimeout(resolve, 60000));
                 continue;
             }
-
-            console.log(`[Worker] Received ${messages.length} message(s) in batch`);
 
             // Process all messages in the batch with rate limiting
             const processPromises = messages.map(message => {
@@ -194,23 +172,21 @@ async function runWorker(): Promise<void> {
 
             // Wait for all messages in the batch to be processed
             await Promise.all(processPromises);
-            console.log(`[Worker] Completed processing batch of ${messages.length} message(s)`);
+            logger.info({ messageCount: messages.length }, 'Completed processing batch');
         } catch (error) {
             // If shutting down, exit on error
             if (shuttingDown) {
                 break;
             }
 
-            const errorMessage = error instanceof Error ? error.message : String(error);
-
             // Log polling errors but continue (credentials should have been checked at startup)
-            console.error('[Worker] Error during polling:', errorMessage);
+            logger.error({ err: error }, 'Error during polling');
             // Wait a bit before retrying to avoid tight error loops
             await new Promise(resolve => setTimeout(resolve, 1000));
         }
     }
 
-    console.log('[Worker] Worker loop exited');
+    logger.info('Worker loop exited');
 }
 
 /**
@@ -225,8 +201,8 @@ async function runWorker(): Promise<void> {
  * will become visible again and be redelivered to another worker instance.
  */
 function shutdown(signal: string): void {
-    console.log(`[Worker] Received ${signal}, shutting down gracefully...`);
-    console.log('[Worker] Stopping message polling. Current batch will finish processing.');
+    logger.info({ signal }, 'Received shutdown signal, shutting down gracefully');
+    logger.info('Stopping message polling. Current batch will finish processing.');
     shuttingDown = true;
 
     // Don't call process.exit() here - let the worker loop exit naturally
@@ -239,11 +215,11 @@ process.on('SIGINT', () => shutdown('SIGINT'));
 
 // Handle uncaught errors
 process.on('unhandledRejection', (reason, promise) => {
-    console.error('[Worker] Unhandled rejection at:', promise, 'reason:', reason);
+    logger.error({ err: reason, promise }, 'Unhandled rejection');
 });
 
 process.on('uncaughtException', error => {
-    console.error('[Worker] Uncaught exception:', error);
+    logger.error({ err: error }, 'Uncaught exception');
     process.exit(1);
 });
 
@@ -252,37 +228,29 @@ process.on('uncaughtException', error => {
     try {
         // Test database connection
         await testConnection();
-        console.log('[Worker] Database connection verified');
+        logger.info('Database connection verified');
 
         // Test AWS credentials and queue access
         let awsReady = false;
         try {
             await testAwsConnection();
-            console.log('[Worker] AWS credentials verified');
+            logger.info('AWS credentials verified');
             awsReady = true;
         } catch (error) {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.error('');
-            console.error('═══════════════════════════════════════════════════════════════');
-            console.error(`[${new Date().toISOString()}] BidBeacon Worker - AWS Credentials Error`);
-            console.error('═══════════════════════════════════════════════════════════════');
-            console.error('✗ AWS credentials not available');
-            console.error(`  Error: ${errorMessage}`);
-            console.error('');
-            console.error('Worker will not start SQS polling until credentials are configured.');
-            console.error('Container will remain running for log visibility.');
-            console.error('');
-            console.error('To fix:');
-            console.error('  1. Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars, or');
-            console.error('  2. Configure IAM role with SQS permissions, or');
-            console.error('  3. Mount ~/.aws/credentials file');
-            console.error('═══════════════════════════════════════════════════════════════');
-            console.error('');
+            const _errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error(
+                {
+                    err: error,
+                    message: 'AWS credentials not available',
+                    fix: 'Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars, configure IAM role with SQS permissions, or mount ~/.aws/credentials file',
+                },
+                'AWS credentials error - Worker will not start SQS polling until credentials are configured'
+            );
         }
 
         if (!awsReady) {
             // Keep container alive but don't start polling
-            console.log('[Worker] Waiting for AWS credentials to be configured...');
+            logger.info('Waiting for AWS credentials to be configured');
             // Wait indefinitely (container stays up, logs visible)
             await new Promise(() => {
                 // Never resolves - keeps container alive
@@ -290,29 +258,22 @@ process.on('uncaughtException', error => {
         }
 
         // Print startup status summary
-        console.log('');
-        console.log('═══════════════════════════════════════════════════════════════');
-        console.log(`[${new Date().toISOString()}] BidBeacon Worker Ready`);
-        console.log('═══════════════════════════════════════════════════════════════');
-        console.log(`✓ Database connected`);
-        console.log(`✓ AWS credentials verified`);
-        console.log(`✓ Queue: ${process.env.AMS_QUEUE_URL}`);
-        console.log(`✓ Region: ${process.env.AWS_REGION || 'us-east-1'}`);
-        console.log('═══════════════════════════════════════════════════════════════');
-        console.log('');
+        logger.info(
+            {
+                queue: process.env.AMS_QUEUE_URL,
+                region: process.env.AWS_REGION || 'us-east-1',
+            },
+            'BidBeacon Worker Ready'
+        );
 
         // Start the main loop
         await runWorker();
 
         // Worker loop exited cleanly
-        console.log('[Worker] Shutdown complete');
+        logger.info('Shutdown complete');
         process.exit(0);
     } catch (error) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error('[Worker] Fatal startup error:', errorMessage);
-        if (error instanceof Error && error.stack) {
-            console.error('[Worker] Stack trace:', error.stack);
-        }
+        logger.error({ err: error }, 'Fatal startup error');
         process.exit(1);
     }
 })();

@@ -9,8 +9,9 @@ import { testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
 import { emitEvent } from '@/utils/events.js';
+import { logger } from '@/utils/logger';
 
-console.log('Starting BidBeacon Server...');
+logger.info('Starting BidBeacon Server');
 
 const fastify = Fastify({
     logger: false, // Disable Pino logger to avoid bundling issues
@@ -83,10 +84,7 @@ fastify.setErrorHandler(async (error: unknown, _request, reply) => {
     const errorMessage = error instanceof Error ? error.message : 'Internal server error';
     const errorStack = error instanceof Error ? error.stack : undefined;
 
-    console.error(`[${new Date().toISOString()}] Unhandled error:`, errorMessage);
-    if (errorStack) {
-        console.error('[Error] Stack trace:', errorStack);
-    }
+    logger.error({ err: error }, 'Unhandled error');
 
     // Emit error event to connected clients
     emitEvent({
@@ -104,23 +102,21 @@ fastify.setErrorHandler(async (error: unknown, _request, reply) => {
 
 const port = Number(process.env.PORT) || 8080;
 
-console.log(`Attempting to start server on port ${port}...`);
-
 // Graceful shutdown handler
 const shutdown = async (signal: string) => {
-    console.log(`[${new Date().toISOString()}] Received ${signal}, shutting down gracefully...`);
+    logger.info({ signal }, 'Received shutdown signal, shutting down gracefully');
 
     try {
         await stopJobs();
 
         // Close Fastify server
         await fastify.close();
-        console.log('[Server] Fastify server closed');
+        logger.info('Fastify server closed');
 
-        console.log(`[${new Date().toISOString()}] Shutdown complete`);
+        logger.info('Shutdown complete');
         process.exit(0);
     } catch (error) {
-        console.error('[Server] Error during shutdown:', error);
+        logger.error({ err: error }, 'Error during shutdown');
         process.exit(1);
     }
 };
@@ -143,18 +139,16 @@ try {
     await fastify.listen({ port, host: '0.0.0.0' });
 
     // Print startup status summary
-    console.log('');
-    console.log('═══════════════════════════════════════════════════════════════');
-    console.log(`[${new Date().toISOString()}] BidBeacon Server Ready`);
-    console.log('═══════════════════════════════════════════════════════════════');
-    console.log(`✓ Database connected`);
-    console.log(`✓ Server running on port ${port}`);
-    console.log(`✓ Health check endpoint: /api/health`);
-    console.log(`✓ WebSocket events: /api/events`);
-    console.log(`✓ tRPC endpoints: /api/*`);
-    console.log('═══════════════════════════════════════════════════════════════');
-    console.log('');
+    logger.info(
+        {
+            port,
+            healthCheck: '/api/health',
+            websocket: '/api/events',
+            trpc: '/api/*',
+        },
+        'BidBeacon Server Ready'
+    );
 } catch (err) {
-    console.error('Failed to start server:', err);
+    logger.error({ err }, 'Failed to start server');
     process.exit(1);
 }

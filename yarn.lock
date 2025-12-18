@@ -870,6 +870,7 @@ __metadata:
     lucide-react: "npm:^0.560.0"
     next-themes: "npm:^0.4.6"
     pg-boss: "npm:12.5.2"
+    pino: "npm:^10.1.0"
     postcss: "npm:^8.5.6"
     postgres: "npm:^3.4.7"
     react: "npm:^19.2.1"

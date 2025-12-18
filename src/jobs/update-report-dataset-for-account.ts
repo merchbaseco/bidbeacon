@@ -11,6 +11,7 @@ import { boss } from '@/jobs/boss.js';
 import { AGGREGATION_TYPES, type AggregationType, ENTITY_TYPES, type EntityType } from '@/types/reports.js';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
+import { createJobLogger } from '@/utils/logger';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
 
 // Amazon Ads API data retention periods
@@ -34,7 +35,13 @@ export const updateReportDatasetForAccountJob = boss
         for (const job of jobs) {
             const { accountId, countryCode } = job.data;
 
-            console.log(`[Update Report Dataset Metadata] Starting job (ID: ${job.id}) for account: ${accountId}, country: ${countryCode}`);
+            // Create job-specific logger with context
+            const logger = createJobLogger('update-report-dataset-for-account', job.id, {
+                accountId,
+                countryCode,
+            });
+
+            logger.info('Starting job');
             const timezone = getTimezoneForCountry(countryCode);
             const now = zonedNow(timezone);
 
@@ -50,7 +57,7 @@ export const updateReportDatasetForAccountJob = boss
                 type: 'reports:refreshed',
                 accountId,
             });
-            console.log(`[Update Report Dataset Metadata] Completed job (ID: ${job.id}) for account: ${accountId}, country: ${countryCode}`);
+            logger.info('Completed job');
         }
     });
 

@@ -16,9 +16,10 @@ Both share the same PostgreSQL database.
 2. **Separate containers** - Worker crashes don't affect API. Can scale independently.
 3. **Idempotency via unique indexes** - `idempotency_id` for metrics, composite keys for campaign management. Retries are harmless.
 4. **Canonical SQS shutdown** - Set flag, finish current batch, exit. Visibility timeout handles in-flight messages.
-5. **No index re-exports** - Each API endpoint is in its own file. Import directly from individual files (e.g., `@/api/dashboard/status.js`), never create `index.ts` files that re-export. One file, one API endpoint.
+5. **No index re-exports** - Each API endpoint is in its own file. Import directly from individual files (e.g., `@/api/dashboard/status`), never create `index.ts` files that re-export. One file, one API endpoint.
 6. **Database-driven UI state** - UI components derive state from database tables (Single Source of Truth). Use a single `{table}:updated` event fired whenever the table changes. Components use optimistic updates for immediate feedback, then refetch on event. On load, components fetch the table; when the table updates, the event invalidates the query to trigger a refetch.
 7. **Helper functions at bottom** - When organizing code, place helper functions at the bottom of the file, after the main exports/definitions. This keeps the primary code at the top and implementation details below.
+8. **No .js extensions in imports** - Do not use `.js` extensions in import statements. Use `import { x } from '@/utils/logger'` not `import { x } from '@/utils/logger.js'`. The TypeScript compiler and bundler handle module resolution without explicit extensions.
 
 ## Important Context
 
@@ -41,9 +42,9 @@ Both share the same PostgreSQL database.
 When adding a new Amazon Ads API integration (e.g., a new endpoint in `src/amazon-ads/`):
 
 1. Create the API function in `src/amazon-ads/` (e.g., `get-campaigns.ts`)
-2. Wrap the API call with `withTracking` from `@/utils/api-tracker.js`:
+2. Wrap the API call with `withTracking` from `@/utils/api-tracker`:
    ```typescript
-   import { withTracking } from '@/utils/api-tracker.js';
+   import { withTracking } from '@/utils/api-tracker';
    
    return withTracking({ apiName: 'getCampaigns', region }, async () => {
      // API call logic here

@@ -8,6 +8,7 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { advertiserAccount } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
+import { logger } from '@/utils/logger';
 import { updateReportDatasetForAccountJob } from './update-report-dataset-for-account.js';
 
 // ============================================================================
@@ -20,7 +21,7 @@ export const updateReportDatasetsJob = boss
         cron: '*/10 * * * *', // Run every 10 minutes
     })
     .work(async () => {
-        console.log('[Update Report Datasets] Starting job - fetching enabled accounts');
+        logger.info('Starting job - fetching enabled accounts');
 
         // Query all enabled advertiser accounts
         const enabledAccounts = await db
@@ -31,7 +32,7 @@ export const updateReportDatasetsJob = boss
             .from(advertiserAccount)
             .where(eq(advertiserAccount.enabled, true));
 
-        console.log(`[Update Report Datasets] Found ${enabledAccounts.length} enabled account(s)`);
+        logger.info({ accountCount: enabledAccounts.length }, 'Found enabled accounts');
 
         // Enqueue update-report-dataset-for-account job for each account
         const jobPromises = enabledAccounts.map(async account => {
@@ -39,11 +40,10 @@ export const updateReportDatasetsJob = boss
                 accountId: account.adsAccountId,
                 countryCode: account.countryCode,
             });
-            console.log(`[Update Report Datasets] Enqueued update job for account: ${account.adsAccountId}, country: ${account.countryCode} (job ID: ${jobId})`);
             return jobId;
         });
 
         await Promise.all(jobPromises);
 
-        console.log(`[Update Report Datasets] Completed - enqueued ${enabledAccounts.length} job(s)`);
+        logger.info({ jobCount: enabledAccounts.length }, 'Completed - enqueued jobs');
     });

@@ -18,6 +18,7 @@ import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, targe
 import { boss } from '@/jobs/boss.js';
 import { utcNow } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
+import { createJobLogger } from '@/utils/logger';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -185,7 +186,13 @@ export const syncAdEntitiesJob = boss
         for (const job of jobs) {
             const { accountId, countryCode } = job.data;
 
-            console.log(`[Sync Ad Entities] Starting job (ID: ${job.id}) for account: ${accountId}, country: ${countryCode}`);
+            // Create job-specific logger with context
+            const logger = createJobLogger('sync-ad-entities', job.id, {
+                accountId,
+                countryCode,
+            });
+
+            logger.info('Starting job');
 
             // Update metadata to indicate sync is starting
             await db
@@ -234,8 +241,6 @@ export const syncAdEntitiesJob = boss
                 const profileId = Number(account.profileId);
 
                 // Step 1: Create all exports in parallel
-                console.log(`[Sync Ad Entities] Creating exports for all entity types...`);
-
                 const [campaignsExport, adGroupsExport, adsExport, targetsExport] = await Promise.all([
                     exportCampaigns({
                         profileId,
@@ -255,8 +260,14 @@ export const syncAdEntitiesJob = boss
                     }),
                 ]);
 
-                console.log(
-                    `[Sync Ad Entities] Created exports: campaigns=${campaignsExport.exportId}, adGroups=${adGroupsExport.exportId}, ads=${adsExport.exportId}, targets=${targetsExport.exportId}`
+                logger.info(
+                    {
+                        campaignsExportId: campaignsExport.exportId,
+                        adGroupsExportId: adGroupsExport.exportId,
+                        adsExportId: adsExport.exportId,
+                        targetsExportId: targetsExport.exportId,
+                    },
+                    'Created exports'
                 );
 
                 // Initialize export states
@@ -292,8 +303,6 @@ export const syncAdEntitiesJob = boss
                 ];
 
                 // Step 2: Poll for all exports to complete
-                console.log(`[Sync Ad Entities] Polling for export completion...`);
-
                 let pollCount = 0;
                 while (pollCount < MAX_POLLS) {
                     const pendingExports = exports.filter(e => e.status === 'PROCESSING');
@@ -301,8 +310,6 @@ export const syncAdEntitiesJob = boss
                     if (pendingExports.length === 0) {
                         break;
                     }
-
-                    console.log(`[Sync Ad Entities] Poll ${pollCount + 1}/${MAX_POLLS}: ${pendingExports.length} exports still processing`);
 
                     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
 
@@ -323,9 +330,7 @@ export const syncAdEntitiesJob = boss
 
                             if (status.status === 'FAILED') {
                                 exportState.error = status.error?.message ?? 'Unknown error';
-                                console.error(`[Sync Ad Entities] Export failed for ${exportState.entityType}: ${exportState.error}`);
-                            } else if (status.status === 'COMPLETED') {
-                                console.log(`[Sync Ad Entities] Export completed for ${exportState.entityType}`);
+                                logger.error({ entityType: exportState.entityType, error: exportState.error }, 'Export failed');
                             }
                         })
                     );
@@ -345,8 +350,6 @@ export const syncAdEntitiesJob = boss
                 }
 
                 // Step 3: Download and parse all exports in parallel
-                console.log(`[Sync Ad Entities] Downloading and parsing export data...`);
-
                 // Helper to get URL safely (we've already verified all exports are COMPLETED)
                 const getExportUrl = (entityType: EntityType): string => {
                     const exportState = exports.find(e => e.entityType === entityType);
@@ -363,11 +366,17 @@ export const syncAdEntitiesJob = boss
                     downloadAndParse(getExportUrl('targets'), targetsExportSchema),
                 ]);
 
-                console.log(`[Sync Ad Entities] Parsed: ${campaignsData.length} campaigns, ${adGroupsData.length} ad groups, ${adsData.length} ads, ${targetsData.length} targets`);
+                logger.info(
+                    {
+                        campaignsCount: campaignsData.length,
+                        adGroupsCount: adGroupsData.length,
+                        adsCount: adsData.length,
+                        targetsCount: targetsData.length,
+                    },
+                    'Parsed export data'
+                );
 
                 // Step 4: Transform and insert into database
-                console.log(`[Sync Ad Entities] Inserting data into database...`);
-
                 // Extract IDs from export data to scope deletions to this account only
                 const campaignIds = campaignsData.map(c => c.campaignId);
                 const adGroupIds = adGroupsData.map(ag => ag.adGroupId);
@@ -379,19 +388,15 @@ export const syncAdEntitiesJob = boss
                     // Delete in reverse dependency order to respect foreign key constraints
                     if (targetIds.length > 0) {
                         await tx.delete(target).where(inArray(target.targetId, targetIds));
-                        console.log(`[Sync Ad Entities] Deleted ${targetIds.length} targets`);
                     }
                     if (adIds.length > 0) {
                         await tx.delete(ad).where(inArray(ad.adId, adIds));
-                        console.log(`[Sync Ad Entities] Deleted ${adIds.length} ads`);
                     }
                     if (adGroupIds.length > 0) {
                         await tx.delete(adGroup).where(inArray(adGroup.adGroupId, adGroupIds));
-                        console.log(`[Sync Ad Entities] Deleted ${adGroupIds.length} ad groups`);
                     }
                     if (campaignIds.length > 0) {
                         await tx.delete(campaign).where(inArray(campaign.campaignId, campaignIds));
-                        console.log(`[Sync Ad Entities] Deleted ${campaignIds.length} campaigns`);
                     }
 
                     // Insert campaigns
@@ -417,7 +422,6 @@ export const syncAdEntitiesJob = boss
                         }));
 
                         await batchInsert(tx, campaign, campaignRecords);
-                        console.log(`[Sync Ad Entities] Inserted ${campaignRecords.length} campaigns`);
                     }
 
                     // Insert ad groups
@@ -436,7 +440,6 @@ export const syncAdEntitiesJob = boss
                         }));
 
                         await batchInsert(tx, adGroup, adGroupRecords);
-                        console.log(`[Sync Ad Entities] Inserted ${adGroupRecords.length} ad groups`);
                     }
 
                     // Insert ads
@@ -456,7 +459,6 @@ export const syncAdEntitiesJob = boss
                         }));
 
                         await batchInsert(tx, ad, adRecords);
-                        console.log(`[Sync Ad Entities] Inserted ${adRecords.length} ads`);
                     }
 
                     // Insert targets
@@ -492,9 +494,18 @@ export const syncAdEntitiesJob = boss
                         });
 
                         await batchInsert(tx, target, targetRecords);
-                        console.log(`[Sync Ad Entities] Inserted ${targetRecords.length} targets`);
                     }
                 });
+
+                logger.info(
+                    {
+                        campaignsCount: campaignsData.length,
+                        adGroupsCount: adGroupsData.length,
+                        adsCount: adsData.length,
+                        targetsCount: targetsData.length,
+                    },
+                    'Inserted data into database'
+                );
 
                 // Update metadata with success
                 await db
@@ -517,7 +528,7 @@ export const syncAdEntitiesJob = boss
                     countryCode,
                 });
 
-                console.log(`[Sync Ad Entities] Completed job (ID: ${job.id}) for account: ${accountId}, country: ${countryCode}`);
+                logger.info('Completed job');
             } catch (error) {
                 // Update metadata with error
                 await db
@@ -535,7 +546,7 @@ export const syncAdEntitiesJob = boss
                     countryCode,
                 });
 
-                console.error(`[Sync Ad Entities] Failed job (ID: ${job.id}) for account: ${accountId}, country: ${countryCode}:`, error);
+                logger.error({ err: error }, 'Failed job');
                 throw error;
             }
         }

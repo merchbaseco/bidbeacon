@@ -3,6 +3,7 @@
  */
 import { PgBoss } from 'pg-boss';
 import type { z } from 'zod';
+import { logger } from '@/utils/logger';
 
 // ============================================================================
 // Types
@@ -112,15 +113,11 @@ class Job<T extends JobData> {
      */
     async register(): Promise<void> {
         if (!this.workFn) {
-            throw new Error(
-                `Job "${this.jobName}" has no work function defined. Use .work() first.`
-            );
+            throw new Error(`Job "${this.jobName}" has no work function defined. Use .work() first.`);
         }
 
         const pgBoss = this.bossWrapper.getInstance();
-        const workOptions = this.workOpts?.batchSize
-            ? { batchSize: this.workOpts.batchSize }
-            : undefined;
+        const workOptions = this.workOpts?.batchSize ? { batchSize: this.workOpts.batchSize } : undefined;
 
         // pg-boss v10+ requires explicit queue creation before work() or schedule()
         await pgBoss.createQueue(this.jobName);
@@ -133,14 +130,9 @@ class Job<T extends JobData> {
                 // Ignore if schedule doesn't exist
             }
 
-            await pgBoss.schedule(
-                this.jobName,
-                this.scheduleOptions.cron,
-                this.scheduleOptions.data ?? {},
-                { tz: 'UTC' }
-            );
+            await pgBoss.schedule(this.jobName, this.scheduleOptions.cron, this.scheduleOptions.data ?? {}, { tz: 'UTC' });
 
-            console.log(`[Jobs] Scheduled ${this.jobName} (${this.scheduleOptions.cron} UTC)`);
+            logger.info({ jobName: this.jobName, cron: this.scheduleOptions.cron }, 'Scheduled job');
         }
 
         // Register the worker
@@ -148,7 +140,7 @@ class Job<T extends JobData> {
             await this.workFn?.(jobs.map(j => ({ id: j.id, data: j.data })));
         });
 
-        console.log(`[Jobs] Registered worker for ${this.jobName}`);
+        logger.info({ jobName: this.jobName }, 'Registered worker');
     }
 
     /**
@@ -170,8 +162,7 @@ class Job<T extends JobData> {
         if (this.retryOptions) {
             if (this.retryOptions.limit !== undefined) options.retryLimit = this.retryOptions.limit;
             if (this.retryOptions.delay !== undefined) options.retryDelay = this.retryOptions.delay;
-            if (this.retryOptions.backoff !== undefined)
-                options.retryBackoff = this.retryOptions.backoff;
+            if (this.retryOptions.backoff !== undefined) options.retryBackoff = this.retryOptions.backoff;
         }
 
         if (this.delayOptions?.seconds) {
@@ -181,18 +172,12 @@ class Job<T extends JobData> {
         let jobId: string | null;
         if (this.debounceOptions) {
             const key = this.debounceOptions.key?.(data) ?? this.jobName;
-            jobId = await pgBoss.sendDebounced(
-                this.jobName,
-                data,
-                options,
-                this.debounceOptions.seconds,
-                key
-            );
+            jobId = await pgBoss.sendDebounced(this.jobName, data, options, this.debounceOptions.seconds, key);
         } else {
             jobId = await pgBoss.send(this.jobName, data, options);
         }
 
-        console.log(`[Jobs] Emitted job ${this.jobName} with ID: ${jobId}`);
+        logger.info({ jobName: this.jobName, jobId }, 'Emitted job');
         return jobId;
     }
 }
@@ -240,11 +225,11 @@ class BossWrapper {
 
         // Handle errors to prevent unhandled error crashes
         this.instance.on('error', error => {
-            console.error('[Jobs] PgBoss error:', error);
+            logger.error({ err: error }, 'PgBoss error');
         });
 
         await this.instance.start();
-        console.log('[Jobs] PgBoss started');
+        logger.info('PgBoss started');
     }
 
     /**
@@ -274,7 +259,7 @@ class BossWrapper {
 
         await this.instance.stop();
         this.instance = null;
-        console.log('[Jobs] PgBoss stopped');
+        logger.info('PgBoss stopped');
     }
 
     /**

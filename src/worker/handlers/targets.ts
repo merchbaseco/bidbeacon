@@ -1,5 +1,6 @@
 import { db } from '@/db/index.js';
 import { amsCmTargets } from '@/db/schema.js';
+import { createContextLogger } from '@/utils/logger';
 import { targetSchema } from '../schemas.js';
 
 /**
@@ -9,14 +10,9 @@ export async function handleTargets(payload: unknown): Promise<void> {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = targetSchema.safeParse(payload);
     if (!validationResult.success) {
-        const datasetId =
-            typeof payload === 'object' && payload !== null && 'dataset_id' in payload
-                ? String(payload.dataset_id)
-                : 'unknown';
-        console.error(
-            `[handleTargets] Validation failed for datasetId ${datasetId}:`,
-            validationResult.error.format()
-        );
+        const datasetId = typeof payload === 'object' && payload !== null && 'dataset_id' in payload ? String(payload.dataset_id) : 'unknown';
+        const logger = createContextLogger({ component: 'handler', handler: 'targets', datasetId });
+        logger.error({ err: validationResult.error, validationErrors: validationResult.error.format() }, 'Validation failed');
         throw new Error(`Invalid targets payload: ${validationResult.error.message}`);
     }
 
@@ -34,9 +30,7 @@ export async function handleTargets(payload: unknown): Promise<void> {
         negative: data.negative ?? null,
         targetLevel: data.target_level ?? null,
         creationDateTime: data.creation_date_time ? new Date(data.creation_date_time) : null,
-        lastUpdatedDateTime: data.last_updated_date_time
-            ? new Date(data.last_updated_date_time)
-            : null,
+        lastUpdatedDateTime: data.last_updated_date_time ? new Date(data.last_updated_date_time) : null,
         targetType: data.target_type ?? null,
         // Nested objects stored as jsonb
         state: data.state ?? null,

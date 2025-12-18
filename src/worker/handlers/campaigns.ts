@@ -1,5 +1,6 @@
 import { db } from '@/db/index.js';
 import { amsCmCampaigns } from '@/db/schema.js';
+import { createContextLogger } from '@/utils/logger';
 import { campaignSchema } from '../schemas.js';
 
 /**
@@ -9,14 +10,9 @@ export async function handleCampaigns(payload: unknown): Promise<void> {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = campaignSchema.safeParse(payload);
     if (!validationResult.success) {
-        const datasetId =
-            typeof payload === 'object' && payload !== null && 'dataset_id' in payload
-                ? String(payload.dataset_id)
-                : 'unknown';
-        console.error(
-            `[handleCampaigns] Validation failed for datasetId ${datasetId}:`,
-            validationResult.error.format()
-        );
+        const datasetId = typeof payload === 'object' && payload !== null && 'dataset_id' in payload ? String(payload.dataset_id) : 'unknown';
+        const logger = createContextLogger({ component: 'handler', handler: 'campaigns', datasetId });
+        logger.error({ err: validationResult.error, validationErrors: validationResult.error.format() }, 'Validation failed');
         throw new Error(`Invalid campaigns payload: ${validationResult.error.message}`);
     }
 
@@ -35,9 +31,7 @@ export async function handleCampaigns(payload: unknown): Promise<void> {
         startDateTime: data.start_date_time ? new Date(data.start_date_time) : null,
         endDateTime: data.end_date_time ? new Date(data.end_date_time) : null,
         creationDateTime: data.creation_date_time ? new Date(data.creation_date_time) : null,
-        lastUpdatedDateTime: data.last_updated_date_time
-            ? new Date(data.last_updated_date_time)
-            : null,
+        lastUpdatedDateTime: data.last_updated_date_time ? new Date(data.last_updated_date_time) : null,
         targetsAmazonDeal: data.targets_amazon_deal ?? null,
         brandId: data.brand_id ?? null,
         costType: data.cost_type ?? null,

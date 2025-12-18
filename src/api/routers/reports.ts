@@ -59,12 +59,11 @@ export const reportsRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            console.log(`[API] Trigger update request received for account: ${input.accountId}, country: ${input.countryCode}`);
             const jobId = await updateReportDatasetForAccountJob.emit({
                 accountId: input.accountId,
                 countryCode: input.countryCode,
             });
-            console.log(`[API] Update job queued with ID: ${jobId}`);
+            logger.info({ accountId: input.accountId, countryCode: input.countryCode, jobId }, 'Update job queued');
             return { success: true, message: 'Update job queued' };
         }),
 
@@ -80,7 +79,6 @@ export const reportsRouter = router({
         )
         .mutation(async ({ input }) => {
             const reportConfig = reportConfigs[input.aggregation][input.entityType];
-            console.log(`[API] Create report request received: ${input.aggregation}/${input.entityType} for ${input.accountId}, country: ${input.countryCode} at ${input.timestamp}`);
 
             const account = await db.query.advertiserAccount.findFirst({
                 where: eq(advertiserAccount.adsAccountId, input.accountId),
@@ -170,7 +168,7 @@ export const reportsRouter = router({
                                 error: null,
                             },
                         });
-                    console.log(`[API] Updated report metadata with reportId: ${reportId} for ${input.accountId} at ${input.timestamp}`);
+                    logger.info({ accountId: input.accountId, timestamp: input.timestamp, reportId }, 'Updated report metadata');
                 }
             }
 
@@ -190,8 +188,6 @@ export const reportsRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            console.log(`[API] Retrieve report request received: ${input.aggregation}/${input.entityType} for ${input.accountId} at ${input.timestamp}`);
-
             const metadata = await db.query.reportDatasetMetadata.findFirst({
                 where: and(
                     eq(reportDatasetMetadata.accountId, input.accountId),
@@ -232,8 +228,6 @@ export const reportsRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            console.log(`[API] Parse report request received: ${input.aggregation}/${input.entityType} for ${input.accountId} at ${input.timestamp}`);
-
             const result = await parseReport({
                 accountId: input.accountId,
                 timestamp: input.timestamp,
@@ -241,7 +235,7 @@ export const reportsRouter = router({
                 entityType: input.entityType,
             });
 
-            console.log(`[API] Parse report completed. Inserted/updated ${result.rowsProcessed} rows.`);
+            logger.info({ accountId: input.accountId, rowsProcessed: result.rowsProcessed }, 'Parse report completed');
 
             return {
                 success: true,
@@ -262,8 +256,6 @@ export const reportsRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            console.log(`[API] Refresh report request received: ${input.aggregation}/${input.entityType} for ${input.accountId} at ${input.timestamp}`);
-
             // Queue the refresh job
             const jobId = await refreshReportDatumJob.emit({
                 accountId: input.accountId,
@@ -273,7 +265,7 @@ export const reportsRouter = router({
                 entityType: input.entityType,
             });
 
-            console.log(`[API] Refresh job queued with ID: ${jobId}`);
+            logger.info({ accountId: input.accountId, jobId }, 'Refresh job queued');
 
             return {
                 success: true,
