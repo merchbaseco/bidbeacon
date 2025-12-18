@@ -41,7 +41,6 @@ export function useReportDatasets(aggregation: Aggregation = 'daily') {
         },
         {
             enabled: !!countryCode,
-            select: response => response.data,
             refetchOnMount: true,
             refetchOnWindowFocus: true,
         }

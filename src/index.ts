@@ -2,7 +2,7 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import websocket from '@fastify/websocket';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { createContext } from '@/api/context.js';
 import { appRouter } from '@/api/router.js';
 import { testConnection } from '@/db/index.js';
@@ -11,144 +11,141 @@ import { startJobs, stopJobs } from '@/jobs/index.js';
 import { emitEvent } from '@/utils/events.js';
 import { logger } from '@/utils/logger';
 
-logger.info('Starting BidBeacon Server');
+const PORT = Number(process.env.PORT) || 8080;
 
-const fastify = Fastify({
-    logger: false, // Disable Pino logger to avoid bundling issues
-});
+// ============================================================================
+// BidBeacon Server Startup
+// ============================================================================
 
-// Register Fastify plugins
-await fastify.register(helmet);
-await fastify.register(websocket);
-await fastify.register(cors, {
-    origin: (origin, callback) => {
-        const allowedOrigins = ['https://merchbase.co', 'https://admin.bidbeacon.merchbase.co', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'http://localhost:4174'];
+async function main() {
+    logger.info('Starting BidBeacon Server');
 
-        // Allow requests with no origin (e.g., mobile apps, server-to-server)
-        if (!origin) return callback(null, true);
+    const fastify = Fastify({ logger: false });
 
-        // Check if origin is in allowed list
-        if (allowedOrigins.includes(origin)) {
-            return callback(null, true);
-        }
+    // Fastify setup
+    await registerPlugins(fastify);
+    await registerRoutes(fastify);
+    registerErrorHandlers(fastify);
+    registerShutdownHandlers(fastify);
 
-        // Allow any localhost origin for development convenience
-        // (origin is the client's origin, not the server's)
-        try {
-            const url = new URL(origin);
-            if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
-                return callback(null, true);
-            }
-        } catch {
-            // Invalid URL, reject
-        }
-
-        return callback(new Error('Not allowed by CORS'), false);
-    },
-    credentials: true,
-});
-
-// Health check endpoint
-fastify.get('/api/health', async () => {
-    return {
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        service: 'bidbeacon-server',
-    };
-});
-
-// WebSocket events endpoint (register BEFORE tRPC to avoid route conflicts)
-const { registerWebSocketRoute } = await import('@/api/events/websocket.js');
-await registerWebSocketRoute(fastify);
-
-// Register tRPC (after WebSocket to ensure WebSocket route is matched first)
-await fastify.register(fastifyTRPCPlugin, {
-    prefix: '/api',
-    trpcOptions: {
-        router: appRouter,
-        createContext,
-    },
-});
-
-// 404 handler
-fastify.setNotFoundHandler(async (_request, reply) => {
-    reply.status(404);
-    return {
-        success: false,
-        error: 'Route not found',
-    };
-});
-
-// Error handler
-fastify.setErrorHandler(async (error: unknown, _request, reply) => {
-    const errorMessage = error instanceof Error ? error.message : 'Internal server error';
-    const errorStack = error instanceof Error ? error.stack : undefined;
-
-    logger.error({ err: error }, 'Unhandled error');
-
-    // Emit error event to connected clients
-    emitEvent({
-        type: 'error',
-        message: errorMessage,
-        details: errorStack,
-    });
-
-    reply.status(500);
-    return {
-        success: false,
-        error: 'Internal server error',
-    };
-});
-
-const port = Number(process.env.PORT) || 8080;
-
-// Graceful shutdown handler
-const shutdown = async (signal: string) => {
-    logger.info({ signal }, 'Received shutdown signal, shutting down gracefully');
-
-    try {
-        await stopJobs();
-
-        // Close Fastify server
-        await fastify.close();
-        logger.info('Fastify server closed');
-
-        logger.info('Shutdown complete');
-        process.exit(0);
-    } catch (error) {
-        logger.error({ err: error }, 'Error during shutdown');
-        process.exit(1);
-    }
-};
-
-// Register shutdown handlers
-process.on('SIGTERM', () => shutdown('SIGTERM'));
-process.on('SIGINT', () => shutdown('SIGINT'));
-
-try {
-    // Run database migrations
+    // Database
     await runMigrations();
-
-    // Test database connection
     await testConnection();
 
-    // Start recurring jobs
+    // Background jobs
     await startJobs();
 
-    // Start Fastify server
-    await fastify.listen({ port, host: '0.0.0.0' });
+    // Start server
+    await fastify.listen({ port: PORT, host: '0.0.0.0' });
 
-    // Print startup status summary
     logger.info(
         {
-            port,
-            healthCheck: '/api/health',
-            websocket: '/api/events',
-            trpc: '/api/*',
+            port: PORT,
         },
         'BidBeacon Server Ready'
     );
-} catch (err) {
+}
+
+main().catch(err => {
     logger.error({ err }, 'Failed to start server');
     process.exit(1);
+});
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+async function registerPlugins(fastify: FastifyInstance) {
+    await fastify.register(helmet);
+    await fastify.register(websocket);
+    await fastify.register(cors, {
+        origin: (origin, callback) => {
+            const allowedOrigins = ['https://merchbase.co', 'https://admin.bidbeacon.merchbase.co', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'http://localhost:4174'];
+
+            // Allow requests with no origin (e.g., mobile apps, server-to-server)
+            if (!origin) return callback(null, true);
+
+            // Check if origin is in allowed list
+            if (allowedOrigins.includes(origin)) {
+                return callback(null, true);
+            }
+
+            // Allow any localhost origin for development convenience
+            try {
+                const url = new URL(origin);
+                if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+                    return callback(null, true);
+                }
+            } catch {
+                // Invalid URL, reject
+            }
+
+            return callback(new Error('Not allowed by CORS'), false);
+        },
+        credentials: true,
+    });
+}
+
+async function registerRoutes(fastify: FastifyInstance) {
+    // Health check endpoint
+    fastify.get('/api/health', async () => ({
+        status: 'ok',
+        timestamp: new Date().toISOString(),
+        service: 'bidbeacon-server',
+    }));
+
+    // WebSocket events endpoint (must be registered BEFORE tRPC to avoid route conflicts)
+    const { registerWebSocketRoute } = await import('@/api/events/websocket.js');
+    await registerWebSocketRoute(fastify);
+
+    // tRPC API routes
+    await fastify.register(fastifyTRPCPlugin, {
+        prefix: '/api',
+        trpcOptions: {
+            router: appRouter,
+            createContext,
+        },
+    });
+}
+
+function registerErrorHandlers(fastify: FastifyInstance) {
+    fastify.setNotFoundHandler(async (_request, reply) => {
+        reply.status(404);
+        return { success: false, error: 'Route not found' };
+    });
+
+    fastify.setErrorHandler(async (error: unknown, _request, reply) => {
+        const errorMessage = error instanceof Error ? error.message : 'Internal server error';
+        const errorStack = error instanceof Error ? error.stack : undefined;
+
+        logger.error({ err: error }, 'Unhandled error');
+
+        emitEvent({
+            type: 'error',
+            message: errorMessage,
+            details: errorStack,
+        });
+
+        reply.status(500);
+        return { success: false, error: 'Internal server error' };
+    });
+}
+
+function registerShutdownHandlers(fastify: FastifyInstance) {
+    const shutdown = async (signal: string) => {
+        logger.info({ signal }, 'Received shutdown signal, shutting down gracefully');
+
+        try {
+            await stopJobs();
+            await fastify.close();
+            logger.info('Shutdown complete');
+            process.exit(0);
+        } catch (error) {
+            logger.error({ err: error }, 'Error during shutdown');
+            process.exit(1);
+        }
+    };
+
+    process.on('SIGTERM', () => shutdown('SIGTERM'));
+    process.on('SIGINT', () => shutdown('SIGINT'));
 }

@@ -642,3 +642,30 @@ export const apiMetrics = pgTable(
         index('api_metrics_timestamp_idx').on(table.timestamp),
     ]
 );
+
+/**
+ * ----------------------------------------------------------------------------
+ * Job Metrics Tracking
+ * ----------------------------------------------------------------------------
+ *
+ * Tracks invocations of background jobs (e.g., update-report-datasets) for monitoring
+ * and analytics purposes. Aggregated by 5-minute intervals for efficient querying.
+ */
+export const jobMetrics = pgTable(
+    'job_metrics',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        jobName: text('job_name').notNull(), // e.g., 'update-report-datasets', 'update-report-dataset-for-account'
+        success: boolean('success').notNull(), // Whether the job succeeded
+        startTime: timestamp('start_time', { withTimezone: true, mode: 'date' }).notNull(), // When the job started
+        endTime: timestamp('end_time', { withTimezone: true, mode: 'date' }).notNull(), // When the job completed
+        error: text('error'), // Error message if job failed
+        metadata: jsonb('metadata'), // Optional job-specific metadata (e.g., { accountCount: 5, jobCount: 5 })
+    },
+    table => [
+        // Index for querying metrics by job name and time range (using endTime for completion time)
+        index('job_metrics_job_name_end_time_idx').on(table.jobName, table.endTime),
+        // Index for querying by endTime (for time-series queries)
+        index('job_metrics_end_time_idx').on(table.endTime),
+    ]
+);

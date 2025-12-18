@@ -1,6 +1,8 @@
 import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
+import { z } from 'zod';
 import { reportConfigs } from '@/config/reports/configs';
+import { hourlyReportRowSchema } from '@/config/reports/hourly-target';
 import { db } from '@/db/index';
 import { performanceHourly } from '@/db/schema';
 import { getTimezoneForCountry } from '@/utils/timezones';
@@ -27,14 +29,13 @@ export async function handleHourlyTarget(input: ParseReportInput, metadata: Repo
     const decompressedData = await gunzipAsync(Buffer.from(compressedData));
     const rawJson = JSON.parse(decompressedData.toString());
 
-    const { z } = await import('zod');
-    const rows = z.array(reportConfig.rowSchema).parse(rawJson);
+    const rows = z.array(hourlyReportRowSchema).parse(rawJson);
 
     let insertedCount = 0;
     for (const row of rows) {
         const { entityId, matchType } = await lookupTargetId(row);
 
-        const hourValue = (row as { 'hour.value': string })['hour.value'];
+        const hourValue = row['hour.value'];
         const { bucketStart, bucketDate, bucketHour } = parseHourlyTimestamp(hourValue, timezone);
 
         await db

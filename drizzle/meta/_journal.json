@@ -169,6 +169,13 @@
       "when": 1766009344598,
       "tag": "0023_familiar_jane_foster",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1766098266065,
+      "tag": "0024_big_ezekiel_stane",
+      "breakpoints": true
     }
   ]
 }

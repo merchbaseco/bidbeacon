@@ -21,7 +21,6 @@ export function useAccountDatasetMetadata(accountId: string | null, countryCode:
         },
         {
             enabled: Boolean(accountId && countryCode),
-            select: response => response.data,
         }
     );
 }
@@ -29,7 +28,7 @@ export function useAccountDatasetMetadata(accountId: string | null, countryCode:
 export function useTriggerSyncAdEntities() {
     const utils = api.useUtils();
 
-    return api.sync.triggerAdEntities.useMutation({
+    return api.accounts.syncAdEntities.useMutation({
         onMutate: async ({ accountId, countryCode }) => {
             // Cancel outgoing refetches to avoid overwriting optimistic update
             await utils.accounts.datasetMetadata.cancel({

@@ -3,6 +3,7 @@
  */
 import { PgBoss } from 'pg-boss';
 import type { z } from 'zod';
+import { trackJobInvocation } from '@/utils/job-tracker';
 import { logger } from '@/utils/logger';
 
 // ============================================================================
@@ -131,16 +132,32 @@ class Job<T extends JobData> {
             }
 
             await pgBoss.schedule(this.jobName, this.scheduleOptions.cron, this.scheduleOptions.data ?? {}, { tz: 'UTC' });
-
-            logger.info({ jobName: this.jobName, cron: this.scheduleOptions.cron }, 'Scheduled job');
         }
 
-        // Register the worker
+        // Register the worker with automatic tracking
         await pgBoss.work<T>(this.jobName, workOptions ?? {}, async jobs => {
-            await this.workFn?.(jobs.map(j => ({ id: j.id, data: j.data })));
-        });
+            const startTime = new Date();
+            let success = false;
+            let error: string | undefined;
 
-        logger.info({ jobName: this.jobName }, 'Registered worker');
+            try {
+                // Execute the work function with the jobs
+                await this.workFn?.(jobs.map(j => ({ id: j.id, data: j.data })));
+                success = true;
+            } catch (err) {
+                error = err instanceof Error ? err.message : String(err);
+                throw err; // Re-throw to let pg-boss handle retries
+            } finally {
+                const endTime = new Date();
+                // Track the job invocation (don't await to avoid blocking)
+                trackJobInvocation(this.jobName, startTime, endTime, success, error, {
+                    jobCount: jobs.length,
+                }).catch(trackErr => {
+                    // Silently fail tracking - don't break job execution
+                    logger.error({ err: trackErr, jobName: this.jobName }, 'Failed to track job invocation');
+                });
+            }
+        });
     }
 
     /**
@@ -176,8 +193,6 @@ class Job<T extends JobData> {
         } else {
             jobId = await pgBoss.send(this.jobName, data, options);
         }
-
-        logger.info({ jobName: this.jobName, jobId }, 'Emitted job');
         return jobId;
     }
 }
@@ -229,7 +244,6 @@ class BossWrapper {
         });
 
         await this.instance.start();
-        logger.info('PgBoss started');
     }
 
     /**
@@ -259,7 +273,6 @@ class BossWrapper {
 
         await this.instance.stop();
         this.instance = null;
-        logger.info('PgBoss stopped');
     }
 
     /**

@@ -1,5 +1,5 @@
 import { toZonedTime } from 'date-fns-tz';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { createReport } from '@/amazon-ads/create-report.js';
 import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
@@ -90,24 +90,31 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
             const zonedTime = toZonedTime(nowUtc, timezone);
             const lastReportCreatedAt = new Date(zonedTime.getFullYear(), zonedTime.getMonth(), zonedTime.getDate(), zonedTime.getHours(), zonedTime.getMinutes(), zonedTime.getSeconds());
 
-            // Update metadata with reportId and status
+            // Insert or update metadata with reportId and status
             const [updatedRow] = await db
-                .update(reportDatasetMetadata)
-                .set({
-                    reportId,
+                .insert(reportDatasetMetadata)
+                .values({
+                    accountId: input.accountId,
+                    countryCode: input.countryCode,
+                    timestamp: date,
+                    aggregation: input.aggregation,
+                    entityType: input.entityType,
                     status: 'fetching',
                     lastRefreshed: utcNow(),
                     lastReportCreatedAt,
+                    reportId,
                     error: null,
                 })
-                .where(
-                    and(
-                        eq(reportDatasetMetadata.accountId, input.accountId),
-                        eq(reportDatasetMetadata.timestamp, date),
-                        eq(reportDatasetMetadata.aggregation, input.aggregation),
-                        eq(reportDatasetMetadata.entityType, input.entityType)
-                    )
-                )
+                .onConflictDoUpdate({
+                    target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
+                    set: {
+                        reportId,
+                        status: 'fetching',
+                        lastRefreshed: utcNow(),
+                        lastReportCreatedAt,
+                        error: null,
+                    },
+                })
                 .returning();
 
             if (updatedRow) {

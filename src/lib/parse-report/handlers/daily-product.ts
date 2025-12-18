@@ -1,9 +1,10 @@
 import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
+import { z } from 'zod';
 import { reportConfigs } from '@/config/reports/configs';
+import { dailyReportRowSchema } from '@/config/reports/daily-product';
 import { db } from '@/db/index';
 import { performanceDaily } from '@/db/schema';
-import { createContextLogger } from '@/utils/logger';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import type { ParseReportInput } from '../index';
 import { parseDailyTimestamp } from '../utils/parse-timestamps';
@@ -14,13 +15,6 @@ const gunzipAsync = promisify(gunzip);
 export async function handleDailyProduct(input: ParseReportInput, metadata: ReportMetadata): Promise<{ rowsProcessed: number }> {
     const reportConfig = reportConfigs[input.aggregation][input.entityType];
     const timezone = getTimezoneForCountry(metadata.countryCode);
-
-    const logger = createContextLogger({
-        component: 'parse-report',
-        handler: 'daily-product',
-        accountId: input.accountId,
-        timestamp: input.timestamp,
-    });
 
     const response = await fetch(metadata.reportUrl, {
         signal: AbortSignal.timeout(60000),
@@ -34,19 +28,13 @@ export async function handleDailyProduct(input: ParseReportInput, metadata: Repo
     const decompressedData = await gunzipAsync(Buffer.from(compressedData));
     const rawJson = JSON.parse(decompressedData.toString());
 
-    const { z } = await import('zod');
-    const rows = z.array(reportConfig.rowSchema).parse(rawJson);
+    const rows = z.array(dailyReportRowSchema).parse(rawJson);
 
     let insertedCount = 0;
     for (const row of rows) {
         // For product reports, entityId is the advertised product ID
-        const entityId = (row as { 'advertisedProduct.id': string | null })['advertisedProduct.id'];
-        if (!entityId) {
-            logger.warn({ row }, 'Skipping row with null advertisedProduct.id');
-            continue;
-        }
-
-        const dateValue = (row as { 'date.value': string })['date.value'];
+        const entityId = row['advertisedProduct.id'];
+        const dateValue = row['date.value'];
         const { bucketStart, bucketDate } = parseDailyTimestamp(dateValue, timezone);
 
         await db

@@ -9,7 +9,7 @@ import type { ReportConfig } from '@/types/reports.js';
  */
 
 // Complete schema for daily report rows
-const dailyReportRowSchema = z.object({
+export const dailyReportRowSchema = z.object({
     'date.value': z.string(),
     'budgetCurrency.value': z.string(),
     'campaign.id': z.coerce.string(),

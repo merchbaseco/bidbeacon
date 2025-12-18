@@ -2,13 +2,12 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { advertiserAccount } from '@/db/schema';
-import { logger } from '@/utils/logger';
+import { syncAdEntitiesJob } from '@/jobs/sync-ad-entities';
 import { publicProcedure, router } from '../trpc';
 
 export const accountsRouter = router({
     list: publicProcedure.query(async () => {
-        const data = await db.select().from(advertiserAccount);
-        return { success: true, data };
+        return db.select().from(advertiserAccount);
     }),
 
     toggle: publicProcedure
@@ -32,7 +31,7 @@ export const accountsRouter = router({
                 enabled: input.enabled,
             });
 
-            return { success: true, message: `Account ${input.enabled ? 'enabled' : 'disabled'}` };
+            return true;
         }),
 
     sync: publicProcedure.mutation(async () => {
@@ -70,8 +69,7 @@ export const accountsRouter = router({
             }
         }
 
-        logger.info({ accountCount: result.adsAccounts.length }, 'Synced advertiser accounts');
-        return { success: true, message: 'Advertiser accounts synced successfully' };
+        return true;
     }),
 
     datasetMetadata: publicProcedure
@@ -86,6 +84,21 @@ export const accountsRouter = router({
                 where: (metadata, { and, eq }) => and(eq(metadata.accountId, input.accountId), eq(metadata.countryCode, input.countryCode)),
             });
 
-            return { success: true, data };
+            return data;
+        }),
+
+    syncAdEntities: publicProcedure
+        .input(
+            z.object({
+                accountId: z.string(),
+                countryCode: z.string(),
+            })
+        )
+        .mutation(async ({ input }) => {
+            await syncAdEntitiesJob.emit({
+                accountId: input.accountId,
+                countryCode: input.countryCode,
+            });
+            return true;
         }),
 });

@@ -9,7 +9,7 @@ import type { ReportConfig } from '@/types/reports.js';
  */
 
 // Complete schema for hourly report rows
-const hourlyReportRowSchema = z.object({
+export const hourlyReportRowSchema = z.object({
     'hour.value': z.string(),
     'budgetCurrency.value': z.string(),
     'campaign.id': z.coerce.string(),

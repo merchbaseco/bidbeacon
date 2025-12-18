@@ -1,6 +1,8 @@
 import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
+import { z } from 'zod';
 import { reportConfigs } from '@/config/reports/configs';
+import { dailyReportRowSchema } from '@/config/reports/daily-target';
 import { db } from '@/db/index';
 import { performanceDaily } from '@/db/schema';
 import { getTimezoneForCountry } from '@/utils/timezones';
@@ -27,14 +29,13 @@ export async function handleDailyTarget(input: ParseReportInput, metadata: Repor
     const decompressedData = await gunzipAsync(Buffer.from(compressedData));
     const rawJson = JSON.parse(decompressedData.toString());
 
-    const { z } = await import('zod');
-    const rows = z.array(reportConfig.rowSchema).parse(rawJson);
+    const rows = z.array(dailyReportRowSchema).parse(rawJson);
 
     let insertedCount = 0;
     for (const row of rows) {
         const { entityId, matchType } = await lookupTargetId(row);
 
-        const dateValue = (row as { 'date.value': string })['date.value'];
+        const dateValue = row['date.value'];
         const { bucketStart, bucketDate } = parseDailyTimestamp(dateValue, timezone);
 
         await db

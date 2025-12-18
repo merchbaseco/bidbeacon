@@ -3,7 +3,7 @@ import { createContextLogger } from './logger';
 
 const logger = createContextLogger({ component: 'events' });
 
-export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'account-dataset-metadata:updated' | 'report-dataset-metadata:updated';
+export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'job-metrics:updated' | 'account-dataset-metadata:updated' | 'report-dataset-metadata:updated';
 
 export interface BaseEvent {
     type: EventType;
@@ -32,6 +32,11 @@ export interface ApiMetricsUpdatedEvent extends BaseEvent {
     apiName: string;
 }
 
+export interface JobMetricsUpdatedEvent extends BaseEvent {
+    type: 'job-metrics:updated';
+    jobName: string;
+}
+
 export interface AccountDatasetMetadataUpdatedEvent extends BaseEvent {
     type: 'account-dataset-metadata:updated';
     accountId: string;
@@ -55,7 +60,7 @@ export interface ReportDatasetMetadataUpdatedEvent extends BaseEvent {
     };
 }
 
-export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent | AccountDatasetMetadataUpdatedEvent | ReportDatasetMetadataUpdatedEvent;
+export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent | JobMetricsUpdatedEvent | AccountDatasetMetadataUpdatedEvent | ReportDatasetMetadataUpdatedEvent;
 
 /**
  * Singleton event emitter for WebSocket connections
@@ -126,6 +131,7 @@ export function emitEvent(event: Omit<ErrorEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<JobMetricsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportDatasetMetadataUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<Event, 'timestamp'>): void {

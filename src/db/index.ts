@@ -29,7 +29,6 @@ export const testConnection = async () => {
     try {
         // Simple query to test connection
         await db.execute('SELECT 1');
-        logger.info('Database connection established');
         return true;
     } catch (error) {
         logger.error({ err: error }, 'Unable to connect to database');

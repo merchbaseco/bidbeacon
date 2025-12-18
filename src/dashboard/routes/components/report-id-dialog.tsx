@@ -31,7 +31,7 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
     };
 
     const handleCopy = async () => {
-        const data = retrieveReportMutation.data?.data;
+        const data = retrieveReportMutation.data;
         const error = retrieveReportMutation.error;
         const text = error ? JSON.stringify({ error: error.message }, null, 2) : JSON.stringify(data, null, 2);
         await navigator.clipboard.writeText(text);
@@ -39,7 +39,7 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const data = retrieveReportMutation.data?.data;
+    const data = retrieveReportMutation.data;
     const error = retrieveReportMutation.error?.message;
 
     return (

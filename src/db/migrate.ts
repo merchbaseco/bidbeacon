@@ -31,7 +31,7 @@ export async function runMigrations() {
         // Close the migration connection
         await migrationClient.end();
     } catch (error) {
-        logger.error({ err: error }, 'Migration failed');
-        throw error; // Fail fast if migrations fail
+        logger.error({ err: error }, 'Database migration failed');
+        throw error;
     }
 }

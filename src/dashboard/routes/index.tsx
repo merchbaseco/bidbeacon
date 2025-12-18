@@ -7,6 +7,7 @@ import { connectionStatusAtom } from './atoms';
 import { AccountEnabledSwitch } from './components/account-selector/account-enabled-switch';
 import { ApiMetricsChart } from './components/api-metrics-chart';
 import { DatasetHealthTracker } from './components/health-tracker';
+import { JobMetricsChart } from './components/job-metrics-chart';
 import { ReportsTable } from './components/reports-table';
 import { SyncAdEntitiesButton } from './components/sync-ad-entities-button';
 
@@ -28,6 +29,12 @@ export function IndexRoute() {
                         <div className="text-sm font-medium">Amazon Ads API Invocations</div>
                     </div>
                     <ApiMetricsChart />
+                </Card>
+                <Card className="p-3 space-y-0 gap-3">
+                    <div className="flex items-start justify-between px-2 pb-1">
+                        <div className="text-sm font-medium">Job Invocations</div>
+                    </div>
+                    <JobMetricsChart />
                 </Card>
                 <Card className="p-3 space-y-0 gap-3">
                     <div className="flex items-start justify-between px-2">

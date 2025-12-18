@@ -11,6 +11,7 @@ type Event =
     | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }
     | { type: 'reports:refreshed'; accountId: string; timestamp: string }
     | { type: 'api-metrics:updated'; apiName: string; timestamp: string }
+    | { type: 'job-metrics:updated'; jobName: string; timestamp: string }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | {
           type: 'report-dataset-metadata:updated';
@@ -65,6 +66,10 @@ export function useWebSocket(): ConnectionStatus {
                     case 'api-metrics:updated':
                         // Invalidate API metrics queries to refresh the chart
                         utils.metrics.api.invalidate();
+                        break;
+                    case 'job-metrics:updated':
+                        // Invalidate job metrics queries to refresh the chart
+                        utils.metrics.job.invalidate();
                         break;
                     case 'account-dataset-metadata:updated':
                         // Invalidate account dataset metadata query to refresh the sync status

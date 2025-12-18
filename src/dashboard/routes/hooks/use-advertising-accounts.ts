@@ -12,9 +12,7 @@ export type AdvertisingAccount = {
 };
 
 export function useAdvertisingAccounts() {
-    const { data, ...rest } = api.accounts.list.useQuery(undefined, {
-        select: response => response.data,
-    });
+    const { data, ...rest } = api.accounts.list.useQuery();
 
     return {
         ...rest,
