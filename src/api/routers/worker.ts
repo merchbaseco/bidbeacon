@@ -1,10 +1,10 @@
 import { eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/db/index.js';
-import { workerControl } from '@/db/schema.js';
+import { db } from '@/db/index';
+import { workerControl } from '@/db/schema';
 import { logger } from '@/utils/logger';
-import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqsClient.js';
-import { publicProcedure, router } from '../trpc.js';
+import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqsClient';
+import { publicProcedure, router } from '../trpc';
 
 export const workerRouter = router({
     status: publicProcedure.query(async () => {

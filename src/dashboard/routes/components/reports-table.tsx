@@ -1,17 +1,13 @@
-import { HugeiconsIcon } from '@hugeicons/react';
-import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
 import { useEffect, useMemo, useState } from 'react';
-import { toast } from 'sonner';
 import { Badge } from '../../components/ui/badge';
-import { Button } from '../../components/ui/button';
 import { Frame, FrameFooter } from '../../components/ui/frame';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { api } from '../../lib/trpc.js';
 import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
 import { useReportDatasets } from '../hooks/use-report-datasets.js';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid.js';
 import { formatDate } from '../utils.js';
 import { ReportIdDialog } from './report-id-dialog.js';
+import { ReportRefreshButton } from './report-refresh-button.js';
 import { ReportsToolbar } from './reports-toolbar.js';
 import { StatusBadge } from './status-badge.js';
 import { TablePagination } from './table-pagination.js';
@@ -26,14 +22,6 @@ export const ReportsTable = () => {
     const accountId = useSelectedAccountId();
 
     const { refreshReportsTable, pending: refreshPending } = useRefreshReportsTable(accountId);
-
-    const refreshReportMutation = api.reports.refresh.useMutation({
-        onError: error => {
-            toast.error('Report refresh failed', {
-                description: error.message,
-            });
-        },
-    });
 
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -137,23 +125,7 @@ export const ReportsTable = () => {
                                         <TableCell>{row.lastRefreshed ? formatDate(row.lastRefreshed) : '—'}</TableCell>
                                         <TableCell>{row.reportId ? <ReportIdDialog row={row} accountId={accountId} /> : <Badge variant="outline">—</Badge>}</TableCell>
                                         <TableCell className="text-right">
-                                            <Button
-                                                variant="secondary"
-                                                size="icon"
-                                                onClick={() => {
-                                                    if (!accountId || !row.countryCode) return;
-                                                    refreshReportMutation.mutate({
-                                                        accountId,
-                                                        countryCode: row.countryCode,
-                                                        timestamp: row.timestamp,
-                                                        aggregation: row.aggregation,
-                                                        entityType: row.entityType,
-                                                    });
-                                                }}
-                                                disabled={row.refreshing}
-                                            >
-                                                <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={20} />
-                                            </Button>
+                                            <ReportRefreshButton row={row} accountId={accountId} />
                                         </TableCell>
                                     </TableRow>
                                 );

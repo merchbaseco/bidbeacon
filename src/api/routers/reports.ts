@@ -1,18 +1,19 @@
 import { toZonedTime } from 'date-fns-tz';
 import { and, desc, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
-import { createReport } from '@/amazon-ads/create-report.js';
-import { retrieveReport } from '@/amazon-ads/retrieve-report.js';
-import { reportConfigs } from '@/config/reports/configs.js';
-import { db } from '@/db/index.js';
-import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
-import { refreshReportDatumJob } from '@/jobs/refresh-report-datum.js';
-import { updateReportDatasetForAccountJob } from '@/jobs/update-report-dataset-for-account.js';
+import { createReport } from '@/amazon-ads/create-report';
+import { retrieveReport } from '@/amazon-ads/retrieve-report';
+import { reportConfigs } from '@/config/reports/configs';
+import { db } from '@/db/index';
+import { advertiserAccount, reportDatasetMetadata } from '@/db/schema';
+import { refreshReportDatumJob } from '@/jobs/refresh-report-datum';
+import { updateReportDatasetForAccountJob } from '@/jobs/update-report-dataset-for-account';
 import { parseReport } from '@/lib/parse-report/index';
-import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
-import { utcAddHours, utcNow } from '@/utils/date.js';
-import { getTimezoneForCountry } from '@/utils/timezones.js';
-import { publicProcedure, router } from '../trpc.js';
+import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports';
+import { utcAddHours, utcNow } from '@/utils/date';
+import { logger } from '@/utils/logger';
+import { getTimezoneForCountry } from '@/utils/timezones';
+import { publicProcedure, router } from '../trpc';
 
 const DEFAULT_ACCOUNT_ID = 'amzn1.ads-account.g.akzidxc3kemvnyklo33ht2mjm';
 

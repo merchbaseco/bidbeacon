@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { syncAdEntitiesJob } from '@/jobs/sync-ad-entities.js';
+import { syncAdEntitiesJob } from '@/jobs/sync-ad-entities';
 import { logger } from '@/utils/logger';
-import { publicProcedure, router } from '../trpc.js';
+import { publicProcedure, router } from '../trpc';
 
 export const syncRouter = router({
     triggerAdEntities: publicProcedure

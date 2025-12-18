@@ -1,9 +1,9 @@
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/db/index.js';
-import { advertiserAccount } from '@/db/schema.js';
+import { db } from '@/db/index';
+import { advertiserAccount } from '@/db/schema';
 import { logger } from '@/utils/logger';
-import { publicProcedure, router } from '../trpc.js';
+import { publicProcedure, router } from '../trpc';
 
 export const accountsRouter = router({
     list: publicProcedure.query(async () => {
@@ -25,7 +25,7 @@ export const accountsRouter = router({
                 .set({ enabled: input.enabled })
                 .where(and(eq(advertiserAccount.adsAccountId, input.adsAccountId), eq(advertiserAccount.profileId, input.profileId)));
 
-            const { emitEvent } = await import('@/utils/events.js');
+            const { emitEvent } = await import('@/utils/events');
             emitEvent({
                 type: 'account:updated',
                 accountId: input.adsAccountId,
@@ -36,7 +36,7 @@ export const accountsRouter = router({
         }),
 
     sync: publicProcedure.mutation(async () => {
-        const { listAdvertiserAccounts } = await import('@/amazon-ads/list-advertiser-accounts.js');
+        const { listAdvertiserAccounts } = await import('@/amazon-ads/list-advertiser-accounts');
 
         const result = await listAdvertiserAccounts(undefined, 'na');
 

@@ -4,6 +4,7 @@ import { AlertCircleIcon, AlertTriangleIcon, CheckCircleIcon, FilterIcon, Loader
 import { Button } from '../../components/ui/button';
 import { ButtonGroup, ButtonGroupSeparator } from '../../components/ui/button-group';
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '../../components/ui/select';
+import { Spinner } from '../../components/ui/spinner';
 
 const STATUS_OPTIONS = [
     { icon: FilterIcon, label: 'All Statuses', value: 'all' },
@@ -82,7 +83,7 @@ export const ReportsToolbar = ({ aggregation, entityType, statusFilter, isLoadin
             </Select>
             <ButtonGroup className="ml-auto">
                 <Button variant="ghost" onClick={onRefresh} disabled={isLoading} className="inline-flex items-center gap-2">
-                    <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} color="currentColor" />
+                    {isLoading ? <Spinner className="size-4" /> : <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} color="currentColor" />}
                 </Button>
             </ButtonGroup>
         </div>

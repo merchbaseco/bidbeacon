@@ -1,8 +1,8 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/db/index.js';
-import { apiMetrics } from '@/db/schema.js';
-import { publicProcedure, router } from '../trpc.js';
+import { db } from '@/db/index';
+import { apiMetrics } from '@/db/schema';
+import { publicProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
 
