@@ -1,27 +1,21 @@
 /**
  * Structured logging utility using pino.
- * Outputs JSON logs that can be easily filtered in log viewers like Dozzle.
- * Uses pino-pretty for human-readable output in development.
+ * Outputs pretty, human-readable logs using pino-pretty.
  */
 
 import pino from 'pino';
 
-// Use pino-pretty in development, JSON in production
-const isDevelopment = process.env.NODE_ENV !== 'production';
-
-// Base logger - outputs structured JSON (or pretty in dev)
+// Base logger - outputs pretty formatted logs
 const baseLogger = pino({
     level: process.env.LOG_LEVEL || 'info',
-    transport: isDevelopment
-        ? {
-              target: 'pino-pretty',
-              options: {
-                  colorize: true,
-                  translateTime: 'HH:MM:ss.l',
-                  ignore: 'pid,hostname',
-              },
-          }
-        : undefined,
+    transport: {
+        target: 'pino-pretty',
+        options: {
+            colorize: true,
+            translateTime: 'HH:MM:ss.l',
+            ignore: 'pid,hostname',
+        },
+    },
 });
 
 /**
