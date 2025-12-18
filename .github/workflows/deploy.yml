@@ -59,6 +59,7 @@ jobs:
       ADS_API_CLIENT_ID: ${{ secrets.ADS_API_CLIENT_ID }}
       ADS_API_CLIENT_SECRET: ${{ secrets.ADS_API_CLIENT_SECRET }}
       ADS_API_REFRESH_TOKEN: ${{ secrets.ADS_API_REFRESH_TOKEN }}
+      NEW_RELIC_LICENSE_KEY: ${{ secrets.NEW_RELIC_LICENSE_KEY }}
     steps:
       - name: Create stack env file
         run: |
@@ -76,6 +77,7 @@ jobs:
               ("ADS_API_CLIENT_ID", os.environ.get("ADS_API_CLIENT_ID", "")),
               ("ADS_API_CLIENT_SECRET", os.environ.get("ADS_API_CLIENT_SECRET", "")),
               ("ADS_API_REFRESH_TOKEN", os.environ.get("ADS_API_REFRESH_TOKEN", "")),
+              ("NEW_RELIC_LICENSE_KEY", os.environ.get("NEW_RELIC_LICENSE_KEY", "")),
           ]
 
           with open("stack.env", "w", encoding="utf-8") as env_file:
@@ -92,6 +94,7 @@ jobs:
           ADS_API_CLIENT_ID: ${{ env.ADS_API_CLIENT_ID }}
           ADS_API_CLIENT_SECRET: ${{ env.ADS_API_CLIENT_SECRET }}
           ADS_API_REFRESH_TOKEN: ${{ env.ADS_API_REFRESH_TOKEN }}
+          NEW_RELIC_LICENSE_KEY: ${{ env.NEW_RELIC_LICENSE_KEY }}
 
       - name: Encode stack env file
         id: encode-env
