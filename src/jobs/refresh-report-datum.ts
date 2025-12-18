@@ -61,19 +61,16 @@ export const refreshReportDatumJob = boss
 
                 // Determine next action using state machine
                 // The state machine will fetch report status if reportId exists
+                const action = await getNextAction(reportDatum.timestamp, reportDatum.aggregation as 'hourly' | 'daily', reportDatum.lastReportCreatedAt, reportDatum.reportId, countryCode);
+
                 logger.info(
                     {
-                        timestamp: reportDatum.timestamp.toISOString(),
-                        aggregation: reportDatum.aggregation,
                         lastReportCreatedAt: reportDatum.lastReportCreatedAt?.toISOString() ?? null,
                         reportId: reportDatum.reportId,
-                        countryCode,
+                        action,
                     },
-                    'State machine inputs'
+                    'State machine determined action'
                 );
-
-                const action = await getNextAction(reportDatum.timestamp, reportDatum.aggregation as 'hourly' | 'daily', reportDatum.lastReportCreatedAt, reportDatum.reportId, countryCode);
-                logger.info({ action }, 'State machine determined action');
 
                 switch (action) {
                     case 'none':
