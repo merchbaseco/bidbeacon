@@ -4,12 +4,12 @@ import { useAtomValue } from 'jotai';
 import { ConnectionStatusBadge } from '../components/connection-status-badge';
 import { Card } from '../components/ui/card';
 import { connectionStatusAtom } from './atoms';
+import { AccountDataCard } from './components/account-data-card';
 import { AccountEnabledSwitch } from './components/account-selector/account-enabled-switch';
 import { ApiMetricsChart } from './components/api-metrics-chart';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { JobMetricsChart } from './components/job-metrics-chart';
 import { ReportsTable } from './components/reports-table';
-import { SyncAdEntitiesButton } from './components/sync-ad-entities-button';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
@@ -17,21 +17,27 @@ export function IndexRoute() {
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between gap-2 py-1">
-                <div className="flex items-center gap-4">
-                    <AccountEnabledSwitch />
-                    <SyncAdEntitiesButton />
-                </div>
+                <AccountEnabledSwitch />
                 <ConnectionStatusBadge status={connectionStatus} className="mt-0.5" />
             </div>
             <div className="space-y-4">
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <Card className="p-3 space-y-0 gap-3">
+                <div className="grid grid-cols-6 gap-4">
+                    <div className="col-span-2">
+                        <AccountDataCard />
+                    </div>
+                    <div className="col-span-2">
+                        <Card></Card>
+                    </div>
+                    <div className="col-span-2">
+                        <Card></Card>
+                    </div>
+                    <Card className="p-3 space-y-0 gap-3 col-span-3">
                         <div className="flex items-start justify-between px-2 pb-1">
                             <div className="text-sm font-medium">Amazon Ads API Invocations</div>
                         </div>
                         <ApiMetricsChart />
                     </Card>
-                    <Card className="p-3 space-y-0 gap-3">
+                    <Card className="p-3 space-y-0 gap-3 col-span-3">
                         <div className="flex items-start justify-between px-2 pb-1">
                             <div className="text-sm font-medium">Job Invocations</div>
                         </div>

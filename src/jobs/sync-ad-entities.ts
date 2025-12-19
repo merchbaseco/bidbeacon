@@ -333,9 +333,13 @@ export const syncAdEntitiesJob = boss
 
                     await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
 
+                    // Track which exports just completed this poll cycle
+                    const justCompleted: EntityType[] = [];
+
                     // Poll all pending exports in parallel
                     await Promise.all(
                         pendingExports.map(async exportState => {
+                            const previousStatus = exportState.status;
                             const status = await getExportStatus(
                                 {
                                     profileId,
@@ -352,16 +356,25 @@ export const syncAdEntitiesJob = boss
                                 exportState.error = status.error?.message ?? 'Unknown error';
                                 logger.error({ entityType: exportState.entityType, error: exportState.error }, 'Export failed');
                             }
+
+                            // Track if this export just completed
+                            if (previousStatus === 'PROCESSING' && status.status === 'COMPLETED') {
+                                justCompleted.push(exportState.entityType);
+                            }
                         })
                     );
 
                     pollCount++;
 
-                    // Update poll counts for each export type
+                    // Update poll counts and fetching flags for each export type
                     const updateData: Partial<{
+                        fetchingCampaigns: boolean;
                         fetchingCampaignsPollCount: number;
+                        fetchingAdGroups: boolean;
                         fetchingAdGroupsPollCount: number;
+                        fetchingAds: boolean;
                         fetchingAdsPollCount: number;
+                        fetchingTargets: boolean;
                         fetchingTargetsPollCount: number;
                     }> = {};
 
@@ -369,20 +382,32 @@ export const syncAdEntitiesJob = boss
                     if (campaignsExport?.status === 'PROCESSING') {
                         updateData.fetchingCampaignsPollCount = pollCount;
                     }
+                    if (justCompleted.includes('campaigns')) {
+                        updateData.fetchingCampaigns = false;
+                    }
 
                     const adGroupsExport = exports.find(e => e.entityType === 'adGroups');
                     if (adGroupsExport?.status === 'PROCESSING') {
                         updateData.fetchingAdGroupsPollCount = pollCount;
+                    }
+                    if (justCompleted.includes('adGroups')) {
+                        updateData.fetchingAdGroups = false;
                     }
 
                     const adsExport = exports.find(e => e.entityType === 'ads');
                     if (adsExport?.status === 'PROCESSING') {
                         updateData.fetchingAdsPollCount = pollCount;
                     }
+                    if (justCompleted.includes('ads')) {
+                        updateData.fetchingAds = false;
+                    }
 
                     const targetsExport = exports.find(e => e.entityType === 'targets');
                     if (targetsExport?.status === 'PROCESSING') {
                         updateData.fetchingTargetsPollCount = pollCount;
+                    }
+                    if (justCompleted.includes('targets')) {
+                        updateData.fetchingTargets = false;
                     }
 
                     if (Object.keys(updateData).length > 0) {
