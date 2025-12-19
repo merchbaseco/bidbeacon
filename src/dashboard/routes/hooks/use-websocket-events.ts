@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import useWebSocketLib from 'react-use-websocket';
-import { apiBaseUrl } from '../../router.js';
+import { apiBaseUrl } from '../../router';
 
 type Event =
     | {
@@ -17,8 +17,6 @@ type Event =
     | { type: 'error'; message: string; details?: string; timestamp: string }
     | { type: 'pong' };
 
-const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
-
 /**
  * Hook to listen for specific WebSocket events
  * Uses the shared WebSocket connection from react-use-websocket
@@ -29,7 +27,10 @@ export function useWebSocketEvents<T extends Event['type']>(eventType: T, handle
     const handlerRef = useRef(handler);
     handlerRef.current = handler;
 
-    useWebSocketLib(WS_URL, {
+    // Compute WebSocket URL lazily inside the hook to avoid initialization order issues
+    const wsUrl = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
+
+    useWebSocketLib(wsUrl, {
         onMessage: event => {
             try {
                 const data: Event = JSON.parse(event.data);

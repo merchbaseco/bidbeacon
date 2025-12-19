@@ -41,12 +41,21 @@ export const updateReportDatasetsJob = boss
         });
 
         // Query records due for refresh (only look at rows from the last 10 days)
+        // Only process daily target datasets - skip hourly and daily product
         const now = new Date();
         const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
         const dueRecords = await db
             .select()
             .from(reportDatasetMetadata)
-            .where(and(lte(reportDatasetMetadata.nextRefreshAt, now), eq(reportDatasetMetadata.refreshing, false), gte(reportDatasetMetadata.timestamp, tenDaysAgo)));
+            .where(
+                and(
+                    lte(reportDatasetMetadata.nextRefreshAt, now),
+                    eq(reportDatasetMetadata.refreshing, false),
+                    gte(reportDatasetMetadata.timestamp, tenDaysAgo),
+                    eq(reportDatasetMetadata.aggregation, 'daily'),
+                    eq(reportDatasetMetadata.entityType, 'target')
+                )
+            );
 
         // Enqueue update-report-status for each due record
         const statusJobPromises = dueRecords.map(async record => {

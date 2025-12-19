@@ -10,6 +10,7 @@ export const useThrottlerMetrics = (params?: { from?: string; to?: string }) => 
         },
         {
             refetchInterval: 10000, // Refetch every 10 seconds as fallback/sync
+            refetchOnWindowFocus: true, // Also refetch when window regains focus
             staleTime: 5000,
         }
     );

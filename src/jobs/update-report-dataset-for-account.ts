@@ -9,7 +9,7 @@ import { db } from '@/db/index.js';
 import { reportDatasetMetadata } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
-import { AGGREGATION_TYPES, type AggregationType, ENTITY_TYPES, type EntityType } from '@/types/reports.js';
+import type { AggregationType, EntityType } from '@/types/reports.js';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
@@ -38,12 +38,9 @@ export const updateReportDatasetForAccountJob = boss
             const timezone = getTimezoneForCountry(countryCode);
             const now = zonedNow(timezone);
 
-            // Update metadata for each combination of aggregation and entity type
-            for (const aggregation of AGGREGATION_TYPES) {
-                for (const entityType of ENTITY_TYPES) {
-                    await updateMetadata(accountId, countryCode, now, aggregation, entityType, timezone);
-                }
-            }
+            // Update metadata only for daily target datasets
+            // Skip hourly datasets and daily product datasets
+            await updateMetadata(accountId, countryCode, now, 'daily', 'target', timezone);
 
             // Emit event when job completes
             emitEvent({

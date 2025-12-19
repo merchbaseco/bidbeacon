@@ -99,35 +99,39 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
     // Poll in 5 minutes to check if report completed
     const nextRefreshAt = new Date(Date.now() + 5 * 60 * 1000);
 
-    // Insert or update metadata with reportId and status
-    const [updatedRow] = await db
-        .insert(reportDatasetMetadata)
-        .values({
-            accountId: input.accountId,
-            countryCode: input.countryCode,
-            timestamp: date,
-            aggregation: input.aggregation,
-            entityType: input.entityType,
-            status: 'fetching',
-            nextRefreshAt,
-            lastReportCreatedAt,
-            reportId,
-            error: null,
-        })
-        .onConflictDoUpdate({
-            target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
-            set: {
-                reportId,
+    // Only insert/update metadata for daily target datasets
+    // Skip hourly datasets and daily product datasets
+    if (input.aggregation === 'daily' && input.entityType === 'target') {
+        // Insert or update metadata with reportId and status
+        const [updatedRow] = await db
+            .insert(reportDatasetMetadata)
+            .values({
+                accountId: input.accountId,
+                countryCode: input.countryCode,
+                timestamp: date,
+                aggregation: input.aggregation,
+                entityType: input.entityType,
                 status: 'fetching',
                 nextRefreshAt,
                 lastReportCreatedAt,
+                reportId,
                 error: null,
-            },
-        })
-        .returning();
+            })
+            .onConflictDoUpdate({
+                target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
+                set: {
+                    reportId,
+                    status: 'fetching',
+                    nextRefreshAt,
+                    lastReportCreatedAt,
+                    error: null,
+                },
+            })
+            .returning();
 
-    if (updatedRow) {
-        emitReportDatasetMetadataUpdated(updatedRow);
+        if (updatedRow) {
+            emitReportDatasetMetadataUpdated(updatedRow);
+        }
     }
 
     return reportId;

@@ -1,6 +1,6 @@
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { useThrottlerMetrics } from '../hooks/use-throttler-metrics';
 
@@ -22,22 +22,23 @@ interface CustomTooltipProps {
 function CustomTooltip({ active, payload, label, chartData }: CustomTooltipProps) {
     if (!active || !payload || payload.length === 0) return null;
 
-    const point = chartData.find(p => {
-        const pointTime = format(new Date(p.interval), 'HH:mm');
-        return pointTime === label;
-    });
-    if (!point) return null;
+    // Find point by matching the formatted interval label
+    const point = chartData.find(p => p.interval === label);
+    if (!point || !point.timestamp) return null;
 
-    const timestamp = new Date(point.interval);
+    const timestamp = new Date(point.timestamp as string);
+    // Check if timestamp is valid
+    if (Number.isNaN(timestamp.getTime())) return null;
+
     const endTime = new Date(timestamp.getTime() + 1000); // 1 second interval
 
-    // Format local time range
-    const localStart = format(timestamp, 'h:mmaaa');
-    const localEnd = format(endTime, 'h:mmaaa');
+    // Format local time range with seconds
+    const localStart = format(timestamp, 'h:mm:ssaaa');
+    const localEnd = format(endTime, 'h:mm:ssaaa');
 
-    // Format UTC time range
-    const utcStart = formatInTimeZone(timestamp, 'UTC', 'h:mmaaa');
-    const utcEnd = formatInTimeZone(endTime, 'UTC', 'h:mmaaa');
+    // Format UTC time range with seconds
+    const utcStart = formatInTimeZone(timestamp, 'UTC', 'h:mm:ssaaa');
+    const utcEnd = formatInTimeZone(endTime, 'UTC', 'h:mm:ssaaa');
 
     const rateLimitPercentage = point.total > 0 ? ((point.rateLimited / point.total) * 100).toFixed(1) : '0.0';
 
@@ -76,12 +77,24 @@ function CustomTooltip({ active, payload, label, chartData }: CustomTooltipProps
 }
 
 /**
- * Format timestamp to relative time (e.g., "12h ago", "3h ago", "2m ago")
+ * Format timestamp to relative time with seconds (e.g., "45s ago", "30s ago", "15s ago")
  */
 function formatRelativeTime(timestamp: string): string {
-    const distance = formatDistanceToNow(new Date(timestamp), { addSuffix: false });
-    // Shorten the format: "about 12 hours" -> "12h", "3 hours" -> "3h", "2 minutes" -> "2m"
-    return `${distance.replace('about ', '').replace(' hours', 'h').replace(' hour', 'h').replace(' minutes', 'm').replace(' minute', 'm').replace('less than a minute', '0m')} ago`;
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffSeconds = Math.floor((now.getTime() - time.getTime()) / 1000);
+
+    if (diffSeconds < 60) {
+        return `${diffSeconds}s ago`;
+    }
+
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    if (diffMinutes < 60) {
+        return `${diffMinutes}m ago`;
+    }
+
+    const diffHours = Math.floor(diffMinutes / 60);
+    return `${diffHours}h ago`;
 }
 
 /**
@@ -93,21 +106,47 @@ function formatRelativeTime(timestamp: string): string {
  * Uses 1-second intervals for the last minute.
  */
 export function ThrottlerMetricsChart() {
-    // Memoize from date to keep query key stable, but let server calculate 'to' as 'now' on each query
+    // Update every second for visual chart updates
+    const [now, setNow] = useState(new Date());
+
+    // Separate state for query updates (slower, to avoid hammering DB)
+    const [queryRefreshKey, setQueryRefreshKey] = useState(0);
+
+    useEffect(() => {
+        // Update visual state every second
+        const visualInterval = setInterval(() => {
+            setNow(new Date());
+        }, 1000);
+
+        // Update query every 10 seconds
+        const queryInterval = setInterval(() => {
+            setQueryRefreshKey(prev => prev + 1);
+        }, 10000);
+
+        return () => {
+            clearInterval(visualInterval);
+            clearInterval(queryInterval);
+        };
+    }, []);
+
+    // Memoize from date, recalculate when queryRefreshKey changes (every 10 seconds)
+    // Round 'from' to nearest 10 seconds to group queries and reduce DB load while ensuring query key changes
+    // biome-ignore lint/correctness/useExhaustiveDependencies: queryRefreshKey is intentionally used to trigger recalculation
     const dateRange = useMemo(() => {
-        const to = new Date();
-        const from = new Date(to.getTime() - 60 * 1000); // 1 minute
+        const now = new Date();
+        // Round down to nearest 10 seconds - this groups queries and reduces DB load
+        const roundedNow = new Date(Math.floor(now.getTime() / 10000) * 10000);
+        const from = new Date(roundedNow.getTime() - 60 * 1000); // 1 minute before rounded time
         return {
             from: from.toISOString(),
             // Don't pass 'to' - let server default to 'now' so we always get latest data
         };
-    }, []); // Empty deps - only calculate once
+    }, [queryRefreshKey]);
 
     const { data, isLoading, error } = useThrottlerMetrics(dateRange);
 
-    // Generate all 1-second intervals for the last minute
+    // Generate all 1-second intervals for the last minute, recalculate when 'now' changes
     const intervals = useMemo(() => {
-        const now = new Date();
         const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
         const intervalList: string[] = [];
 
@@ -127,13 +166,13 @@ export function ThrottlerMetricsChart() {
         }
 
         return intervalList;
-    }, []);
+    }, [now]);
 
     // Transform data for Recharts
     const chartData = useMemo(() => {
         return intervals.map(interval => {
             const point: Record<string, string | number> = {
-                interval: format(new Date(interval), 'HH:mm'),
+                interval: format(new Date(interval), 'HH:mm:ss'),
                 timestamp: interval,
             };
 
@@ -175,14 +214,14 @@ export function ThrottlerMetricsChart() {
         return <div className="flex items-center justify-center h-[200px] text-destructive text-sm">Error loading throttler metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>;
     }
 
-    // Custom tick formatter to show relative time at specific intervals
+    // Custom tick formatter to show relative time with seconds
     const formatXAxisTick = (value: string, index: number) => {
         const point = chartData.find(p => p.interval === value);
         if (!point) return value;
 
         // Show tick at roughly every 15 seconds (15 intervals of 1 second = 15 seconds)
         const totalTicks = chartData.length;
-        const tickInterval = Math.floor(totalTicks / 4); // Show ~4-5 ticks
+        const tickInterval = Math.max(1, Math.floor(totalTicks / 5)); // Show ~5 ticks
         if (index === 0 || index === totalTicks - 1 || index % tickInterval === 0) {
             return formatRelativeTime(point.timestamp as string);
         }
@@ -215,8 +254,8 @@ export function ThrottlerMetricsChart() {
                         <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} domain={[0, maxCount]} />
                         <Tooltip content={<CustomTooltip chartData={chartData as Array<{ interval: string; total: number; rateLimited: number }>} />} />
-                        <Line type="monotone" dataKey="total" stroke="#3B82F6" strokeWidth={1.5} dot={false} name="Total Calls" />
-                        <Line type="monotone" dataKey="rateLimited" stroke="#EF4444" strokeWidth={1.5} dot={false} name="Rate Limited (429)" />
+                        <Line type="monotone" dataKey="total" stroke="#3B82F6" strokeWidth={1.5} dot={false} name="Total Calls" isAnimationActive={false} />
+                        <Line type="monotone" dataKey="rateLimited" stroke="#EF4444" strokeWidth={1.5} dot={false} name="Rate Limited (429)" isAnimationActive={false} />
                     </LineChart>
                 </ResponsiveContainer>
             </div>
