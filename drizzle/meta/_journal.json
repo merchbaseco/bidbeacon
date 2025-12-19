@@ -190,6 +190,13 @@
       "when": 1766110205139,
       "tag": "0026_violet_fat_cobra",
       "breakpoints": true
+    },
+    {
+      "idx": 27,
+      "version": "7",
+      "when": 1766181948780,
+      "tag": "0027_burly_radioactive_man",
+      "breakpoints": true
     }
   ]
 }
