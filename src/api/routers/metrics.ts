@@ -130,4 +130,41 @@ export const metricsRouter = router({
                 to: to.toISOString(),
             };
         }),
+    throttler: publicProcedure
+        .input(
+            z.object({
+                from: z.string().datetime().optional(),
+                to: z.string().datetime().optional(),
+            })
+        )
+        .query(async ({ input }) => {
+            const to = input.to ? new Date(input.to) : new Date();
+            const from = input.from ? new Date(input.from) : new Date(to.getTime() - 60 * 1000); // Default to 1 minute
+
+            const conditions = [gte(apiMetrics.timestamp, from), lte(apiMetrics.timestamp, to)];
+
+            // Query for 1-second intervals
+            const data = await db
+                .select({
+                    interval: sql<string>`date_trunc('minute', ${apiMetrics.timestamp}) + floor(extract(second from ${apiMetrics.timestamp})) * interval '1 second'`.as('interval'),
+                    totalCount: sql<number>`count(*)`.as('total_count'),
+                    rateLimitedCount: sql<number>`sum(case when ${apiMetrics.statusCode} = 429 then 1 else 0 end)`.as('rate_limited_count'),
+                })
+                .from(apiMetrics)
+                .where(and(...conditions))
+                .groupBy(sql`date_trunc('minute', ${apiMetrics.timestamp}) + floor(extract(second from ${apiMetrics.timestamp})) * interval '1 second'`)
+                .orderBy(sql`date_trunc('minute', ${apiMetrics.timestamp}) + floor(extract(second from ${apiMetrics.timestamp})) * interval '1 second'`);
+
+            const chartData = data.map(row => ({
+                interval: new Date(row.interval).toISOString(),
+                total: Number(row.totalCount),
+                rateLimited: Number(row.rateLimitedCount),
+            }));
+
+            return {
+                data: chartData,
+                from: from.toISOString(),
+                to: to.toISOString(),
+            };
+        }),
 });

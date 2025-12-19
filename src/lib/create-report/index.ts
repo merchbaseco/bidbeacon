@@ -4,7 +4,6 @@ import { createReport } from '@/amazon-ads/create-report.js';
 import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
-import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
 import type { AggregationType, EntityType } from '@/types/reports.js';
 import { utcAddHours, utcNow } from '@/utils/date.js';
 import { emitReportDatasetMetadataUpdated } from '@/utils/emit-report-dataset-metadata-updated.js';
@@ -97,8 +96,8 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
     const zonedTime = toZonedTime(nowUtc, timezone);
     const lastReportCreatedAt = new Date(zonedTime.getFullYear(), zonedTime.getMonth(), zonedTime.getDate(), zonedTime.getHours(), zonedTime.getMinutes(), zonedTime.getSeconds());
 
-    // Calculate next refresh time
-    const nextRefreshAt = getNextRefreshTime(date, input.aggregation, lastReportCreatedAt, input.countryCode);
+    // Poll in 5 minutes to check if report completed
+    const nextRefreshAt = new Date(Date.now() + 5 * 60 * 1000);
 
     // Insert or update metadata with reportId and status
     const [updatedRow] = await db

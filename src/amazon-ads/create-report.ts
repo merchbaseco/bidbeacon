@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker.js';
 import { type ApiRegion, getApiBaseUrl } from './config.js';
 import { refreshAccessToken } from './reauth.js';
+import { throttledFetch } from './throttled-fetch.js';
 
 // ============================================================================
 // Schemas
@@ -141,7 +142,7 @@ export async function createReport(options: CreateReportOptions, region: ApiRegi
             'Content-Type': 'application/json',
         };
 
-        const response = await fetch(url, {
+        const response = await throttledFetch(url, {
             method: 'POST',
             headers,
             body: JSON.stringify(validatedRequestBody),

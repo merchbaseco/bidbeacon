@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker.js';
 import { type ApiRegion, getApiBaseUrl } from './config.js';
 import { refreshAccessToken } from './reauth.js';
+import { throttledFetch } from './throttled-fetch.js';
 
 // ============================================================================
 // Schemas
@@ -18,16 +19,7 @@ const stateFilterSchema = z.enum(['ARCHIVED', 'ENABLED', 'PAUSED']);
 
 const targetLevelFilterSchema = z.enum(['AD_GROUP', 'CAMPAIGN']);
 
-const targetTypeFilterSchema = z.enum([
-    'AUDIENCE',
-    'AUTO',
-    'KEYWORD',
-    'PRODUCT',
-    'PRODUCT_AUDIENCE',
-    'PRODUCT_CATEGORY',
-    'PRODUCT_CATEGORY_AUDIENCE',
-    'THEME',
-]);
+const targetTypeFilterSchema = z.enum(['AUDIENCE', 'AUTO', 'KEYWORD', 'PRODUCT', 'PRODUCT_AUDIENCE', 'PRODUCT_CATEGORY', 'PRODUCT_CATEGORY_AUDIENCE', 'THEME']);
 
 const targetsExportRequestSchema = z.object({
     adProductFilter: z.array(adProductFilterSchema).min(1).max(3).optional(),
@@ -66,16 +58,7 @@ export interface ExportTargetsOptions {
     stateFilter?: Array<'ARCHIVED' | 'ENABLED' | 'PAUSED'>;
     negativeFilter?: boolean[];
     targetLevelFilter?: Array<'AD_GROUP' | 'CAMPAIGN'>;
-    targetTypeFilter?: Array<
-        | 'AUDIENCE'
-        | 'AUTO'
-        | 'KEYWORD'
-        | 'PRODUCT'
-        | 'PRODUCT_AUDIENCE'
-        | 'PRODUCT_CATEGORY'
-        | 'PRODUCT_CATEGORY_AUDIENCE'
-        | 'THEME'
-    >;
+    targetTypeFilter?: Array<'AUDIENCE' | 'AUTO' | 'KEYWORD' | 'PRODUCT' | 'PRODUCT_AUDIENCE' | 'PRODUCT_CATEGORY' | 'PRODUCT_CATEGORY_AUDIENCE' | 'THEME'>;
 }
 
 // ============================================================================
@@ -129,7 +112,7 @@ export async function exportTargets(options: ExportTargetsOptions, region: ApiRe
             Accept: 'application/vnd.targetsexport.v1+json',
         };
 
-        const response = await fetch(url, {
+        const response = await throttledFetch(url, {
             method: 'POST',
             headers,
             body: JSON.stringify(validatedRequestBody),
@@ -154,4 +137,3 @@ export async function exportTargets(options: ExportTargetsOptions, region: ApiRe
         return result;
     });
 }
-

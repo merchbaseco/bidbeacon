@@ -57,10 +57,21 @@ export const updateReportStatusJob = boss
 
                 // Determine next action using state machine
                 // The state machine will fetch report status if reportId exists
-                const action = await getNextAction(reportDatum.timestamp, reportDatum.aggregation as 'hourly' | 'daily', reportDatum.lastReportCreatedAt, reportDatum.reportId, countryCode);
+                const action = await getNextAction(
+                    reportDatum.timestamp,
+                    reportDatum.aggregation as 'hourly' | 'daily',
+                    reportDatum.entityType as 'target' | 'product',
+                    reportDatum.lastReportCreatedAt,
+                    reportDatum.reportId,
+                    countryCode
+                );
 
                 switch (action) {
                     case 'none':
+                        // If report is pending, set nextRefreshAt to poll again in 5 minutes
+                        if (reportDatum.reportId) {
+                            await setNextRefreshForPending(accountId, date, aggregation, entityType);
+                        }
                         await setRefreshing(false, accountId, date, aggregation, entityType, null, countryCode);
                         return;
 
@@ -69,8 +80,8 @@ export const updateReportStatusJob = boss
                         await updateStatus('parsing', null, accountId, date, aggregation, entityType, countryCode);
                         await parseReport({ accountId, timestamp, aggregation, entityType });
 
-                        // Update status to 'completed' after successful parsing
-                        await updateStatus('completed', null, accountId, date, aggregation, entityType, countryCode);
+                        // Mark report as processed: clear reportId, set lastProcessedReportId, recalculate nextRefreshAt
+                        await markReportProcessed(accountId, date, aggregation, entityType, countryCode);
                         await setRefreshing(false, accountId, date, aggregation, entityType, null, countryCode);
                         return;
 
@@ -192,6 +203,77 @@ async function updateStatus(status: string, error: string | null, accountId: str
         .set({
             status,
             error,
+            nextRefreshAt,
+        })
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, accountId),
+                eq(reportDatasetMetadata.timestamp, timestamp),
+                eq(reportDatasetMetadata.aggregation, aggregation),
+                eq(reportDatasetMetadata.entityType, entityType)
+            )
+        )
+        .returning();
+
+    if (updatedRow) {
+        emitReportDatasetMetadataUpdated(updatedRow);
+    }
+}
+
+/**
+ * Marks a report as processed: clears reportId, sets lastProcessedReportId, and recalculates nextRefreshAt
+ */
+async function markReportProcessed(accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType, countryCode: string): Promise<void> {
+    // Get current row to get reportId and calculate nextRefreshAt
+    const currentRow = await db.query.reportDatasetMetadata.findFirst({
+        where: and(
+            eq(reportDatasetMetadata.accountId, accountId),
+            eq(reportDatasetMetadata.timestamp, timestamp),
+            eq(reportDatasetMetadata.aggregation, aggregation),
+            eq(reportDatasetMetadata.entityType, entityType)
+        ),
+    });
+
+    if (!currentRow) {
+        return;
+    }
+
+    const oldReportId = currentRow.reportId;
+    const nextRefreshAt = getNextRefreshTime(timestamp, aggregation as 'hourly' | 'daily', currentRow.lastReportCreatedAt, countryCode);
+
+    const [updatedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({
+            status: 'completed',
+            reportId: null,
+            lastProcessedReportId: oldReportId,
+            nextRefreshAt,
+            error: null,
+        })
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, accountId),
+                eq(reportDatasetMetadata.timestamp, timestamp),
+                eq(reportDatasetMetadata.aggregation, aggregation),
+                eq(reportDatasetMetadata.entityType, entityType)
+            )
+        )
+        .returning();
+
+    if (updatedRow) {
+        emitReportDatasetMetadataUpdated(updatedRow);
+    }
+}
+
+/**
+ * Sets nextRefreshAt to 5 minutes from now for a pending report
+ */
+async function setNextRefreshForPending(accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
+    const nextRefreshAt = new Date(Date.now() + 5 * 60 * 1000);
+
+    const [updatedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({
             nextRefreshAt,
         })
         .where(

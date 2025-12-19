@@ -7,7 +7,7 @@
 
 import { db } from '@/db/index.js';
 import { apiMetrics } from '@/db/schema.js';
-import { emitEvent } from '@/utils/events.js';
+import { type ApiMetricsUpdatedEvent, emitEvent } from '@/utils/events.js';
 import { logger } from '@/utils/logger';
 
 export interface ApiCallOptions {
@@ -30,18 +30,35 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
     const timestamp = new Date();
 
     try {
-        await db.insert(apiMetrics).values({
-            apiName: options.apiName,
-            region: options.region,
-            statusCode: statusCode ?? null,
-            success,
-            durationMs,
-            timestamp,
-            error: error ?? null,
-        });
+        const [insertedRow] = await db
+            .insert(apiMetrics)
+            .values({
+                apiName: options.apiName,
+                region: options.region,
+                statusCode: statusCode ?? null,
+                success,
+                durationMs,
+                timestamp,
+                error: error ?? null,
+            })
+            .returning();
 
         // Notify connected clients that API metrics have been updated
-        emitEvent({ type: 'api-metrics:updated', apiName: options.apiName });
+        // Include the row data so clients can append it without refetching
+        const event: Omit<ApiMetricsUpdatedEvent, 'timestamp'> = {
+            type: 'api-metrics:updated',
+            apiName: options.apiName,
+            data: {
+                apiName: insertedRow.apiName,
+                region: insertedRow.region,
+                statusCode: insertedRow.statusCode,
+                success: insertedRow.success,
+                durationMs: insertedRow.durationMs,
+                timestamp: insertedRow.timestamp.toISOString(),
+                error: insertedRow.error,
+            },
+        };
+        emitEvent(event);
     } catch (err) {
         // Silently fail - we don't want tracking failures to break the app
         logger.error({ err, apiName: options.apiName }, 'Failed to track API call');

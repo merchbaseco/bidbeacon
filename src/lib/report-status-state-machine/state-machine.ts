@@ -1,5 +1,5 @@
 import { retrieveReport } from '@/amazon-ads/retrieve-report.js';
-import type { AggregationType } from '@/types/reports';
+import type { AggregationType, EntityType } from '@/types/reports';
 import { isEligibleForReport } from './eligibility';
 import type { NextAction } from './types';
 
@@ -9,11 +9,12 @@ import type { NextAction } from './types';
  * State machine logic:
  * 1. If report exists AND status is COMPLETED → 'process'
  * 2. If report exists AND status is NOT COMPLETED → 'none'
- * 3. If no report AND eligible → 'create'
- * 4. If no report AND not eligible → 'none'
+ * 3. If no report AND eligible AND (target + daily) → 'create'
+ * 4. If no report AND not eligible OR not (target + daily) → 'none'
  *
  * @param timestamp - Report timestamp
  * @param aggregation - Report aggregation type
+ * @param entityType - Entity type (target or product)
  * @param lastReportCreatedAt - Last time a report was created for this datum
  * @param reportId - Report ID if a report exists, null otherwise
  * @param countryCode - Country code for timezone calculations
@@ -24,6 +25,7 @@ import type { NextAction } from './types';
 export async function getNextAction(
     timestamp: Date,
     aggregation: AggregationType,
+    entityType: EntityType,
     lastReportCreatedAt: Date | null,
     reportId: string | null,
     countryCode: string,
@@ -52,10 +54,11 @@ export async function getNextAction(
     }
 
     // No report - check eligibility
-    if (isEligibleForReport(timestamp, aggregation, lastReportCreatedAt, countryCode, now)) {
+    // Only allow creation for TARGETS + DAILY (other report types aren't ready yet)
+    if (isEligibleForReport(timestamp, aggregation, lastReportCreatedAt, countryCode, now) && entityType === 'target' && aggregation === 'daily') {
         return 'create';
     }
 
-    // Not eligible
+    // Not eligible or not supported report type
     return 'none';
 }

@@ -1,0 +1,1 @@
+ALTER TABLE "report_dataset_metadata" ADD COLUMN "last_processed_report_id" text;

@@ -143,6 +143,7 @@ export const reportDatasetMetadata = pgTable(
         nextRefreshAt: timestamp('next_refresh_at', { withTimezone: false, mode: 'date' }), // utc - when the next refresh should occur based on eligibility
         lastReportCreatedAt: timestamp('last_report_created_at', { withTimezone: false, mode: 'date' }), // timezone-less, represents local time in country's timezone
         reportId: text('report_id'),
+        lastProcessedReportId: text('last_processed_report_id'),
         error: text('error'),
     },
     table => [primaryKey({ columns: [table.accountId, table.timestamp, table.aggregation, table.entityType] })]

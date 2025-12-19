@@ -10,7 +10,20 @@ type Event =
     | { type: 'error'; message: string; details?: string; timestamp: string }
     | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }
     | { type: 'reports:refreshed'; accountId: string; timestamp: string }
-    | { type: 'api-metrics:updated'; apiName: string; timestamp: string }
+    | {
+          type: 'api-metrics:updated';
+          apiName: string;
+          timestamp: string;
+          data: {
+              apiName: string;
+              region: string;
+              statusCode: number | null;
+              success: boolean;
+              durationMs: number;
+              timestamp: string;
+              error: string | null;
+          };
+      }
     | { type: 'job-metrics:updated'; jobName: string; timestamp: string }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | {

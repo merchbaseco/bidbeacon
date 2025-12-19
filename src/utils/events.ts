@@ -30,6 +30,15 @@ export interface ReportsRefreshedEvent extends BaseEvent {
 export interface ApiMetricsUpdatedEvent extends BaseEvent {
     type: 'api-metrics:updated';
     apiName: string;
+    data: {
+        apiName: string;
+        region: string;
+        statusCode: number | null;
+        success: boolean;
+        durationMs: number;
+        timestamp: string;
+        error: string | null;
+    };
 }
 
 export interface JobMetricsUpdatedEvent extends BaseEvent {

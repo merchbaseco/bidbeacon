@@ -10,6 +10,7 @@ import { ApiMetricsChart } from './components/api-metrics-chart';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { JobMetricsChart } from './components/job-metrics-chart';
 import { ReportsTable } from './components/reports-table';
+import { ThrottlerMetricsChart } from './components/throttler-metrics-chart';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
@@ -36,6 +37,12 @@ export function IndexRoute() {
                             <div className="text-sm font-medium">Amazon Ads API Invocations</div>
                         </div>
                         <ApiMetricsChart />
+                        <div className="pt-4 border-t border-border mt-4">
+                            <div className="flex items-start justify-between px-2 pb-1">
+                                <div className="text-sm font-medium">API Throttler Metrics</div>
+                            </div>
+                            <ThrottlerMetricsChart />
+                        </div>
                     </Card>
                     <Card className="p-3 space-y-0 gap-3 col-span-3">
                         <div className="flex items-start justify-between px-2 pb-1">

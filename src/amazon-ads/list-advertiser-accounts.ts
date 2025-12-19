@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker.js';
 import { type ApiRegion, getApiBaseUrl } from './config.js';
 import { refreshAccessToken } from './reauth.js';
+import { throttledFetch } from './throttled-fetch.js';
 
 // ============================================================================
 // Schemas
@@ -93,7 +94,7 @@ export async function listAdvertiserAccounts(options?: ListAdsAccountsOptions, r
             'Content-Type': 'application/vnd.listaccountsresource.v1+json',
         };
 
-        const response = await fetch(url, {
+        const response = await throttledFetch(url, {
             method: 'POST',
             headers,
             body: JSON.stringify(requestBody),

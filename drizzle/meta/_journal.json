@@ -197,6 +197,13 @@
       "when": 1766181948780,
       "tag": "0027_burly_radioactive_man",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1766183976546,
+      "tag": "0028_dear_retro_girl",
+      "breakpoints": true
     }
   ]
 }

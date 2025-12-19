@@ -56,7 +56,14 @@ export const refreshReportDatumJob = boss
 
                 // Determine next action using state machine
                 // The state machine will fetch report status if reportId exists
-                const action = await getNextAction(reportDatum.timestamp, reportDatum.aggregation as 'hourly' | 'daily', reportDatum.lastReportCreatedAt, reportDatum.reportId, countryCode);
+                const action = await getNextAction(
+                    reportDatum.timestamp,
+                    reportDatum.aggregation as 'hourly' | 'daily',
+                    reportDatum.entityType as 'target' | 'product',
+                    reportDatum.lastReportCreatedAt,
+                    reportDatum.reportId,
+                    countryCode
+                );
 
                 switch (action) {
                     case 'none':

@@ -7,6 +7,7 @@ import { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker.js';
 import { type ApiRegion, getApiBaseUrl } from './config.js';
 import { refreshAccessToken } from './reauth.js';
+import { throttledFetch } from './throttled-fetch.js';
 
 // ============================================================================
 // Schemas
@@ -34,11 +35,7 @@ const exportResponseSchema = z.object({
 
 export type ExportStatusResponse = z.infer<typeof exportResponseSchema>;
 
-export type ExportContentType =
-    | 'application/vnd.campaignsexport.v1+json'
-    | 'application/vnd.adgroupsexport.v1+json'
-    | 'application/vnd.adsexport.v1+json'
-    | 'application/vnd.targetsexport.v1+json';
+export type ExportContentType = 'application/vnd.campaignsexport.v1+json' | 'application/vnd.adgroupsexport.v1+json' | 'application/vnd.adsexport.v1+json' | 'application/vnd.targetsexport.v1+json';
 
 export interface GetExportStatusOptions {
     profileId: number; // Required for Amazon-Advertising-API-Scope header
@@ -56,10 +53,7 @@ export interface GetExportStatusOptions {
  * @param region - API region (default: 'na' for North America)
  * @returns The export status response
  */
-export async function getExportStatus(
-    options: GetExportStatusOptions,
-    region: ApiRegion = 'na'
-): Promise<ExportStatusResponse> {
+export async function getExportStatus(options: GetExportStatusOptions, region: ApiRegion = 'na'): Promise<ExportStatusResponse> {
     return withTracking({ apiName: 'getExportStatus', region }, async () => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
@@ -78,7 +72,7 @@ export async function getExportStatus(
             Accept: options.contentType,
         };
 
-        const response = await fetch(url, {
+        const response = await throttledFetch(url, {
             method: 'GET',
             headers,
             signal: AbortSignal.timeout(30000),
@@ -102,4 +96,3 @@ export async function getExportStatus(
         return result;
     });
 }
-
