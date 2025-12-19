@@ -173,7 +173,7 @@ interface ExportState {
 // ============================================================================
 
 const POLL_INTERVAL_MS = 15000; // 15 seconds
-const MAX_POLLS = 120; // 30 minutes max
+const MAX_POLLS = 20; // 5 minutes max
 
 // ============================================================================
 // Job Definition
@@ -200,13 +200,13 @@ export const syncAdEntitiesJob = boss
                     countryCode,
                     lastSyncStarted: utcNow(),
                     error: null,
-                    fetchingCampaigns: false,
+                    fetchingCampaigns: true,
                     fetchingCampaignsPollCount: 0,
-                    fetchingAdGroups: false,
+                    fetchingAdGroups: true,
                     fetchingAdGroupsPollCount: 0,
-                    fetchingAds: false,
+                    fetchingAds: true,
                     fetchingAdsPollCount: 0,
-                    fetchingTargets: false,
+                    fetchingTargets: true,
                     fetchingTargetsPollCount: 0,
                 })
                 .onConflictDoUpdate({
@@ -214,13 +214,13 @@ export const syncAdEntitiesJob = boss
                     set: {
                         lastSyncStarted: utcNow(),
                         error: null,
-                        fetchingCampaigns: false,
+                        fetchingCampaigns: true,
                         fetchingCampaignsPollCount: 0,
-                        fetchingAdGroups: false,
+                        fetchingAdGroups: true,
                         fetchingAdGroupsPollCount: 0,
-                        fetchingAds: false,
+                        fetchingAds: true,
                         fetchingAdsPollCount: 0,
-                        fetchingTargets: false,
+                        fetchingTargets: true,
                         fetchingTargetsPollCount: 0,
                     },
                 });
@@ -271,24 +271,6 @@ export const syncAdEntitiesJob = boss
                         adProductFilter: ['SPONSORED_PRODUCTS'],
                     }),
                 ]);
-
-                // Update metadata to indicate all exports are being fetched
-                await db
-                    .update(accountDatasetMetadata)
-                    .set({
-                        fetchingCampaigns: true,
-                        fetchingAdGroups: true,
-                        fetchingAds: true,
-                        fetchingTargets: true,
-                    })
-                    .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
-
-                // Emit event when metadata is updated
-                emitEvent({
-                    type: 'account-dataset-metadata:updated',
-                    accountId,
-                    countryCode,
-                });
 
                 // Initialize export states
                 const exports: ExportState[] = [

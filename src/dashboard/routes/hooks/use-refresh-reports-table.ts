@@ -1,8 +1,8 @@
 import { toast } from 'sonner';
-import { api } from '../../lib/trpc.js';
-import { useSelectedCountryCode } from './use-selected-country-code.js';
+import { api } from '../../lib/trpc';
+import { useSelectedCountryCode } from './use-selected-country-code';
 
-export function useRefreshReportsTable(accountId: string) {
+export const useRefreshReportsTable = (accountId: string) => {
     const countryCode = useSelectedCountryCode();
     const mutation = api.reports.triggerUpdate.useMutation({
         onSuccess: () => {
@@ -21,7 +21,7 @@ export function useRefreshReportsTable(accountId: string) {
     });
 
     return {
-        refreshReportsTable: () => {
+        refresh: () => {
             if (!countryCode) {
                 toast.error('Country code required', {
                     description: 'Country code is required to trigger update',
@@ -32,4 +32,4 @@ export function useRefreshReportsTable(accountId: string) {
         },
         pending: mutation.isPending,
     };
-}
+};

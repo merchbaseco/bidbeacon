@@ -5,12 +5,13 @@ import { useAtom } from 'jotai';
 import { useEffect, useMemo } from 'react';
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { useAdvertisingAccounts } from '../../hooks/use-advertising-accounts';
-import { selectedAccountIdAtom, selectedProfileIdAtom } from './atoms';
+import { selectedAccountIdAtom, selectedCountryCodeAtom, selectedProfileIdAtom } from './atoms';
 
 export function AccountSelector() {
     const { data: accounts = [], isLoading, error } = useAdvertisingAccounts();
     const [accountId, setAccountId] = useAtom(selectedAccountIdAtom);
     const [profileId, setProfileId] = useAtom(selectedProfileIdAtom);
+    const [, setCountryCode] = useAtom(selectedCountryCodeAtom);
 
     const selectOptions = useMemo(() => {
         return accounts
@@ -34,16 +35,30 @@ export function AccountSelector() {
             if (firstAccount?.profileId) {
                 setAccountId(firstAccount.adsAccountId);
                 setProfileId(firstAccount.profileId);
+                setCountryCode(firstAccount.countryCode);
             }
         }
-    }, [accounts, accountId, setAccountId, setProfileId]);
+    }, [accounts, accountId, setAccountId, setProfileId, setCountryCode]);
+
+    useEffect(() => {
+        if (accountId && profileId && accounts.length > 0) {
+            const selectedAccount = accounts.find(a => a.adsAccountId === accountId && a.profileId === profileId);
+            if (selectedAccount) {
+                setCountryCode(selectedAccount.countryCode);
+            }
+        }
+    }, [accountId, profileId, accounts, setCountryCode]);
 
     const handleValueChange = (value: string | null) => {
         if (!value) return;
         const [adsAccountId, profileId] = value.split(':');
         if (adsAccountId && profileId) {
+            const selectedAccount = accounts.find(a => a.adsAccountId === adsAccountId && a.profileId === profileId);
             setAccountId(adsAccountId);
             setProfileId(profileId);
+            if (selectedAccount) {
+                setCountryCode(selectedAccount.countryCode);
+            }
         }
     };
 
@@ -59,7 +74,7 @@ export function AccountSelector() {
                                     <span className="bg-muted rounded-sm px-1 py-0.5 inline-flex">{selectedRow.countryCode}</span>
                                 </span>
                             ) : (
-                                'Select account / marketplace'
+                                <div className="text-muted-foreground font-mono text-sm py-0.5">Select account / marketplace</div>
                             )
                         }
                     </SelectValue>

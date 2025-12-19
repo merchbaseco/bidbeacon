@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Frame, FrameFooter } from '../../components/ui/frame';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table.js';
-import { useReportDatasets } from '../hooks/use-report-datasets.js';
-import { useSelectedAccountId } from '../hooks/use-selected-accountid.js';
+import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table';
+import { useReportDatasets } from '../hooks/use-report-datasets';
+import { useSelectedAccountId } from '../hooks/use-selected-accountid';
 import { formatDate } from '../utils.js';
 import { ReportIdDialog } from './report-id-dialog.js';
 import { ReportRefreshButton } from './report-refresh-button.js';
@@ -71,7 +71,7 @@ export const ReportsTable = () => {
     };
 
     const handleRefresh = () => {
-        refreshReportsTable();
+        refresh();
     };
 
     return (

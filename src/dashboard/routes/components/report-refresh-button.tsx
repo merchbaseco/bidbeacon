@@ -5,7 +5,7 @@ import { toast } from 'sonner';
 import { Button } from '../../components/ui/button';
 import { Spinner } from '../../components/ui/spinner';
 import { api } from '../../lib/trpc.js';
-import type { ReportDatasetMetadata } from '../hooks/use-report-datasets.js';
+import type { ReportDatasetMetadata } from '../hooks/use-report-datasets';
 
 interface ReportRefreshButtonProps {
     row: ReportDatasetMetadata;

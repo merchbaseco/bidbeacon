@@ -2,7 +2,7 @@ import { useSetAtom } from 'jotai';
 import { useCallback, useEffect } from 'react';
 import useWebSocketLib, { ReadyState } from 'react-use-websocket';
 import { toast } from 'sonner';
-import { api } from '../../lib/trpc.js';
+import { api } from '../../lib/trpc';
 import { apiBaseUrl } from '../../router';
 import { type ConnectionStatus, connectionStatusAtom } from '../atoms';
 
@@ -34,7 +34,7 @@ type Event =
 
 const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
 
-export function useWebSocket(): ConnectionStatus {
+export const useWebSocket = () => {
     const utils = api.useUtils();
     const setConnectionStatus = useSetAtom(connectionStatusAtom);
 
@@ -77,8 +77,6 @@ export function useWebSocket(): ConnectionStatus {
                             accountId: data.accountId,
                             countryCode: data.countryCode,
                         });
-                        // Show success toast only when sync completes (status changes from syncing to completed)
-                        // Note: We can't determine this from the event alone, so we'll check in the component
                         break;
                     case 'report-dataset-metadata:updated':
                         // Invalidate queries to refresh the report status with updated data
@@ -122,5 +120,5 @@ export function useWebSocket(): ConnectionStatus {
         setConnectionStatus(status);
     }, [status, setConnectionStatus]);
 
-    return status;
-}
+    return { status };
+};
