@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Frame, FrameFooter } from '../../components/ui/frame';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '../../components/ui/tooltip';
 import { useReportDatasets } from '../hooks/use-report-datasets';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid';
 import { formatDate, formatRelativeTime } from '../utils.js';
@@ -114,7 +115,18 @@ export const ReportsTable = () => {
                                         <TableCell>
                                             <StatusBadge status={row.status} />
                                         </TableCell>
-                                        <TableCell>{formatRelativeTime(row.nextRefreshAt ?? null)}</TableCell>
+                                        <TableCell>
+                                            {row.nextRefreshAt ? (
+                                                <Tooltip>
+                                                    <TooltipTrigger asChild>
+                                                        <span className="cursor-help">{formatRelativeTime(row.nextRefreshAt)}</span>
+                                                    </TooltipTrigger>
+                                                    <TooltipPopup>{formatDate(row.nextRefreshAt)}</TooltipPopup>
+                                                </Tooltip>
+                                            ) : (
+                                                '—'
+                                            )}
+                                        </TableCell>
                                         <TableCell>{row.reportId ? <ReportIdDialog row={row} accountId={accountId} /> : <Badge variant="outline">—</Badge>}</TableCell>
                                         <TableCell className="text-right">
                                             <ReportRefreshButton row={row} accountId={accountId} />

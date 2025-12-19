@@ -7,6 +7,7 @@ export function formatDate(input: string) {
 
 /**
  * Format a date as a natural relative time (e.g., "in 2 hours", "in 3 days", "in 5 minutes")
+ * Returns "Overdue" if the date is in the past
  */
 export function formatRelativeTime(input: string | null): string {
     if (!input) {
@@ -16,16 +17,16 @@ export function formatRelativeTime(input: string | null): string {
     const date = new Date(input);
     const now = new Date();
     const diffMs = date.getTime() - now.getTime();
-    const diffSeconds = Math.floor(diffMs / 1000);
-    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffMinutes = Math.floor(diffMs / (1000 * 60));
     const diffHours = Math.floor(diffMinutes / 60);
     const diffDays = Math.floor(diffHours / 24);
 
+    // For past dates, show "Overdue"
     if (diffMs < 0) {
-        // Past date - show absolute time
-        return formatDate(input);
+        return 'Overdue';
     }
 
+    // For future dates, show as "in X days" or "in X hours"
     if (diffDays > 0) {
         return `in ${diffDays} ${diffDays === 1 ? 'day' : 'days'}`;
     }
