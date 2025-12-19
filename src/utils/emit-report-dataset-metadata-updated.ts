@@ -8,7 +8,7 @@ type ReportDatasetMetadataRow = {
     entityType: string;
     status: string;
     refreshing: boolean;
-    lastRefreshed: Date | null;
+    nextRefreshAt: Date | null;
     lastReportCreatedAt: Date | null;
     reportId: string | null;
     error: string | null;
@@ -29,7 +29,7 @@ export function emitReportDatasetMetadataUpdated(row: ReportDatasetMetadataRow) 
             entityType: row.entityType as 'target' | 'product',
             status: row.status,
             refreshing: row.refreshing,
-            lastRefreshed: row.lastRefreshed?.toISOString() ?? null,
+            nextRefreshAt: row.nextRefreshAt?.toISOString() ?? null,
             lastReportCreatedAt: row.lastReportCreatedAt?.toISOString() ?? null,
             reportId: row.reportId ?? null,
             error: row.error ?? null,

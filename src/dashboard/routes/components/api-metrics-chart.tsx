@@ -5,17 +5,20 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { useApiMetrics } from '../hooks/use-api-metrics';
 
-// Color palette for APIs
-const COLORS = [
-    '#F59E0B', // Amber/Orange
-    '#10B981', // Green
-    '#14B8A6', // Teal
-    '#3B82F6', // Blue
-    '#8B5CF6', // Purple
-    '#EF4444', // Red
-    '#EC4899', // Pink
-    '#6366F1', // Indigo
-];
+// API name -> color mapping
+const API_COLORS: Record<string, string> = {
+    listAdvertiserAccounts: '#F59E0B', // Amber/Orange
+    createReport: '#10B981', // Green
+    retrieveReport: '#14B8A6', // Teal
+    exportCampaigns: '#3B82F6', // Blue
+    exportAdGroups: '#3B82F6', // Blue
+    exportAds: '#3B82F6', // Blue
+    exportTargets: '#3B82F6', // Blue
+    getExportStatus: '#3B82F6', // Blue
+};
+
+// Default color for APIs not in the map
+const DEFAULT_COLOR = '#6366F1'; // Indigo
 
 interface CustomTooltipProps {
     active?: boolean;
@@ -153,13 +156,13 @@ export function ApiMetricsChart() {
     const apiTotals = useMemo(() => {
         const apiNames = data?.apiNames || [];
         return apiNames
-            .map((apiName, index) => {
+            .map(apiName => {
                 const apiData = data?.data[apiName] || [];
                 const total = apiData.reduce((sum, point) => sum + point.count, 0);
                 return {
                     name: apiName,
                     total,
-                    color: COLORS[index % COLORS.length],
+                    color: API_COLORS[apiName] ?? DEFAULT_COLOR,
                 };
             })
             .sort((a, b) => b.total - a.total); // Sort by total descending
@@ -203,8 +206,8 @@ export function ApiMetricsChart() {
                         <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} />
                         <Tooltip content={<CustomTooltip chartData={chartData} />} />
-                        {(data?.apiNames || []).map((apiName, index) => (
-                            <Line key={apiName} type="monotone" dataKey={apiName} stroke={COLORS[index % COLORS.length]} strokeWidth={1.5} dot={false} name={apiName} />
+                        {(data?.apiNames || []).map(apiName => (
+                            <Line key={apiName} type="monotone" dataKey={apiName} stroke={API_COLORS[apiName] ?? DEFAULT_COLOR} strokeWidth={1.5} dot={false} name={apiName} />
                         ))}
                     </LineChart>
                 </ResponsiveContainer>

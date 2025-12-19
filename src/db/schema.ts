@@ -140,7 +140,7 @@ export const reportDatasetMetadata = pgTable(
         entityType: text('entity_type').notNull(), // target, product
         status: text('status').notNull(), // enum: missing, fetching, parsing, completed, failed
         refreshing: boolean('refreshing').notNull().default(false), // whether a refresh is currently in progress
-        lastRefreshed: timestamp('last_refreshed', { withTimezone: false, mode: 'date' }), // utc
+        nextRefreshAt: timestamp('next_refresh_at', { withTimezone: false, mode: 'date' }), // utc - when the next refresh should occur based on eligibility
         lastReportCreatedAt: timestamp('last_report_created_at', { withTimezone: false, mode: 'date' }), // timezone-less, represents local time in country's timezone
         reportId: text('report_id'),
         error: text('error'),

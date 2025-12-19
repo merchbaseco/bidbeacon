@@ -2,10 +2,9 @@ import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '../../components/ui/badge';
 import { Frame, FrameFooter } from '../../components/ui/frame';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { useRefreshReportsTable } from '../hooks/use-refresh-reports-table';
 import { useReportDatasets } from '../hooks/use-report-datasets';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid';
-import { formatDate } from '../utils.js';
+import { formatDate, formatRelativeTime } from '../utils.js';
 import { ReportIdDialog } from './report-id-dialog.js';
 import { ReportRefreshButton } from './report-refresh-button.js';
 import { ReportsToolbar } from './reports-toolbar.js';
@@ -20,8 +19,6 @@ export const ReportsTable = () => {
     const [entityType, setEntityType] = useState<'target' | 'product'>('target');
     const { data: rows = [], isLoading } = useReportDatasets(aggregation);
     const accountId = useSelectedAccountId();
-
-    const { refreshReportsTable, pending: refreshPending } = useRefreshReportsTable(accountId);
 
     const [currentPage, setCurrentPage] = useState(1);
     const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -70,21 +67,16 @@ export const ReportsTable = () => {
         setCurrentPage(1);
     };
 
-    const handleRefresh = () => {
-        refresh();
-    };
-
     return (
         <>
             <ReportsToolbar
                 aggregation={aggregation}
                 entityType={entityType}
                 statusFilter={statusFilter}
-                isLoading={isLoading || refreshPending}
+                isLoading={isLoading}
                 onAggregationChange={handleAggregationChange}
                 onEntityTypeChange={handleEntityTypeChange}
                 onStatusFilterChange={handleStatusFilterChange}
-                onRefresh={handleRefresh}
             />
             <Frame className="w-full">
                 <Table>
@@ -94,7 +86,7 @@ export const ReportsTable = () => {
                             <TableHead>Aggregation</TableHead>
                             <TableHead>Entity Type</TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead>Last refreshed</TableHead>
+                            <TableHead>Next refresh</TableHead>
                             <TableHead>Report ID</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
@@ -122,7 +114,7 @@ export const ReportsTable = () => {
                                         <TableCell>
                                             <StatusBadge status={row.status} />
                                         </TableCell>
-                                        <TableCell>{row.lastRefreshed ? formatDate(row.lastRefreshed) : '—'}</TableCell>
+                                        <TableCell>{formatRelativeTime(row.nextRefreshAt ?? null)}</TableCell>
                                         <TableCell>{row.reportId ? <ReportIdDialog row={row} accountId={accountId} /> : <Badge variant="outline">—</Badge>}</TableCell>
                                         <TableCell className="text-right">
                                             <ReportRefreshButton row={row} accountId={accountId} />

@@ -5,6 +5,42 @@ export function formatDate(input: string) {
     }).format(new Date(input));
 }
 
+/**
+ * Format a date as a natural relative time (e.g., "in 2 hours", "in 3 days", "in 5 minutes")
+ */
+export function formatRelativeTime(input: string | null): string {
+    if (!input) {
+        return '—';
+    }
+
+    const date = new Date(input);
+    const now = new Date();
+    const diffMs = date.getTime() - now.getTime();
+    const diffSeconds = Math.floor(diffMs / 1000);
+    const diffMinutes = Math.floor(diffSeconds / 60);
+    const diffHours = Math.floor(diffMinutes / 60);
+    const diffDays = Math.floor(diffHours / 24);
+
+    if (diffMs < 0) {
+        // Past date - show absolute time
+        return formatDate(input);
+    }
+
+    if (diffDays > 0) {
+        return `in ${diffDays} ${diffDays === 1 ? 'day' : 'days'}`;
+    }
+
+    if (diffHours > 0) {
+        return `in ${diffHours} ${diffHours === 1 ? 'hour' : 'hours'}`;
+    }
+
+    if (diffMinutes > 0) {
+        return `in ${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'}`;
+    }
+
+    return 'now';
+}
+
 export async function postJson(url: string, body: Record<string, unknown>) {
     const response = await fetch(url, {
         method: 'POST',

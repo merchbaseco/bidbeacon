@@ -3,8 +3,8 @@ import { z } from 'zod';
 import { retrieveReport } from '@/amazon-ads/retrieve-report';
 import { db } from '@/db/index';
 import { reportDatasetMetadata } from '@/db/schema';
-import { refreshReportDatumJob } from '@/jobs/refresh-report-datum';
 import { updateReportDatasetForAccountJob } from '@/jobs/update-report-dataset-for-account';
+import { updateReportStatusJob } from '@/jobs/update-report-status';
 import { createReportForDataset } from '@/lib/create-report/index';
 import { parseReport } from '@/lib/parse-report/index';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports';
@@ -144,8 +144,8 @@ export const reportsRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            // Queue the refresh job
-            const jobId = await refreshReportDatumJob.emit({
+            // Queue the update status job
+            const jobId = await updateReportStatusJob.emit({
                 accountId: input.accountId,
                 countryCode: input.countryCode,
                 timestamp: input.timestamp,

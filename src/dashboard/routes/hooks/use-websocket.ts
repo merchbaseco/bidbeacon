@@ -23,7 +23,7 @@ type Event =
               entityType: 'target' | 'product';
               status: string;
               refreshing: boolean;
-              lastRefreshed: string | null;
+              nextRefreshAt: string | null;
               lastReportCreatedAt: string | null;
               reportId: string | null;
               error: string | null;

@@ -11,7 +11,7 @@ export interface ReportDatum {
     aggregation: AggregationType;
     entityType: EntityType;
     status: string; // missing, fetching, parsing, completed, failed
-    lastRefreshed: Date | null;
+    nextRefreshAt: Date | null;
     lastReportCreatedAt: Date | null; // timezone-less, represents local time in country's timezone
     reportId: string | null;
     error: string | null;

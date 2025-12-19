@@ -69,3 +69,41 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
     // If lastCreatedAgeHours >= matchingOffset, we already created a report at this or a later threshold
     return lastCreatedAgeHours < matchingOffset;
 }
+
+/**
+ * Calculate the next refresh time for a report datum.
+ *
+ * Returns the timestamp when the next eligible refresh should occur, or null if
+ * all eligible offsets have been reached and reports created.
+ */
+export function getNextRefreshTime(timestamp: Date, aggregation: AggregationType, lastReportCreatedAt: Date | null, _countryCode: string, now: Date = new Date()): Date | null {
+    const eligibleOffsets = getEligibleOffsets(aggregation);
+    const sortedOffsets = [...eligibleOffsets].sort((a, b) => a - b);
+
+    // Calculate current age in hours
+    const ageMs = now.getTime() - timestamp.getTime();
+    const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
+
+    // Calculate last report created age if it exists
+    const lastCreatedAgeHours = lastReportCreatedAt ? Math.floor((lastReportCreatedAt.getTime() - timestamp.getTime()) / (1000 * 60 * 60)) : null;
+
+    // Find the next offset that either:
+    // 1. Hasn't been reached yet (ageHours < offset), OR
+    // 2. Has been reached but no report was created at that offset yet
+    for (const offset of sortedOffsets) {
+        if (ageHours < offset) {
+            // Offset hasn't been reached yet - next refresh is when we reach it
+            return new Date(timestamp.getTime() + offset * 60 * 60 * 1000);
+        }
+
+        // Offset has been reached - check if report was created at this offset
+        if (lastCreatedAgeHours === null || lastCreatedAgeHours < offset) {
+            // No report created at this offset yet - next refresh is now (or when we reached it)
+            // Return the timestamp when this offset was reached
+            return new Date(timestamp.getTime() + offset * 60 * 60 * 1000);
+        }
+    }
+
+    // All offsets have been reached and reports created - no more refreshes needed
+    return null;
+}

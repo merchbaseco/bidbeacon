@@ -92,10 +92,10 @@ function SlotPopup({ slot, dataset }: { slot: Date; dataset?: ReportDatasetMetad
                 <div className="text-xs font-medium text-muted-foreground">Status</div>
                 <div className="text-sm capitalize">{dataset.status}</div>
             </div>
-            {dataset.lastRefreshed && (
+            {dataset.nextRefreshAt && (
                 <div>
-                    <div className="text-xs font-medium text-muted-foreground">Last Refreshed</div>
-                    <div className="text-sm">{formatDate(dataset.lastRefreshed)}</div>
+                    <div className="text-xs font-medium text-muted-foreground">Next Refresh</div>
+                    <div className="text-sm">{formatDate(dataset.nextRefreshAt)}</div>
                 </div>
             )}
             <div>

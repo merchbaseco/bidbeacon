@@ -75,7 +75,7 @@ Use `yarn peek-dlq` to inspect failures. Common fixes:
 
 ## Report State Machine
 
-Isolated in `src/lib/report-datum-state-machine/`. Decision logic separate from execution.
+Isolated in `src/lib/report-status-state-machine/`. Decision logic separate from execution.
 
 **Flow:**
 1. Report exists + COMPLETED → process

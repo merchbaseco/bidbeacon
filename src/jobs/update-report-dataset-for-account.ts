@@ -8,6 +8,7 @@ import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { reportDatasetMetadata } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
+import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
 import { AGGREGATION_TYPES, type AggregationType, ENTITY_TYPES, type EntityType } from '@/types/reports.js';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
@@ -63,10 +64,12 @@ async function upsertMetadata(args: {
     aggregation: AggregationType;
     entityType: EntityType;
     status: 'missing' | 'fetching' | 'parsing' | 'completed' | 'error';
-    lastRefreshed: Date;
     error?: string | null;
 }): Promise<void> {
-    const { accountId, countryCode, timestamp, aggregation, entityType, status, lastRefreshed, error } = args;
+    const { accountId, countryCode, timestamp, aggregation, entityType, status, error } = args;
+
+    // Calculate next refresh time (no report created yet, so lastReportCreatedAt is null)
+    const nextRefreshAt = getNextRefreshTime(timestamp, aggregation, null, countryCode);
 
     await db
         .insert(reportDatasetMetadata)
@@ -77,7 +80,7 @@ async function upsertMetadata(args: {
             aggregation,
             entityType,
             status,
-            lastRefreshed,
+            nextRefreshAt,
             reportId: null,
             error: error ?? null,
         })
@@ -86,7 +89,7 @@ async function upsertMetadata(args: {
             set: {
                 countryCode,
                 status,
-                lastRefreshed,
+                nextRefreshAt,
                 error: error ?? null,
             },
         });
@@ -97,8 +100,6 @@ async function upsertMetadata(args: {
  * Used when initially creating rows to maintain the time-based dataset.
  */
 async function createMetadataRow(accountId: string, countryCode: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
-    const timezone = getTimezoneForCountry(countryCode);
-
     await upsertMetadata({
         accountId,
         countryCode,
@@ -106,7 +107,6 @@ async function createMetadataRow(accountId: string, countryCode: string, timesta
         aggregation,
         entityType,
         status: 'missing',
-        lastRefreshed: zonedNow(timezone),
         error: null,
     });
 }

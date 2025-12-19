@@ -10,9 +10,6 @@ export function useStats(rows: ReportDatasetMetadata[]) {
         const parsing = rows.filter(row => row.status === 'parsing').length;
         const missing = rows.filter(row => row.status === 'missing').length;
 
-        const latest = rows[0];
-        const lastRefreshed = latest?.lastRefreshed ?? null;
-
-        return { total, completed, error, fetching, parsing, missing, lastRefreshed };
+        return { total, completed, error, fetching, parsing, missing };
     }, [rows]);
 }

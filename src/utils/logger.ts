@@ -23,9 +23,9 @@ const baseLogger = pino({
  * This makes it easy to filter logs by jobId, jobName, etc. in Dozzle.
  *
  * @example
- * const logger = createJobLogger('refresh-report-datum', job.id, { accountId, countryCode });
+ * const logger = createJobLogger('update-report-status', job.id, { accountId, countryCode });
  * logger.info('Starting job');
- * // Output: {"level":30,"time":1234567890,"jobName":"refresh-report-datum","jobId":"abc123","accountId":"123","countryCode":"US","msg":"Starting job"}
+ * // Output: {"level":30,"time":1234567890,"jobName":"update-report-status","jobId":"abc123","accountId":"123","countryCode":"US","msg":"Starting job"}
  */
 export function createJobLogger(jobName: string, jobId: string, context?: Record<string, unknown>): pino.Logger {
     return baseLogger.child({
