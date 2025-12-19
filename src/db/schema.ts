@@ -103,7 +103,6 @@ export const accountDatasetMetadata = pgTable(
     {
         accountId: text('account_id').notNull(),
         countryCode: text('country_code').notNull(),
-        status: text('status').notNull(), // enum: idle, syncing, completed, failed
         lastSyncStarted: timestamp('last_sync_started', { withTimezone: false, mode: 'date' }), // utc
         lastSyncCompleted: timestamp('last_sync_completed', { withTimezone: false, mode: 'date' }), // utc
         campaignsCount: integer('campaigns_count'),
@@ -111,6 +110,15 @@ export const accountDatasetMetadata = pgTable(
         adsCount: integer('ads_count'),
         targetsCount: integer('targets_count'),
         error: text('error'),
+        // Per-export type fetching status
+        fetchingCampaigns: boolean('fetching_campaigns').default(false),
+        fetchingCampaignsPollCount: integer('fetching_campaigns_poll_count').default(0),
+        fetchingAdGroups: boolean('fetching_ad_groups').default(false),
+        fetchingAdGroupsPollCount: integer('fetching_ad_groups_poll_count').default(0),
+        fetchingAds: boolean('fetching_ads').default(false),
+        fetchingAdsPollCount: integer('fetching_ads_poll_count').default(0),
+        fetchingTargets: boolean('fetching_targets').default(false),
+        fetchingTargetsPollCount: integer('fetching_targets_poll_count').default(0),
     },
     table => [primaryKey({ columns: [table.accountId, table.countryCode] })]
 );

@@ -79,7 +79,7 @@ export const metricsRouter = router({
         )
         .query(async ({ input }) => {
             const to = input.to ? new Date(input.to) : new Date();
-            const from = input.from ? new Date(input.from) : new Date(to.getTime() - 12 * 60 * 60 * 1000); // Default to 12 hours like dashboard
+            const from = input.from ? new Date(input.from) : new Date(to.getTime() - 3 * 60 * 60 * 1000); // Default to 3 hours like dashboard
 
             const conditions = [gte(jobMetrics.endTime, from), lte(jobMetrics.endTime, to)];
 

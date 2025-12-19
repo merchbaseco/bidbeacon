@@ -192,24 +192,36 @@ export const syncAdEntitiesJob = boss
                 countryCode,
             });
 
-            logger.info('Starting job');
-
             // Update metadata to indicate sync is starting
             await db
                 .insert(accountDatasetMetadata)
                 .values({
                     accountId,
                     countryCode,
-                    status: 'syncing',
                     lastSyncStarted: utcNow(),
                     error: null,
+                    fetchingCampaigns: false,
+                    fetchingCampaignsPollCount: 0,
+                    fetchingAdGroups: false,
+                    fetchingAdGroupsPollCount: 0,
+                    fetchingAds: false,
+                    fetchingAdsPollCount: 0,
+                    fetchingTargets: false,
+                    fetchingTargetsPollCount: 0,
                 })
                 .onConflictDoUpdate({
                     target: [accountDatasetMetadata.accountId, accountDatasetMetadata.countryCode],
                     set: {
-                        status: 'syncing',
                         lastSyncStarted: utcNow(),
                         error: null,
+                        fetchingCampaigns: false,
+                        fetchingCampaignsPollCount: 0,
+                        fetchingAdGroups: false,
+                        fetchingAdGroupsPollCount: 0,
+                        fetchingAds: false,
+                        fetchingAdsPollCount: 0,
+                        fetchingTargets: false,
+                        fetchingTargetsPollCount: 0,
                     },
                 });
 
@@ -260,15 +272,23 @@ export const syncAdEntitiesJob = boss
                     }),
                 ]);
 
-                logger.info(
-                    {
-                        campaignsExportId: campaignsExport.exportId,
-                        adGroupsExportId: adGroupsExport.exportId,
-                        adsExportId: adsExport.exportId,
-                        targetsExportId: targetsExport.exportId,
-                    },
-                    'Created exports'
-                );
+                // Update metadata to indicate all exports are being fetched
+                await db
+                    .update(accountDatasetMetadata)
+                    .set({
+                        fetchingCampaigns: true,
+                        fetchingAdGroups: true,
+                        fetchingAds: true,
+                        fetchingTargets: true,
+                    })
+                    .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                // Emit event when metadata is updated
+                emitEvent({
+                    type: 'account-dataset-metadata:updated',
+                    accountId,
+                    countryCode,
+                });
 
                 // Initialize export states
                 const exports: ExportState[] = [
@@ -336,16 +356,126 @@ export const syncAdEntitiesJob = boss
                     );
 
                     pollCount++;
+
+                    // Update poll counts for each export type
+                    const updateData: Partial<{
+                        fetchingCampaignsPollCount: number;
+                        fetchingAdGroupsPollCount: number;
+                        fetchingAdsPollCount: number;
+                        fetchingTargetsPollCount: number;
+                    }> = {};
+
+                    const campaignsExport = exports.find(e => e.entityType === 'campaigns');
+                    if (campaignsExport?.status === 'PROCESSING') {
+                        updateData.fetchingCampaignsPollCount = pollCount;
+                    }
+
+                    const adGroupsExport = exports.find(e => e.entityType === 'adGroups');
+                    if (adGroupsExport?.status === 'PROCESSING') {
+                        updateData.fetchingAdGroupsPollCount = pollCount;
+                    }
+
+                    const adsExport = exports.find(e => e.entityType === 'ads');
+                    if (adsExport?.status === 'PROCESSING') {
+                        updateData.fetchingAdsPollCount = pollCount;
+                    }
+
+                    const targetsExport = exports.find(e => e.entityType === 'targets');
+                    if (targetsExport?.status === 'PROCESSING') {
+                        updateData.fetchingTargetsPollCount = pollCount;
+                    }
+
+                    if (Object.keys(updateData).length > 0) {
+                        await db
+                            .update(accountDatasetMetadata)
+                            .set(updateData)
+                            .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                        // Emit event when metadata is updated
+                        emitEvent({
+                            type: 'account-dataset-metadata:updated',
+                            accountId,
+                            countryCode,
+                        });
+                    }
                 }
 
                 // Check for failures
                 const failedExports = exports.filter(e => e.status === 'FAILED');
                 if (failedExports.length > 0) {
+                    // Set fetching flags to false for failed exports
+                    const updateData: Partial<{
+                        fetchingCampaigns: boolean;
+                        fetchingAdGroups: boolean;
+                        fetchingAds: boolean;
+                        fetchingTargets: boolean;
+                    }> = {};
+
+                    if (failedExports.some(e => e.entityType === 'campaigns')) {
+                        updateData.fetchingCampaigns = false;
+                    }
+                    if (failedExports.some(e => e.entityType === 'adGroups')) {
+                        updateData.fetchingAdGroups = false;
+                    }
+                    if (failedExports.some(e => e.entityType === 'ads')) {
+                        updateData.fetchingAds = false;
+                    }
+                    if (failedExports.some(e => e.entityType === 'targets')) {
+                        updateData.fetchingTargets = false;
+                    }
+
+                    if (Object.keys(updateData).length > 0) {
+                        await db
+                            .update(accountDatasetMetadata)
+                            .set(updateData)
+                            .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                        emitEvent({
+                            type: 'account-dataset-metadata:updated',
+                            accountId,
+                            countryCode,
+                        });
+                    }
+
                     throw new Error(`Exports failed: ${failedExports.map(e => `${e.entityType}: ${e.error}`).join(', ')}`);
                 }
 
                 const incompleteExports = exports.filter(e => e.status !== 'COMPLETED');
                 if (incompleteExports.length > 0) {
+                    // Set fetching flags to false for incomplete exports
+                    const updateData: Partial<{
+                        fetchingCampaigns: boolean;
+                        fetchingAdGroups: boolean;
+                        fetchingAds: boolean;
+                        fetchingTargets: boolean;
+                    }> = {};
+
+                    if (incompleteExports.some(e => e.entityType === 'campaigns')) {
+                        updateData.fetchingCampaigns = false;
+                    }
+                    if (incompleteExports.some(e => e.entityType === 'adGroups')) {
+                        updateData.fetchingAdGroups = false;
+                    }
+                    if (incompleteExports.some(e => e.entityType === 'ads')) {
+                        updateData.fetchingAds = false;
+                    }
+                    if (incompleteExports.some(e => e.entityType === 'targets')) {
+                        updateData.fetchingTargets = false;
+                    }
+
+                    if (Object.keys(updateData).length > 0) {
+                        await db
+                            .update(accountDatasetMetadata)
+                            .set(updateData)
+                            .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                        emitEvent({
+                            type: 'account-dataset-metadata:updated',
+                            accountId,
+                            countryCode,
+                        });
+                    }
+
                     throw new Error(`Exports did not complete within timeout: ${incompleteExports.map(e => e.entityType).join(', ')}`);
                 }
 
@@ -366,15 +496,23 @@ export const syncAdEntitiesJob = boss
                     downloadAndParse(getExportUrl('targets'), targetsExportSchema),
                 ]);
 
-                logger.info(
-                    {
-                        campaignsCount: campaignsData.length,
-                        adGroupsCount: adGroupsData.length,
-                        adsCount: adsData.length,
-                        targetsCount: targetsData.length,
-                    },
-                    'Parsed export data'
-                );
+                // Update metadata to indicate downloads are complete (set fetching flags to false)
+                await db
+                    .update(accountDatasetMetadata)
+                    .set({
+                        fetchingCampaigns: false,
+                        fetchingAdGroups: false,
+                        fetchingAds: false,
+                        fetchingTargets: false,
+                    })
+                    .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                // Emit event when metadata is updated
+                emitEvent({
+                    type: 'account-dataset-metadata:updated',
+                    accountId,
+                    countryCode,
+                });
 
                 // Step 4: Transform and insert into database
                 // Extract IDs from export data to scope deletions to this account only
@@ -497,21 +635,10 @@ export const syncAdEntitiesJob = boss
                     }
                 });
 
-                logger.info(
-                    {
-                        campaignsCount: campaignsData.length,
-                        adGroupsCount: adGroupsData.length,
-                        adsCount: adsData.length,
-                        targetsCount: targetsData.length,
-                    },
-                    'Inserted data into database'
-                );
-
                 // Update metadata with success
                 await db
                     .update(accountDatasetMetadata)
                     .set({
-                        status: 'completed',
                         lastSyncCompleted: utcNow(),
                         campaignsCount: campaignsData.length,
                         adGroupsCount: adGroupsData.length,
@@ -527,14 +654,11 @@ export const syncAdEntitiesJob = boss
                     accountId,
                     countryCode,
                 });
-
-                logger.info('Completed job');
             } catch (error) {
                 // Update metadata with error
                 await db
                     .update(accountDatasetMetadata)
                     .set({
-                        status: 'failed',
                         error: error instanceof Error ? error.message : 'Unknown error',
                     })
                     .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));

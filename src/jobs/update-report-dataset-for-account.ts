@@ -11,7 +11,6 @@ import { boss } from '@/jobs/boss.js';
 import { AGGREGATION_TYPES, type AggregationType, ENTITY_TYPES, type EntityType } from '@/types/reports.js';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
-import { createJobLogger } from '@/utils/logger';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
 
 // Amazon Ads API data retention periods
@@ -35,13 +34,6 @@ export const updateReportDatasetForAccountJob = boss
         for (const job of jobs) {
             const { accountId, countryCode } = job.data;
 
-            // Create job-specific logger with context
-            const logger = createJobLogger('update-report-dataset-for-account', job.id, {
-                accountId,
-                countryCode,
-            });
-
-            logger.info('Starting job');
             const timezone = getTimezoneForCountry(countryCode);
             const now = zonedNow(timezone);
 
@@ -57,7 +49,6 @@ export const updateReportDatasetForAccountJob = boss
                 type: 'reports:refreshed',
                 accountId,
             });
-            logger.info('Completed job');
         }
     });
 
@@ -71,7 +62,7 @@ async function upsertMetadata(args: {
     timestamp: Date;
     aggregation: AggregationType;
     entityType: EntityType;
-    status: 'missing' | 'fetching' | 'parsing' | 'completed' | 'failed';
+    status: 'missing' | 'fetching' | 'parsing' | 'completed' | 'error';
     lastRefreshed: Date;
     error?: string | null;
 }): Promise<void> {

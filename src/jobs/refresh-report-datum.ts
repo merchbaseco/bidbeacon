@@ -5,7 +5,6 @@
  */
 
 import { and, eq } from 'drizzle-orm';
-import type pino from 'pino';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { reportDatasetMetadata } from '@/db/schema.js';
@@ -47,15 +46,11 @@ export const refreshReportDatumJob = boss
                 timestamp,
             });
 
-            logger.info('Starting job');
-
             try {
                 // Set refreshing=true in database and get the report datum
                 const reportDatum = await setRefreshing(true, accountId, date, aggregation, entityType, null);
 
                 if (!reportDatum) {
-                    logger.warn('Report datum not found - clearing refreshing state');
-                    await setRefreshing(false, accountId, date, aggregation, entityType, 'Report datum not found');
                     return;
                 }
 
@@ -63,55 +58,46 @@ export const refreshReportDatumJob = boss
                 // The state machine will fetch report status if reportId exists
                 const action = await getNextAction(reportDatum.timestamp, reportDatum.aggregation as 'hourly' | 'daily', reportDatum.lastReportCreatedAt, reportDatum.reportId, countryCode);
 
-                logger.info(
-                    {
-                        lastReportCreatedAt: reportDatum.lastReportCreatedAt?.toISOString() ?? null,
-                        reportId: reportDatum.reportId,
-                        action,
-                    },
-                    'State machine determined action'
-                );
-
                 switch (action) {
                     case 'none':
-                        await handleNoneAction(accountId, date, aggregation, entityType);
+                        await setRefreshing(false, accountId, date, aggregation, entityType, null);
                         return;
 
                     case 'process':
-                        await handleProcessAction(logger, accountId, timestamp, date, aggregation, entityType);
+                        // Set status to 'parsing' at the start of parsing
+                        await updateStatus('parsing', null, accountId, date, aggregation, entityType);
+                        await parseReport({ accountId, timestamp, aggregation, entityType });
+
+                        // Update status to 'completed' after successful parsing
+                        await updateStatus('completed', null, accountId, date, aggregation, entityType);
+                        await setRefreshing(false, accountId, date, aggregation, entityType, null);
                         return;
 
-                    case 'create':
-                        await handleCreateAction(logger, accountId, countryCode, timestamp, date, aggregation, entityType);
+                    case 'create': {
+                        const _reportId = await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
+                        await setRefreshing(false, accountId, date, aggregation, entityType, null);
                         return;
+                    }
 
                     default:
                         // Set refreshing=false in database for unknown action
                         logger.error({ action }, 'Unknown action received');
-                        await setRefreshing(false, accountId, date, aggregation, entityType, `Unknown action: ${action}`);
+                        await setRefreshing(false, accountId, date, aggregation, entityType, `Unknown next state machine action: ${action}`);
                         return;
                 }
             } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+
                 logger.error(
                     {
                         err: error,
-                        errorMessage: error instanceof Error ? error.message : 'Unknown error',
-                        errorStack: error instanceof Error ? error.stack : undefined,
                     },
-                    'Error during refresh processing'
+                    'Error during refreshing report datum state.'
                 );
-                // Set refreshing=false in database on error
-                try {
-                    await setRefreshing(false, accountId, date, aggregation, entityType, error instanceof Error ? error.message : 'Unknown error');
-                } catch (updateError) {
-                    logger.error(
-                        {
-                            err: updateError,
-                            originalError: error instanceof Error ? error.message : 'Unknown error',
-                        },
-                        'Failed to update refreshing state on error'
-                    );
-                }
+
+                // Set status to 'error' whenever an error occurs
+                await updateStatus('error', errorMessage, accountId, date, aggregation, entityType);
+                await setRefreshing(false, accountId, date, aggregation, entityType, errorMessage);
             }
         }
     });
@@ -191,85 +177,4 @@ async function updateStatus(status: string, error: string | null, accountId: str
     if (updatedRow) {
         emitReportDatasetMetadataUpdated(updatedRow);
     }
-}
-
-// ============================================================================
-// Action Handlers
-// ============================================================================
-
-/**
- * Handles the 'none' action - no work needed, just clear refreshing state
- */
-async function handleNoneAction(accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
-    await setRefreshing(false, accountId, timestamp, aggregation, entityType, null);
-}
-
-/**
- * Handles the 'process' action - parses an existing report
- */
-async function handleProcessAction(logger: pino.Logger, accountId: string, timestamp: string, date: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
-    // Set status to 'parsing' at the start of parsing
-    await updateStatus('parsing', null, accountId, date, aggregation, entityType);
-
-    try {
-        await parseReport({
-            accountId,
-            timestamp,
-            aggregation,
-            entityType,
-        });
-
-        // Update status to 'completed' after successful parsing
-        await updateStatus('completed', null, accountId, date, aggregation, entityType);
-    } catch (error) {
-        logger.error(
-            {
-                err: error,
-                errorMessage: error instanceof Error ? error.message : 'Unknown error',
-                errorStack: error instanceof Error ? error.stack : undefined,
-            },
-            'Error parsing report'
-        );
-        // Update status to 'failed' on error
-        await updateStatus('failed', error instanceof Error ? error.message : 'Unknown error', accountId, date, aggregation, entityType);
-        throw error;
-    }
-
-    await setRefreshing(false, accountId, date, aggregation, entityType, null);
-}
-
-/**
- * Handles the 'create' action - creates a new report
- */
-async function handleCreateAction(logger: pino.Logger, accountId: string, countryCode: string, timestamp: string, date: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
-    try {
-        const reportId = await createReportForDataset({
-            accountId,
-            countryCode,
-            timestamp,
-            aggregation,
-            entityType,
-        });
-
-        if (!reportId) {
-            logger.warn('Failed to create report - no reportId returned');
-            await setRefreshing(false, accountId, date, aggregation, entityType, 'Failed to create report');
-            return;
-        }
-
-        logger.info({ reportId }, 'Report created successfully');
-    } catch (error) {
-        logger.error(
-            {
-                err: error,
-                errorMessage: error instanceof Error ? error.message : 'Unknown error',
-                errorStack: error instanceof Error ? error.stack : undefined,
-            },
-            'Error creating report'
-        );
-        await setRefreshing(false, accountId, date, aggregation, entityType, error instanceof Error ? error.message : 'Unknown error');
-        return;
-    }
-
-    await setRefreshing(false, accountId, date, aggregation, entityType, null);
 }

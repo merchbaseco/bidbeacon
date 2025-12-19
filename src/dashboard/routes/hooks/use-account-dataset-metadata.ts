@@ -3,7 +3,6 @@ import { api } from '../../lib/trpc.js';
 export type AccountDatasetMetadata = {
     accountId: string;
     countryCode: string;
-    status: 'idle' | 'syncing' | 'completed' | 'failed';
     lastSyncStarted: string | null;
     lastSyncCompleted: string | null;
     campaignsCount: number | null;
@@ -11,7 +10,55 @@ export type AccountDatasetMetadata = {
     adsCount: number | null;
     targetsCount: number | null;
     error: string | null;
+    fetchingCampaigns: boolean | null;
+    fetchingCampaignsPollCount: number | null;
+    fetchingAdGroups: boolean | null;
+    fetchingAdGroupsPollCount: number | null;
+    fetchingAds: boolean | null;
+    fetchingAdsPollCount: number | null;
+    fetchingTargets: boolean | null;
+    fetchingTargetsPollCount: number | null;
 };
+
+export type SyncStatus = 'idle' | 'syncing' | 'completed' | 'failed';
+
+/**
+ * Derives the overall sync status from the metadata fields.
+ * Status is determined by:
+ * - If any fetching flag is true → 'syncing'
+ * - If lastSyncStarted exists and no fetching flags are true and no error and no lastSyncCompleted → 'syncing' (database insert phase)
+ * - If error exists → 'failed'
+ * - If lastSyncCompleted exists → 'completed'
+ * - Otherwise → 'idle'
+ */
+export function deriveSyncStatus(metadata: AccountDatasetMetadata | null | undefined): SyncStatus {
+    if (!metadata) {
+        return 'idle';
+    }
+
+    // If any export is currently being fetched, we're syncing
+    if (metadata.fetchingCampaigns === true || metadata.fetchingAdGroups === true || metadata.fetchingAds === true || metadata.fetchingTargets === true) {
+        return 'syncing';
+    }
+
+    // If there's an error, status is failed
+    if (metadata.error) {
+        return 'failed';
+    }
+
+    // If sync completed successfully, status is completed
+    if (metadata.lastSyncCompleted) {
+        return 'completed';
+    }
+
+    // If sync has started but not completed and no error, we're still syncing (database insert phase)
+    if (metadata.lastSyncStarted && !metadata.error) {
+        return 'syncing';
+    }
+
+    // Otherwise, idle
+    return 'idle';
+}
 
 export function useAccountDatasetMetadata(accountId: string | null, countryCode: string | null) {
     return api.accounts.datasetMetadata.useQuery(
@@ -49,7 +96,6 @@ export function useTriggerSyncAdEntities() {
                     return {
                         accountId,
                         countryCode,
-                        status: 'syncing' as const,
                         lastSyncStarted: new Date().toISOString(),
                         lastSyncCompleted: null,
                         campaignsCount: null,
@@ -57,13 +103,28 @@ export function useTriggerSyncAdEntities() {
                         adsCount: null,
                         targetsCount: null,
                         error: null,
+                        fetchingCampaigns: false,
+                        fetchingCampaignsPollCount: 0,
+                        fetchingAdGroups: false,
+                        fetchingAdGroupsPollCount: 0,
+                        fetchingAds: false,
+                        fetchingAdsPollCount: 0,
+                        fetchingTargets: false,
+                        fetchingTargetsPollCount: 0,
                     };
                 }
                 return {
                     ...old,
-                    status: 'syncing' as const,
                     lastSyncStarted: new Date().toISOString(),
                     error: null,
+                    fetchingCampaigns: false,
+                    fetchingCampaignsPollCount: 0,
+                    fetchingAdGroups: false,
+                    fetchingAdGroupsPollCount: 0,
+                    fetchingAds: false,
+                    fetchingAdsPollCount: 0,
+                    fetchingTargets: false,
+                    fetchingTargetsPollCount: 0,
                 };
             });
 

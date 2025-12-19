@@ -176,6 +176,20 @@
       "when": 1766098266065,
       "tag": "0024_big_ezekiel_stane",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "7",
+      "when": 1766110158977,
+      "tag": "0025_parched_killraven",
+      "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1766110205139,
+      "tag": "0026_violet_fat_cobra",
+      "breakpoints": true
     }
   ]
 }

@@ -19,9 +19,9 @@ export type CreateReportForDatasetInput = {
 
 /**
  * Creates a report for a dataset and updates the metadata.
- * Returns the reportId if successful, null otherwise.
+ * Returns the reportId if successful, throws an error otherwise.
  */
-export async function createReportForDataset(input: CreateReportForDatasetInput): Promise<string | null> {
+export async function createReportForDataset(input: CreateReportForDatasetInput): Promise<string> {
     const reportConfig = reportConfigs[input.aggregation][input.entityType];
     const date = new Date(input.timestamp);
 
@@ -81,49 +81,51 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
         'na'
     );
 
-    if (response.success && response.success.length > 0) {
-        const reportId = response.success[0]?.report?.reportId;
-        if (reportId) {
-            // Convert current UTC time to country's timezone and store as timezone-less timestamp
-            const timezone = getTimezoneForCountry(input.countryCode);
-            const nowUtc = utcNow();
-            const zonedTime = toZonedTime(nowUtc, timezone);
-            const lastReportCreatedAt = new Date(zonedTime.getFullYear(), zonedTime.getMonth(), zonedTime.getDate(), zonedTime.getHours(), zonedTime.getMinutes(), zonedTime.getSeconds());
-
-            // Insert or update metadata with reportId and status
-            const [updatedRow] = await db
-                .insert(reportDatasetMetadata)
-                .values({
-                    accountId: input.accountId,
-                    countryCode: input.countryCode,
-                    timestamp: date,
-                    aggregation: input.aggregation,
-                    entityType: input.entityType,
-                    status: 'fetching',
-                    lastRefreshed: utcNow(),
-                    lastReportCreatedAt,
-                    reportId,
-                    error: null,
-                })
-                .onConflictDoUpdate({
-                    target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
-                    set: {
-                        reportId,
-                        status: 'fetching',
-                        lastRefreshed: utcNow(),
-                        lastReportCreatedAt,
-                        error: null,
-                    },
-                })
-                .returning();
-
-            if (updatedRow) {
-                emitReportDatasetMetadataUpdated(updatedRow);
-            }
-
-            return reportId;
-        }
+    if (!response.success || response.success.length === 0) {
+        throw new Error('Failed to create report - API response did not contain success data');
     }
 
-    return null;
+    const reportId = response.success[0]?.report?.reportId;
+    if (!reportId) {
+        throw new Error('Failed to create report - no reportId returned from API');
+    }
+
+    // Convert current UTC time to country's timezone and store as timezone-less timestamp
+    const timezone = getTimezoneForCountry(input.countryCode);
+    const nowUtc = utcNow();
+    const zonedTime = toZonedTime(nowUtc, timezone);
+    const lastReportCreatedAt = new Date(zonedTime.getFullYear(), zonedTime.getMonth(), zonedTime.getDate(), zonedTime.getHours(), zonedTime.getMinutes(), zonedTime.getSeconds());
+
+    // Insert or update metadata with reportId and status
+    const [updatedRow] = await db
+        .insert(reportDatasetMetadata)
+        .values({
+            accountId: input.accountId,
+            countryCode: input.countryCode,
+            timestamp: date,
+            aggregation: input.aggregation,
+            entityType: input.entityType,
+            status: 'fetching',
+            lastRefreshed: utcNow(),
+            lastReportCreatedAt,
+            reportId,
+            error: null,
+        })
+        .onConflictDoUpdate({
+            target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
+            set: {
+                reportId,
+                status: 'fetching',
+                lastRefreshed: utcNow(),
+                lastReportCreatedAt,
+                error: null,
+            },
+        })
+        .returning();
+
+    if (updatedRow) {
+        emitReportDatasetMetadataUpdated(updatedRow);
+    }
+
+    return reportId;
 }

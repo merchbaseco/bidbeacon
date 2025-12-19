@@ -96,7 +96,7 @@ export function ApiMetricsChart() {
     // Memoize from date to keep query key stable, but let server calculate 'to' as 'now' on each query
     const dateRange = useMemo(() => {
         const to = new Date();
-        const from = new Date(to.getTime() - 12 * 60 * 60 * 1000); // 12 hours
+        const from = new Date(to.getTime() - 3 * 60 * 60 * 1000); // 3 hours
         return {
             from: from.toISOString(),
             // Don't pass 'to' - let server default to 'now' so we always get latest data
@@ -105,14 +105,14 @@ export function ApiMetricsChart() {
 
     const { data, isLoading, error } = useApiMetrics(dateRange);
 
-    // Generate all 5-minute intervals for the last 12 hours
+    // Generate all 5-minute intervals for the last 3 hours
     const intervals = useMemo(() => {
         const now = new Date();
-        const twelveHoursAgo = new Date(now.getTime() - 12 * 60 * 60 * 1000);
+        const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
         const intervalList: string[] = [];
 
         // Round start down to the nearest 5-minute interval
-        const roundedStart = new Date(twelveHoursAgo);
+        const roundedStart = new Date(threeHoursAgo);
         roundedStart.setMinutes(Math.floor(roundedStart.getMinutes() / 5) * 5, 0, 0);
 
         // Round now down to the nearest 5-minute interval
