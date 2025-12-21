@@ -26,6 +26,7 @@ export const metricsRouter = router({
                 conditions.push(eq(apiMetrics.apiName, input.apiName));
             }
 
+            // Query for 5-minute intervals (only returns intervals with data)
             const data = await db
                 .select({
                     interval: sql<string>`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`.as('interval'),
@@ -40,19 +41,14 @@ export const metricsRouter = router({
                 .groupBy(sql`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`, apiMetrics.apiName)
                 .orderBy(sql`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`, sql`${apiMetrics.apiName}`);
 
-            const chartData: Record<string, Array<{ interval: string; count: number; avgDuration: number; successCount: number; errorCount: number }>> = {};
-
-            for (const apiName of SUPPORTED_APIS) {
-                chartData[apiName] = [];
-            }
-
+            // Build a map: interval -> apiName -> data
+            const dataMap = new Map<string, Map<string, { count: number; avgDuration: number; successCount: number; errorCount: number }>>();
             for (const row of data) {
                 const interval = new Date(row.interval).toISOString();
-                if (!chartData[row.apiName]) {
-                    chartData[row.apiName] = [];
+                if (!dataMap.has(interval)) {
+                    dataMap.set(interval, new Map());
                 }
-                chartData[row.apiName].push({
-                    interval,
+                dataMap.get(interval)!.set(row.apiName, {
                     count: Number(row.count),
                     avgDuration: Math.round(Number(row.avgDuration)),
                     successCount: Number(row.successCount),
@@ -60,13 +56,38 @@ export const metricsRouter = router({
                 });
             }
 
-            const apiNames = [...SUPPORTED_APIS];
+            // Generate all 5-minute intervals from `from` to `to`, filling with zeros
+            const roundedFrom = new Date(from);
+            roundedFrom.setMinutes(Math.floor(roundedFrom.getMinutes() / 5) * 5, 0, 0);
+            const roundedTo = new Date(to);
+            roundedTo.setMinutes(Math.floor(roundedTo.getMinutes() / 5) * 5, 0, 0);
+
+            const chartData: Array<{
+                interval: string;
+                timestamp: string;
+                [apiName: string]: string | number;
+            }> = [];
+
+            for (let ts = roundedFrom.getTime(); ts <= roundedTo.getTime(); ts += 5 * 60 * 1000) {
+                const date = new Date(ts);
+                const interval = date.toISOString();
+                const point: { interval: string; timestamp: string; [apiName: string]: string | number } = {
+                    interval: date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' }),
+                    timestamp: interval,
+                };
+
+                // Add count for each API (0 if no data)
+                const intervalData = dataMap.get(interval);
+                for (const apiName of SUPPORTED_APIS) {
+                    point[apiName] = intervalData?.get(apiName)?.count ?? 0;
+                }
+
+                chartData.push(point);
+            }
 
             return {
                 data: chartData,
-                apiNames,
-                from: from.toISOString(),
-                to: to.toISOString(),
+                apiNames: [...SUPPORTED_APIS],
             };
         }),
     job: publicProcedure

@@ -39,6 +39,11 @@ Both share the same PostgreSQL database.
 2. **Sync APIs** - Caller awaits response, then invalidates React Query. No WebSocket events.
 3. **Async Jobs** - Emit WebSocket events on completion for background changes the caller didn't initiate.
 
+### Charts & Real-time Data
+
+1. **Backend returns chart-ready data** - APIs should return complete arrays with zeros filled in, not sparse data. Frontend shouldn't generate intervals or match/merge data.
+2. **Simple real-time updates** - WebSocket events update the current data point, not timestamp-matched positions. Periodic backend refresh syncs accuracy.
+
 ---
 
 ## Backend Design

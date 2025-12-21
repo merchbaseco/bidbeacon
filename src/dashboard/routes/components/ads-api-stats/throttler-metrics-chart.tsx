@@ -1,69 +1,94 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
-import { formatTimeAgo } from '@/dashboard/lib/utils';
-import { useAdsApiThrottlerMetrics } from '../../hooks/use-ads-api-throttler-metrics';
+import { api } from '@/dashboard/lib/trpc';
+import { useWebSocketEvents } from '../../hooks/use-websocket-events';
 import { ChartTooltip } from '../chart-tooltip';
 
+type ChartPoint = {
+    time: string;
+    timestamp: string;
+    total: number;
+    rateLimited: number;
+    interval: string;
+};
+
+function createEmptyPoint(date: Date): ChartPoint {
+    const time = date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    return { time, timestamp: date.toISOString(), total: 0, rateLimited: 0, interval: time };
+}
+
 /**
- * Throttler Metrics Chart Component
- *
- * Displays a line chart showing throttler metrics over the last minute:
- * - Total API calls per second
- * - Rate-limited calls (429 responses) per second
+ * Throttler Metrics Chart - Shows API calls per second for the last 60 seconds
  */
 export const ThrottlerMetricsChart = () => {
-    const [queryRefreshKey, setQueryRefreshKey] = useState(0);
+    const [refreshKey, setRefreshKey] = useState(0);
+    const [chartData, setChartData] = useState<ChartPoint[]>([]);
 
-    // Refresh the query every 10 seconds
+    // Refresh query every 10 seconds
     useEffect(() => {
-        const interval = setInterval(() => {
-            setQueryRefreshKey(prev => prev + 1);
-        }, 10000);
+        const interval = setInterval(() => setRefreshKey(k => k + 1), 10000);
         return () => clearInterval(interval);
     }, []);
 
-    // Calculate date range (last 60 seconds)
-    // biome-ignore lint/correctness/useExhaustiveDependencies: queryRefreshKey is intentionally used to trigger recalculation
+    // biome-ignore lint/correctness/useExhaustiveDependencies: refreshKey triggers recalculation
     const dateRange = useMemo(() => {
         const to = new Date();
-        const from = new Date(to.getTime() - 60 * 1000);
-        return {
-            from: from.toISOString(),
-            to: to.toISOString(),
-        };
-    }, [queryRefreshKey]);
+        const from = new Date(to.getTime() - 60_000);
+        return { from: from.toISOString(), to: to.toISOString() };
+    }, [refreshKey]);
 
-    const { data } = useAdsApiThrottlerMetrics(dateRange);
+    const { data } = api.metrics.adsApiThrottler.useQuery(dateRange, {
+        refetchInterval: 10000,
+        staleTime: 5000,
+    });
 
-    // Transform for Recharts (add interval field for x-axis display)
-    const chartData = useMemo(() => {
-        if (!data?.data) return [];
-        return data.data.map(point => ({
-            ...point,
-            interval: point.time,
-        }));
+    // Sync chart data when backend data arrives
+    useEffect(() => {
+        if (data?.data) {
+            setChartData(data.data.map(p => ({ ...p, interval: p.time })));
+        }
     }, [data]);
 
-    // Calculate max count for Y-axis scaling
+    // Slide window forward every second
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setChartData(prev => {
+                if (prev.length === 0) return prev;
+                const now = new Date();
+                now.setMilliseconds(0);
+                const newPoint = createEmptyPoint(now);
+                // Skip if current second already exists
+                if (prev[prev.length - 1]?.timestamp === newPoint.timestamp) return prev;
+                return [...prev.slice(1), newPoint];
+            });
+        }, 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    // Real-time updates: just increment the current (last) second
+    useWebSocketEvents('api-metrics:updated', event => {
+        setChartData(prev => {
+            if (prev.length === 0) return prev;
+            const lastIdx = prev.length - 1;
+            const updated = [...prev];
+            updated[lastIdx] = {
+                ...updated[lastIdx],
+                total: updated[lastIdx].total + 1,
+                rateLimited: updated[lastIdx].rateLimited + (event.data.statusCode === 429 ? 1 : 0),
+            };
+            return updated;
+        });
+    });
+
     const maxCount = useMemo(() => {
         if (chartData.length === 0) return 1;
-        const maxTotal = Math.max(...chartData.map(p => p.total));
-        const maxRateLimited = Math.max(...chartData.map(p => p.rateLimited));
-        return Math.max(maxTotal, maxRateLimited, 1);
+        return Math.max(...chartData.map(p => Math.max(p.total, p.rateLimited)), 1);
     }, [chartData]);
 
-    // Custom tick formatter to show relative time
-    const formatXAxisTick = (value: string, index: number) => {
-        const point = chartData.find(p => p.interval === value);
-        if (!point) return value;
-
-        // Show ~5 ticks
-        const totalTicks = chartData.length;
-        const tickInterval = Math.max(1, Math.floor(totalTicks / 5));
-        if (index === 0 || index === totalTicks - 1 || index % tickInterval === 0) {
-            return formatTimeAgo(point.timestamp);
-        }
+    const formatXAxisTick = (_value: string, index: number) => {
+        if (index === 0) return '60s';
+        if (index === chartData.length - 1) return '0s';
         return '';
     };
 

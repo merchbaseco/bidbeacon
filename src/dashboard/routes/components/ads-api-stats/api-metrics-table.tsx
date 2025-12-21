@@ -5,39 +5,28 @@ import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { useAdsApiMetrics } from '@/dashboard/routes/hooks/use-ads-api-metrics';
 
 /**
- * API Metrics Table Component
- *
- * Displays a table showing totals for each API endpoint with visual bars.
+ * API Metrics Table - Shows totals for each API endpoint with visual bars
  */
 export function ApiMetricsTable() {
     const dateRange = useMemo(() => {
         const to = new Date();
         const from = new Date(to.getTime() - 3 * 60 * 60 * 1000); // 3 hours
-        return {
-            from: from.toISOString(),
-            to: to.toISOString(),
-        };
+        return { from: from.toISOString(), to: to.toISOString() };
     }, []);
 
     const { data } = useAdsApiMetrics(dateRange);
 
-    // Calculate totals for each API
+    // Calculate totals from chart data
     const apiTotals = useMemo(() => {
-        const apiNames = data?.apiNames || [];
-        return apiNames
+        if (!data?.data || !data?.apiNames) return [];
+        return data.apiNames
             .map((apiName, index) => {
-                const apiData = data?.data[apiName] || [];
-                const total = apiData.reduce((sum, point) => sum + point.count, 0);
-                return {
-                    name: apiName,
-                    total,
-                    color: LEGEND_COLORS[index % LEGEND_COLORS.length],
-                };
+                const total = data.data.reduce((sum, point) => sum + ((point[apiName] as number) || 0), 0);
+                return { name: apiName, total, color: LEGEND_COLORS[index % LEGEND_COLORS.length] };
             })
-            .sort((a, b) => b.total - a.total); // Sort by total descending
+            .sort((a, b) => b.total - a.total);
     }, [data]);
 
-    // Calculate max count for bar scaling
     const maxCount = useMemo(() => {
         if (apiTotals.length === 0) return 1;
         return Math.max(...apiTotals.map(api => api.total));
