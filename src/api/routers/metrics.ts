@@ -11,14 +11,14 @@ export const metricsRouter = router({
     adsApi: publicProcedure
         .input(
             z.object({
-                from: z.string().datetime().optional(),
-                to: z.string().datetime().optional(),
+                from: z.string().datetime(),
+                to: z.string().datetime(),
                 apiName: z.string().optional(),
             })
         )
         .query(async ({ input }) => {
-            const to = input.to ? new Date(input.to) : new Date();
-            const from = input.from ? new Date(input.from) : new Date(to.getTime() - 3 * 60 * 60 * 1000);
+            const from = new Date(input.from);
+            const to = new Date(input.to);
 
             const conditions = [gte(apiMetrics.timestamp, from), lte(apiMetrics.timestamp, to)];
 
@@ -72,14 +72,14 @@ export const metricsRouter = router({
     job: publicProcedure
         .input(
             z.object({
-                from: z.string().datetime().optional(),
-                to: z.string().datetime().optional(),
+                from: z.string().datetime(),
+                to: z.string().datetime(),
                 jobName: z.string().optional(),
             })
         )
         .query(async ({ input }) => {
-            const to = input.to ? new Date(input.to) : new Date();
-            const from = input.from ? new Date(input.from) : new Date(to.getTime() - 3 * 60 * 60 * 1000); // Default to 3 hours like dashboard
+            const from = new Date(input.from);
+            const to = new Date(input.to);
 
             const conditions = [gte(jobMetrics.endTime, from), lte(jobMetrics.endTime, to)];
 
@@ -133,13 +133,13 @@ export const metricsRouter = router({
     adsApiThrottler: publicProcedure
         .input(
             z.object({
-                from: z.string().datetime().optional(),
-                to: z.string().datetime().optional(),
+                from: z.string().datetime(),
+                to: z.string().datetime(),
             })
         )
         .query(async ({ input }) => {
-            const to = input.to ? new Date(input.to) : new Date();
-            const from = input.from ? new Date(input.from) : new Date(to.getTime() - 60 * 1000); // Default to 1 minute
+            const from = new Date(input.from);
+            const to = new Date(input.to);
 
             const conditions = [gte(apiMetrics.timestamp, from), lte(apiMetrics.timestamp, to)];
 

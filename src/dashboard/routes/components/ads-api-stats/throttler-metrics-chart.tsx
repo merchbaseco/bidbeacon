@@ -38,17 +38,14 @@ export const ThrottlerMetricsChart = () => {
         };
     }, []);
 
-    // Memoize from date, recalculate when queryRefreshKey changes (every 10 seconds)
-    // Round 'from' to nearest 10 seconds to group queries and reduce DB load while ensuring query key changes
+    // Memoize date range, recalculate when queryRefreshKey changes (every 10 seconds)
     // biome-ignore lint/correctness/useExhaustiveDependencies: queryRefreshKey is intentionally used to trigger recalculation
     const dateRange = useMemo(() => {
-        const now = new Date();
-        // Round down to nearest 10 seconds - this groups queries and reduces DB load
-        const roundedNow = new Date(Math.floor(now.getTime() / 10000) * 10000);
-        const from = new Date(roundedNow.getTime() - 60 * 1000); // 1 minute before rounded time
+        const to = new Date();
+        const from = new Date(to.getTime() - 60 * 1000); // 1 minute
         return {
             from: from.toISOString(),
-            // Don't pass 'to' - let server default to 'now' so we always get latest data
+            to: to.toISOString(),
         };
     }, [queryRefreshKey]);
 

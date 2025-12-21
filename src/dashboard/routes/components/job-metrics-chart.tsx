@@ -89,15 +89,14 @@ function CustomTooltip({ active, payload, label, coordinate, chartData }: Custom
  * with a table below showing totals for each job.
  */
 export function JobMetricsChart() {
-    // Memoize from date to keep query key stable, but let server calculate 'to' as 'now' on each query
     const dateRange = useMemo(() => {
         const to = new Date();
         const from = new Date(to.getTime() - 3 * 60 * 60 * 1000); // 3 hours
         return {
             from: from.toISOString(),
-            // Don't pass 'to' - let server default to 'now' so we always get latest data
+            to: to.toISOString(),
         };
-    }, []); // Empty deps - only calculate once
+    }, []);
 
     const { data, isLoading, error } = useJobMetrics(dateRange);
 

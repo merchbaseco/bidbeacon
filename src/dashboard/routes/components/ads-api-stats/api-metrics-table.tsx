@@ -10,15 +10,14 @@ import { useAdsApiMetrics } from '@/dashboard/routes/hooks/use-ads-api-metrics';
  * Displays a table showing totals for each API endpoint with visual bars.
  */
 export function ApiMetricsTable() {
-    // Memoize from date to keep query key stable, but let server calculate 'to' as 'now' on each query
     const dateRange = useMemo(() => {
         const to = new Date();
         const from = new Date(to.getTime() - 3 * 60 * 60 * 1000); // 3 hours
         return {
             from: from.toISOString(),
-            // Don't pass 'to' - let server default to 'now' so we always get latest data
+            to: to.toISOString(),
         };
-    }, []); // Empty deps - only calculate once
+    }, []);
 
     const { data } = useAdsApiMetrics(dateRange);
 
