@@ -2,8 +2,8 @@ import { useEffect, useRef } from 'react';
 import { api } from '../../lib/trpc';
 import { useWebSocketEvents } from './use-websocket-events';
 
-export const useThrottlerMetrics = (params?: { from?: string; to?: string }) => {
-    const { data, isLoading, ...rest } = api.metrics.throttler.useQuery(
+export const useAdsApiThrottlerMetrics = (params?: { from?: string; to?: string }) => {
+    const { data, isLoading, ...rest } = api.metrics.adsApiThrottler.useQuery(
         {
             from: params?.from,
             to: params?.to,
@@ -12,6 +12,7 @@ export const useThrottlerMetrics = (params?: { from?: string; to?: string }) => 
             refetchInterval: 10000, // Refetch every 10 seconds as fallback/sync
             refetchOnWindowFocus: true, // Also refetch when window regains focus
             staleTime: 5000,
+            placeholderData: previousData => previousData, // Preserve previous data while loading
         }
     );
 
@@ -67,7 +68,7 @@ export const useThrottlerMetrics = (params?: { from?: string; to?: string }) => 
         dataRef.current = newData;
 
         // Update the query cache
-        queryClient.metrics.throttler.setData(
+        queryClient.metrics.adsApiThrottler.setData(
             {
                 from: params?.from,
                 to: params?.to,

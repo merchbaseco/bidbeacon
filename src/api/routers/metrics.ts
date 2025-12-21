@@ -8,7 +8,7 @@ const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveRepor
 const SUPPORTED_JOBS = ['update-report-datasets', 'update-report-dataset-for-account', 'sync-ad-entities', 'update-report-status'] as const;
 
 export const metricsRouter = router({
-    api: publicProcedure
+    adsApi: publicProcedure
         .input(
             z.object({
                 from: z.string().datetime().optional(),
@@ -130,7 +130,7 @@ export const metricsRouter = router({
                 to: to.toISOString(),
             };
         }),
-    throttler: publicProcedure
+    adsApiThrottler: publicProcedure
         .input(
             z.object({
                 from: z.string().datetime().optional(),

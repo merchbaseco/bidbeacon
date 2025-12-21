@@ -1,9 +1,11 @@
-import { format, formatDistanceToNow } from 'date-fns';
+import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { formatTimeAgo } from '@/dashboard/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
 import { useJobMetrics } from '../hooks/use-job-metrics';
+import { ChartTooltipPortal } from './chart-tooltip-portal';
 
 // Color palette for jobs
 const COLORS = [
@@ -26,13 +28,14 @@ interface CustomTooltipProps {
         color?: string;
     }>;
     label?: string;
+    coordinate?: { x: number; y: number };
     chartData: Record<string, string | number>[];
 }
 
 /**
  * Custom tooltip component matching the design spec
  */
-function CustomTooltip({ active, payload, label, chartData }: CustomTooltipProps) {
+function CustomTooltip({ active, payload, label, coordinate, chartData }: CustomTooltipProps) {
     if (!active || !payload || payload.length === 0) return null;
 
     const point = chartData.find(p => p.interval === label);
@@ -50,40 +53,33 @@ function CustomTooltip({ active, payload, label, chartData }: CustomTooltipProps
     const utcEnd = formatInTimeZone(endTime, 'UTC', 'h:mmaaa');
 
     return (
-        <div className="bg-card border border-border rounded-lg shadow-md p-3 min-w-[180px]">
-            {/* Series list */}
-            <div className="flex flex-col gap-1.5 mb-3">
-                {payload.map(entry => (
-                    <div key={entry.dataKey} className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                            <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-                            <span className="text-sm text-foreground">{entry.name}</span>
+        <ChartTooltipPortal active={active} coordinate={coordinate}>
+            <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[180px]">
+                {/* Series list */}
+                <div className="flex flex-col gap-1.5 mb-3">
+                    {payload.map(entry => (
+                        <div key={entry.dataKey} className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
+                                <span className="text-sm text-foreground">{entry.name}</span>
+                            </div>
+                            <span className="text-sm text-foreground font-medium">{entry.value}</span>
                         </div>
-                        <span className="text-sm text-foreground font-medium">{entry.value}</span>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
 
-            {/* Time ranges */}
-            <div className="flex flex-col gap-0.5">
-                <span className="text-[13px] text-muted-foreground">
-                    {localStart} - {localEnd}
-                </span>
-                <span className="text-[13px] text-muted-foreground">
-                    {utcStart} - {utcEnd} UTC
-                </span>
+                {/* Time ranges */}
+                <div className="flex flex-col gap-0.5">
+                    <span className="text-[13px] text-muted-foreground">
+                        {localStart} - {localEnd}
+                    </span>
+                    <span className="text-[13px] text-muted-foreground">
+                        {utcStart} - {utcEnd} UTC
+                    </span>
+                </div>
             </div>
-        </div>
+        </ChartTooltipPortal>
     );
-}
-
-/**
- * Format timestamp to relative time (e.g., "12h ago", "3h ago", "2m ago")
- */
-function formatRelativeTime(timestamp: string): string {
-    const distance = formatDistanceToNow(new Date(timestamp), { addSuffix: false });
-    // Shorten the format: "about 12 hours" -> "12h", "3 hours" -> "3h", "2 minutes" -> "2m"
-    return `${distance.replace('about ', '').replace(' hours', 'h').replace(' hour', 'h').replace(' minutes', 'm').replace(' minute', 'm').replace('less than a minute', '0m')} ago`;
 }
 
 /**
@@ -188,7 +184,7 @@ export function JobMetricsChart() {
         const totalTicks = chartData.length;
         const tickInterval = Math.floor(totalTicks / 4); // Show ~5 ticks
         if (index === 0 || index === totalTicks - 1 || index % tickInterval === 0) {
-            return formatRelativeTime(point.timestamp as string);
+            return formatTimeAgo(point.timestamp as string);
         }
         return '';
     };
@@ -202,7 +198,10 @@ export function JobMetricsChart() {
                         <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
                         <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
                         <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} />
-                        <Tooltip content={<CustomTooltip chartData={chartData} />} />
+                        <Tooltip
+                            content={<CustomTooltip chartData={chartData} />}
+                            wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }}
+                        />
                         {(data?.jobNames || []).map((jobName, index) => (
                             <Line key={jobName} type="monotone" dataKey={jobName} stroke={COLORS[index % COLORS.length]} strokeWidth={1.5} dot={false} name={jobName} />
                         ))}

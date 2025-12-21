@@ -78,7 +78,7 @@ export const useWebSocket = () => {
                         break;
                     case 'api-metrics:updated':
                         // Invalidate API metrics queries to refresh the chart
-                        utils.metrics.api.invalidate();
+                        utils.metrics.adsApi.invalidate();
                         break;
                     case 'job-metrics:updated':
                         // Invalidate job metrics queries to refresh the chart

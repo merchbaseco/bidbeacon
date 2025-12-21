@@ -1,7 +1,7 @@
 import { api } from '../../lib/trpc';
 
-export const useApiMetrics = (params?: { from?: string; to?: string; apiName?: string }) => {
-    const { data, isLoading, ...rest } = api.metrics.api.useQuery(
+export const useAdsApiMetrics = (params?: { from?: string; to?: string; apiName?: string }) => {
+    const { data, isLoading, ...rest } = api.metrics.adsApi.useQuery(
         {
             from: params?.from,
             to: params?.to,
