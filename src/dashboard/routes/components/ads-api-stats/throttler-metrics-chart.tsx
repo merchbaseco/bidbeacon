@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 import { useEffect, useMemo, useState } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
@@ -9,40 +8,26 @@ import { ChartTooltip } from '../chart-tooltip';
 /**
  * Throttler Metrics Chart Component
  *
- * Displays a line chart showing throttler metrics over time:
- * - Total API calls
- * - Rate-limited calls (429 responses)
- * Uses 1-second intervals for the last minute.
+ * Displays a line chart showing throttler metrics over the last minute:
+ * - Total API calls per second
+ * - Rate-limited calls (429 responses) per second
  */
 export const ThrottlerMetricsChart = () => {
-    // Update every second for visual chart updates
-    const [now, setNow] = useState(new Date());
-
-    // Separate state for query updates (these happens only every 10 seconds).
     const [queryRefreshKey, setQueryRefreshKey] = useState(0);
 
+    // Refresh the query every 10 seconds
     useEffect(() => {
-        // Update visual state every second
-        const visualInterval = setInterval(() => {
-            setNow(new Date());
-        }, 1000);
-
-        // Update query every 10 seconds
-        const queryInterval = setInterval(() => {
+        const interval = setInterval(() => {
             setQueryRefreshKey(prev => prev + 1);
         }, 10000);
-
-        return () => {
-            clearInterval(visualInterval);
-            clearInterval(queryInterval);
-        };
+        return () => clearInterval(interval);
     }, []);
 
-    // Memoize date range, recalculate when queryRefreshKey changes (every 10 seconds)
+    // Calculate date range (last 60 seconds)
     // biome-ignore lint/correctness/useExhaustiveDependencies: queryRefreshKey is intentionally used to trigger recalculation
     const dateRange = useMemo(() => {
         const to = new Date();
-        const from = new Date(to.getTime() - 60 * 1000); // 1 minute
+        const from = new Date(to.getTime() - 60 * 1000);
         return {
             from: from.toISOString(),
             to: to.toISOString(),
@@ -51,69 +36,33 @@ export const ThrottlerMetricsChart = () => {
 
     const { data } = useAdsApiThrottlerMetrics(dateRange);
 
-    // Generate all 1-second intervals for the last minute, recalculate when 'now' changes
-    const intervals = useMemo(() => {
-        const oneMinuteAgo = new Date(now.getTime() - 60 * 1000);
-        const intervalList: string[] = [];
-
-        // Round start down to the nearest 1-second interval
-        const roundedStart = new Date(oneMinuteAgo);
-        roundedStart.setMilliseconds(0);
-
-        // Round now down to the nearest 1-second interval
-        const roundedEnd = new Date(now);
-        roundedEnd.setMilliseconds(0);
-
-        // Generate all 1-second intervals
-        let current = new Date(roundedStart);
-        while (current <= roundedEnd) {
-            intervalList.push(current.toISOString());
-            current = new Date(current.getTime() + 1000); // Add 1 second
-        }
-
-        return intervalList;
-    }, [now]);
-
-    // Transform data for Recharts
+    // Transform for Recharts (add interval field for x-axis display)
     const chartData = useMemo(() => {
-        return intervals.map(interval => {
-            const point: Record<string, string | number> = {
-                interval: format(new Date(interval), 'HH:mm:ss'),
-                timestamp: interval,
-            };
-
-            // Find matching data point
-            const matchingPoint = data?.data.find(p => {
-                const dataInterval = new Date(p.interval);
-                const currentInterval = new Date(interval);
-                // Match if within the same second
-                return dataInterval.getTime() >= currentInterval.getTime() && dataInterval.getTime() < currentInterval.getTime() + 1000;
-            });
-
-            point.total = matchingPoint ? matchingPoint.total : 0;
-            point.rateLimited = matchingPoint ? matchingPoint.rateLimited : 0;
-
-            return point;
-        });
-    }, [intervals, data]);
+        if (!data?.data) return [];
+        return data.data.map(point => ({
+            ...point,
+            interval: point.time,
+        }));
+    }, [data]);
 
     // Calculate max count for Y-axis scaling
     const maxCount = useMemo(() => {
-        const maxTotal = Math.max(...chartData.map(p => p.total as number), 1);
-        const maxRateLimited = Math.max(...chartData.map(p => p.rateLimited as number), 1);
-        return Math.max(maxTotal, maxRateLimited);
+        if (chartData.length === 0) return 1;
+        const maxTotal = Math.max(...chartData.map(p => p.total));
+        const maxRateLimited = Math.max(...chartData.map(p => p.rateLimited));
+        return Math.max(maxTotal, maxRateLimited, 1);
     }, [chartData]);
 
-    // Custom tick formatter to show relative time with seconds
+    // Custom tick formatter to show relative time
     const formatXAxisTick = (value: string, index: number) => {
         const point = chartData.find(p => p.interval === value);
         if (!point) return value;
 
-        // Show tick at roughly every 15 seconds (15 intervals of 1 second = 15 seconds)
+        // Show ~5 ticks
         const totalTicks = chartData.length;
-        const tickInterval = Math.max(1, Math.floor(totalTicks / 5)); // Show ~5 ticks
+        const tickInterval = Math.max(1, Math.floor(totalTicks / 5));
         if (index === 0 || index === totalTicks - 1 || index % tickInterval === 0) {
-            return formatTimeAgo(point.timestamp as string);
+            return formatTimeAgo(point.timestamp);
         }
         return '';
     };

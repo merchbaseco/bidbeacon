@@ -2,6 +2,9 @@ import { useEffect, useRef } from 'react';
 import { api } from '../../lib/trpc';
 import { useWebSocketEvents } from './use-websocket-events';
 
+type ChartPoint = { time: string; timestamp: string; total: number; rateLimited: number };
+type ThrottlerData = { data: ChartPoint[] };
+
 export const useAdsApiThrottlerMetrics = (params: { from: string; to: string }) => {
     const { data, isLoading, ...rest } = api.metrics.adsApiThrottler.useQuery(params, {
         refetchInterval: 10000,
@@ -17,47 +20,33 @@ export const useAdsApiThrottlerMetrics = (params: { from: string; to: string }) 
         dataRef.current = data;
     }, [data]);
 
+    // Handle real-time updates via WebSocket
     useWebSocketEvents('api-metrics:updated', event => {
         if (!dataRef.current) return;
 
-        const eventTimestamp = new Date(event.data.timestamp);
-        const fromTime = new Date(params.from);
-        const toTime = new Date(params.to);
+        const eventTime = new Date(event.data.timestamp);
+        eventTime.setMilliseconds(0);
+        const eventTimestamp = eventTime.toISOString();
 
-        if (eventTimestamp < fromTime || eventTimestamp > toTime) return;
+        // Find the matching second in our data
+        const pointIndex = dataRef.current.data.findIndex(p => p.timestamp === eventTimestamp);
+        if (pointIndex === -1) return;
 
-        const intervalStart = new Date(eventTimestamp);
-        intervalStart.setMilliseconds(0);
-        const intervalKey = intervalStart.toISOString();
-
-        const newData = { ...dataRef.current };
-        const existingIntervalIndex = newData.data.findIndex(p => p.interval === intervalKey);
-
-        if (existingIntervalIndex >= 0) {
-            newData.data[existingIntervalIndex] = {
-                ...newData.data[existingIntervalIndex],
-                total: newData.data[existingIntervalIndex].total + 1,
-                rateLimited: newData.data[existingIntervalIndex].rateLimited + (event.data.statusCode === 429 ? 1 : 0),
-            };
-        } else {
-            newData.data = [
-                ...newData.data,
-                {
-                    interval: intervalKey,
-                    total: 1,
-                    rateLimited: event.data.statusCode === 429 ? 1 : 0,
-                },
-            ];
-            newData.data.sort((a, b) => new Date(a.interval).getTime() - new Date(b.interval).getTime());
-        }
+        // Create updated data
+        const newData: ThrottlerData = {
+            data: dataRef.current.data.map((point, i) => {
+                if (i !== pointIndex) return point;
+                return {
+                    ...point,
+                    total: point.total + 1,
+                    rateLimited: point.rateLimited + (event.data.statusCode === 429 ? 1 : 0),
+                };
+            }),
+        };
 
         dataRef.current = newData;
         queryClient.metrics.adsApiThrottler.setData(params, newData);
     });
 
-    return {
-        data,
-        isLoading,
-        ...rest,
-    };
+    return { data, isLoading, ...rest };
 };

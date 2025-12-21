@@ -1,4 +1,4 @@
-import { httpBatchLink, loggerLink } from '@trpc/client';
+import { httpLink, loggerLink } from '@trpc/client';
 import { apiBaseUrl } from '../router.js';
 
 export function createTRPCClient() {
@@ -7,7 +7,7 @@ export function createTRPCClient() {
             loggerLink({
                 enabled: () => true,
             }),
-            httpBatchLink({
+            httpLink({
                 url: `${apiBaseUrl}/api`,
             }),
         ],

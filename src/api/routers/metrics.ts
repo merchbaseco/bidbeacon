@@ -143,28 +143,46 @@ export const metricsRouter = router({
 
             const conditions = [gte(apiMetrics.timestamp, from), lte(apiMetrics.timestamp, to)];
 
-            // Query for 1-second intervals
+            // Query for 1-second intervals (only returns seconds with data)
             const data = await db
                 .select({
-                    interval: sql<string>`date_trunc('minute', ${apiMetrics.timestamp}) + floor(extract(second from ${apiMetrics.timestamp})) * interval '1 second'`.as('interval'),
+                    interval: sql<string>`date_trunc('second', ${apiMetrics.timestamp})`.as('interval'),
                     totalCount: sql<number>`count(*)`.as('total_count'),
                     rateLimitedCount: sql<number>`sum(case when ${apiMetrics.statusCode} = 429 then 1 else 0 end)`.as('rate_limited_count'),
                 })
                 .from(apiMetrics)
                 .where(and(...conditions))
-                .groupBy(sql`date_trunc('minute', ${apiMetrics.timestamp}) + floor(extract(second from ${apiMetrics.timestamp})) * interval '1 second'`)
-                .orderBy(sql`date_trunc('minute', ${apiMetrics.timestamp}) + floor(extract(second from ${apiMetrics.timestamp})) * interval '1 second'`);
+                .groupBy(sql`date_trunc('second', ${apiMetrics.timestamp})`)
+                .orderBy(sql`date_trunc('second', ${apiMetrics.timestamp})`);
 
-            const chartData = data.map(row => ({
-                interval: new Date(row.interval).toISOString(),
-                total: Number(row.totalCount),
-                rateLimited: Number(row.rateLimitedCount),
-            }));
+            // Build a map of timestamp -> data for quick lookup
+            const dataMap = new Map<number, { total: number; rateLimited: number }>();
+            for (const row of data) {
+                const ts = new Date(row.interval).getTime();
+                dataMap.set(ts, {
+                    total: Number(row.totalCount),
+                    rateLimited: Number(row.rateLimitedCount),
+                });
+            }
 
-            return {
-                data: chartData,
-                from: from.toISOString(),
-                to: to.toISOString(),
-            };
+            // Generate all 1-second intervals from `from` to `to`, filling with zeros
+            const chartData: Array<{ time: string; timestamp: string; total: number; rateLimited: number }> = [];
+            const roundedFrom = new Date(from);
+            roundedFrom.setMilliseconds(0);
+            const roundedTo = new Date(to);
+            roundedTo.setMilliseconds(0);
+
+            for (let ts = roundedFrom.getTime(); ts <= roundedTo.getTime(); ts += 1000) {
+                const date = new Date(ts);
+                const existing = dataMap.get(ts);
+                chartData.push({
+                    time: date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                    timestamp: date.toISOString(),
+                    total: existing?.total ?? 0,
+                    rateLimited: existing?.rateLimited ?? 0,
+                });
+            }
+
+            return { data: chartData };
         }),
 });
