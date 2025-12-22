@@ -1,13 +1,14 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import ArrowExpandIcon from '@merchbaseco/icons/core-solid-rounded/ArrowExpandIcon';
 import { useAtomValue } from 'jotai';
+import { useMemo } from 'react';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { ConnectionStatusBadge } from '../components/connection-status-badge';
 import { Card } from '../components/ui/card';
+import { Frame } from '../components/ui/frame';
 import { connectionStatusAtom } from './atoms';
 import { AccountDataCard } from './components/account-data-card';
 import { AccountEnabledSwitch } from './components/account-selector/account-enabled-switch';
-import { ApiMetricsChart } from './components/ads-api-stats/api-metrics-chart';
 import { ApiMetricsTable } from './components/ads-api-stats/api-metrics-table';
 import { ThrottlerMetricsChart } from './components/ads-api-stats/throttler-metrics-chart';
 import { ChartCard } from './components/chart-card';
@@ -18,6 +19,13 @@ import { ReportsTable } from './components/reports-table/index';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
+
+    const legendItems = useMemo(() => {
+        return [
+            { label: 'API', value: '', color: 'rainbow' },
+            { label: '429', value: '', color: LEGEND_COLORS[5] }, // Red
+        ];
+    }, []);
 
     return (
         <div className="space-y-6">
@@ -37,31 +45,26 @@ export function IndexRoute() {
                         <Card></Card>
                     </div>
                 </div>
-                <div className="col-span-6 grid grid-cols-2 gap-3">
-                    <ChartCard title="Amazon Ads API Invocations" legendItems={[]}>
-                        <ApiMetricsChart />
-                    </ChartCard>
-                    <ChartCard
-                        title="API Throttler Metrics"
-                        legendItems={[
-                            { label: 'Total Calls', value: '', color: LEGEND_COLORS[3] }, // Blue
-                            { label: 'Rate Limited (429)', value: '', color: LEGEND_COLORS[5] }, // Red
-                        ]}
-                    >
-                        <ThrottlerMetricsChart />
-                    </ChartCard>
-                    <div className="col-span-2">
-                        <ApiMetricsTable />
+
+                <Frame className="w-full overflow-visible">
+                    <div className="grid grid-cols-2 gap-3">
+                        <ChartCard title="Ads API Invocations" legendItems={legendItems}>
+                            <ThrottlerMetricsChart />
+                        </ChartCard>
+                        <div className="row-span-2">
+                            <ApiMetricsTable />
+                        </div>
                     </div>
-                </div>
-                <div className="col-span-6 grid grid-cols-2 gap-3">
-                    <ChartCard title="Job Invocations" legendItems={[]}>
-                        <JobMetricsChart />
-                    </ChartCard>
-                    <div className="col-span-2">
+                </Frame>
+
+                <Frame className="w-full overflow-visible">
+                    <div className="grid grid-cols-2 gap-3">
+                        <ChartCard title="Job Invocations" legendItems={[]}>
+                            <JobMetricsChart />
+                        </ChartCard>
                         <JobMetricsTable />
                     </div>
-                </div>
+                </Frame>
                 <Card className="p-3 space-y-0 gap-3">
                     <div className="flex items-start justify-between px-2">
                         <div className="text-sm font-medium">Daily Dataset Health</div>

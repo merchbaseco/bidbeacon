@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { Frame } from '@/dashboard/components/ui/frame';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/dashboard/components/ui/table';
+import { Table, TableBody, TableCell, TableRow } from '@/dashboard/components/ui/table';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { useJobMetrics } from '@/dashboard/routes/hooks/use-job-metrics';
 
@@ -34,47 +33,39 @@ export function JobMetricsTable() {
     }, [jobTotals]);
 
     return (
-        <Frame className="w-full overflow-visible">
-            <div className="overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible">
-                <Table>
-                    <TableHeader>
+        <div className="overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible">
+            <Table>
+                <TableBody>
+                    {jobTotals.length === 0 ? (
                         <TableRow>
-                            <TableHead>Job Name</TableHead>
-                            <TableHead>Count</TableHead>
+                            <TableCell colSpan={2} className="text-center text-muted-foreground">
+                                No job metrics available.
+                            </TableCell>
                         </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {jobTotals.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={2} className="text-center text-muted-foreground">
-                                    No job metrics available.
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            jobTotals.map(job => {
-                                const percentage = maxCount > 0 ? (job.total / maxCount) * 100 : 0;
-                                return (
-                                    <TableRow key={job.name}>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2 pl-1">
-                                                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: job.color }} />
-                                                {job.name}
+                    ) : (
+                        jobTotals.map(job => {
+                            const percentage = maxCount > 0 ? (job.total / maxCount) * 100 : 0;
+                            return (
+                                <TableRow key={job.name}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2 pl-1">
+                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: job.color }} />
+                                            {job.name}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="relative w-full h-6 flex items-center">
+                                            <div className="h-full bg-muted rounded flex items-center px-2 min-w-fit" style={{ width: `${Math.max(percentage, 0)}%` }}>
+                                                <span className="text-sm text-foreground whitespace-nowrap">{job.total.toLocaleString()}</span>
                                             </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="relative w-full h-6 flex items-center">
-                                                <div className="h-full bg-muted rounded flex items-center px-2 min-w-fit" style={{ width: `${Math.max(percentage, 0)}%` }}>
-                                                    <span className="text-sm text-foreground whitespace-nowrap">{job.total.toLocaleString()}</span>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
-        </Frame>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })
+                    )}
+                </TableBody>
+            </Table>
+        </div>
     );
 }

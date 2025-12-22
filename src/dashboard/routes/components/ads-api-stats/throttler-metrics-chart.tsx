@@ -8,14 +8,22 @@ import { ChartTooltip } from '../chart-tooltip';
 type ChartPoint = {
     time: string;
     timestamp: string;
-    total: number;
-    rateLimited: number;
     interval: string;
+    [apiName: string]: string | number;
 };
 
-function createEmptyPoint(date: Date): ChartPoint {
+function createEmptyPoint(date: Date, apiNames: string[]): ChartPoint {
     const time = date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    return { time, timestamp: date.toISOString(), total: 0, rateLimited: 0, interval: time };
+    const point: ChartPoint = {
+        time,
+        timestamp: date.toISOString(),
+        interval: time,
+    };
+    for (const apiName of apiNames) {
+        point[apiName] = 0;
+    }
+    point['429'] = 0;
+    return point;
 }
 
 /**
@@ -46,7 +54,7 @@ export const ThrottlerMetricsChart = () => {
     // Sync chart data when backend data arrives
     useEffect(() => {
         if (data?.data) {
-            setChartData(data.data.map(p => ({ ...p, interval: p.time })));
+            setChartData(data.data);
         }
     }, [data]);
 
@@ -54,37 +62,51 @@ export const ThrottlerMetricsChart = () => {
     useEffect(() => {
         const interval = setInterval(() => {
             setChartData(prev => {
-                if (prev.length === 0) return prev;
+                if (prev.length === 0 || !data?.apiNames) return prev;
                 const now = new Date();
                 now.setMilliseconds(0);
-                const newPoint = createEmptyPoint(now);
+                const newPoint = createEmptyPoint(now, data.apiNames);
                 // Skip if current second already exists
                 if (prev[prev.length - 1]?.timestamp === newPoint.timestamp) return prev;
                 return [...prev.slice(1), newPoint];
             });
         }, 1000);
         return () => clearInterval(interval);
-    }, []);
+    }, [data?.apiNames]);
 
-    // Real-time updates: just increment the current (last) second
+    // Real-time updates: just increment the current (last) second for the specific API
     useWebSocketEvents('api-metrics:updated', event => {
         setChartData(prev => {
             if (prev.length === 0) return prev;
             const lastIdx = prev.length - 1;
             const updated = [...prev];
+            const apiName = event.data.apiName;
+            const currentValue = (updated[lastIdx][apiName] as number) || 0;
+            const is429 = event.data.statusCode === 429;
+            const current429Value = (updated[lastIdx]['429'] as number) || 0;
             updated[lastIdx] = {
                 ...updated[lastIdx],
-                total: updated[lastIdx].total + 1,
-                rateLimited: updated[lastIdx].rateLimited + (event.data.statusCode === 429 ? 1 : 0),
+                [apiName]: currentValue + 1,
+                '429': is429 ? current429Value + 1 : current429Value,
             };
             return updated;
         });
     });
 
     const maxCount = useMemo(() => {
-        if (chartData.length === 0) return 1;
-        return Math.max(...chartData.map(p => Math.max(p.total, p.rateLimited)), 1);
-    }, [chartData]);
+        if (chartData.length === 0 || !data?.apiNames) return 1;
+        let max = 0;
+        for (const point of chartData) {
+            for (const apiName of data.apiNames) {
+                const value = (point[apiName] as number) || 0;
+                if (value > max) max = value;
+            }
+            // Also check 429 count
+            const rateLimitedValue = (point['429'] as number) || 0;
+            if (rateLimitedValue > max) max = rateLimitedValue;
+        }
+        return Math.max(max, 1);
+    }, [chartData, data?.apiNames]);
 
     const formatXAxisTick = (_value: string, index: number) => {
         if (index === 0) return '60s';
@@ -100,8 +122,10 @@ export const ThrottlerMetricsChart = () => {
                     <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} domain={[0, maxCount]} />
                     <Tooltip content={<ChartTooltip chartData={chartData} intervalMs={1000} />} wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }} />
-                    <Line type="monotone" dataKey="total" stroke={LEGEND_COLORS[3]} strokeWidth={1.5} dot={false} name="Total Calls" isAnimationActive={false} />
-                    <Line type="monotone" dataKey="rateLimited" stroke={LEGEND_COLORS[5]} strokeWidth={1.5} dot={false} name="Rate Limited (429)" isAnimationActive={false} />
+                    {(data?.apiNames || []).map((apiName, index) => (
+                        <Line key={apiName} type="monotone" dataKey={apiName} stroke={LEGEND_COLORS[index % LEGEND_COLORS.length]} strokeWidth={1.5} dot={false} name={apiName} isAnimationActive={false} />
+                    ))}
+                    <Line type="monotone" dataKey="429" stroke={LEGEND_COLORS[5]} strokeWidth={1.5} dot={false} name="429" isAnimationActive={false} />
                 </LineChart>
             </ResponsiveContainer>
         </div>

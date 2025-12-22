@@ -89,8 +89,9 @@ export const useWebSocket = () => {
                         });
                         break;
                     case 'api-metrics:updated':
-                        // Invalidate API metrics queries to refresh the chart
+                        // Invalidate API metrics queries to refresh the chart and table
                         utils.metrics.adsApi.invalidate();
+                        utils.metrics.adsApiThrottler.invalidate();
                         break;
                     case 'job-metrics:updated':
                         // Invalidate job metrics queries to refresh the chart

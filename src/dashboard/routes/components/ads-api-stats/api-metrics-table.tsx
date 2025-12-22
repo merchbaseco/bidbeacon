@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
-import { Frame } from '@/dashboard/components/ui/frame';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/dashboard/components/ui/table';
+import { Table, TableBody, TableCell, TableRow } from '@/dashboard/components/ui/table';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { useAdsApiMetrics } from '@/dashboard/routes/hooks/use-ads-api-metrics';
 
@@ -33,47 +32,39 @@ export function ApiMetricsTable() {
     }, [apiTotals]);
 
     return (
-        <Frame className="w-full overflow-visible">
-            <div className="overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible">
-                <Table>
-                    <TableHeader>
+        <div className="overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible">
+            <Table>
+                <TableBody>
+                    {apiTotals.length === 0 ? (
                         <TableRow>
-                            <TableHead>API Endpoint</TableHead>
-                            <TableHead>Count</TableHead>
+                            <TableCell colSpan={2} className="text-center text-muted-foreground">
+                                No API metrics available.
+                            </TableCell>
                         </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {apiTotals.length === 0 ? (
-                            <TableRow>
-                                <TableCell colSpan={2} className="text-center text-muted-foreground">
-                                    No API metrics available.
-                                </TableCell>
-                            </TableRow>
-                        ) : (
-                            apiTotals.map(api => {
-                                const percentage = maxCount > 0 ? (api.total / maxCount) * 100 : 0;
-                                return (
-                                    <TableRow key={api.name}>
-                                        <TableCell>
-                                            <div className="flex items-center gap-2 pl-1">
-                                                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: api.color }} />
-                                                {api.name}
+                    ) : (
+                        apiTotals.map(api => {
+                            const percentage = maxCount > 0 ? (api.total / maxCount) * 100 : 0;
+                            return (
+                                <TableRow key={api.name}>
+                                    <TableCell>
+                                        <div className="flex items-center gap-2 pl-1">
+                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: api.color }} />
+                                            {api.name}
+                                        </div>
+                                    </TableCell>
+                                    <TableCell>
+                                        <div className="relative w-full h-6 flex items-center">
+                                            <div className="h-full bg-muted rounded flex items-center px-2 min-w-fit" style={{ width: `${Math.max(percentage, 0)}%` }}>
+                                                <span className="text-sm text-foreground whitespace-nowrap">{api.total.toLocaleString()}</span>
                                             </div>
-                                        </TableCell>
-                                        <TableCell>
-                                            <div className="relative w-full h-6 flex items-center">
-                                                <div className="h-full bg-muted rounded flex items-center px-2 min-w-fit" style={{ width: `${Math.max(percentage, 0)}%` }}>
-                                                    <span className="text-sm text-foreground whitespace-nowrap">{api.total.toLocaleString()}</span>
-                                                </div>
-                                            </div>
-                                        </TableCell>
-                                    </TableRow>
-                                );
-                            })
-                        )}
-                    </TableBody>
-                </Table>
-            </div>
-        </Frame>
+                                        </div>
+                                    </TableCell>
+                                </TableRow>
+                            );
+                        })
+                    )}
+                </TableBody>
+            </Table>
+        </div>
     );
 }

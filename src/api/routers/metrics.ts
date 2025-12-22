@@ -164,30 +164,53 @@ export const metricsRouter = router({
 
             const conditions = [gte(apiMetrics.timestamp, from), lte(apiMetrics.timestamp, to)];
 
-            // Query for 1-second intervals (only returns seconds with data)
+            // Query for 1-second intervals grouped by API name (only returns seconds with data)
             const data = await db
                 .select({
                     interval: sql<string>`date_trunc('second', ${apiMetrics.timestamp})`.as('interval'),
-                    totalCount: sql<number>`count(*)`.as('total_count'),
-                    rateLimitedCount: sql<number>`sum(case when ${apiMetrics.statusCode} = 429 then 1 else 0 end)`.as('rate_limited_count'),
+                    apiName: apiMetrics.apiName,
+                    count: sql<number>`count(*)`.as('count'),
                 })
                 .from(apiMetrics)
                 .where(and(...conditions))
+                .groupBy(sql`date_trunc('second', ${apiMetrics.timestamp})`, apiMetrics.apiName)
+                .orderBy(sql`date_trunc('second', ${apiMetrics.timestamp})`, sql`${apiMetrics.apiName}`);
+
+            // Query for 429s aggregated per second (all APIs combined)
+            const rateLimitedData = await db
+                .select({
+                    interval: sql<string>`date_trunc('second', ${apiMetrics.timestamp})`.as('interval'),
+                    count: sql<number>`count(*)`.as('count'),
+                })
+                .from(apiMetrics)
+                .where(and(...conditions, eq(apiMetrics.statusCode, 429)))
                 .groupBy(sql`date_trunc('second', ${apiMetrics.timestamp})`)
                 .orderBy(sql`date_trunc('second', ${apiMetrics.timestamp})`);
 
-            // Build a map of timestamp -> data for quick lookup
-            const dataMap = new Map<number, { total: number; rateLimited: number }>();
+            // Build a map: timestamp -> apiName -> count
+            const dataMap = new Map<number, Map<string, number>>();
             for (const row of data) {
                 const ts = new Date(row.interval).getTime();
-                dataMap.set(ts, {
-                    total: Number(row.totalCount),
-                    rateLimited: Number(row.rateLimitedCount),
-                });
+                if (!dataMap.has(ts)) {
+                    dataMap.set(ts, new Map());
+                }
+                dataMap.get(ts)!.set(row.apiName, Number(row.count));
+            }
+
+            // Build a map: timestamp -> 429 count
+            const rateLimitedMap = new Map<number, number>();
+            for (const row of rateLimitedData) {
+                const ts = new Date(row.interval).getTime();
+                rateLimitedMap.set(ts, Number(row.count));
             }
 
             // Generate all 1-second intervals from `from` to `to`, filling with zeros
-            const chartData: Array<{ time: string; timestamp: string; total: number; rateLimited: number }> = [];
+            const chartData: Array<{
+                time: string;
+                timestamp: string;
+                interval: string;
+                [apiName: string]: string | number;
+            }> = [];
             const roundedFrom = new Date(from);
             roundedFrom.setMilliseconds(0);
             const roundedTo = new Date(to);
@@ -195,15 +218,28 @@ export const metricsRouter = router({
 
             for (let ts = roundedFrom.getTime(); ts <= roundedTo.getTime(); ts += 1000) {
                 const date = new Date(ts);
-                const existing = dataMap.get(ts);
-                chartData.push({
-                    time: date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
+                const time = date.toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+                const point: { time: string; timestamp: string; interval: string; [apiName: string]: string | number } = {
+                    time,
                     timestamp: date.toISOString(),
-                    total: existing?.total ?? 0,
-                    rateLimited: existing?.rateLimited ?? 0,
-                });
+                    interval: time,
+                };
+
+                // Add count for each API (0 if no data)
+                const intervalData = dataMap.get(ts);
+                for (const apiName of SUPPORTED_APIS) {
+                    point[apiName] = intervalData?.get(apiName) ?? 0;
+                }
+
+                // Add 429 count (aggregated across all APIs)
+                point['429'] = rateLimitedMap.get(ts) ?? 0;
+
+                chartData.push(point);
             }
 
-            return { data: chartData };
+            return {
+                data: chartData,
+                apiNames: [...SUPPORTED_APIS],
+            };
         }),
 });

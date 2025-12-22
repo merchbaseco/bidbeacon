@@ -9,7 +9,16 @@ export const ChartCard = ({ title, legendItems, children }: { title: string; leg
                 <div className="flex items-center gap-4">
                     {legendItems.map(item => (
                         <div key={item.label} className="flex items-center gap-1">
-                            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                            {item.color === 'rainbow' ? (
+                                <div
+                                    className="w-2 h-2 rounded-full"
+                                    style={{
+                                        background: 'linear-gradient(90deg, #F59E0B, #10B981, #14B8A6, #3B82F6, #8B5CF6, #EF4444, #EC4899, #6366F1)',
+                                    }}
+                                />
+                            ) : (
+                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                            )}
                             <div className="text-sm">{item.label}</div>
                         </div>
                     ))}
