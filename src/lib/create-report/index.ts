@@ -4,6 +4,7 @@ import { createReport } from '@/amazon-ads/create-report.js';
 import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
+import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility.js';
 import type { AggregationType, EntityType } from '@/types/reports.js';
 import { utcAddHours, utcNow } from '@/utils/date.js';
 import { emitReportDatasetMetadataUpdated } from '@/utils/emit-report-dataset-metadata-updated.js';
@@ -96,8 +97,14 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
     const zonedTime = toZonedTime(nowUtc, timezone);
     const lastReportCreatedAt = new Date(zonedTime.getFullYear(), zonedTime.getMonth(), zonedTime.getDate(), zonedTime.getHours(), zonedTime.getMinutes(), zonedTime.getSeconds());
 
-    // Poll in 5 minutes to check if report completed
-    const nextRefreshAt = new Date(Date.now() + 5 * 60 * 1000);
+    // Calculate next refresh time using centralized logic (will return 5-minute poll since reportId is set)
+    const nextRefreshAt = getNextRefreshTime({
+        periodStart: date,
+        aggregation: input.aggregation,
+        lastReportCreatedAt,
+        reportId,
+        countryCode: input.countryCode,
+    });
 
     // Only insert/update metadata for daily target datasets
     // Skip hourly datasets and daily product datasets
@@ -108,7 +115,7 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
             .values({
                 accountId: input.accountId,
                 countryCode: input.countryCode,
-                timestamp: date,
+                periodStart: date,
                 aggregation: input.aggregation,
                 entityType: input.entityType,
                 status: 'fetching',
@@ -118,7 +125,7 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
                 error: null,
             })
             .onConflictDoUpdate({
-                target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
+                target: [reportDatasetMetadata.accountId, reportDatasetMetadata.periodStart, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
                 set: {
                     reportId,
                     status: 'fetching',

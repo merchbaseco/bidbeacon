@@ -58,7 +58,7 @@ export const updateReportStatusJob = boss
                 // Determine next action using state machine
                 // The state machine will fetch report status if reportId exists
                 const action = await getNextAction(
-                    reportDatum.timestamp,
+                    reportDatum.periodStart,
                     reportDatum.aggregation as 'hourly' | 'daily',
                     reportDatum.entityType as 'target' | 'product',
                     reportDatum.lastReportCreatedAt,
@@ -125,7 +125,7 @@ export const updateReportStatusJob = boss
 async function setRefreshing(
     refreshing: boolean,
     accountId: string,
-    timestamp: Date,
+    periodStart: Date,
     aggregation: AggregationType,
     entityType: EntityType,
     error: string | null | undefined,
@@ -135,7 +135,7 @@ async function setRefreshing(
     const currentRow = await db.query.reportDatasetMetadata.findFirst({
         where: and(
             eq(reportDatasetMetadata.accountId, accountId),
-            eq(reportDatasetMetadata.timestamp, timestamp),
+            eq(reportDatasetMetadata.periodStart, periodStart),
             eq(reportDatasetMetadata.aggregation, aggregation),
             eq(reportDatasetMetadata.entityType, entityType)
         ),
@@ -146,7 +146,13 @@ async function setRefreshing(
     }
 
     // Calculate next refresh time
-    const nextRefreshAt = getNextRefreshTime(timestamp, aggregation as 'hourly' | 'daily', currentRow.lastReportCreatedAt, countryCode);
+    const nextRefreshAt = getNextRefreshTime({
+        periodStart: currentRow.periodStart,
+        aggregation: currentRow.aggregation as 'hourly' | 'daily',
+        lastReportCreatedAt: currentRow.lastReportCreatedAt,
+        reportId: currentRow.reportId,
+        countryCode: currentRow.countryCode,
+    });
 
     const updateData: { refreshing: boolean; error?: string | null; nextRefreshAt?: Date | null } = {
         refreshing,
@@ -162,7 +168,7 @@ async function setRefreshing(
         .where(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
-                eq(reportDatasetMetadata.timestamp, timestamp),
+                eq(reportDatasetMetadata.periodStart, periodStart),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType)
             )
@@ -180,12 +186,12 @@ async function setRefreshing(
 /**
  * Updates the status for a report datum and emits the update event
  */
-async function updateStatus(status: string, error: string | null, accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType, countryCode: string): Promise<void> {
+async function updateStatus(status: string, error: string | null, accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType, countryCode: string): Promise<void> {
     // Get current row to calculate nextRefreshAt
     const currentRow = await db.query.reportDatasetMetadata.findFirst({
         where: and(
             eq(reportDatasetMetadata.accountId, accountId),
-            eq(reportDatasetMetadata.timestamp, timestamp),
+            eq(reportDatasetMetadata.periodStart, periodStart),
             eq(reportDatasetMetadata.aggregation, aggregation),
             eq(reportDatasetMetadata.entityType, entityType)
         ),
@@ -196,7 +202,13 @@ async function updateStatus(status: string, error: string | null, accountId: str
     }
 
     // Calculate next refresh time
-    const nextRefreshAt = getNextRefreshTime(timestamp, aggregation as 'hourly' | 'daily', currentRow.lastReportCreatedAt, countryCode);
+    const nextRefreshAt = getNextRefreshTime({
+        periodStart: currentRow.periodStart,
+        aggregation: currentRow.aggregation as 'hourly' | 'daily',
+        lastReportCreatedAt: currentRow.lastReportCreatedAt,
+        reportId: currentRow.reportId,
+        countryCode: currentRow.countryCode,
+    });
 
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
@@ -208,7 +220,7 @@ async function updateStatus(status: string, error: string | null, accountId: str
         .where(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
-                eq(reportDatasetMetadata.timestamp, timestamp),
+                eq(reportDatasetMetadata.periodStart, periodStart),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType)
             )
@@ -223,12 +235,12 @@ async function updateStatus(status: string, error: string | null, accountId: str
 /**
  * Marks a report as processed: clears reportId, sets lastProcessedReportId, and recalculates nextRefreshAt
  */
-async function markReportProcessed(accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType, countryCode: string): Promise<void> {
+async function markReportProcessed(accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType, countryCode: string): Promise<void> {
     // Get current row to get reportId and calculate nextRefreshAt
     const currentRow = await db.query.reportDatasetMetadata.findFirst({
         where: and(
             eq(reportDatasetMetadata.accountId, accountId),
-            eq(reportDatasetMetadata.timestamp, timestamp),
+            eq(reportDatasetMetadata.periodStart, periodStart),
             eq(reportDatasetMetadata.aggregation, aggregation),
             eq(reportDatasetMetadata.entityType, entityType)
         ),
@@ -239,7 +251,13 @@ async function markReportProcessed(accountId: string, timestamp: Date, aggregati
     }
 
     const oldReportId = currentRow.reportId;
-    const nextRefreshAt = getNextRefreshTime(timestamp, aggregation as 'hourly' | 'daily', currentRow.lastReportCreatedAt, countryCode);
+    const nextRefreshAt = getNextRefreshTime({
+        periodStart: currentRow.periodStart,
+        aggregation: currentRow.aggregation as 'hourly' | 'daily',
+        lastReportCreatedAt: currentRow.lastReportCreatedAt,
+        reportId: currentRow.reportId,
+        countryCode: currentRow.countryCode,
+    });
 
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
@@ -253,7 +271,7 @@ async function markReportProcessed(accountId: string, timestamp: Date, aggregati
         .where(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
-                eq(reportDatasetMetadata.timestamp, timestamp),
+                eq(reportDatasetMetadata.periodStart, periodStart),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType)
             )
@@ -268,7 +286,7 @@ async function markReportProcessed(accountId: string, timestamp: Date, aggregati
 /**
  * Sets nextRefreshAt to 5 minutes from now for a pending report
  */
-async function setNextRefreshForPending(accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
+async function setNextRefreshForPending(accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
     const nextRefreshAt = new Date(Date.now() + 5 * 60 * 1000);
 
     const [updatedRow] = await db
@@ -279,7 +297,7 @@ async function setNextRefreshForPending(accountId: string, timestamp: Date, aggr
         .where(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
-                eq(reportDatasetMetadata.timestamp, timestamp),
+                eq(reportDatasetMetadata.periodStart, periodStart),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType)
             )

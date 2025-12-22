@@ -86,7 +86,7 @@ function SlotPopup({ slot, dataset }: { slot: Date; dataset?: ReportDatasetMetad
         <div className="space-y-2">
             <div>
                 <div className="text-xs font-medium text-muted-foreground">Timestamp</div>
-                <div className="text-sm font-medium">{formatDate(dataset.timestamp)}</div>
+                <div className="text-sm font-medium">{formatDate(dataset.periodStart)}</div>
             </div>
             <div>
                 <div className="text-xs font-medium text-muted-foreground">Status</div>
@@ -155,7 +155,7 @@ export function DatasetHealthTracker({
 
         const map = new Map<string, ReportDatasetMetadata>();
         for (const d of filteredDatasets) {
-            const key = normalizeToSlotStart(new Date(d.timestamp), aggregation).toISOString();
+            const key = normalizeToSlotStart(new Date(d.periodStart), aggregation).toISOString();
             map.set(key, d);
         }
 

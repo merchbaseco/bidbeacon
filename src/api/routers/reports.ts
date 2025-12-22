@@ -34,8 +34,8 @@ export const reportsRouter = router({
             const conditions = [
                 eq(reportDatasetMetadata.accountId, input.accountId),
                 eq(reportDatasetMetadata.aggregation, input.aggregation),
-                gte(reportDatasetMetadata.timestamp, from),
-                lte(reportDatasetMetadata.timestamp, to),
+                gte(reportDatasetMetadata.periodStart, from),
+                lte(reportDatasetMetadata.periodStart, to),
             ];
 
             if (input.countryCode) {
@@ -65,7 +65,7 @@ export const reportsRouter = router({
                 .select()
                 .from(reportDatasetMetadata)
                 .where(whereClause)
-                .orderBy(desc(reportDatasetMetadata.timestamp))
+                .orderBy(desc(reportDatasetMetadata.periodStart))
                 .limit(input.limit)
                 .offset(input.offset);
 
@@ -118,7 +118,7 @@ export const reportsRouter = router({
             const metadata = await db.query.reportDatasetMetadata.findFirst({
                 where: and(
                     eq(reportDatasetMetadata.accountId, input.accountId),
-                    eq(reportDatasetMetadata.timestamp, new Date(input.timestamp)),
+                    eq(reportDatasetMetadata.periodStart, new Date(input.timestamp)),
                     eq(reportDatasetMetadata.aggregation, input.aggregation),
                     eq(reportDatasetMetadata.entityType, input.entityType)
                 ),

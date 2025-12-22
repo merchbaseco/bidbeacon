@@ -65,11 +65,11 @@ export const ReportsTable = () => {
                             </TableRow>
                         ) : (
                             rows.map(row => {
-                                const rowKey = `${row.timestamp}-${row.aggregation}-${row.entityType}`;
+                                const rowKey = `${row.periodStart}-${row.aggregation}-${row.entityType}`;
 
                                 return (
                                     <TableRow key={rowKey}>
-                                        <TableCell className="font-medium">{formatDate(row.timestamp)}</TableCell>
+                                        <TableCell className="font-medium">{formatDate(row.periodStart)}</TableCell>
                                         <TableCell>
                                             <Badge variant="outline">{row.aggregation}</Badge>
                                         </TableCell>

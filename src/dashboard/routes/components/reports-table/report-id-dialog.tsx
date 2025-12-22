@@ -22,7 +22,7 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
             if (accountId && row.reportId) {
                 retrieveReportMutation.mutate({
                     accountId,
-                    timestamp: row.timestamp,
+                    timestamp: row.periodStart,
                     aggregation: row.aggregation,
                     entityType: row.entityType,
                 });

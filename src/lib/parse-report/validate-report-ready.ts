@@ -36,7 +36,7 @@ export async function validateReportReady(input: ParseReportInput): Promise<Repo
     const metadata = await db.query.reportDatasetMetadata.findFirst({
         where: and(
             eq(reportDatasetMetadata.accountId, input.accountId),
-            eq(reportDatasetMetadata.timestamp, date),
+            eq(reportDatasetMetadata.periodStart, date),
             eq(reportDatasetMetadata.aggregation, input.aggregation),
             eq(reportDatasetMetadata.entityType, input.entityType)
         ),

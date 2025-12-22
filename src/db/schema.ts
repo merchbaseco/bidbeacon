@@ -135,7 +135,7 @@ export const reportDatasetMetadata = pgTable(
     {
         accountId: text('account_id').notNull(),
         countryCode: text('country_code').notNull(),
-        timestamp: timestamp('timestamp', { withTimezone: false, mode: 'date' }).notNull(), // utc
+        periodStart: timestamp('period_start', { withTimezone: false, mode: 'date' }).notNull(), // utc
         aggregation: text('aggregation').notNull(), // hourly, daily
         entityType: text('entity_type').notNull(), // target, product
         status: text('status').notNull(), // enum: missing, fetching, parsing, completed, failed
@@ -146,7 +146,7 @@ export const reportDatasetMetadata = pgTable(
         lastProcessedReportId: text('last_processed_report_id'),
         error: text('error'),
     },
-    table => [primaryKey({ columns: [table.accountId, table.timestamp, table.aggregation, table.entityType] })]
+    table => [primaryKey({ columns: [table.accountId, table.periodStart, table.aggregation, table.entityType] })]
 );
 
 /**

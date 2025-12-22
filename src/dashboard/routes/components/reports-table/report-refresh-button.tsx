@@ -39,7 +39,7 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
         mutation.mutate({
             accountId,
             countryCode: row.countryCode,
-            timestamp: row.timestamp,
+            timestamp: row.periodStart,
             aggregation: row.aggregation,
             entityType: row.entityType,
         });

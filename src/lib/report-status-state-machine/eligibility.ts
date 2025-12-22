@@ -1,4 +1,7 @@
+import type { reportDatasetMetadata } from '@/db/schema.js';
 import type { AggregationType } from '@/types/reports';
+
+type ReportMetadataInput = Pick<typeof reportDatasetMetadata.$inferSelect, 'periodStart' | 'aggregation' | 'lastReportCreatedAt' | 'reportId' | 'countryCode'>;
 
 /**
  * Eligible time offsets for report refresh (in hours).
@@ -75,17 +78,27 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
  *
  * Returns the timestamp when the next eligible refresh should occur, or null if
  * all eligible offsets have been reached and reports created.
+ *
+ * If a report is in-flight (reportId is non-null), returns a short poll interval (5 minutes).
  */
-export function getNextRefreshTime(timestamp: Date, aggregation: AggregationType, lastReportCreatedAt: Date | null, _countryCode: string, now: Date = new Date()): Date | null {
-    const eligibleOffsets = getEligibleOffsets(aggregation);
+export function getNextRefreshTime(row: ReportMetadataInput, now: Date = new Date()): Date | null {
+    // If a report is in-flight, poll in 5 minutes to check its status
+    if (row.reportId) {
+        return new Date(now.getTime() + 5 * 60 * 1000);
+    }
+
+    const { periodStart, aggregation, lastReportCreatedAt } = row;
+
+    // Get all eligible offsets in hours.
+    const eligibleOffsets = getEligibleOffsets(aggregation as AggregationType);
     const sortedOffsets = [...eligibleOffsets].sort((a, b) => a - b);
 
     // Calculate current age in hours
-    const ageMs = now.getTime() - timestamp.getTime();
+    const ageMs = now.getTime() - periodStart.getTime();
     const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
 
     // Calculate last report created age if it exists
-    const lastCreatedAgeHours = lastReportCreatedAt ? Math.floor((lastReportCreatedAt.getTime() - timestamp.getTime()) / (1000 * 60 * 60)) : null;
+    const lastCreatedAgeHours = lastReportCreatedAt ? Math.floor((lastReportCreatedAt.getTime() - periodStart.getTime()) / (1000 * 60 * 60)) : null;
 
     // Find the next offset that either:
     // 1. Hasn't been reached yet (ageHours < offset), OR
@@ -93,14 +106,14 @@ export function getNextRefreshTime(timestamp: Date, aggregation: AggregationType
     for (const offset of sortedOffsets) {
         if (ageHours < offset) {
             // Offset hasn't been reached yet - next refresh is when we reach it
-            return new Date(timestamp.getTime() + offset * 60 * 60 * 1000);
+            return new Date(periodStart.getTime() + offset * 60 * 60 * 1000);
         }
 
         // Offset has been reached - check if report was created at this offset
         if (lastCreatedAgeHours === null || lastCreatedAgeHours < offset) {
             // No report created at this offset yet - next refresh is now (or when we reached it)
             // Return the timestamp when this offset was reached
-            return new Date(timestamp.getTime() + offset * 60 * 60 * 1000);
+            return new Date(periodStart.getTime() + offset * 60 * 60 * 1000);
         }
     }
 

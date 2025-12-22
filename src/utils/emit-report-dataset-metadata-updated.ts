@@ -3,7 +3,7 @@ import { emitEvent } from './events.js';
 type ReportDatasetMetadataRow = {
     accountId: string;
     countryCode: string;
-    timestamp: Date;
+    periodStart: Date;
     aggregation: string;
     entityType: string;
     status: string;
@@ -24,7 +24,7 @@ export function emitReportDatasetMetadataUpdated(row: ReportDatasetMetadataRow) 
         data: {
             accountId: row.accountId,
             countryCode: row.countryCode,
-            timestamp: row.timestamp.toISOString(),
+            timestamp: row.periodStart.toISOString(),
             aggregation: row.aggregation as 'hourly' | 'daily',
             entityType: row.entityType as 'target' | 'product',
             status: row.status,

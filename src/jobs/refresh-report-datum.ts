@@ -57,7 +57,7 @@ export const refreshReportDatumJob = boss
                 // Determine next action using state machine
                 // The state machine will fetch report status if reportId exists
                 const action = await getNextAction(
-                    reportDatum.timestamp,
+                    reportDatum.periodStart,
                     reportDatum.aggregation as 'hourly' | 'daily',
                     reportDatum.entityType as 'target' | 'product',
                     reportDatum.lastReportCreatedAt,
@@ -120,7 +120,7 @@ export const refreshReportDatumJob = boss
 async function setRefreshing(
     refreshing: boolean,
     accountId: string,
-    timestamp: Date,
+    periodStart: Date,
     aggregation: AggregationType,
     entityType: EntityType,
     error?: string | null
@@ -136,7 +136,7 @@ async function setRefreshing(
         .where(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
-                eq(reportDatasetMetadata.timestamp, timestamp),
+                eq(reportDatasetMetadata.periodStart, periodStart),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType)
             )
@@ -152,7 +152,7 @@ async function setRefreshing(
     const existingRow = await db.query.reportDatasetMetadata.findFirst({
         where: and(
             eq(reportDatasetMetadata.accountId, accountId),
-            eq(reportDatasetMetadata.timestamp, timestamp),
+            eq(reportDatasetMetadata.periodStart, periodStart),
             eq(reportDatasetMetadata.aggregation, aggregation),
             eq(reportDatasetMetadata.entityType, entityType)
         ),
@@ -164,7 +164,7 @@ async function setRefreshing(
 /**
  * Updates the status for a report datum and emits the update event
  */
-async function updateStatus(status: string, error: string | null, accountId: string, timestamp: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
+async function updateStatus(status: string, error: string | null, accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
         .set({
@@ -174,7 +174,7 @@ async function updateStatus(status: string, error: string | null, accountId: str
         .where(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
-                eq(reportDatasetMetadata.timestamp, timestamp),
+                eq(reportDatasetMetadata.periodStart, periodStart),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType)
             )

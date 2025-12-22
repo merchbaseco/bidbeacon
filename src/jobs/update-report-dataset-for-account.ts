@@ -1,4 +1,4 @@
-import { and, eq, gte, lte } from 'drizzle-orm';
+import { and, eq, gte, inArray, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { reportDatasetMetadata } from '@/db/schema.js';
@@ -76,7 +76,7 @@ async function insertMissingMetadataRecords(accountId: string, countryCode: stri
         await insertMetadata({
             accountId,
             countryCode,
-            timestamp: periodStart,
+            periodStart,
             aggregation,
             entityType,
             status: 'missing',
@@ -91,23 +91,29 @@ async function insertMissingMetadataRecords(accountId: string, countryCode: stri
 async function insertMetadata(args: {
     accountId: string;
     countryCode: string;
-    timestamp: Date;
+    periodStart: Date;
     aggregation: AggregationType;
     entityType: EntityType;
     status: 'missing' | 'fetching' | 'parsing' | 'completed' | 'error';
     error?: string | null;
 }): Promise<void> {
-    const { accountId, countryCode, timestamp, aggregation, entityType, status, error } = args;
+    const { accountId, countryCode, periodStart, aggregation, entityType, status, error } = args;
 
-    // Calculate next refresh time (no report created yet, so lastReportCreatedAt is null)
-    const nextRefreshAt = getNextRefreshTime(timestamp, aggregation, null, countryCode);
+    // Calculate next refresh time (no report created yet, so lastReportCreatedAt is null and reportId is null)
+    const nextRefreshAt = getNextRefreshTime({
+        periodStart,
+        aggregation,
+        lastReportCreatedAt: null,
+        reportId: null,
+        countryCode,
+    });
 
     await db
         .insert(reportDatasetMetadata)
         .values({
             accountId,
             countryCode,
-            timestamp,
+            periodStart,
             aggregation,
             entityType,
             status,
@@ -116,7 +122,7 @@ async function insertMetadata(args: {
             error: error ?? null,
         })
         .onConflictDoNothing({
-            target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
+            target: [reportDatasetMetadata.accountId, reportDatasetMetadata.periodStart, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
         });
 }
 
@@ -141,19 +147,30 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
                 eq(reportDatasetMetadata.countryCode, countryCode),
                 lte(reportDatasetMetadata.nextRefreshAt, now),
                 eq(reportDatasetMetadata.refreshing, false), // avoids refreshing the same record multiple times
-                gte(reportDatasetMetadata.timestamp, tenDaysAgo),
+                gte(reportDatasetMetadata.periodStart, tenDaysAgo),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType)
             )
         );
 
-    // For each record, enqueue an update-report-status job. This job will invoke the state machine
-    // for the report dataset to determine the next action.
+    // For each record, first market it as refreshing.
+    await db
+        .update(reportDatasetMetadata)
+        .set({ refreshing: true })
+        .where(
+            inArray(
+                reportDatasetMetadata.accountId,
+                dueRecords.map(record => record.accountId)
+            )
+        );
+
+    // Then, enqueue an update-report-status job. This job will invoke the state machine
+    // for the given dataset to determine the next action.
     const statusJobPromises = dueRecords.map(async record => {
         const jobId = await updateReportStatusJob.emit({
             accountId: record.accountId,
             countryCode: record.countryCode,
-            timestamp: record.timestamp.toISOString(),
+            timestamp: record.periodStart.toISOString(),
             aggregation: record.aggregation as 'hourly' | 'daily',
             entityType: record.entityType as 'target' | 'product',
         });
