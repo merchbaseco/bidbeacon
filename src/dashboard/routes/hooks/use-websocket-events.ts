@@ -10,7 +10,23 @@ type Event =
           data: { apiName: string; region: string; statusCode: number | null; success: boolean; durationMs: number; timestamp: string; error: string | null };
       }
     | { type: 'job-metrics:updated'; jobName: string; timestamp: string }
-    | { type: 'report-dataset-metadata:updated'; data: unknown; timestamp: string }
+    | {
+          type: 'report-dataset-metadata:updated';
+          data: {
+              accountId: string;
+              countryCode: string;
+              periodStart: string;
+              aggregation: 'hourly' | 'daily';
+              entityType: 'target' | 'product';
+              status: string;
+              refreshing: boolean;
+              nextRefreshAt: string | null;
+              lastReportCreatedAt: string | null;
+              reportId: string | null;
+              error: string | null;
+          };
+          timestamp: string;
+      }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | { type: 'reports:refreshed'; accountId: string; timestamp: string }
     | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }

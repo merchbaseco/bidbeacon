@@ -24,7 +24,7 @@ export function emitReportDatasetMetadataUpdated(row: ReportDatasetMetadataRow) 
         data: {
             accountId: row.accountId,
             countryCode: row.countryCode,
-            timestamp: row.periodStart.toISOString(),
+            periodStart: row.periodStart.toISOString(),
             aggregation: row.aggregation as 'hourly' | 'daily',
             entityType: row.entityType as 'target' | 'product',
             status: row.status,

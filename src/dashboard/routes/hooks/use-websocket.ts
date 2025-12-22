@@ -31,7 +31,7 @@ type Event =
           data: {
               accountId: string;
               countryCode: string;
-              timestamp: string;
+              periodStart: string;
               aggregation: 'hourly' | 'daily';
               entityType: 'target' | 'product';
               status: string;
