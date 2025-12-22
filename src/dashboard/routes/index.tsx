@@ -15,7 +15,6 @@ import { ChartCard } from './components/chart-card';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { JobMetricsChart } from './components/job-metrics-chart';
 import { JobMetricsTable } from './components/job-metrics-table';
-import { ReportsTable } from './components/reports-table/index';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
@@ -83,7 +82,6 @@ export function IndexRoute() {
                     <DatasetHealthTracker aggregation="hourly" />
                 </Card>
             </div>
-            <ReportsTable />
         </div>
     );
 }

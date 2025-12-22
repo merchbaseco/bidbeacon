@@ -28,7 +28,7 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
 
     return (
         <Button variant="secondary" size="icon" onClick={handleClick} disabled={showSpinner}>
-            {showSpinner ? <Spinner className="size-5" /> : <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={20} />}
+            {showSpinner ? <Spinner /> : <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={20} />}
         </Button>
     );
 }

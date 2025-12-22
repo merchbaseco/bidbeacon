@@ -101,11 +101,18 @@ async function insertMetadata(args: {
 
     // Calculate next refresh time (no report created yet, so lastReportCreatedAt is null and reportId is null)
     const nextRefreshAt = getNextRefreshTime({
+        accountId,
+        countryCode,
         periodStart,
         aggregation,
+        entityType,
+        status,
+        refreshing: false,
+        nextRefreshAt: null,
         lastReportCreatedAt: null,
         reportId: null,
-        countryCode,
+        lastProcessedReportId: null,
+        error: null,
     });
 
     await db

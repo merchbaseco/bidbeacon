@@ -1,22 +1,22 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useMemo } from 'react';
-import { Badge } from '../../../components/ui/badge';
-import { ButtonGroupSeparator } from '../../../components/ui/button-group';
-import { Frame, FrameFooter } from '../../../components/ui/frame';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '../../../components/ui/tooltip';
-import { useReportDatasets } from '../../hooks/use-report-datasets';
-import { useSelectedAccountId } from '../../hooks/use-selected-accountid';
+import { Badge } from '../../../components/ui/badge.js';
+import { ButtonGroupSeparator } from '../../../components/ui/button-group.js';
+import { Frame, FrameFooter } from '../../../components/ui/frame.js';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table.js';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '../../../components/ui/tooltip.js';
+import { useReportDatasets } from '../../hooks/use-report-datasets.js';
+import { useSelectedAccountId } from '../../hooks/use-selected-accountid.js';
 import { formatDate, formatRelativeTime } from '../../utils.js';
+import { StatusBadge } from '../status-badge.js';
+import { limitAtom, offsetAtom } from './atoms.js';
+import { EntityAggregationFilter } from './entity-aggregation-filter.js';
+import { EntityTypeFilter } from './entity-type-filter.js';
 import { ErrorDialog } from './error-dialog.js';
+import { RefreshButton } from './refresh-button.js';
 import { ReportIdDialog } from './report-id-dialog.js';
 import { ReportRefreshButton } from './report-refresh-button.js';
-import { limitAtom, offsetAtom } from './atoms';
-import { EntityAggregationFilter } from './entity-aggregation-filter';
-import { EntityTypeFilter } from './entity-type-filter';
-import { RefreshButton } from './refresh-button';
-import { StatusFilter } from './status-filter';
-import { StatusBadge } from '../status-badge.js';
+import { StatusFilter } from './status-filter.js';
 import { TablePagination } from './table-pagination.js';
 import { TableResultsRange } from './table-results-range.js';
 
@@ -77,13 +77,7 @@ export const ReportsTable = () => {
                                         <TableCell>
                                             <Badge variant="secondary">{row.entityType}</Badge>
                                         </TableCell>
-                                        <TableCell>
-                                            {row.error ? (
-                                                <ErrorDialog row={row} />
-                                            ) : (
-                                                <StatusBadge status={row.status} />
-                                            )}
-                                        </TableCell>
+                                        <TableCell>{row.error ? <ErrorDialog row={row} /> : <StatusBadge status={row.status} />}</TableCell>
                                         <TableCell>
                                             {row.nextRefreshAt ? (
                                                 <Tooltip>
@@ -118,4 +112,3 @@ export const ReportsTable = () => {
         </>
     );
 };
-
