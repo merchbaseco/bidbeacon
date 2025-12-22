@@ -65,7 +65,8 @@ export const ReportsTable = () => {
                             </TableRow>
                         ) : (
                             rows.map(row => {
-                                const rowKey = `${row.periodStart}-${row.aggregation}-${row.entityType}`;
+                                // Include refreshing in the key to force re-render when it changes
+                                const rowKey = `${row.periodStart}-${row.aggregation}-${row.entityType}-${row.refreshing}`;
 
                                 return (
                                     <TableRow key={rowKey}>

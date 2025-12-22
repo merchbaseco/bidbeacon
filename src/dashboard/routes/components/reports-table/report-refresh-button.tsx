@@ -33,7 +33,8 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
     // Reset local state when row.refreshing becomes false (from WebSocket update)
     // Use the actual refreshing value from the row to ensure we're in sync
     useEffect(() => {
-        if (!row.refreshing) {
+        // Explicitly check for false (not just falsy) to handle null/undefined cases
+        if (row.refreshing === false) {
             setLocalRefreshing(false);
         }
     }, [row.refreshing]);
