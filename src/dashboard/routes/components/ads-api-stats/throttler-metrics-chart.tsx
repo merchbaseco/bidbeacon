@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, CartesianGrid, ComposedChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { api } from '@/dashboard/lib/trpc';
 import { useWebSocketEvents } from '../../hooks/use-websocket-events';
@@ -93,40 +93,40 @@ export const ThrottlerMetricsChart = () => {
         });
     });
 
-    const maxCount = useMemo(() => {
-        if (chartData.length === 0 || !data?.apiNames) return 1;
-        let max = 0;
-        for (const point of chartData) {
-            for (const apiName of data.apiNames) {
-                const value = (point[apiName] as number) || 0;
-                if (value > max) max = value;
-            }
-            // Also check 429 count
-            const rateLimitedValue = (point['429'] as number) || 0;
-            if (rateLimitedValue > max) max = rateLimitedValue;
-        }
-        return Math.max(max, 1);
-    }, [chartData, data?.apiNames]);
-
     const formatXAxisTick = (_value: string, index: number) => {
         if (index === 0) return '60s';
         if (index === chartData.length - 1) return '0s';
         return '';
     };
 
+    const formatYAxisTick = (value: number) => {
+        // Only show integer values
+        return Number.isInteger(value) ? value.toString() : '';
+    };
+
     return (
         <div className="w-full h-[200px] relative">
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
+                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
                     <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
                     <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} domain={[0, maxCount]} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} domain={[0, 2]} tickFormatter={formatYAxisTick} />
                     <Tooltip content={<ChartTooltip chartData={chartData} intervalMs={1000} />} wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }} />
-                    {(data?.apiNames || []).map((apiName, index) => (
-                        <Line key={apiName} type="monotone" dataKey={apiName} stroke={LEGEND_COLORS[index % LEGEND_COLORS.length]} strokeWidth={1.5} dot={false} name={apiName} isAnimationActive={false} />
-                    ))}
-                    <Line type="monotone" dataKey="429" stroke={LEGEND_COLORS[5]} strokeWidth={1.5} dot={false} name="429" isAnimationActive={false} />
-                </LineChart>
+                    {(data?.apiNames || []).map((apiName, index) => {
+                        const isFirst = index === 0;
+                        const isLast = index === (data?.apiNames?.length || 0) - 1;
+                        const radius: [number, number, number, number] =
+                            isFirst && isLast
+                                ? [4, 4, 4, 4] // Single bar: round all corners
+                                : isFirst
+                                  ? [0, 0, 4, 4] // First bar: round bottom corners
+                                  : isLast
+                                    ? [4, 4, 0, 0] // Last bar: round top corners
+                                    : [0, 0, 0, 0]; // Middle bars: no rounding
+                        return <Bar key={apiName} dataKey={apiName} stackId="apis" fill={LEGEND_COLORS[index % LEGEND_COLORS.length]} name={apiName} isAnimationActive={false} radius={radius} />;
+                    })}
+                    <Line type="linear" dataKey="429" stroke={LEGEND_COLORS[5]} strokeWidth={1.5} dot={false} name="429" isAnimationActive={false} />
+                </ComposedChart>
             </ResponsiveContainer>
         </div>
     );

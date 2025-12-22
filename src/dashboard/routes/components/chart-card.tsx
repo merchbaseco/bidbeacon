@@ -11,13 +11,13 @@ export const ChartCard = ({ title, legendItems, children }: { title: string; leg
                         <div key={item.label} className="flex items-center gap-1">
                             {item.color === 'rainbow' ? (
                                 <div
-                                    className="w-2 h-2 rounded-full"
+                                    className="size-2.5 rounded-full"
                                     style={{
-                                        background: 'linear-gradient(90deg, #F59E0B, #10B981, #14B8A6, #3B82F6, #8B5CF6, #EF4444, #EC4899, #6366F1)',
+                                        background: 'conic-gradient(#F59E0B 0deg 90deg, #10B981 90deg 180deg, #3B82F6 180deg 270deg, #8B5CF6 270deg 360deg)',
                                     }}
                                 />
                             ) : (
-                                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: item.color }} />
+                                <div className="size-2.5 rounded-full" style={{ backgroundColor: item.color }} />
                             )}
                             <div className="text-sm">{item.label}</div>
                         </div>

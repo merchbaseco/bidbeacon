@@ -33,24 +33,32 @@ export async function getNextAction(
 ): Promise<NextAction> {
     // If reportId exists, fetch its status
     if (reportId) {
-        const retrieveResponse = await retrieveReport(
-            {
-                reportIds: [reportId],
-            },
-            'na'
-        );
+        try {
+            const retrieveResponse = await retrieveReport(
+                {
+                    reportIds: [reportId],
+                },
+                'na'
+            );
 
-        const report = retrieveResponse.success?.[0]?.report;
-        if (!report) {
-            throw new Error('Report not found in retrieve API response');
-        }
+            const report = retrieveResponse.success?.[0]?.report;
+            if (!report) {
+                throw new Error(`Report ${reportId} not found in retrieve API response for ${aggregation} ${entityType} report (timestamp: ${timestamp.toISOString()})`);
+            }
 
-        // Report exists - check its status
-        if (report.status === 'COMPLETED') {
-            return 'process';
+            // Report exists - check its status
+            if (report.status === 'COMPLETED') {
+                return 'process';
+            }
+            // Report exists but not ready
+            return 'none';
+        } catch (error) {
+            // Wrap error with context about what we were trying to do
+            if (error instanceof Error) {
+                throw new Error(`Failed to retrieve report status for reportId ${reportId} (${aggregation} ${entityType}, timestamp: ${timestamp.toISOString()}): ${error.message}`, { cause: error });
+            }
+            throw error;
         }
-        // Report exists but not ready
-        return 'none';
     }
 
     // No report - check eligibility

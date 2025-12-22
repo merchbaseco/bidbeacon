@@ -55,40 +55,49 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
     const endDate = formatDate(windowEnd);
 
     // Create the report via Amazon Ads API
-    const response = await createReport(
-        {
-            accessRequestedAccounts: [
-                {
-                    advertiserAccountId: account.adsAccountId,
-                },
-            ],
-            reports: [
-                {
-                    format: reportConfig.format,
-                    periods: [
-                        {
-                            datePeriod: {
-                                startDate,
-                                endDate,
-                            },
-                        },
-                    ],
-                    query: {
-                        fields: reportConfig.fields,
+    let reportId: string;
+    try {
+        const response = await createReport(
+            {
+                accessRequestedAccounts: [
+                    {
+                        advertiserAccountId: account.adsAccountId,
                     },
-                },
-            ],
-        },
-        'na'
-    );
+                ],
+                reports: [
+                    {
+                        format: reportConfig.format,
+                        periods: [
+                            {
+                                datePeriod: {
+                                    startDate,
+                                    endDate,
+                                },
+                            },
+                        ],
+                        query: {
+                            fields: reportConfig.fields,
+                        },
+                    },
+                ],
+            },
+            'na'
+        );
 
-    if (!response.success || response.success.length === 0) {
-        throw new Error('Failed to create report - API response did not contain success data');
-    }
+        if (!response.success || response.success.length === 0) {
+            throw new Error(`Failed to create ${input.aggregation} ${input.entityType} report - API response did not contain success data (account: ${input.accountId}, period: ${input.timestamp}, date range: ${startDate} to ${endDate})`);
+        }
 
-    const reportId = response.success[0]?.report?.reportId;
-    if (!reportId) {
-        throw new Error('Failed to create report - no reportId returned from API');
+        reportId = response.success[0]?.report?.reportId || '';
+        if (!reportId) {
+            throw new Error(`Failed to create ${input.aggregation} ${input.entityType} report - no reportId returned from API (account: ${input.accountId}, period: ${input.timestamp})`);
+        }
+    } catch (error) {
+        // Wrap error with context about what we were trying to create
+        if (error instanceof Error) {
+            throw new Error(`Failed to create ${input.aggregation} ${input.entityType} report for account ${input.accountId} (period: ${input.timestamp}, date range: ${startDate} to ${endDate}): ${error.message}`, { cause: error });
+        }
+        throw error;
     }
 
     // Convert current UTC time to country's timezone and store as timezone-less timestamp

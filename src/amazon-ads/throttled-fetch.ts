@@ -79,23 +79,36 @@ function handleRetryAfter(retryAfterMs: number): void {
  */
 export async function throttledFetch(url: string | URL | Request, options?: RequestInit): Promise<Response> {
     return limiter.schedule(async () => {
-        const response = await fetch(url, options);
+        const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+        const method = options?.method || 'GET';
 
-        // Check for rate limit response (429 Too Many Requests)
-        if (response.status === 429) {
-            const retryAfter = response.headers.get('Retry-After');
-            const retryAfterMs = parseRetryAfter(retryAfter);
+        try {
+            const response = await fetch(url, options);
 
-            if (retryAfterMs !== null) {
-                handleRetryAfter(retryAfterMs);
-            } else {
-                // If Retry-After is missing or invalid, use exponential backoff
-                const backoffMs = lastRetryAfter ? lastRetryAfter * 2 : 5000;
-                logger.warn({ backoffMs }, 'Rate limit hit but no valid Retry-After header, using exponential backoff');
-                handleRetryAfter(backoffMs);
+            // Check for rate limit response (429 Too Many Requests)
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After');
+                const retryAfterMs = parseRetryAfter(retryAfter);
+
+                if (retryAfterMs !== null) {
+                    handleRetryAfter(retryAfterMs);
+                } else {
+                    // If Retry-After is missing or invalid, use exponential backoff
+                    const backoffMs = lastRetryAfter ? lastRetryAfter * 2 : 5000;
+                    logger.warn({ backoffMs }, 'Rate limit hit but no valid Retry-After header, using exponential backoff');
+                    handleRetryAfter(backoffMs);
+                }
             }
-        }
 
-        return response;
+            return response;
+        } catch (error) {
+            // Wrap network errors with context
+            if (error instanceof Error) {
+                const enhancedError = new Error(`Network error during ${method} ${urlString}: ${error.message}`);
+                (enhancedError as Error & { cause?: Error }).cause = error;
+                throw enhancedError;
+            }
+            throw error;
+        }
     });
 }

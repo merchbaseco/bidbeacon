@@ -46,25 +46,28 @@ export function IndexRoute() {
                     </div>
                 </div>
 
-                <Frame className="w-full overflow-visible">
-                    <div className="grid grid-cols-2 gap-3">
-                        <ChartCard title="Ads API Invocations" legendItems={legendItems}>
-                            <ThrottlerMetricsChart />
-                        </ChartCard>
-                        <div className="row-span-2">
-                            <ApiMetricsTable />
+                <div className="grid grid-cols-2 gap-1">
+                    <Frame className="w-full overflow-visible">
+                        <div className="grid grid-cols-1 gap-1">
+                            <ChartCard title="Ads API Invocations" legendItems={legendItems}>
+                                <ThrottlerMetricsChart />
+                            </ChartCard>
+                            <div>
+                                <ApiMetricsTable />
+                            </div>
                         </div>
-                    </div>
-                </Frame>
+                    </Frame>
 
-                <Frame className="w-full overflow-visible">
-                    <div className="grid grid-cols-2 gap-3">
-                        <ChartCard title="Job Invocations" legendItems={[]}>
-                            <JobMetricsChart />
-                        </ChartCard>
-                        <JobMetricsTable />
-                    </div>
-                </Frame>
+                    <Frame className="w-full overflow-visible">
+                        <div className="grid grid-cols-1 gap-1">
+                            <ChartCard title="Job Invocations" legendItems={[]}>
+                                <JobMetricsChart />
+                            </ChartCard>
+                            <JobMetricsTable />
+                        </div>
+                    </Frame>
+                </div>
+
                 <Card className="p-3 space-y-0 gap-3">
                     <div className="flex items-start justify-between px-2">
                         <div className="text-sm font-medium">Daily Dataset Health</div>

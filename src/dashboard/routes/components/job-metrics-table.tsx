@@ -32,38 +32,57 @@ export function JobMetricsTable() {
         return Math.max(...jobTotals.map(job => job.total));
     }, [jobTotals]);
 
+    // Ensure exactly 5 rows
+    const rowsToRender = useMemo(() => {
+        const rows: Array<{ name: string; total: number; color: string } | null> = [...jobTotals];
+        while (rows.length < 5) {
+            rows.push(null);
+        }
+        return rows.slice(0, 5);
+    }, [jobTotals]);
+
     return (
         <div className="overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible">
             <Table>
                 <TableBody>
-                    {jobTotals.length === 0 ? (
-                        <TableRow>
-                            <TableCell colSpan={2} className="text-center text-muted-foreground">
-                                No job metrics available.
-                            </TableCell>
-                        </TableRow>
-                    ) : (
-                        jobTotals.map(job => {
-                            const percentage = maxCount > 0 ? (job.total / maxCount) * 100 : 0;
+                    {rowsToRender.map((job, index) => {
+                        if (!job) {
                             return (
-                                <TableRow key={job.name}>
+                                <TableRow key={`job-empty-placeholder-${index}`}>
                                     <TableCell>
                                         <div className="flex items-center gap-2 pl-1">
-                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: job.color }} />
-                                            {job.name}
+                                            <span className="size-2.5 rounded-full shrink-0 opacity-0" />
                                         </div>
                                     </TableCell>
                                     <TableCell>
                                         <div className="relative w-full h-6 flex items-center">
-                                            <div className="h-full bg-muted rounded flex items-center px-2 min-w-fit" style={{ width: `${Math.max(percentage, 0)}%` }}>
-                                                <span className="text-sm text-foreground whitespace-nowrap">{job.total.toLocaleString()}</span>
+                                            <div className="h-full bg-transparent rounded flex items-center px-2 min-w-fit" style={{ width: '0%' }}>
+                                                <span className="text-sm text-foreground whitespace-nowrap opacity-0">0</span>
                                             </div>
                                         </div>
                                     </TableCell>
                                 </TableRow>
                             );
-                        })
-                    )}
+                        }
+                        const percentage = maxCount > 0 ? (job.total / maxCount) * 100 : 0;
+                        return (
+                            <TableRow key={job.name}>
+                                <TableCell>
+                                    <div className="flex items-center gap-2 pl-1">
+                                        <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: job.color }} />
+                                        {job.name}
+                                    </div>
+                                </TableCell>
+                                <TableCell>
+                                    <div className="relative w-full h-6 flex items-center">
+                                        <div className="h-full bg-muted rounded flex items-center px-2 min-w-fit" style={{ width: `${Math.max(percentage, 0)}%` }}>
+                                            <span className="text-sm text-foreground whitespace-nowrap">{job.total.toLocaleString()}</span>
+                                        </div>
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        );
+                    })}
                 </TableBody>
             </Table>
         </div>

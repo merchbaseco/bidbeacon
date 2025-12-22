@@ -8,6 +8,7 @@ import { Tooltip, TooltipPopup, TooltipTrigger } from '../../../components/ui/to
 import { useReportDatasets } from '../../hooks/use-report-datasets';
 import { useSelectedAccountId } from '../../hooks/use-selected-accountid';
 import { formatDate, formatRelativeTime } from '../../utils.js';
+import { ErrorDialog } from './error-dialog.js';
 import { ReportIdDialog } from './report-id-dialog.js';
 import { ReportRefreshButton } from './report-refresh-button.js';
 import { limitAtom, offsetAtom } from './atoms';
@@ -77,7 +78,11 @@ export const ReportsTable = () => {
                                             <Badge variant="secondary">{row.entityType}</Badge>
                                         </TableCell>
                                         <TableCell>
-                                            <StatusBadge status={row.status} />
+                                            {row.error ? (
+                                                <ErrorDialog row={row} />
+                                            ) : (
+                                                <StatusBadge status={row.status} />
+                                            )}
                                         </TableCell>
                                         <TableCell>
                                             {row.nextRefreshAt ? (

@@ -48,9 +48,11 @@ export const updateReportStatusJob = boss
                 timestamp,
             });
 
+            let action: string | undefined;
+            let reportDatum: typeof reportDatasetMetadata.$inferSelect | null | undefined = null;
             try {
                 // Fetch current row once at the start
-                const reportDatum = await db.query.reportDatasetMetadata.findFirst({
+                reportDatum = await db.query.reportDatasetMetadata.findFirst({
                     where: and(
                         eq(reportDatasetMetadata.accountId, accountId),
                         eq(reportDatasetMetadata.periodStart, date),
@@ -80,7 +82,7 @@ export const updateReportStatusJob = boss
 
                 // Determine next action using state machine
                 // The state machine will fetch report status if reportId exists
-                const action = await getNextAction(
+                action = await getNextAction(
                     reportDatum.periodStart,
                     reportDatum.aggregation as 'hourly' | 'daily',
                     reportDatum.entityType as 'target' | 'product',
@@ -118,22 +120,11 @@ export const updateReportStatusJob = boss
                         return;
                 }
             } catch (error) {
-                const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-
-                logger.error({ err: error }, 'Error during updating report status.');
-
-                // Set error state, then complete job with null nextRefreshAt
-                await setErrorState(accountId, date, aggregation, entityType, errorMessage);
-                await completeJob(accountId, date, aggregation, entityType, null);
-
-                // Emit error event
-                emitReportDatasetMetadataError({
-                    accountId,
-                    countryCode,
-                    periodStart: date,
-                    aggregation: aggregation as 'hourly' | 'daily',
-                    entityType: entityType as 'target' | 'product',
-                    error: errorMessage,
+                await handleJobError({
+                    error,
+                    reportDatum,
+                    action: action || 'unknown',
+                    logger,
                 });
             }
         }
@@ -260,4 +251,57 @@ async function setErrorState(accountId: string, periodStart: Date, aggregation: 
     if (updatedRow) {
         emitReportDatasetMetadataUpdated(updatedRow);
     }
+}
+
+/**
+ * Handles errors during report status update job execution.
+ * Builds detailed error message, logs error, sets error state, schedules retry, and emits error event.
+ */
+async function handleJobError(args: {
+    error: unknown;
+    reportDatum: typeof reportDatasetMetadata.$inferSelect | null | undefined;
+    action: string;
+    logger: ReturnType<typeof createJobLogger>;
+}): Promise<void> {
+    const { error, reportDatum, action, logger } = args;
+
+    if (!reportDatum) {
+        logger.error({ err: error }, 'Error occurred but reportDatum is not available');
+        return;
+    }
+
+    const { accountId, countryCode, aggregation, entityType, periodStart } = reportDatum;
+    const timestamp = periodStart.toISOString();
+
+    // Build detailed error message with context
+    let errorMessage: string;
+    if (error instanceof Error) {
+        errorMessage = `Error during ${action} for ${aggregation} ${entityType} report (account: ${accountId}, period: ${timestamp}): ${error.message}`;
+
+        // Include cause if available
+        if ((error as Error & { cause?: Error }).cause) {
+            errorMessage += `\nCause: ${(error as Error & { cause?: Error }).cause?.message}`;
+        }
+    } else {
+        errorMessage = `Unknown error during report status update for ${aggregation} ${entityType} report (account: ${accountId}, period: ${timestamp})`;
+    }
+
+    logger.error({ err: error, accountId, countryCode, aggregation, entityType, timestamp, action }, 'Error during updating report status.');
+
+    // Retry in 5 minutes - throttling system will handle rate limiting
+    const retryTime = new Date(Date.now() + 5 * 60 * 1000);
+
+    // Set error state, then complete job with retry time
+    await setErrorState(accountId, periodStart, aggregation as AggregationType, entityType as EntityType, errorMessage);
+    await completeJob(accountId, periodStart, aggregation as AggregationType, entityType as EntityType, retryTime);
+
+    // Emit error event
+    emitReportDatasetMetadataError({
+        accountId,
+        countryCode,
+        periodStart,
+        aggregation: aggregation as 'hourly' | 'daily',
+        entityType: entityType as 'target' | 'product',
+        error: errorMessage,
+    });
 }

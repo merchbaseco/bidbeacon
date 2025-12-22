@@ -168,13 +168,18 @@ export function JobMetricsChart() {
         return '';
     };
 
+    const formatYAxisTick = (value: number) => {
+        // Only show integer values
+        return Number.isInteger(value) ? value.toString() : '';
+    };
+
     return (
         <div className="w-full h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
                     <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
                     <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} tickFormatter={formatYAxisTick} />
                     <Tooltip
                         content={<CustomTooltip chartData={chartData} />}
                         wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }}
