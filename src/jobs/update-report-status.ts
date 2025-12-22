@@ -4,6 +4,7 @@
  * report creation, parsing, and status updates.
  */
 
+import { toZonedTime } from 'date-fns-tz';
 import { and, eq, type InferSelectModel } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
@@ -13,8 +14,10 @@ import { parseReport } from '@/lib/parse-report/index';
 import { getNextAction } from '@/lib/report-status-state-machine';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
+import { utcNow } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
 import { createJobLogger } from '@/utils/logger';
+import { getTimezoneForCountry } from '@/utils/timezones.js';
 import { boss } from './boss.js';
 
 // ============================================================================
@@ -84,16 +87,19 @@ export const updateReportStatusJob = boss
                     case 'none': {
                         await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
                         await setRefreshing(reportDatum, false);
-                        return;
+                        break;
                     }
 
-                    case 'create':
-                        await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
-                        await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
-                        await setRefreshing(reportDatum, false);
-                        return;
+                    case 'create': {
+                        const reportId = await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
+                        const updatedRow = await setReport(reportDatum, reportId);
+                        await setNextRefreshAt(updatedRow, getNextRefreshTime(updatedRow));
+                        await setStatus(updatedRow, 'fetching');
+                        await setRefreshing(updatedRow, false);
+                        break;
+                    }
 
-                    case 'process':
+                    case 'process': {
                         // Set status to 'parsing' at the start of parsing
                         await setStatus(reportDatum, 'parsing');
                         await parseReport({ accountId, timestamp, aggregation, entityType });
@@ -102,10 +108,15 @@ export const updateReportStatusJob = boss
                         await markReportProcessed(reportDatum, reportDatum.reportId);
                         await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
                         await setRefreshing(reportDatum, false);
-                        return;
+                        break;
+                    }
 
                     default:
                         throw new Error(`Unknown action received from state machine: ${action}`);
+                }
+
+                if (reportDatum.error) {
+                    await clearError(reportDatum);
                 }
             } catch (error) {
                 logger.error({ err: error }, 'Error encountered while updating state machine for report datum.');
@@ -224,6 +235,45 @@ async function setNextRefreshAt(row: InferSelectModel<typeof reportDatasetMetada
 }
 
 /**
+ * Sets the reportId and lastReportCreatedAt after a report is created via the Amazon Ads API.
+ * Returns the updated row.
+ */
+async function setReport(row: InferSelectModel<typeof reportDatasetMetadata>, reportId: string): Promise<InferSelectModel<typeof reportDatasetMetadata>> {
+    // Convert current UTC time to country's timezone and store as timezone-less timestamp
+    const timezone = getTimezoneForCountry(row.countryCode);
+    const nowUtc = utcNow();
+    const zonedTime = toZonedTime(nowUtc, timezone);
+    const lastReportCreatedAt = new Date(zonedTime.getFullYear(), zonedTime.getMonth(), zonedTime.getDate(), zonedTime.getHours(), zonedTime.getMinutes(), zonedTime.getSeconds());
+
+    const [updatedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({
+            reportId,
+            lastReportCreatedAt,
+        })
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, row.accountId),
+                eq(reportDatasetMetadata.periodStart, row.periodStart),
+                eq(reportDatasetMetadata.aggregation, row.aggregation),
+                eq(reportDatasetMetadata.entityType, row.entityType)
+            )
+        )
+        .returning();
+
+    if (!updatedRow) {
+        throw new Error(`Failed to update metadata for report ${reportId}`);
+    }
+
+    emitEvent({
+        type: 'report:refreshed',
+        row: updatedRow,
+    });
+
+    return updatedRow;
+}
+
+/**
  * Handles errors during report status update job execution.
  * Builds detailed error message, logs error, sets error state, schedules retry, and emits events.
  */
@@ -245,6 +295,27 @@ async function setError(reportDatum: typeof reportDatasetMetadata.$inferSelect, 
             )
         )
         .returning();
+
+    if (updatedRow) {
+        emitEvent({
+            type: 'report:refreshed',
+            row: updatedRow,
+        });
+    }
+}
+
+async function clearError(row: InferSelectModel<typeof reportDatasetMetadata>): Promise<void> {
+    const [updatedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({ error: null })
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, row.accountId),
+                eq(reportDatasetMetadata.periodStart, row.periodStart),
+                eq(reportDatasetMetadata.aggregation, row.aggregation),
+                eq(reportDatasetMetadata.entityType, row.entityType)
+            )
+        );
 
     if (updatedRow) {
         emitEvent({

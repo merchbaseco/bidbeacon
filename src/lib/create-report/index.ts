@@ -1,13 +1,10 @@
-import { toZonedTime } from 'date-fns-tz';
 import { eq } from 'drizzle-orm';
 import { createReport } from '@/amazon-ads/create-report.js';
 import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
-import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
-import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility.js';
+import { advertiserAccount } from '@/db/schema.js';
 import type { AggregationType, EntityType } from '@/types/reports.js';
-import { utcAddHours, utcNow } from '@/utils/date.js';
-import { getTimezoneForCountry } from '@/utils/timezones.js';
+import { utcAddHours } from '@/utils/date.js';
 
 export type CreateReportForDatasetInput = {
     accountId: string;
@@ -18,7 +15,7 @@ export type CreateReportForDatasetInput = {
 };
 
 /**
- * Creates a report for a dataset and updates the metadata.
+ * Creates a report via Amazon Ads API.
  * Returns the reportId if successful, throws an error otherwise.
  */
 export async function createReportForDataset(input: CreateReportForDatasetInput): Promise<string> {
@@ -84,7 +81,9 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
         );
 
         if (!response.success || response.success.length === 0) {
-            throw new Error(`Failed to create ${input.aggregation} ${input.entityType} report - API response did not contain success data (account: ${input.accountId}, period: ${input.timestamp}, date range: ${startDate} to ${endDate})`);
+            throw new Error(
+                `Failed to create ${input.aggregation} ${input.entityType} report - API response did not contain success data (account: ${input.accountId}, period: ${input.timestamp}, date range: ${startDate} to ${endDate})`
+            );
         }
 
         reportId = response.success[0]?.report?.reportId || '';
@@ -94,53 +93,12 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
     } catch (error) {
         // Wrap error with context about what we were trying to create
         if (error instanceof Error) {
-            throw new Error(`Failed to create ${input.aggregation} ${input.entityType} report for account ${input.accountId} (period: ${input.timestamp}, date range: ${startDate} to ${endDate}): ${error.message}`, { cause: error });
+            throw new Error(
+                `Failed to create ${input.aggregation} ${input.entityType} report for account ${input.accountId} (period: ${input.timestamp}, date range: ${startDate} to ${endDate}): ${error.message}`,
+                { cause: error }
+            );
         }
         throw error;
-    }
-
-    // Convert current UTC time to country's timezone and store as timezone-less timestamp
-    const timezone = getTimezoneForCountry(input.countryCode);
-    const nowUtc = utcNow();
-    const zonedTime = toZonedTime(nowUtc, timezone);
-    const lastReportCreatedAt = new Date(zonedTime.getFullYear(), zonedTime.getMonth(), zonedTime.getDate(), zonedTime.getHours(), zonedTime.getMinutes(), zonedTime.getSeconds());
-
-    // Calculate next refresh time using centralized logic (will return 5-minute poll since reportId is set)
-    const nextRefreshAt = getNextRefreshTime({
-        reportId,
-        periodStart: date,
-        aggregation: input.aggregation,
-        lastReportCreatedAt,
-    });
-
-    // Only insert/update metadata for daily target datasets
-    // Skip hourly datasets and daily product datasets
-    if (input.aggregation === 'daily' && input.entityType === 'target') {
-        // Insert or update metadata with reportId and status
-        await db
-            .insert(reportDatasetMetadata)
-            .values({
-                accountId: input.accountId,
-                countryCode: input.countryCode,
-                periodStart: date,
-                aggregation: input.aggregation,
-                entityType: input.entityType,
-                status: 'fetching',
-                nextRefreshAt,
-                lastReportCreatedAt,
-                reportId,
-                error: null,
-            })
-            .onConflictDoUpdate({
-                target: [reportDatasetMetadata.accountId, reportDatasetMetadata.periodStart, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
-                set: {
-                    reportId,
-                    status: 'fetching',
-                    nextRefreshAt,
-                    lastReportCreatedAt,
-                    error: null,
-                },
-            });
     }
 
     return reportId;

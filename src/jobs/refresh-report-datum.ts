@@ -80,7 +80,7 @@ export const refreshReportDatumJob = boss
                         return;
 
                     case 'create': {
-                        const _reportId = await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
+                        await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
                         await setRefreshing(false, accountId, date, aggregation, entityType, null);
                         return;
                     }
