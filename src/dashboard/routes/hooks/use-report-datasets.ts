@@ -57,6 +57,7 @@ export const useReportDatasets = () => {
      */
     const apiUtils = api.useUtils();
     useWebSocketEvents('report:refreshed', event => {
+        console.log('REPORT REFRESHED', event);
         apiUtils.reports.status.setData(
             {
                 accountId,

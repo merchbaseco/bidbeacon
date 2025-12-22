@@ -15,7 +15,7 @@ export type LegendItem = {
 export const LEGEND_COLORS = [
     '#F59E0B', // Amber/Orange
     '#10B981', // Green
-    '#14B8A6', // Teal
+    '#06B6D4', // Cyan
     '#3B82F6', // Blue
     '#8B5CF6', // Purple
     '#EF4444', // Red

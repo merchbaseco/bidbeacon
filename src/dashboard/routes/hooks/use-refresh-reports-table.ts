@@ -10,14 +10,8 @@ export const useRefreshReportsTable = (accountId: string) => {
     const utils = api.useUtils();
     const mutation = api.reports.triggerUpdate.useMutation({
         onSuccess: () => {
-            // Set waiting state - we'll clear it when we receive the WebSocket event
             setIsWaitingForCompletion(true);
-            // Invalidate the refresh status query to immediately check for active refreshes
             utils.reports.isAnyRefreshActive.invalidate({ accountId, countryCode });
-            // Show success toast indicating the job was queued
-            toast.success('Refresh queued', {
-                description: 'The refresh job has been queued successfully. The table will update when it completes.',
-            });
         },
         onError: error => {
             setIsWaitingForCompletion(false);
@@ -28,11 +22,11 @@ export const useRefreshReportsTable = (accountId: string) => {
     });
 
     // Check if any rows are currently refreshing (across all pages, not just current view)
+    // Only fetch on initial load to get current state; button clicks handle refreshing state
     const { data: refreshStatus } = api.reports.isAnyRefreshActive.useQuery(
         { accountId, countryCode },
         {
             enabled: !!countryCode,
-            refetchInterval: 2000, // Poll every 2 seconds to catch state changes
         }
     );
 

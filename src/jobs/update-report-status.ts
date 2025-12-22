@@ -83,7 +83,7 @@ export const updateReportStatusJob = boss
                 switch (action) {
                     case 'none': {
                         await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
-                        await setRefreshing(reportDatum, true);
+                        await setRefreshing(reportDatum, false);
                         return;
                     }
 

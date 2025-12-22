@@ -1,7 +1,7 @@
 import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo } from 'react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, BarStack, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatTimeAgo } from '@/dashboard/lib/utils';
 import { useJobMetrics } from '../hooks/use-job-metrics';
 import { roundUpToNearestMinute } from '../utils';
@@ -85,14 +85,14 @@ function CustomTooltip({ active, payload, label, coordinate, chartData }: Custom
 /**
  * Job Metrics Chart Component
  *
- * Displays a line chart showing job invocation counts over time,
+ * Displays a stacked bar chart showing job invocation counts over time,
  * with a table below showing totals for each job.
  */
 export function JobMetricsChart() {
     const dateRange = useMemo(() => {
         // Round up to nearest minute to ensure stable query keys
         const to = roundUpToNearestMinute(new Date());
-        const from = new Date(to.getTime() - 3 * 60 * 60 * 1000); // 3 hours
+        const from = new Date(to.getTime() - 1 * 60 * 60 * 1000); // 1 hour
         return {
             from: from.toISOString(),
             to: to.toISOString(),
@@ -101,14 +101,14 @@ export function JobMetricsChart() {
 
     const { data, isLoading, error } = useJobMetrics(dateRange);
 
-    // Generate all 5-minute intervals for the last 3 hours
+    // Generate all 5-minute intervals for the last 1 hour
     const intervals = useMemo(() => {
         const now = new Date();
-        const threeHoursAgo = new Date(now.getTime() - 3 * 60 * 60 * 1000);
+        const oneHourAgo = new Date(now.getTime() - 1 * 60 * 60 * 1000);
         const intervalList: string[] = [];
 
         // Round start down to the nearest 5-minute interval
-        const roundedStart = new Date(threeHoursAgo);
+        const roundedStart = new Date(oneHourAgo);
         roundedStart.setMinutes(Math.floor(roundedStart.getMinutes() / 5) * 5, 0, 0);
 
         // Round now down to the nearest 5-minute interval
@@ -153,20 +153,28 @@ export function JobMetricsChart() {
         return <div className="flex items-center justify-center h-[400px] text-destructive text-sm">Error loading job metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>;
     }
 
-    // Custom tick formatter to show relative time at specific intervals
+    // Custom tick formatter to show specific time labels
     const formatXAxisTick = (value: string, index: number) => {
-        const point = chartData.find(p => p.interval === value);
-        if (!point) return value;
-
-        // Show tick at roughly every 3 hours (36 intervals of 5 minutes = 3 hours)
         const totalTicks = chartData.length;
-        const tickInterval = Math.floor(totalTicks / 4); // Show ~5 ticks
-        if (index === 0 || index === totalTicks - 1 || index % tickInterval === 0) {
-            // Show "now" for the last (rightmost) tick
-            if (index === totalTicks - 1) {
-                return 'now';
-            }
-            return formatTimeAgo(point.timestamp as string);
+        
+        // Show specific labels at key intervals
+        if (index === totalTicks - 1) {
+            return 'now';
+        }
+        if (index === 0) {
+            return '1hr';
+        }
+        // 15min = index 9 (out of 12 intervals)
+        if (index === Math.floor(totalTicks * 0.75)) {
+            return '15min';
+        }
+        // 30min = index 6 (out of 12 intervals)
+        if (index === Math.floor(totalTicks * 0.5)) {
+            return '30min';
+        }
+        // 45min = index 3 (out of 12 intervals)
+        if (index === Math.floor(totalTicks * 0.25)) {
+            return '45min';
         }
         return '';
     };
@@ -179,15 +187,17 @@ export function JobMetricsChart() {
     return (
         <div className="w-full h-[200px]">
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
+                <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
                     <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
                     <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} tickFormatter={formatYAxisTick} />
                     <Tooltip content={<CustomTooltip chartData={chartData} />} wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }} />
-                    {(data?.jobNames || []).map((jobName, index) => (
-                        <Line key={jobName} type="monotone" dataKey={jobName} stroke={COLORS[index % COLORS.length]} strokeWidth={1.5} dot={false} name={jobName} />
-                    ))}
-                </LineChart>
+                    <BarStack radius={4}>
+                        {(data?.jobNames || []).map((jobName, index) => (
+                            <Bar key={jobName} dataKey={jobName} stackId="jobs" fill={COLORS[index % COLORS.length]} name={jobName} isAnimationActive={false} />
+                        ))}
+                    </BarStack>
+                </ComposedChart>
             </ResponsiveContainer>
         </div>
     );

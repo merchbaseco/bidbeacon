@@ -93,6 +93,7 @@ export const useWebSocket = () => {
                         break;
                     case 'job-metrics:updated':
                         // Invalidate job metrics queries to refresh the chart
+                        console.log('JOB METRICS INVALIDATED!');
                         utils.metrics.job.invalidate();
                         break;
                     case 'account-dataset-metadata:updated':

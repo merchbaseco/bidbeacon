@@ -3,8 +3,8 @@ import type { LegendItem } from '@/dashboard/lib/chart-constants';
 
 export const ChartCard = ({ title, legendItems, children }: { title: string; legendItems: LegendItem[]; children: React.ReactNode }) => {
     return (
-        <Card className="p-4 pb-0 overflow-visible">
-            <div className="flex items-start justify-between">
+        <Card className="p-2 pb-0 overflow-visible">
+            <div className="flex items-start justify-between p-2 pb-0">
                 <div className="text-sm font-medium tracking-tight">{title}</div>
                 <div className="flex items-center gap-4">
                     {legendItems.map(item => (
