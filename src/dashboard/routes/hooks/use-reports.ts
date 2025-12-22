@@ -10,7 +10,7 @@ import { useSelectedCountryCode } from './use-selected-country-code';
 export type ReportSummary = RouterOutputs['reports']['summary']['data'][number];
 export type ReportDatasetMetadata = RouterOutputs['reports']['get'];
 
-export const useReportDatasets = () => {
+export const useReports = () => {
     const [searchParams] = useSearchParams();
     const accountId = useSelectedAccountId();
     const countryCode = useSelectedCountryCode();
@@ -46,12 +46,13 @@ export const useReportDatasets = () => {
         },
         {
             enabled: !!countryCode,
-            refetchOnMount: true,
-            refetchOnWindowFocus: true,
+            staleTime: Infinity, // Never refetch due to staleness - rely on WebSocket events for invalidation
         }
     );
 
     // Populate reports.get cache with data from summary so individual queries don't fire
+    // This data is fresh since it comes from the summary query
+    // Both queries use staleTime: Infinity, so they won't refetch until invalidated via WebSocket events
     useEffect(() => {
         if (data?.data) {
             data.data.forEach(report => {
@@ -67,3 +68,4 @@ export const useReportDatasets = () => {
         ...rest,
     };
 };
+

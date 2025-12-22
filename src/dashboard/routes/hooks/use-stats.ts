@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import type { ReportDatasetMetadata } from './use-report-datasets';
+import type { ReportDatasetMetadata } from './use-reports';
 
 export function useStats(rows: ReportDatasetMetadata[]) {
     return useMemo(() => {

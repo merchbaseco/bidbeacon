@@ -5,11 +5,11 @@ import { ButtonGroup } from '../../../components/ui/button-group';
 import { Spinner } from '../../../components/ui/spinner';
 import { useRefreshReportsTable } from '../../hooks/use-refresh-reports-table';
 import { useSelectedAccountId } from '../../hooks/use-selected-accountid';
-import { useReportDatasets } from '../../hooks/use-report-datasets';
+import { useReports } from '../../hooks/use-reports';
 
 export const RefreshButton = () => {
     const accountId = useSelectedAccountId();
-    const { isLoading } = useReportDatasets();
+    const { isLoading } = useReports();
     const { refresh, pending } = useRefreshReportsTable(accountId);
     const isRefreshing = pending || isLoading;
 

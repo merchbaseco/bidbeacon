@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { ButtonGroupSeparator } from '../../../components/ui/button-group.js';
 import { Frame, FrameFooter } from '../../../components/ui/frame.js';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table.js';
-import { useReportDatasets } from '../../hooks/use-report-datasets.js';
+import { useReports } from '../../hooks/use-reports.js';
 import { limitAtom, offsetAtom } from './atoms.js';
 import { EntityAggregationFilter } from './entity-aggregation-filter.js';
 import { EntityTypeFilter } from './entity-type-filter.js';
@@ -16,7 +16,7 @@ import { TableResultsRange } from './table-results-range.js';
 export const ReportsTable = () => {
     const limit = useAtomValue(limitAtom);
     const [offset, setOffset] = useAtom(offsetAtom);
-    const { data: rows = [], total, isLoading } = useReportDatasets();
+    const { data: rows = [], total, isLoading } = useReports();
 
     // Calculate current page from offset/limit for pagination components
     const currentPage = useMemo(() => Math.floor(offset / limit) + 1, [offset, limit]);

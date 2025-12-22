@@ -3,7 +3,7 @@ import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/Arr
 import { Button } from '@/dashboard/components/ui/button.js';
 import { Spinner } from '../../../components/ui/spinner';
 import { api } from '../../../lib/trpc.js';
-import type { ReportDatasetMetadata } from '../../hooks/use-report-datasets';
+import type { ReportDatasetMetadata } from '../../hooks/use-reports';
 
 interface ReportRefreshButtonProps {
     row: ReportDatasetMetadata;
@@ -11,6 +11,7 @@ interface ReportRefreshButtonProps {
 }
 
 export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps) {
+    const apiUtils = api.useUtils();
     const mutation = api.reports.refresh.useMutation({});
 
     const handleClick = () => {
@@ -21,6 +22,13 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
             timestamp: row.periodStart,
             aggregation: row.aggregation as 'hourly' | 'daily',
             entityType: row.entityType as 'target' | 'product',
+        });
+        apiUtils.reports.get.setData({ uid: row.uid }, prev => {
+            if (!prev) return prev;
+            return {
+                ...prev,
+                refreshing: true,
+            };
         });
     };
 

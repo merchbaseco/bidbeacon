@@ -87,6 +87,12 @@ export const updateReportStatusJob = boss
                         return;
                     }
 
+                    case 'create':
+                        await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
+                        await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
+                        await setRefreshing(reportDatum, false);
+                        return;
+
                     case 'process':
                         // Set status to 'parsing' at the start of parsing
                         await setStatus(reportDatum, 'parsing');
@@ -94,12 +100,6 @@ export const updateReportStatusJob = boss
 
                         // Mark report as processed: clear reportId, set lastProcessedReportId
                         await markReportProcessed(reportDatum, reportDatum.reportId);
-                        await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
-                        await setRefreshing(reportDatum, false);
-                        return;
-
-                    case 'create':
-                        await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
                         await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
                         await setRefreshing(reportDatum, false);
                         return;

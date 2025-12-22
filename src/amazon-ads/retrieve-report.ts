@@ -47,7 +47,7 @@ const reportResponseSchema = z.object({
     query: reportQuerySchema,
     linkedAccounts: z.array(linkedAccountSchema),
     completedDateTime: z.string().nullable().optional(),
-    completedReportParts: z.array(completedReportPartSchema).optional(),
+    completedReportParts: z.array(completedReportPartSchema).nullable().optional(),
     url: z.string().url().nullable().optional(), // Legacy field, kept for backward compatibility
     currencyOfView: z.string().nullable().optional(),
     failureCode: z.string().nullable().optional(),

@@ -3,7 +3,7 @@
 import { useMemo } from 'react';
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { cn } from '../../lib/utils';
-import { useReportDatasets, type ReportSummary } from '../hooks/use-report-datasets';
+import { useReports, type ReportSummary } from '../hooks/use-reports';
 import { formatDate } from '../utils';
 
 export type HealthColor = 'completed' | 'failed' | 'fetching' | 'missing';
@@ -127,7 +127,7 @@ export function DatasetHealthTracker({
     slotCount?: number;
     entityType?: 'target' | 'product';
 }) {
-    const { data: summaries = [], isLoading } = useReportDatasets();
+    const { data: summaries = [], isLoading } = useReports();
 
     const model = useMemo(() => {
         const now = new Date();
