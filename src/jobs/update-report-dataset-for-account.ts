@@ -1,4 +1,4 @@
-import { and, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, lte, or } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { reportDatasetMetadata } from '@/db/schema.js';
@@ -122,13 +122,41 @@ async function insertMetadata(args: {
  * Queries for records where nextRefreshAt has passed and refreshing is false,
  * filtered by the specific account, aggregation, and entity type.
  *
- * For testing, only processes records from the last 10 days.
- * TODO: Remove the 10 day limitation when done testing.
+ * To avoid overwhelming the system, we limit concurrent report fetches to 100.
+ * The limit is computed as: 100 - (count of rows with an active reportId).
+ *
+ * Eligible rows are sorted by most recent period first, then by nextRefreshAt
+ * to ensure we prioritize recent data while still processing overdue refreshes.
  */
 async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
-    // For testing, only move forward with refreshing last 10 days of records.
-    const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
+    const MAX_CONCURRENT_REPORTS = 100;
 
+    // Count how many rows already have a reportId (active report fetches)
+    const [activeReportsResult] = await db
+        .select({ count: count() })
+        .from(reportDatasetMetadata)
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, accountId),
+                eq(reportDatasetMetadata.countryCode, countryCode),
+                eq(reportDatasetMetadata.aggregation, aggregation),
+                eq(reportDatasetMetadata.entityType, entityType),
+                isNotNull(reportDatasetMetadata.reportId)
+            )
+        );
+
+    const activeReportCount = activeReportsResult?.count ?? 0;
+    const availableSlots = MAX_CONCURRENT_REPORTS - activeReportCount;
+
+    // If we're at capacity, skip enqueueing new jobs
+    if (availableSlots <= 0) {
+        return;
+    }
+
+    // Get eligible rows sorted by most recent period first, then by nextRefreshAt
+    // Include rows that are either:
+    // 1. Due for refresh (nextRefreshAt <= now, not currently refreshing), OR
+    // 2. Have a reportId (in-progress reports that need continued processing)
     const dueRecords = await db
         .select()
         .from(reportDatasetMetadata)
@@ -136,13 +164,13 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
                 eq(reportDatasetMetadata.countryCode, countryCode),
-                lte(reportDatasetMetadata.nextRefreshAt, now),
-                eq(reportDatasetMetadata.refreshing, false), // avoids refreshing the same record multiple times
-                gte(reportDatasetMetadata.periodStart, tenDaysAgo),
                 eq(reportDatasetMetadata.aggregation, aggregation),
-                eq(reportDatasetMetadata.entityType, entityType)
+                eq(reportDatasetMetadata.entityType, entityType),
+                or(and(lte(reportDatasetMetadata.nextRefreshAt, now), eq(reportDatasetMetadata.refreshing, false)), isNotNull(reportDatasetMetadata.reportId))
             )
-        );
+        )
+        .orderBy(desc(reportDatasetMetadata.periodStart), reportDatasetMetadata.nextRefreshAt)
+        .limit(availableSlots);
 
     // For each record, first mark it as refreshing.
     // Use UIDs to ensure we only update the specific due records
