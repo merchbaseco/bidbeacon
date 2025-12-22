@@ -19,7 +19,7 @@ export const useReports = () => {
     const statusFilter = useAtomValue(statusFilterAtom);
     const limit = useAtomValue(limitAtom);
     const offset = useAtomValue(offsetAtom);
-    const days = Number(searchParams.get('days')) || 30;
+    const days = Number(searchParams.get('days')) || 360;
     const apiUtils = api.useUtils();
 
     const dateRange = useMemo(() => {
@@ -68,4 +68,3 @@ export const useReports = () => {
         ...rest,
     };
 };
-
