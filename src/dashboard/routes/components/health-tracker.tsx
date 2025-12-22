@@ -3,8 +3,7 @@
 import { useMemo } from 'react';
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { cn } from '../../lib/utils';
-import type { ReportDatasetMetadata } from '../hooks/use-report-datasets';
-import { useReportDatasets } from '../hooks/use-report-datasets';
+import { useReportDatasets, type ReportSummary } from '../hooks/use-report-datasets';
 import { formatDate } from '../utils';
 
 export type HealthColor = 'completed' | 'failed' | 'fetching' | 'missing';
@@ -66,8 +65,8 @@ export function HealthTracker({ children, className }: { children: React.ReactNo
     return <div className={cn('flex gap-0.5 h-10 rounded-lg overflow-hidden', className)}>{children}</div>;
 }
 
-function SlotPopup({ slot, dataset }: { slot: Date; dataset?: ReportDatasetMetadata }) {
-    if (!dataset) {
+function SlotPopup({ slot, summary }: { slot: Date; summary?: ReportSummary }) {
+    if (!summary) {
         return (
             <div className="space-y-2">
                 <div>
@@ -86,34 +85,18 @@ function SlotPopup({ slot, dataset }: { slot: Date; dataset?: ReportDatasetMetad
         <div className="space-y-2">
             <div>
                 <div className="text-xs font-medium text-muted-foreground">Period Start</div>
-                <div className="text-sm font-medium">{formatDate(dataset.periodStart)}</div>
+                <div className="text-sm font-medium">{formatDate(summary.periodStart)}</div>
             </div>
             <div>
                 <div className="text-xs font-medium text-muted-foreground">Status</div>
-                <div className="text-sm capitalize">{dataset.status}</div>
+                <div className="text-sm capitalize">{summary.status}</div>
             </div>
-            {dataset.nextRefreshAt && (
-                <div>
-                    <div className="text-xs font-medium text-muted-foreground">Next Refresh</div>
-                    <div className="text-sm">{formatDate(dataset.nextRefreshAt)}</div>
-                </div>
-            )}
-            <div>
-                <div className="text-xs font-medium text-muted-foreground">Report ID</div>
-                <div className="text-xs font-mono">{dataset.reportId}</div>
-            </div>
-            {dataset.error && (
-                <div>
-                    <div className="text-xs font-medium text-muted-foreground">Error</div>
-                    <div className="text-sm text-destructive">{dataset.error}</div>
-                </div>
-            )}
         </div>
     );
 }
 
-function TrackerSlot({ slot, dataset, index, length }: { slot: Date; dataset?: ReportDatasetMetadata; index: number; length: number }) {
-    const color: HealthColor = dataset ? statusToColor(dataset.status) : 'missing';
+function TrackerSlot({ slot, summary, index, length }: { slot: Date; summary?: ReportSummary; index: number; length: number }) {
+    const color: HealthColor = summary ? statusToColor(summary.status) : 'missing';
     const rounding = cornerClass(index, length);
 
     return (
@@ -127,7 +110,7 @@ function TrackerSlot({ slot, dataset, index, length }: { slot: Date; dataset?: R
                 delay={100}
             />
             <TooltipPopup>
-                <SlotPopup slot={slot} dataset={dataset} />
+                <SlotPopup slot={slot} summary={summary} />
             </TooltipPopup>
         </Tooltip>
     );
@@ -144,23 +127,24 @@ export function DatasetHealthTracker({
     slotCount?: number;
     entityType?: 'target' | 'product';
 }) {
-    const { data: datasets = [], isLoading } = useReportDatasets(aggregation);
+    const { data: summaries = [], isLoading } = useReportDatasets();
 
     const model = useMemo(() => {
         const now = new Date();
         const slots = slotTimes(aggregation, slotCount, now);
 
-        // Filter datasets by entity type to match the table filter
-        const filteredDatasets = datasets.filter(d => d.entityType === entityType);
+        // Filter summaries by aggregation and entity type to match the table filter
+        const filteredSummaries = summaries.filter(d => d.aggregation === aggregation && d.entityType === entityType);
 
-        const map = new Map<string, ReportDatasetMetadata>();
-        for (const d of filteredDatasets) {
-            const key = normalizeToSlotStart(new Date(d.periodStart), aggregation).toISOString();
-            map.set(key, d);
+        // Create a map keyed by normalized slot time
+        const map = new Map<string, ReportSummary>();
+        for (const s of filteredSummaries) {
+            const key = normalizeToSlotStart(new Date(s.periodStart), aggregation).toISOString();
+            map.set(key, s);
         }
 
-        return slots.map(slot => ({ slot, dataset: map.get(slot.toISOString()) }));
-    }, [aggregation, datasets, slotCount, entityType]);
+        return slots.map(slot => ({ slot, summary: map.get(slot.toISOString()) }));
+    }, [aggregation, summaries, slotCount, entityType]);
 
     if (isLoading) {
         const now = new Date();
@@ -178,12 +162,11 @@ export function DatasetHealthTracker({
     return (
         <HealthTracker className={className}>
             <TooltipProvider>
-                {model.map(({ slot, dataset }, index) => (
+                {model.map(({ slot, summary }, index) => (
                     <TrackerSlot
-                        // If there can be multiple datasets per slot, this will still be stable.
-                        key={`${aggregation}-${slot.toISOString()}-${dataset?.reportId ?? 'missing'}`}
+                        key={`${aggregation}-${slot.toISOString()}-${summary?.uid ?? 'missing'}`}
                         slot={slot}
-                        dataset={dataset}
+                        summary={summary}
                         index={index}
                         length={model.length}
                     />

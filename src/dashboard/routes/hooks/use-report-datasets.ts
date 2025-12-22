@@ -1,16 +1,14 @@
 import { useAtomValue } from 'jotai';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { api, type RouterOutputs } from '../../lib/trpc';
 import { aggregationAtom, entityTypeAtom, limitAtom, offsetAtom, statusFilterAtom } from '../components/reports-table/atoms';
 import { roundUpToNearestMinute } from '../utils';
 import { useSelectedAccountId } from './use-selected-accountid';
 import { useSelectedCountryCode } from './use-selected-country-code';
-import { useWebSocketEvents } from './use-websocket-events';
 
-type Aggregation = 'daily' | 'hourly';
-
-export type ReportDatasetMetadata = RouterOutputs['reports']['status']['data'][number];
+export type ReportSummary = RouterOutputs['reports']['summary']['data'][number];
+export type ReportDatasetMetadata = RouterOutputs['reports']['get'];
 
 export const useReportDatasets = () => {
     const [searchParams] = useSearchParams();
@@ -22,6 +20,7 @@ export const useReportDatasets = () => {
     const limit = useAtomValue(limitAtom);
     const offset = useAtomValue(offsetAtom);
     const days = Number(searchParams.get('days')) || 30;
+    const apiUtils = api.useUtils();
 
     const dateRange = useMemo(() => {
         // Round dates up to nearest minute to ensure stable query keys across components
@@ -33,7 +32,7 @@ export const useReportDatasets = () => {
         return { from: from.toISOString(), to: roundedNow.toISOString() };
     }, [days]);
 
-    const { data, isLoading, ...rest } = api.reports.status.useQuery(
+    const { data, isLoading, ...rest } = api.reports.summary.useQuery(
         {
             accountId,
             countryCode,
@@ -52,40 +51,14 @@ export const useReportDatasets = () => {
         }
     );
 
-    /**
-     * Update the individual rows the report dataset metadata is updated
-     */
-    const apiUtils = api.useUtils();
-    useWebSocketEvents('report:refreshed', event => {
-        console.log('REPORT REFRESHED', event);
-        apiUtils.reports.status.setData(
-            {
-                accountId,
-                countryCode,
-                aggregation,
-                entityType,
-                statusFilter,
-                from: dateRange.from,
-                to: dateRange.to,
-                limit,
-                offset,
-            },
-            prev => {
-                if (!prev || !Array.isArray(prev.data)) return prev;
-                // Convert Date objects to ISO strings to match cached data shape
-                const row = {
-                    ...event.row,
-                    periodStart: event.row.periodStart.toISOString(),
-                    nextRefreshAt: event.row.nextRefreshAt?.toISOString() ?? null,
-                    lastReportCreatedAt: event.row.lastReportCreatedAt?.toISOString() ?? null,
-                };
-                return {
-                    ...prev,
-                    data: prev.data.map(item => (item.uid === row.uid ? row : item)),
-                };
-            }
-        );
-    });
+    // Populate reports.get cache with data from summary so individual queries don't fire
+    useEffect(() => {
+        if (data?.data) {
+            data.data.forEach(report => {
+                apiUtils.reports.get.setData({ uid: report.uid }, report);
+            });
+        }
+    }, [data?.data, apiUtils]);
 
     return {
         data: data?.data ?? [],

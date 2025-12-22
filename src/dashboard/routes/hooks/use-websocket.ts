@@ -83,8 +83,8 @@ export const useWebSocket = () => {
                         utils.accounts.list.invalidate();
                         break;
                     case 'reports:refreshed':
-                        // Invalidate dashboard status queries to refresh the table
-                        utils.reports.status.invalidate();
+                        // Invalidate dashboard summary queries to refresh the table
+                        utils.reports.summary.invalidate();
                         break;
                     case 'api-metrics:updated':
                         // Invalidate API metrics queries to refresh the table

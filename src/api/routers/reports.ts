@@ -13,7 +13,7 @@ import { publicProcedure, router } from '../trpc';
 const DEFAULT_ACCOUNT_ID = 'amzn1.ads-account.g.akzidxc3kemvnyklo33ht2mjm';
 
 export const reportsRouter = router({
-    status: publicProcedure
+    summary: publicProcedure
         .input(
             z.object({
                 accountId: z.string().default(DEFAULT_ACCOUNT_ID),
@@ -53,26 +53,35 @@ export const reportsRouter = router({
             const whereClause = and(...conditions);
 
             // Get total count for pagination
-            const [totalResult] = await db
-                .select({ count: count() })
-                .from(reportDatasetMetadata)
-                .where(whereClause);
+            const [totalResult] = await db.select({ count: count() }).from(reportDatasetMetadata).where(whereClause);
 
             const total = totalResult?.count ?? 0;
 
-            // Get paginated data
-            const data = await db
-                .select()
-                .from(reportDatasetMetadata)
-                .where(whereClause)
-                .orderBy(desc(reportDatasetMetadata.periodStart))
-                .limit(input.limit)
-                .offset(input.offset);
+            // Get paginated data - return full records so we can populate reports.get cache
+            const data = await db.select().from(reportDatasetMetadata).where(whereClause).orderBy(desc(reportDatasetMetadata.periodStart)).limit(input.limit).offset(input.offset);
 
             return {
                 data,
                 total,
             };
+        }),
+
+    get: publicProcedure
+        .input(
+            z.object({
+                uid: z.string().uuid(),
+            })
+        )
+        .query(async ({ input }) => {
+            const report = await db.query.reportDatasetMetadata.findFirst({
+                where: eq(reportDatasetMetadata.uid, input.uid),
+            });
+
+            if (!report) {
+                throw new Error('Report not found');
+            }
+
+            return report;
         }),
 
     triggerUpdate: publicProcedure
