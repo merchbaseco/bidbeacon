@@ -49,12 +49,34 @@ export const updateReportStatusJob = boss
             });
 
             try {
-                // Set refreshing=true in database and get the report datum
-                const reportDatum = await setRefreshing(true, accountId, date, aggregation, entityType, null, countryCode);
+                // Fetch current row once at the start
+                const reportDatum = await db.query.reportDatasetMetadata.findFirst({
+                    where: and(
+                        eq(reportDatasetMetadata.accountId, accountId),
+                        eq(reportDatasetMetadata.periodStart, date),
+                        eq(reportDatasetMetadata.aggregation, aggregation),
+                        eq(reportDatasetMetadata.entityType, entityType)
+                    ),
+                });
 
                 if (!reportDatum) {
                     return;
                 }
+
+                // Mark as refreshing immediately so UI updates ASAP
+                await startRefreshing(accountId, date, aggregation, entityType);
+
+                // TODO: Remove this artificial delay after testing
+                await new Promise(resolve => setTimeout(resolve, 5000));
+
+                // Calculate nextRefreshAt once for the entire job
+                const nextRefreshAt = getNextRefreshTime({
+                    periodStart: reportDatum.periodStart,
+                    aggregation: reportDatum.aggregation as 'hourly' | 'daily',
+                    lastReportCreatedAt: reportDatum.lastReportCreatedAt,
+                    reportId: reportDatum.reportId,
+                    countryCode: reportDatum.countryCode,
+                });
 
                 // Determine next action using state machine
                 // The state machine will fetch report status if reportId exists
@@ -68,49 +90,41 @@ export const updateReportStatusJob = boss
                 );
 
                 switch (action) {
-                    case 'none':
-                        // If report is pending, set nextRefreshAt to poll again in 5 minutes
-                        if (reportDatum.reportId) {
-                            await setNextRefreshForPending(accountId, date, aggregation, entityType);
-                        }
-                        await setRefreshing(false, accountId, date, aggregation, entityType, null, countryCode);
-                        return;
-
-                    case 'process':
-                        // Set status to 'parsing' at the start of parsing
-                        await updateStatus('parsing', null, accountId, date, aggregation, entityType, countryCode);
-                        await parseReport({ accountId, timestamp, aggregation, entityType });
-
-                        // Mark report as processed: clear reportId, set lastProcessedReportId, recalculate nextRefreshAt
-                        await markReportProcessed(accountId, date, aggregation, entityType, countryCode);
-                        await setRefreshing(false, accountId, date, aggregation, entityType, null, countryCode);
-                        return;
-
-                    case 'create': {
-                        const _reportId = await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
-                        await setRefreshing(false, accountId, date, aggregation, entityType, null, countryCode);
+                    case 'none': {
+                        // If report is pending, poll again in 5 minutes; otherwise use calculated refresh time
+                        const refreshAt = reportDatum.reportId ? new Date(Date.now() + 5 * 60 * 1000) : nextRefreshAt;
+                        await completeJob(accountId, date, aggregation, entityType, refreshAt);
                         return;
                     }
 
+                    case 'process':
+                        // Set status to 'parsing' at the start of parsing
+                        await updateStatus('parsing', null, accountId, date, aggregation, entityType);
+                        await parseReport({ accountId, timestamp, aggregation, entityType });
+
+                        // Mark report as processed: clear reportId, set lastProcessedReportId
+                        await markReportProcessed(accountId, date, aggregation, entityType, reportDatum.reportId);
+                        await completeJob(accountId, date, aggregation, entityType, nextRefreshAt);
+                        return;
+
+                    case 'create':
+                        await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
+                        await completeJob(accountId, date, aggregation, entityType, nextRefreshAt);
+                        return;
+
                     default:
-                        // Set refreshing=false in database for unknown action
                         logger.error({ action }, 'Unknown action received');
-                        await setRefreshing(false, accountId, date, aggregation, entityType, `Unknown next state machine action: ${action}`, countryCode);
+                        await completeJob(accountId, date, aggregation, entityType, nextRefreshAt);
                         return;
                 }
             } catch (error) {
                 const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-                logger.error(
-                    {
-                        err: error,
-                    },
-                    'Error during updating report status.'
-                );
+                logger.error({ err: error }, 'Error during updating report status.');
 
-                // Set status to 'error' whenever an error occurs
-                await updateStatus('error', errorMessage, accountId, date, aggregation, entityType, countryCode);
-                await setRefreshing(false, accountId, date, aggregation, entityType, errorMessage, countryCode);
+                // Set error state, then complete job with null nextRefreshAt
+                await setErrorState(accountId, date, aggregation, entityType, errorMessage);
+                await completeJob(accountId, date, aggregation, entityType, null);
 
                 // Emit error event
                 emitReportDatasetMetadataError({
@@ -130,52 +144,12 @@ export const updateReportStatusJob = boss
 // ============================================================================
 
 /**
- * Sets the refreshing state for a report datum and emits the update event.
- * Returns the updated report datum row, or null if it doesn't exist.
+ * Sets refreshing=true and emits the update event.
  */
-async function setRefreshing(
-    refreshing: boolean,
-    accountId: string,
-    periodStart: Date,
-    aggregation: AggregationType,
-    entityType: EntityType,
-    error: string | null | undefined,
-    countryCode: string
-): Promise<typeof reportDatasetMetadata.$inferSelect | null> {
-    // Get current row to calculate nextRefreshAt
-    const currentRow = await db.query.reportDatasetMetadata.findFirst({
-        where: and(
-            eq(reportDatasetMetadata.accountId, accountId),
-            eq(reportDatasetMetadata.periodStart, periodStart),
-            eq(reportDatasetMetadata.aggregation, aggregation),
-            eq(reportDatasetMetadata.entityType, entityType)
-        ),
-    });
-
-    if (!currentRow) {
-        return null;
-    }
-
-    // Calculate next refresh time
-    const nextRefreshAt = getNextRefreshTime({
-        periodStart: currentRow.periodStart,
-        aggregation: currentRow.aggregation as 'hourly' | 'daily',
-        lastReportCreatedAt: currentRow.lastReportCreatedAt,
-        reportId: currentRow.reportId,
-        countryCode: currentRow.countryCode,
-    });
-
-    const updateData: { refreshing: boolean; error?: string | null; nextRefreshAt?: Date | null } = {
-        refreshing,
-        nextRefreshAt,
-    };
-    if (error !== undefined) {
-        updateData.error = error;
-    }
-
+async function startRefreshing(accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
-        .set(updateData)
+        .set({ refreshing: true })
         .where(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
@@ -188,46 +162,39 @@ async function setRefreshing(
 
     if (updatedRow) {
         emitReportDatasetMetadataUpdated(updatedRow);
-        return updatedRow;
     }
+}
 
-    return null;
+/**
+ * Completes the job: sets refreshing=false and nextRefreshAt.
+ * This is the job's responsibility - helpers should not set these fields.
+ */
+async function completeJob(accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType, nextRefreshAt: Date | null): Promise<void> {
+    const [updatedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({ refreshing: false, nextRefreshAt })
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, accountId),
+                eq(reportDatasetMetadata.periodStart, periodStart),
+                eq(reportDatasetMetadata.aggregation, aggregation),
+                eq(reportDatasetMetadata.entityType, entityType)
+            )
+        )
+        .returning();
+
+    if (updatedRow) {
+        emitReportDatasetMetadataUpdated(updatedRow);
+    }
 }
 
 /**
  * Updates the status for a report datum and emits the update event
  */
-async function updateStatus(status: string, error: string | null, accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType, countryCode: string): Promise<void> {
-    // Get current row to calculate nextRefreshAt
-    const currentRow = await db.query.reportDatasetMetadata.findFirst({
-        where: and(
-            eq(reportDatasetMetadata.accountId, accountId),
-            eq(reportDatasetMetadata.periodStart, periodStart),
-            eq(reportDatasetMetadata.aggregation, aggregation),
-            eq(reportDatasetMetadata.entityType, entityType)
-        ),
-    });
-
-    if (!currentRow) {
-        return;
-    }
-
-    // Calculate next refresh time
-    const nextRefreshAt = getNextRefreshTime({
-        periodStart: currentRow.periodStart,
-        aggregation: currentRow.aggregation as 'hourly' | 'daily',
-        lastReportCreatedAt: currentRow.lastReportCreatedAt,
-        reportId: currentRow.reportId,
-        countryCode: currentRow.countryCode,
-    });
-
+async function updateStatus(status: string, error: string | null, accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
-        .set({
-            status,
-            error,
-            nextRefreshAt,
-        })
+        .set({ status, error })
         .where(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
@@ -244,39 +211,15 @@ async function updateStatus(status: string, error: string | null, accountId: str
 }
 
 /**
- * Marks a report as processed: clears reportId, sets lastProcessedReportId, and recalculates nextRefreshAt
+ * Marks a report as processed: clears reportId, sets lastProcessedReportId
  */
-async function markReportProcessed(accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType, countryCode: string): Promise<void> {
-    // Get current row to get reportId and calculate nextRefreshAt
-    const currentRow = await db.query.reportDatasetMetadata.findFirst({
-        where: and(
-            eq(reportDatasetMetadata.accountId, accountId),
-            eq(reportDatasetMetadata.periodStart, periodStart),
-            eq(reportDatasetMetadata.aggregation, aggregation),
-            eq(reportDatasetMetadata.entityType, entityType)
-        ),
-    });
-
-    if (!currentRow) {
-        return;
-    }
-
-    const oldReportId = currentRow.reportId;
-    const nextRefreshAt = getNextRefreshTime({
-        periodStart: currentRow.periodStart,
-        aggregation: currentRow.aggregation as 'hourly' | 'daily',
-        lastReportCreatedAt: currentRow.lastReportCreatedAt,
-        reportId: currentRow.reportId,
-        countryCode: currentRow.countryCode,
-    });
-
+async function markReportProcessed(accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType, reportId: string | null): Promise<void> {
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
         .set({
             status: 'completed',
             reportId: null,
-            lastProcessedReportId: oldReportId,
-            nextRefreshAt,
+            lastProcessedReportId: reportId,
             error: null,
         })
         .where(
@@ -295,15 +238,14 @@ async function markReportProcessed(accountId: string, periodStart: Date, aggrega
 }
 
 /**
- * Sets nextRefreshAt to 5 minutes from now for a pending report
+ * Sets error state: status='error', error message
  */
-async function setNextRefreshForPending(accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
-    const nextRefreshAt = new Date(Date.now() + 5 * 60 * 1000);
-
+async function setErrorState(accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType, errorMessage: string): Promise<void> {
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
         .set({
-            nextRefreshAt,
+            status: 'error',
+            error: errorMessage,
         })
         .where(
             and(
