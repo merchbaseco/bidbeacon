@@ -13,7 +13,7 @@ import { ThrottlerMetricsChart } from './components/ads-api-stats/throttler-metr
 import { ChartCard } from './components/chart-card';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { JobMetricsChart } from './components/job-metrics-chart';
-import { ReportsTable } from './components/reports-table';
+import { ReportsTable } from './components/reports-table/index';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);

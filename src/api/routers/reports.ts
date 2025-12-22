@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lte } from 'drizzle-orm';
+import { and, count, desc, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { retrieveReport } from '@/amazon-ads/retrieve-report';
 import { db } from '@/db/index';
@@ -19,8 +19,12 @@ export const reportsRouter = router({
                 accountId: z.string().default(DEFAULT_ACCOUNT_ID),
                 countryCode: z.string().optional(),
                 aggregation: z.enum(['hourly', 'daily']).default('daily'),
+                entityType: z.enum(['target', 'product']).optional(),
+                statusFilter: z.string().optional(),
                 from: z.string().datetime().optional(),
                 to: z.string().datetime().optional(),
+                limit: z.number().min(1).max(100).default(10),
+                offset: z.number().min(0).default(0),
             })
         )
         .query(async ({ input }) => {
@@ -38,13 +42,37 @@ export const reportsRouter = router({
                 conditions.push(eq(reportDatasetMetadata.countryCode, input.countryCode));
             }
 
+            if (input.entityType) {
+                conditions.push(eq(reportDatasetMetadata.entityType, input.entityType));
+            }
+
+            if (input.statusFilter && input.statusFilter !== 'all') {
+                conditions.push(eq(reportDatasetMetadata.status, input.statusFilter));
+            }
+
+            const whereClause = and(...conditions);
+
+            // Get total count for pagination
+            const [totalResult] = await db
+                .select({ count: count() })
+                .from(reportDatasetMetadata)
+                .where(whereClause);
+
+            const total = totalResult?.count ?? 0;
+
+            // Get paginated data
             const data = await db
                 .select()
                 .from(reportDatasetMetadata)
-                .where(and(...conditions))
-                .orderBy(desc(reportDatasetMetadata.timestamp));
+                .where(whereClause)
+                .orderBy(desc(reportDatasetMetadata.timestamp))
+                .limit(input.limit)
+                .offset(input.offset);
 
-            return data;
+            return {
+                data,
+                total,
+            };
         }),
 
     triggerUpdate: publicProcedure

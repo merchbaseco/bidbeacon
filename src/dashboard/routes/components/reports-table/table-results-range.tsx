@@ -4,7 +4,7 @@ import {
     SelectPopup,
     SelectTrigger,
     SelectValue,
-} from '../../components/ui/select';
+} from '../../../components/ui/select';
 
 type TableResultsRangeProps = {
     currentPage: number;
@@ -62,3 +62,4 @@ export const TableResultsRange = ({
         </div>
     );
 };
+

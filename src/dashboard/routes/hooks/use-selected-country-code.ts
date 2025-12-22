@@ -1,12 +1,7 @@
 import { useAtomValue } from 'jotai';
-import { selectedAccountIdAtom, selectedProfileIdAtom } from '../components/account-selector/atoms';
-import { useAdvertisingAccounts } from './use-advertising-accounts';
+import { selectedCountryCodeAtom } from '../components/account-selector/atoms';
 
-export const useSelectedCountryCode = (): string | undefined => {
-    const { data = [] } = useAdvertisingAccounts();
-    const accountId = useAtomValue(selectedAccountIdAtom);
-    const profileId = useAtomValue(selectedProfileIdAtom);
-
-    const selectedAccount = data.find(a => a.adsAccountId === accountId && a.profileId === profileId);
-    return selectedAccount?.countryCode;
+export const useSelectedCountryCode = (): string => {
+    const countryCode = useAtomValue(selectedCountryCodeAtom);
+    return countryCode;
 };

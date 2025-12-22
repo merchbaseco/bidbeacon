@@ -6,8 +6,8 @@ import {
     PaginationLink,
     PaginationNext,
     PaginationPrevious,
-} from '../../components/ui/pagination';
-import { cn } from '../../lib/utils.js';
+} from '../../../components/ui/pagination';
+import { cn } from '../../../lib/utils.js';
 
 type TablePaginationProps = {
     currentPage: number;
@@ -159,3 +159,4 @@ export const TablePagination = ({
         </Pagination>
     );
 };
+

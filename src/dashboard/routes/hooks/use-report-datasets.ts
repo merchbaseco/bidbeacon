@@ -1,17 +1,24 @@
 import { useMemo } from 'react';
+import { useAtomValue } from 'jotai';
 import { useSearchParams } from 'react-router';
 import { api, type RouterOutputs } from '../../lib/trpc';
+import { aggregationAtom, entityTypeAtom, limitAtom, offsetAtom, statusFilterAtom } from '../components/reports-table/atoms';
 import { useSelectedAccountId } from './use-selected-accountid';
 import { useSelectedCountryCode } from './use-selected-country-code';
 
 type Aggregation = 'daily' | 'hourly';
 
-export type ReportDatasetMetadata = RouterOutputs['reports']['status'][number];
+export type ReportDatasetMetadata = RouterOutputs['reports']['status']['data'][number];
 
-export const useReportDatasets = (aggregation: Aggregation = 'daily') => {
+export const useReportDatasets = () => {
     const [searchParams] = useSearchParams();
     const accountId = useSelectedAccountId();
     const countryCode = useSelectedCountryCode();
+    const aggregation = useAtomValue(aggregationAtom);
+    const entityType = useAtomValue(entityTypeAtom);
+    const statusFilter = useAtomValue(statusFilterAtom);
+    const limit = useAtomValue(limitAtom);
+    const offset = useAtomValue(offsetAtom);
     const days = Number(searchParams.get('days')) || 30;
 
     const dateRange = useMemo(() => {
@@ -25,8 +32,12 @@ export const useReportDatasets = (aggregation: Aggregation = 'daily') => {
             accountId,
             countryCode,
             aggregation,
+            entityType,
+            statusFilter,
             from: dateRange.from,
             to: dateRange.to,
+            limit,
+            offset,
         },
         {
             enabled: !!countryCode,
@@ -36,7 +47,8 @@ export const useReportDatasets = (aggregation: Aggregation = 'daily') => {
     );
 
     return {
-        data,
+        data: data?.data ?? [],
+        total: data?.total ?? 0,
         isLoading,
         ...rest,
     };

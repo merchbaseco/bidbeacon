@@ -1,84 +1,48 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Badge } from '../../components/ui/badge';
-import { Frame, FrameFooter } from '../../components/ui/frame';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
-import { Tooltip, TooltipPopup, TooltipTrigger } from '../../components/ui/tooltip';
-import { useReportDatasets } from '../hooks/use-report-datasets';
-import { useSelectedAccountId } from '../hooks/use-selected-accountid';
-import { formatDate, formatRelativeTime } from '../utils.js';
+import { useAtom, useAtomValue } from 'jotai';
+import { useMemo } from 'react';
+import { Badge } from '../../../components/ui/badge';
+import { ButtonGroupSeparator } from '../../../components/ui/button-group';
+import { Frame, FrameFooter } from '../../../components/ui/frame';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table';
+import { Tooltip, TooltipPopup, TooltipTrigger } from '../../../components/ui/tooltip';
+import { useReportDatasets } from '../../hooks/use-report-datasets';
+import { useSelectedAccountId } from '../../hooks/use-selected-accountid';
+import { formatDate, formatRelativeTime } from '../../utils.js';
 import { ReportIdDialog } from './report-id-dialog.js';
 import { ReportRefreshButton } from './report-refresh-button.js';
-import { ReportsToolbar } from './reports-toolbar.js';
-import { StatusBadge } from './status-badge.js';
+import { limitAtom, offsetAtom } from './atoms';
+import { EntityAggregationFilter } from './entity-aggregation-filter';
+import { EntityTypeFilter } from './entity-type-filter';
+import { RefreshButton } from './refresh-button';
+import { StatusFilter } from './status-filter';
+import { StatusBadge } from '../status-badge.js';
 import { TablePagination } from './table-pagination.js';
 import { TableResultsRange } from './table-results-range.js';
 
-const ITEMS_PER_PAGE = 10;
-
 export const ReportsTable = () => {
-    const [aggregation, setAggregation] = useState<'daily' | 'hourly'>('daily');
-    const [entityType, setEntityType] = useState<'target' | 'product'>('target');
-    const { data: rows = [], isLoading } = useReportDatasets(aggregation);
+    const limit = useAtomValue(limitAtom);
+    const [offset, setOffset] = useAtom(offsetAtom);
+    const { data: rows = [], total, isLoading } = useReportDatasets();
     const accountId = useSelectedAccountId();
 
-    const [currentPage, setCurrentPage] = useState(1);
-    const [statusFilter, setStatusFilter] = useState<string>('all');
+    // Calculate current page from offset/limit for pagination components
+    const currentPage = useMemo(() => Math.floor(offset / limit) + 1, [offset, limit]);
+    const totalPages = useMemo(() => Math.ceil(total / limit), [total, limit]);
 
-    // Filter rows by status and entity type
-    const filteredRows = useMemo(() => {
-        let filtered = rows;
-
-        // Filter by entity type
-        filtered = filtered.filter(row => row.entityType === entityType);
-
-        // Filter by status
-        if (statusFilter !== 'all') {
-            filtered = filtered.filter(row => row.status === statusFilter);
-        }
-
-        return filtered;
-    }, [rows, entityType, statusFilter]);
-
-    const totalPages = Math.ceil(filteredRows.length / ITEMS_PER_PAGE);
-    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-    const endIndex = startIndex + ITEMS_PER_PAGE;
-    const paginatedRows = filteredRows.slice(startIndex, endIndex);
-
-    // Adjust current page if it exceeds total pages
-    useEffect(() => {
-        if (totalPages > 0 && currentPage > totalPages) {
-            setCurrentPage(totalPages);
-        } else if (totalPages === 0 && currentPage !== 1) {
-            setCurrentPage(1);
-        }
-    }, [totalPages, currentPage]);
-
-    const handleAggregationChange = (value: 'daily' | 'hourly') => {
-        setAggregation(value);
-        setCurrentPage(1);
-    };
-
-    const handleEntityTypeChange = (value: 'target' | 'product') => {
-        setEntityType(value);
-        setCurrentPage(1);
-    };
-
-    const handleStatusFilterChange = (value: string) => {
-        setStatusFilter(value);
-        setCurrentPage(1);
+    const handlePageChange = (page: number) => {
+        setOffset((page - 1) * limit);
     };
 
     return (
         <>
-            <ReportsToolbar
-                aggregation={aggregation}
-                entityType={entityType}
-                statusFilter={statusFilter}
-                isLoading={isLoading}
-                onAggregationChange={handleAggregationChange}
-                onEntityTypeChange={handleEntityTypeChange}
-                onStatusFilterChange={handleStatusFilterChange}
-            />
+            <div className="mb-4 flex items-center gap-2">
+                <EntityAggregationFilter />
+                <ButtonGroupSeparator />
+                <EntityTypeFilter />
+                <ButtonGroupSeparator />
+                <StatusFilter />
+                <RefreshButton />
+            </div>
             <Frame className="w-full">
                 <Table>
                     <TableHeader>
@@ -93,14 +57,14 @@ export const ReportsTable = () => {
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {filteredRows.length === 0 ? (
+                        {rows.length === 0 && !isLoading ? (
                             <TableRow>
                                 <TableCell colSpan={7} className="text-center text-muted-foreground">
                                     No records found in this window.
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            paginatedRows.map(row => {
+                            rows.map(row => {
                                 const rowKey = `${row.timestamp}-${row.aggregation}-${row.entityType}`;
 
                                 return (
@@ -118,7 +82,7 @@ export const ReportsTable = () => {
                                         <TableCell>
                                             {row.nextRefreshAt ? (
                                                 <Tooltip>
-                                                    <TooltipTrigger asChild>
+                                                    <TooltipTrigger>
                                                         <span className="cursor-help">{formatRelativeTime(row.nextRefreshAt)}</span>
                                                     </TooltipTrigger>
                                                     <TooltipPopup>{formatDate(row.nextRefreshAt)}</TooltipPopup>
@@ -137,11 +101,11 @@ export const ReportsTable = () => {
                         )}
                     </TableBody>
                 </Table>
-                {filteredRows.length > 0 && (
+                {total > 0 && (
                     <FrameFooter className="p-2">
                         <div className="flex items-center justify-between gap-2">
-                            <TableResultsRange currentPage={currentPage} totalPages={totalPages} pageSize={ITEMS_PER_PAGE} totalResults={filteredRows.length} onPageChange={setCurrentPage} />
-                            {filteredRows.length > ITEMS_PER_PAGE && <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />}
+                            <TableResultsRange currentPage={currentPage} totalPages={totalPages} pageSize={limit} totalResults={total} onPageChange={handlePageChange} />
+                            {totalPages > 1 && <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />}
                         </div>
                     </FrameFooter>
                 )}
@@ -149,3 +113,4 @@ export const ReportsTable = () => {
         </>
     );
 };
+
