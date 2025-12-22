@@ -263,3 +263,9 @@ html.dark {
       )
       0 / 1px 100% no-repeat;
 }
+
+.recharts-wrapper *:focus {
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+}

@@ -27,18 +27,20 @@ type Event =
     | { type: 'job-metrics:updated'; jobName: string; timestamp: string }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | {
-          type: 'report-dataset-metadata:updated';
-          data: {
+          type: 'report:refreshed';
+          row: {
+              uid: string;
               accountId: string;
               countryCode: string;
               periodStart: string;
-              aggregation: 'hourly' | 'daily';
-              entityType: 'target' | 'product';
+              aggregation: string;
+              entityType: string;
               status: string;
               refreshing: boolean;
               nextRefreshAt: string | null;
               lastReportCreatedAt: string | null;
               reportId: string | null;
+              lastProcessedReportId: string | null;
               error: string | null;
           };
           timestamp: string;
@@ -83,10 +85,6 @@ export const useWebSocket = () => {
                     case 'reports:refreshed':
                         // Invalidate dashboard status queries to refresh the table
                         utils.reports.status.invalidate();
-                        toast.success('Reports refreshed', {
-                            description: 'Report dataset metadata has been updated',
-                            duration: 5000, // Auto-dismiss after 5 seconds
-                        });
                         break;
                     case 'api-metrics:updated':
                         // Invalidate API metrics queries to refresh the table
@@ -102,15 +100,6 @@ export const useWebSocket = () => {
                         utils.accounts.datasetMetadata.invalidate({
                             accountId: data.accountId,
                             countryCode: data.countryCode,
-                        });
-                        break;
-                    case 'report-dataset-metadata:updated':
-                        utils.reports.status.invalidate();
-                        break;
-                    case 'report-dataset-metadata:error':
-                        utils.reports.status.invalidate();
-                        toast.error('Report refresh failed', {
-                            description: data.data.error,
                         });
                         break;
                 }

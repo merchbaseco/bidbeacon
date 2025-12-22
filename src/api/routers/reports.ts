@@ -182,4 +182,21 @@ export const reportsRouter = router({
             });
             return { jobId };
         }),
+
+    isAnyRefreshActive: publicProcedure
+        .input(
+            z.object({
+                accountId: z.string(),
+                countryCode: z.string(),
+            })
+        )
+        .query(async ({ input }) => {
+            const result = await db
+                .select()
+                .from(reportDatasetMetadata)
+                .where(and(eq(reportDatasetMetadata.accountId, input.accountId), eq(reportDatasetMetadata.countryCode, input.countryCode), eq(reportDatasetMetadata.refreshing, true)))
+                .limit(1);
+
+            return { isActive: result.length > 0 };
+        }),
 });

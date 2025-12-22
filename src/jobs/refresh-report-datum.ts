@@ -13,7 +13,6 @@ import { parseReport } from '@/lib/parse-report/index';
 import { getNextAction } from '@/lib/report-status-state-machine';
 import type { AggregationType, EntityType } from '@/types/reports.js';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
-import { emitReportDatasetMetadataUpdated } from '@/utils/emit-report-dataset-metadata-updated.js';
 import { createJobLogger } from '@/utils/logger';
 import { boss } from './boss.js';
 
@@ -114,7 +113,7 @@ export const refreshReportDatumJob = boss
 // ============================================================================
 
 /**
- * Sets the refreshing state for a report datum and emits the update event.
+ * Sets the refreshing state for a report datum.
  * Returns the updated report datum row, or null if it doesn't exist.
  */
 async function setRefreshing(
@@ -144,7 +143,6 @@ async function setRefreshing(
         .returning();
 
     if (updatedRow) {
-        emitReportDatasetMetadataUpdated(updatedRow);
         return updatedRow;
     }
 
@@ -162,10 +160,10 @@ async function setRefreshing(
 }
 
 /**
- * Updates the status for a report datum and emits the update event
+ * Updates the status for a report datum.
  */
 async function updateStatus(status: string, error: string | null, accountId: string, periodStart: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
-    const [updatedRow] = await db
+    await db
         .update(reportDatasetMetadata)
         .set({
             status,
@@ -178,10 +176,5 @@ async function updateStatus(status: string, error: string | null, accountId: str
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType)
             )
-        )
-        .returning();
-
-    if (updatedRow) {
-        emitReportDatasetMetadataUpdated(updatedRow);
-    }
+        );
 }

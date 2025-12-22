@@ -6,6 +6,7 @@ import { aggregationAtom, entityTypeAtom, limitAtom, offsetAtom, statusFilterAto
 import { roundUpToNearestMinute } from '../utils';
 import { useSelectedAccountId } from './use-selected-accountid';
 import { useSelectedCountryCode } from './use-selected-country-code';
+import { useWebSocketEvents } from './use-websocket-events';
 
 type Aggregation = 'daily' | 'hourly';
 
@@ -50,6 +51,40 @@ export const useReportDatasets = () => {
             refetchOnWindowFocus: true,
         }
     );
+
+    /**
+     * Update the individual rows the report dataset metadata is updated
+     */
+    const apiUtils = api.useUtils();
+    useWebSocketEvents('report:refreshed', event => {
+        apiUtils.reports.status.setData(
+            {
+                accountId,
+                countryCode,
+                aggregation,
+                entityType,
+                statusFilter,
+                from: dateRange.from,
+                to: dateRange.to,
+                limit,
+                offset,
+            },
+            prev => {
+                if (!prev || !Array.isArray(prev.data)) return prev;
+                // Convert Date objects to ISO strings to match cached data shape
+                const row = {
+                    ...event.row,
+                    periodStart: event.row.periodStart.toISOString(),
+                    nextRefreshAt: event.row.nextRefreshAt?.toISOString() ?? null,
+                    lastReportCreatedAt: event.row.lastReportCreatedAt?.toISOString() ?? null,
+                };
+                return {
+                    ...prev,
+                    data: prev.data.map(item => (item.uid === row.uid ? row : item)),
+                };
+            }
+        );
+    });
 
     return {
         data: data?.data ?? [],

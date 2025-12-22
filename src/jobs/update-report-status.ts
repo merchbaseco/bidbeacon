@@ -13,8 +13,7 @@ import { parseReport } from '@/lib/parse-report/index';
 import { getNextAction } from '@/lib/report-status-state-machine';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
-import { emitReportDatasetMetadataError } from '@/utils/emit-report-dataset-metadata-error.js';
-import { emitReportDatasetMetadataUpdated } from '@/utils/emit-report-dataset-metadata-updated.js';
+import { emitEvent } from '@/utils/events.js';
 import { createJobLogger } from '@/utils/logger';
 import { boss } from './boss.js';
 
@@ -123,7 +122,7 @@ export const updateReportStatusJob = boss
 // ============================================================================
 
 /**
- * Sets refreshing=true/false and emits the update event.
+ * Sets refreshing=true/false and emits update event.
  */
 async function setRefreshing(row: InferSelectModel<typeof reportDatasetMetadata>, refreshing: boolean): Promise<void> {
     const [updatedRow] = await db
@@ -140,12 +139,15 @@ async function setRefreshing(row: InferSelectModel<typeof reportDatasetMetadata>
         .returning();
 
     if (updatedRow) {
-        emitReportDatasetMetadataUpdated(updatedRow);
+        emitEvent({
+            type: 'report:refreshed',
+            row: updatedRow,
+        });
     }
 }
 
 /**
- * Updates the status for a report datum and emits the update event
+ * Updates the status for a report datum and emits update event.
  */
 async function setStatus(row: InferSelectModel<typeof reportDatasetMetadata>, status: string): Promise<void> {
     const [updatedRow] = await db
@@ -162,12 +164,15 @@ async function setStatus(row: InferSelectModel<typeof reportDatasetMetadata>, st
         .returning();
 
     if (updatedRow) {
-        emitReportDatasetMetadataUpdated(updatedRow);
+        emitEvent({
+            type: 'report:refreshed',
+            row: updatedRow,
+        });
     }
 }
 
 /**
- * Marks a report as processed: clears reportId, sets lastProcessedReportId
+ * Marks a report as processed: clears reportId, sets lastProcessedReportId, and emits update event.
  */
 async function markReportProcessed(row: InferSelectModel<typeof reportDatasetMetadata>, reportId: string | null): Promise<void> {
     const [updatedRow] = await db
@@ -189,7 +194,10 @@ async function markReportProcessed(row: InferSelectModel<typeof reportDatasetMet
         .returning();
 
     if (updatedRow) {
-        emitReportDatasetMetadataUpdated(updatedRow);
+        emitEvent({
+            type: 'report:refreshed',
+            row: updatedRow,
+        });
     }
 }
 
@@ -208,13 +216,16 @@ async function setNextRefreshAt(row: InferSelectModel<typeof reportDatasetMetada
         .returning();
 
     if (updatedRow) {
-        emitReportDatasetMetadataUpdated(updatedRow);
+        emitEvent({
+            type: 'report:refreshed',
+            row: updatedRow,
+        });
     }
 }
 
 /**
  * Handles errors during report status update job execution.
- * Builds detailed error message, logs error, sets error state, schedules retry, and emits error event.
+ * Builds detailed error message, logs error, sets error state, schedules retry, and emits events.
  */
 async function setError(reportDatum: typeof reportDatasetMetadata.$inferSelect, error: unknown): Promise<void> {
     // Build error message and stack trace for logging
@@ -236,16 +247,9 @@ async function setError(reportDatum: typeof reportDatasetMetadata.$inferSelect, 
         .returning();
 
     if (updatedRow) {
-        emitReportDatasetMetadataUpdated(updatedRow);
+        emitEvent({
+            type: 'report:refreshed',
+            row: updatedRow,
+        });
     }
-
-    // Emit error event
-    emitReportDatasetMetadataError({
-        accountId: reportDatum.accountId,
-        countryCode: reportDatum.countryCode,
-        periodStart: reportDatum.periodStart,
-        aggregation: reportDatum.aggregation as 'hourly' | 'daily',
-        entityType: reportDatum.entityType as 'target' | 'product',
-        error: fullError,
-    });
 }

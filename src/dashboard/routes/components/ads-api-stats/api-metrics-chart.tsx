@@ -34,6 +34,10 @@ export const ApiMetricsChart = () => {
         const totalTicks = chartData.length;
         const tickInterval = Math.floor(totalTicks / 4);
         if (index === 0 || index === totalTicks - 1 || index % tickInterval === 0) {
+            // Show "now" for the last (rightmost) tick
+            if (index === totalTicks - 1) {
+                return 'now';
+            }
             return formatTimeAgo(point.timestamp as string);
         }
         return '';

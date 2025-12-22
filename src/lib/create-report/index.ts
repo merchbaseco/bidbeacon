@@ -7,7 +7,6 @@ import { advertiserAccount, reportDatasetMetadata } from '@/db/schema.js';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility.js';
 import type { AggregationType, EntityType } from '@/types/reports.js';
 import { utcAddHours, utcNow } from '@/utils/date.js';
-import { emitReportDatasetMetadataUpdated } from '@/utils/emit-report-dataset-metadata-updated.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
 
 export type CreateReportForDatasetInput = {
@@ -118,7 +117,7 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
     // Skip hourly datasets and daily product datasets
     if (input.aggregation === 'daily' && input.entityType === 'target') {
         // Insert or update metadata with reportId and status
-        const [updatedRow] = await db
+        await db
             .insert(reportDatasetMetadata)
             .values({
                 accountId: input.accountId,
@@ -141,12 +140,7 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
                     lastReportCreatedAt,
                     error: null,
                 },
-            })
-            .returning();
-
-        if (updatedRow) {
-            emitReportDatasetMetadataUpdated(updatedRow);
-        }
+            });
     }
 
     return reportId;

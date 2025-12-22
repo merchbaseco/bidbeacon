@@ -1,9 +1,19 @@
+import type { InferSelectModel } from 'drizzle-orm';
 import type { WebSocket } from 'ws';
+import type { reportDatasetMetadata } from '@/db/schema';
 import { createContextLogger } from './logger';
 
 const logger = createContextLogger({ component: 'events' });
 
-export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'job-metrics:updated' | 'account-dataset-metadata:updated' | 'report-dataset-metadata:updated' | 'report-dataset-metadata:error';
+export type EventType =
+    | 'error'
+    | 'account:updated'
+    | 'reports:refreshed'
+    | 'api-metrics:updated'
+    | 'job-metrics:updated'
+    | 'account-dataset-metadata:updated'
+    | 'report:refreshed'
+    | 'report-dataset-metadata:error';
 
 export interface BaseEvent {
     type: EventType;
@@ -52,21 +62,9 @@ export interface AccountDatasetMetadataUpdatedEvent extends BaseEvent {
     countryCode: string;
 }
 
-export interface ReportDatasetMetadataUpdatedEvent extends BaseEvent {
-    type: 'report-dataset-metadata:updated';
-    data: {
-        accountId: string;
-        countryCode: string;
-        periodStart: string;
-        aggregation: 'hourly' | 'daily';
-        entityType: 'target' | 'product';
-        status: string;
-        refreshing: boolean;
-        nextRefreshAt: string | null;
-        lastReportCreatedAt: string | null;
-        reportId: string | null;
-        error: string | null;
-    };
+export interface ReportRefreshedEvent extends BaseEvent {
+    type: 'report:refreshed';
+    row: InferSelectModel<typeof reportDatasetMetadata>;
 }
 
 export interface ReportDatasetMetadataErrorEvent extends BaseEvent {
@@ -81,7 +79,15 @@ export interface ReportDatasetMetadataErrorEvent extends BaseEvent {
     };
 }
 
-export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent | JobMetricsUpdatedEvent | AccountDatasetMetadataUpdatedEvent | ReportDatasetMetadataUpdatedEvent | ReportDatasetMetadataErrorEvent;
+export type Event =
+    | ErrorEvent
+    | AccountUpdatedEvent
+    | ReportsRefreshedEvent
+    | ApiMetricsUpdatedEvent
+    | JobMetricsUpdatedEvent
+    | AccountDatasetMetadataUpdatedEvent
+    | ReportRefreshedEvent
+    | ReportDatasetMetadataErrorEvent;
 
 /**
  * Singleton event emitter for WebSocket connections
@@ -154,7 +160,7 @@ export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void
 export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<JobMetricsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<ReportDatasetMetadataUpdatedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<ReportRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportDatasetMetadataErrorEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<Event, 'timestamp'>): void {
     const eventWithTimestamp: Event = {

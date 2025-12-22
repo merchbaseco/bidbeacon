@@ -10,12 +10,13 @@ import { useReportDatasets } from '../../hooks/use-report-datasets';
 export const RefreshButton = () => {
     const accountId = useSelectedAccountId();
     const { isLoading } = useReportDatasets();
-    const { refresh } = useRefreshReportsTable(accountId);
+    const { refresh, pending } = useRefreshReportsTable(accountId);
+    const isRefreshing = pending || isLoading;
 
     return (
         <ButtonGroup className="ml-auto">
-            <Button variant="ghost" onClick={refresh} disabled={isLoading} className="inline-flex items-center gap-2">
-                {isLoading ? <Spinner className="size-4" /> : <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} color="currentColor" />}
+            <Button variant="ghost" onClick={refresh} disabled={isRefreshing} className="inline-flex items-center gap-2">
+                {isRefreshing ? <Spinner className="size-4" /> : <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} color="currentColor" />}
             </Button>
         </ButtonGroup>
     );
