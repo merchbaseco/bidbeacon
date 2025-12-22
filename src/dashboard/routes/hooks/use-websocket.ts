@@ -92,12 +92,10 @@ export const useWebSocket = () => {
                         });
                         break;
                     case 'report-dataset-metadata:updated':
-                        // Invalidate queries to refresh the report status with updated data
-                        utils.reports.status.invalidate({
-                            accountId: data.data.accountId,
-                            countryCode: data.data.countryCode,
-                            aggregation: data.data.aggregation,
-                        });
+                        // Invalidate all report status queries to refresh the table with updated data
+                        // We invalidate all queries (not just matching ones) to ensure the UI updates
+                        // regardless of current filters/pagination
+                        utils.reports.status.invalidate();
                         // Show error toast if there's an error
                         if (data.data.error) {
                             toast.error('Report refresh failed', {
