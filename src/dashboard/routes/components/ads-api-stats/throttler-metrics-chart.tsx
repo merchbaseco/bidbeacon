@@ -39,8 +39,8 @@ export const ThrottlerMetricsChart = () => {
     }, [refreshKey]);
 
     const { data } = api.metrics.adsApiThrottler.useQuery(dateRange, {
-        refetchInterval: 10000,
-        staleTime: 5000,
+        refetchInterval: 60000,
+        staleTime: 1000,
     });
 
     // Sync chart data when backend data arrives

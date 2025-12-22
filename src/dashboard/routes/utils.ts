@@ -1,3 +1,12 @@
+/**
+ * Round a date up to the nearest minute boundary.
+ * This ensures stable query keys across components by preventing
+ * millisecond-level timestamp differences from creating separate queries.
+ */
+export function roundUpToNearestMinute(date: Date): Date {
+    return new Date(Math.ceil(date.getTime() / 60000) * 60000);
+}
+
 export function formatDate(input: string) {
     return new Intl.DateTimeFormat('en', {
         dateStyle: 'medium',

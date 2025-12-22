@@ -3,6 +3,7 @@ import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YA
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { formatTimeAgo } from '@/dashboard/lib/utils';
 import { useAdsApiMetrics } from '@/dashboard/routes/hooks/use-ads-api-metrics';
+import { roundUpToNearestMinute } from '../../utils';
 import { ChartTooltip } from '../chart-tooltip';
 
 /**
@@ -10,7 +11,8 @@ import { ChartTooltip } from '../chart-tooltip';
  */
 export const ApiMetricsChart = () => {
     const dateRange = useMemo(() => {
-        const to = new Date();
+        // Round up to nearest minute to ensure stable query keys
+        const to = roundUpToNearestMinute(new Date());
         const from = new Date(to.getTime() - 3 * 60 * 60 * 1000); // 3 hours
         return { from: from.toISOString(), to: to.toISOString() };
     }, []);

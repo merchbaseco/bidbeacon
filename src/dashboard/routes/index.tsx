@@ -13,6 +13,7 @@ import { ThrottlerMetricsChart } from './components/ads-api-stats/throttler-metr
 import { ChartCard } from './components/chart-card';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { JobMetricsChart } from './components/job-metrics-chart';
+import { JobMetricsTable } from './components/job-metrics-table';
 import { ReportsTable } from './components/reports-table/index';
 
 export function IndexRoute() {
@@ -54,12 +55,12 @@ export function IndexRoute() {
                     </div>
                 </div>
                 <div className="col-span-6 grid grid-cols-2 gap-3">
-                    <Card className="p-3 space-y-0 gap-3 col-span-2">
-                        <div className="flex items-start justify-between px-2 pb-1">
-                            <div className="text-sm font-medium">Job Invocations</div>
-                        </div>
+                    <ChartCard title="Job Invocations" legendItems={[]}>
                         <JobMetricsChart />
-                    </Card>
+                    </ChartCard>
+                    <div className="col-span-2">
+                        <JobMetricsTable />
+                    </div>
                 </div>
                 <Card className="p-3 space-y-0 gap-3">
                     <div className="flex items-start justify-between px-2">

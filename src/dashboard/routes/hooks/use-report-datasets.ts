@@ -1,8 +1,9 @@
-import { useMemo } from 'react';
 import { useAtomValue } from 'jotai';
+import { useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { api, type RouterOutputs } from '../../lib/trpc';
 import { aggregationAtom, entityTypeAtom, limitAtom, offsetAtom, statusFilterAtom } from '../components/reports-table/atoms';
+import { roundUpToNearestMinute } from '../utils';
 import { useSelectedAccountId } from './use-selected-accountid';
 import { useSelectedCountryCode } from './use-selected-country-code';
 
@@ -22,9 +23,13 @@ export const useReportDatasets = () => {
     const days = Number(searchParams.get('days')) || 30;
 
     const dateRange = useMemo(() => {
+        // Round dates up to nearest minute to ensure stable query keys across components
+        // This prevents multiple components from creating separate queries due to
+        // millisecond-level timestamp differences
         const now = new Date();
-        const from = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-        return { from: from.toISOString(), to: now.toISOString() };
+        const roundedNow = roundUpToNearestMinute(now);
+        const from = new Date(roundedNow.getTime() - days * 24 * 60 * 60 * 1000);
+        return { from: from.toISOString(), to: roundedNow.toISOString() };
     }, [days]);
 
     const { data, isLoading, ...rest } = api.reports.status.useQuery(

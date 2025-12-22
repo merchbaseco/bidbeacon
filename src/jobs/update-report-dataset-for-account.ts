@@ -1,3 +1,4 @@
+import { and, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
 import { reportDatasetMetadata } from '@/db/schema.js';
@@ -7,6 +8,7 @@ import type { AggregationType, EntityType } from '@/types/reports.js';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
+import { updateReportStatusJob } from './update-report-status.js';
 
 // Amazon Ads API data retention periods
 const HOURLY_RETENTION_DAYS = 14;
@@ -16,8 +18,9 @@ const DAILY_RETENTION_DAYS = DAILY_RETENTION_MONTHS * 30; // Approximate: 15 mon
 // ============================================================================
 // Job Definition
 //
-// This job backfills the report_dataset_metadata table for a given account
-// and country code.
+// This job backfills any missing rows into the report_dataset_metadata table
+// for a given account and country code, and then enqueues update-report-status
+// for any rows that are due for refresh.
 // ============================================================================
 
 const jobInputSchema = z.object({
@@ -38,6 +41,9 @@ export const updateReportDatasetForAccountJob = boss
             // Insert missing metadata records for daily target datasets within retention period
             // Skip hourly datasets and daily product datasets
             await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
+
+            // Enqueue update-report-status jobs for any rows that are due for refresh
+            await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
 
             // Emit event when job completes
             emitEvent({
@@ -112,4 +118,47 @@ async function insertMetadata(args: {
         .onConflictDoNothing({
             target: [reportDatasetMetadata.accountId, reportDatasetMetadata.timestamp, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
         });
+}
+
+/**
+ * Enqueue update-report-status jobs for records that are due for refresh.
+ * Queries for records where nextRefreshAt has passed and refreshing is false,
+ * filtered by the specific account, aggregation, and entity type.
+ *
+ * For testing, only processes records from the last 10 days.
+ * TODO: Remove the 10 day limitation when done testing.
+ */
+async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
+    // For testing, only move forward with refreshing last 10 days of records.
+    const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
+
+    const dueRecords = await db
+        .select()
+        .from(reportDatasetMetadata)
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, accountId),
+                eq(reportDatasetMetadata.countryCode, countryCode),
+                lte(reportDatasetMetadata.nextRefreshAt, now),
+                eq(reportDatasetMetadata.refreshing, false), // avoids refreshing the same record multiple times
+                gte(reportDatasetMetadata.timestamp, tenDaysAgo),
+                eq(reportDatasetMetadata.aggregation, aggregation),
+                eq(reportDatasetMetadata.entityType, entityType)
+            )
+        );
+
+    // For each record, enqueue an update-report-status job. This job will invoke the state machine
+    // for the report dataset to determine the next action.
+    const statusJobPromises = dueRecords.map(async record => {
+        const jobId = await updateReportStatusJob.emit({
+            accountId: record.accountId,
+            countryCode: record.countryCode,
+            timestamp: record.timestamp.toISOString(),
+            aggregation: record.aggregation as 'hourly' | 'daily',
+            entityType: record.entityType as 'target' | 'product',
+        });
+        return jobId;
+    });
+
+    await Promise.all(statusJobPromises);
 }

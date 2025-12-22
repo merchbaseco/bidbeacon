@@ -3,7 +3,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatTimeAgo } from '@/dashboard/lib/utils';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../components/ui/table';
+import { roundUpToNearestMinute } from '../utils';
 import { useJobMetrics } from '../hooks/use-job-metrics';
 import { ChartTooltipPortal } from './chart-tooltip-portal';
 
@@ -90,7 +90,8 @@ function CustomTooltip({ active, payload, label, coordinate, chartData }: Custom
  */
 export function JobMetricsChart() {
     const dateRange = useMemo(() => {
-        const to = new Date();
+        // Round up to nearest minute to ensure stable query keys
+        const to = roundUpToNearestMinute(new Date());
         const from = new Date(to.getTime() - 3 * 60 * 60 * 1000); // 3 hours
         return {
             from: from.toISOString(),
@@ -144,27 +145,6 @@ export function JobMetricsChart() {
         });
     }, [intervals, data]);
 
-    // Calculate totals for each job
-    const jobTotals = useMemo(() => {
-        const jobNames = data?.jobNames || [];
-        return jobNames
-            .map((jobName, index) => {
-                const jobData = data?.data[jobName] || [];
-                const total = jobData.reduce((sum, point) => sum + point.count, 0);
-                return {
-                    name: jobName,
-                    total,
-                    color: COLORS[index % COLORS.length],
-                };
-            })
-            .sort((a, b) => b.total - a.total); // Sort by total descending
-    }, [data]);
-
-    // Calculate max count for bar scaling
-    const maxCount = useMemo(() => {
-        if (jobTotals.length === 0) return 1;
-        return Math.max(...jobTotals.map(job => job.total));
-    }, [jobTotals]);
 
     if (isLoading) {
         return <div className="flex items-center justify-center h-[400px] text-muted-foreground text-sm">Loading job metrics...</div>;
@@ -189,58 +169,21 @@ export function JobMetricsChart() {
     };
 
     return (
-        <div className="w-full">
-            {/* Chart */}
-            <div className="w-full h-[250px]">
-                <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
-                        <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
-                        <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
-                        <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} />
-                        <Tooltip
-                            content={<CustomTooltip chartData={chartData} />}
-                            wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }}
-                        />
-                        {(data?.jobNames || []).map((jobName, index) => (
-                            <Line key={jobName} type="monotone" dataKey={jobName} stroke={COLORS[index % COLORS.length]} strokeWidth={1.5} dot={false} name={jobName} />
-                        ))}
-                    </LineChart>
-                </ResponsiveContainer>
-            </div>
-
-            {/* Table */}
-            <div className="w-full">
-                <Table>
-                    <TableHeader>
-                        <TableRow>
-                            <TableHead>Job Name</TableHead>
-                            <TableHead>Count</TableHead>
-                        </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                        {jobTotals.map(job => {
-                            const percentage = maxCount > 0 ? (job.total / maxCount) * 100 : 0;
-                            return (
-                                <TableRow key={job.name}>
-                                    <TableCell>
-                                        <div className="flex items-center gap-2">
-                                            <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: job.color }} />
-                                            {job.name}
-                                        </div>
-                                    </TableCell>
-                                    <TableCell>
-                                        <div className="relative w-full h-6 flex items-center">
-                                            <div className="h-full bg-muted rounded flex items-center px-2 min-w-fit" style={{ width: `${Math.max(percentage, 0)}%` }}>
-                                                <span className="text-sm text-foreground whitespace-nowrap">{job.total.toLocaleString()}</span>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                </TableRow>
-                            );
-                        })}
-                    </TableBody>
-                </Table>
-            </div>
+        <div className="w-full h-[200px]">
+            <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
+                    <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
+                    <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} />
+                    <Tooltip
+                        content={<CustomTooltip chartData={chartData} />}
+                        wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }}
+                    />
+                    {(data?.jobNames || []).map((jobName, index) => (
+                        <Line key={jobName} type="monotone" dataKey={jobName} stroke={COLORS[index % COLORS.length]} strokeWidth={1.5} dot={false} name={jobName} />
+                    ))}
+                </LineChart>
+            </ResponsiveContainer>
         </div>
     );
 }
