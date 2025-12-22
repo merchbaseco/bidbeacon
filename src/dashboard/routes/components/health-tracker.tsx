@@ -71,7 +71,7 @@ function SlotPopup({ slot, dataset }: { slot: Date; dataset?: ReportDatasetMetad
         return (
             <div className="space-y-2">
                 <div>
-                    <div className="text-xs font-medium text-muted-foreground">Timestamp</div>
+                    <div className="text-xs font-medium text-muted-foreground">Period Start</div>
                     <div className="text-sm font-medium">{formatDate(slot.toISOString())}</div>
                 </div>
                 <div>
@@ -85,7 +85,7 @@ function SlotPopup({ slot, dataset }: { slot: Date; dataset?: ReportDatasetMetad
     return (
         <div className="space-y-2">
             <div>
-                <div className="text-xs font-medium text-muted-foreground">Timestamp</div>
+                <div className="text-xs font-medium text-muted-foreground">Period Start</div>
                 <div className="text-sm font-medium">{formatDate(dataset.periodStart)}</div>
             </div>
             <div>
