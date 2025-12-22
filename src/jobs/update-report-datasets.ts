@@ -31,7 +31,7 @@ export const updateReportDatasetsJob = boss
             .from(advertiserAccount)
             .where(eq(advertiserAccount.enabled, true));
 
-        // Enqueue update-report-dataset-for-account job for each account
+        // For each enable account, backfill any missing report dataset metadata records.
         const accountJobPromises = enabledAccounts.map(async account => {
             const jobId = await updateReportDatasetForAccountJob.emit({
                 accountId: account.adsAccountId,
@@ -40,8 +40,8 @@ export const updateReportDatasetsJob = boss
             return jobId;
         });
 
-        // Query records due for refresh (only look at rows from the last 10 days)
-        // Only process daily target datasets - skip hourly and daily product
+        // For testing, only move forward with refreshing last 10 days of records.
+        // Delete when done testing.
         const now = new Date();
         const tenDaysAgo = new Date(now.getTime() - 10 * 24 * 60 * 60 * 1000);
         const dueRecords = await db
@@ -50,14 +50,15 @@ export const updateReportDatasetsJob = boss
             .where(
                 and(
                     lte(reportDatasetMetadata.nextRefreshAt, now),
-                    eq(reportDatasetMetadata.refreshing, false),
+                    eq(reportDatasetMetadata.refreshing, false), // avoids refreshing the same record multiple times
                     gte(reportDatasetMetadata.timestamp, tenDaysAgo),
                     eq(reportDatasetMetadata.aggregation, 'daily'),
                     eq(reportDatasetMetadata.entityType, 'target')
                 )
             );
 
-        // Enqueue update-report-status for each due record
+        // For each record, enqueue an update-report-status job. This job will invoke the state machine
+        // for the report dataset to determine the next action.
         const statusJobPromises = dueRecords.map(async record => {
             const jobId = await updateReportStatusJob.emit({
                 accountId: record.accountId,
