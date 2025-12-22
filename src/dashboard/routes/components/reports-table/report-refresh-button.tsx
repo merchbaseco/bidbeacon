@@ -19,6 +19,11 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
         onMutate: () => {
             setIsRefreshing(true);
         },
+        onSuccess: () => {
+            // Reset local state - the WebSocket event will update row.refreshing
+            // but we reset immediately to avoid stale state
+            setIsRefreshing(false);
+        },
         onError: error => {
             setIsRefreshing(false);
             toast.error('Report refresh failed', {
@@ -28,6 +33,7 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
     });
 
     // Reset local state when row.refreshing becomes false (from WebSocket update)
+    // This handles cases where the WebSocket event arrives before mutation completes
     useEffect(() => {
         if (!row.refreshing) {
             setIsRefreshing(false);
