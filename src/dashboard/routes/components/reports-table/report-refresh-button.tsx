@@ -13,29 +13,24 @@ interface ReportRefreshButtonProps {
 }
 
 export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps) {
-    const [localRefreshing, setLocalRefreshing] = useState(false);
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const mutation = api.reports.refresh.useMutation({
         onMutate: () => {
-            setLocalRefreshing(true);
+            setIsRefreshing(true);
         },
         onError: error => {
-            setLocalRefreshing(false);
+            setIsRefreshing(false);
             toast.error('Report refresh failed', {
                 description: error.message,
             });
         },
-        // Note: We don't reset localRefreshing in onSuccess because the mutation
-        // only queues the job - the actual refresh happens asynchronously.
-        // The WebSocket event will update row.refreshing when the job completes.
     });
 
     // Reset local state when row.refreshing becomes false (from WebSocket update)
-    // Use the actual refreshing value from the row to ensure we're in sync
     useEffect(() => {
-        // Explicitly check for false (not just falsy) to handle null/undefined cases
-        if (row.refreshing === false) {
-            setLocalRefreshing(false);
+        if (!row.refreshing) {
+            setIsRefreshing(false);
         }
     }, [row.refreshing]);
 
@@ -50,9 +45,7 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
         });
     };
 
-    // Show spinner if either the row is refreshing OR we're in local refreshing state
-    // This handles the gap between clicking and the WebSocket update
-    const showSpinner = row.refreshing || localRefreshing;
+    const showSpinner = row.refreshing || isRefreshing;
 
     return (
         <Button variant="secondary" size="icon" onClick={handleClick} disabled={showSpinner}>
