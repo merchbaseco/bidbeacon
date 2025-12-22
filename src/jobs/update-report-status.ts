@@ -14,6 +14,7 @@ import { getNextAction } from '@/lib/report-status-state-machine';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
 import type { AggregationType, EntityType } from '@/types/reports.js';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
+import { emitReportDatasetMetadataError } from '@/utils/emit-report-dataset-metadata-error.js';
 import { emitReportDatasetMetadataUpdated } from '@/utils/emit-report-dataset-metadata-updated.js';
 import { createJobLogger } from '@/utils/logger';
 import { boss } from './boss.js';
@@ -110,6 +111,16 @@ export const updateReportStatusJob = boss
                 // Set status to 'error' whenever an error occurs
                 await updateStatus('error', errorMessage, accountId, date, aggregation, entityType, countryCode);
                 await setRefreshing(false, accountId, date, aggregation, entityType, errorMessage, countryCode);
+
+                // Emit error event
+                emitReportDatasetMetadataError({
+                    accountId,
+                    countryCode,
+                    periodStart: date,
+                    aggregation: aggregation as 'hourly' | 'daily',
+                    entityType: entityType as 'target' | 'product',
+                    error: errorMessage,
+                });
             }
         }
     });

@@ -43,6 +43,18 @@ type Event =
           };
           timestamp: string;
       }
+    | {
+          type: 'report-dataset-metadata:error';
+          data: {
+              accountId: string;
+              countryCode: string;
+              periodStart: string;
+              aggregation: 'hourly' | 'daily';
+              entityType: 'target' | 'product';
+              error: string;
+          };
+          timestamp: string;
+      }
     | { type: 'pong' };
 
 const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
@@ -92,16 +104,13 @@ export const useWebSocket = () => {
                         });
                         break;
                     case 'report-dataset-metadata:updated':
-                        // Invalidate all report status queries to refresh the table with updated data
-                        // We invalidate all queries (not just matching ones) to ensure the UI updates
-                        // regardless of current filters/pagination
                         utils.reports.status.invalidate();
-                        // Show error toast if there's an error
-                        if (data.data.error) {
-                            toast.error('Report refresh failed', {
-                                description: data.data.error,
-                            });
-                        }
+                        break;
+                    case 'report-dataset-metadata:error':
+                        utils.reports.status.invalidate();
+                        toast.error('Report refresh failed', {
+                            description: data.data.error,
+                        });
                         break;
                 }
             } catch {

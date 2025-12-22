@@ -3,7 +3,7 @@ import { createContextLogger } from './logger';
 
 const logger = createContextLogger({ component: 'events' });
 
-export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'job-metrics:updated' | 'account-dataset-metadata:updated' | 'report-dataset-metadata:updated';
+export type EventType = 'error' | 'account:updated' | 'reports:refreshed' | 'api-metrics:updated' | 'job-metrics:updated' | 'account-dataset-metadata:updated' | 'report-dataset-metadata:updated' | 'report-dataset-metadata:error';
 
 export interface BaseEvent {
     type: EventType;
@@ -57,7 +57,7 @@ export interface ReportDatasetMetadataUpdatedEvent extends BaseEvent {
     data: {
         accountId: string;
         countryCode: string;
-        timestamp: string;
+        periodStart: string;
         aggregation: 'hourly' | 'daily';
         entityType: 'target' | 'product';
         status: string;
@@ -69,7 +69,19 @@ export interface ReportDatasetMetadataUpdatedEvent extends BaseEvent {
     };
 }
 
-export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent | JobMetricsUpdatedEvent | AccountDatasetMetadataUpdatedEvent | ReportDatasetMetadataUpdatedEvent;
+export interface ReportDatasetMetadataErrorEvent extends BaseEvent {
+    type: 'report-dataset-metadata:error';
+    data: {
+        accountId: string;
+        countryCode: string;
+        periodStart: string;
+        aggregation: 'hourly' | 'daily';
+        entityType: 'target' | 'product';
+        error: string;
+    };
+}
+
+export type Event = ErrorEvent | AccountUpdatedEvent | ReportsRefreshedEvent | ApiMetricsUpdatedEvent | JobMetricsUpdatedEvent | AccountDatasetMetadataUpdatedEvent | ReportDatasetMetadataUpdatedEvent | ReportDatasetMetadataErrorEvent;
 
 /**
  * Singleton event emitter for WebSocket connections
@@ -143,6 +155,7 @@ export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): voi
 export function emitEvent(event: Omit<JobMetricsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportDatasetMetadataUpdatedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<ReportDatasetMetadataErrorEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<Event, 'timestamp'>): void {
     const eventWithTimestamp: Event = {
         ...event,

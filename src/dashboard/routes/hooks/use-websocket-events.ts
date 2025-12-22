@@ -27,6 +27,18 @@ type Event =
           };
           timestamp: string;
       }
+    | {
+          type: 'report-dataset-metadata:error';
+          data: {
+              accountId: string;
+              countryCode: string;
+              periodStart: string;
+              aggregation: 'hourly' | 'daily';
+              entityType: 'target' | 'product';
+              error: string;
+          };
+          timestamp: string;
+      }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | { type: 'reports:refreshed'; accountId: string; timestamp: string }
     | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }
