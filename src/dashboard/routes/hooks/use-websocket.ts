@@ -89,9 +89,9 @@ export const useWebSocket = () => {
                         });
                         break;
                     case 'api-metrics:updated':
-                        // Invalidate API metrics queries to refresh the chart and table
+                        // Invalidate API metrics queries to refresh the table
+                        // Note: adsApi uses 5-minute intervals and refreshes automatically
                         utils.metrics.adsApi.invalidate();
-                        utils.metrics.adsApiThrottler.invalidate();
                         break;
                     case 'job-metrics:updated':
                         // Invalidate job metrics queries to refresh the chart

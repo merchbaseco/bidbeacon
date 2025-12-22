@@ -10,11 +10,11 @@ import { connectionStatusAtom } from './atoms';
 import { AccountDataCard } from './components/account-data-card';
 import { AccountEnabledSwitch } from './components/account-selector/account-enabled-switch';
 import { ApiMetricsTable } from './components/ads-api-stats/api-metrics-table';
-import { ThrottlerMetricsChart } from './components/ads-api-stats/throttler-metrics-chart';
 import { ChartCard } from './components/chart-card';
 import { DatasetHealthTracker } from './components/health-tracker';
 import { JobMetricsChart } from './components/job-metrics-chart';
 import { JobMetricsTable } from './components/job-metrics-table';
+import { ReportsTable } from './components/reports-table/reports-table';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
@@ -49,7 +49,7 @@ export function IndexRoute() {
                     <Frame className="w-full overflow-visible">
                         <div className="grid grid-cols-1 gap-1">
                             <ChartCard title="Ads API Invocations" legendItems={legendItems}>
-                                <ThrottlerMetricsChart />
+                                {/* <ThrottlerMetricsChart /> */}
                             </ChartCard>
                             <div>
                                 <ApiMetricsTable />
@@ -81,6 +81,8 @@ export function IndexRoute() {
                     </div>
                     <DatasetHealthTracker aggregation="hourly" />
                 </Card>
+
+                <ReportsTable />
             </div>
         </div>
     );

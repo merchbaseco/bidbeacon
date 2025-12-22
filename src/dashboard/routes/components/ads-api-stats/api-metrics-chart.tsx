@@ -9,7 +9,7 @@ import { ChartTooltip } from '../chart-tooltip';
 /**
  * Throttler Metrics Chart - Shows API calls per 5-minute interval for the last 3 hours
  */
-export const ThrottlerMetricsChart = () => {
+export const ApiMetricsChart = () => {
     const dateRange = useMemo(() => {
         // Round up to nearest minute to ensure stable query keys
         const to = roundUpToNearestMinute(new Date());
@@ -20,7 +20,7 @@ export const ThrottlerMetricsChart = () => {
         };
     }, []);
 
-    const { data, isLoading, error } = api.metrics.adsApiThrottler.useQuery(dateRange, {
+    const { data, isLoading, error } = api.metrics.adsApi.useQuery(dateRange, {
         refetchInterval: 300000, // 5 minutes
         staleTime: 60000,
     });

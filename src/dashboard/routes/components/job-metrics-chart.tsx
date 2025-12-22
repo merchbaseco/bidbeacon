@@ -3,8 +3,8 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo } from 'react';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { formatTimeAgo } from '@/dashboard/lib/utils';
-import { roundUpToNearestMinute } from '../utils';
 import { useJobMetrics } from '../hooks/use-job-metrics';
+import { roundUpToNearestMinute } from '../utils';
 import { ChartTooltipPortal } from './chart-tooltip-portal';
 
 // Color palette for jobs
@@ -145,7 +145,6 @@ export function JobMetricsChart() {
         });
     }, [intervals, data]);
 
-
     if (isLoading) {
         return <div className="flex items-center justify-center h-[400px] text-muted-foreground text-sm">Loading job metrics...</div>;
     }
@@ -180,10 +179,7 @@ export function JobMetricsChart() {
                     <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
                     <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} tickFormatter={formatYAxisTick} />
-                    <Tooltip
-                        content={<CustomTooltip chartData={chartData} />}
-                        wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }}
-                    />
+                    <Tooltip content={<CustomTooltip chartData={chartData} />} wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }} />
                     {(data?.jobNames || []).map((jobName, index) => (
                         <Line key={jobName} type="monotone" dataKey={jobName} stroke={COLORS[index % COLORS.length]} strokeWidth={1.5} dot={false} name={jobName} />
                     ))}
