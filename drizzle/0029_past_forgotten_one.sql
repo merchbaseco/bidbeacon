@@ -1,0 +1,3 @@
+ALTER TABLE "report_dataset_metadata" RENAME COLUMN "timestamp" TO "period_start";--> statement-breakpoint
+ALTER TABLE "report_dataset_metadata" DROP CONSTRAINT "report_dataset_metadata_account_id_timestamp_aggregation_entity_type_pk";--> statement-breakpoint
+ALTER TABLE "report_dataset_metadata" ADD CONSTRAINT "report_dataset_metadata_account_id_period_start_aggregation_entity_type_pk" PRIMARY KEY("account_id","period_start","aggregation","entity_type");
