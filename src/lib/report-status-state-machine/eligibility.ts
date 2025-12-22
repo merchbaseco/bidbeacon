@@ -1,7 +1,6 @@
+import type { InferSelectModel } from 'drizzle-orm';
 import type { reportDatasetMetadata } from '@/db/schema.js';
 import type { AggregationType } from '@/types/reports';
-
-type ReportMetadataInput = Pick<typeof reportDatasetMetadata.$inferSelect, 'periodStart' | 'aggregation' | 'lastReportCreatedAt' | 'reportId' | 'countryCode'>;
 
 /**
  * Eligible time offsets for report refresh (in hours).
@@ -81,7 +80,9 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
  *
  * If a report is in-flight (reportId is non-null), returns a short poll interval (5 minutes).
  */
-export function getNextRefreshTime(row: ReportMetadataInput, now: Date = new Date()): Date | null {
+export function getNextRefreshTime(row: InferSelectModel<typeof reportDatasetMetadata>): Date | null {
+    const now = new Date();
+
     // If a report is in-flight, poll in 5 minutes to check its status
     if (row.reportId) {
         return new Date(now.getTime() + 5 * 60 * 1000);

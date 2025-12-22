@@ -28,7 +28,7 @@
         "noExplicitAny": "off"
       },
       "correctness": {
-        "noUnusedVariables": "warn",
+        "noUnusedVariables": "off",
         "noUnusedImports": "error"
       }
     }

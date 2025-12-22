@@ -24,6 +24,7 @@ Both share the same PostgreSQL database.
 
 1. **Rely on type inference** - Let tRPC/Drizzle be the source of truth. Don't manually define types that can be inferred.
 2. **Minimal exports** - Only export what's actually imported elsewhere. No preemptive exports.
+3. **No underscore prefix for unused/private variables** - Don't use `_` prefix for unused or private variables. Remove unused variables or ignore linter warnings if needed.
 
 ### React Hooks
 
