@@ -13,30 +13,28 @@ interface ReportRefreshButtonProps {
 }
 
 export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps) {
-    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [localRefreshing, setLocalRefreshing] = useState(false);
 
     const mutation = api.reports.refresh.useMutation({
         onMutate: () => {
-            setIsRefreshing(true);
-        },
-        onSuccess: () => {
-            // Reset local state - the WebSocket event will update row.refreshing
-            // but we reset immediately to avoid stale state
-            setIsRefreshing(false);
+            setLocalRefreshing(true);
         },
         onError: error => {
-            setIsRefreshing(false);
+            setLocalRefreshing(false);
             toast.error('Report refresh failed', {
                 description: error.message,
             });
         },
+        // Note: We don't reset localRefreshing in onSuccess because the mutation
+        // only queues the job - the actual refresh happens asynchronously.
+        // The WebSocket event will update row.refreshing when the job completes.
     });
 
     // Reset local state when row.refreshing becomes false (from WebSocket update)
-    // This handles cases where the WebSocket event arrives before mutation completes
+    // Use the actual refreshing value from the row to ensure we're in sync
     useEffect(() => {
         if (!row.refreshing) {
-            setIsRefreshing(false);
+            setLocalRefreshing(false);
         }
     }, [row.refreshing]);
 
@@ -51,7 +49,9 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
         });
     };
 
-    const showSpinner = row.refreshing || isRefreshing;
+    // Show spinner if either the row is refreshing OR we're in local refreshing state
+    // This handles the gap between clicking and the WebSocket update
+    const showSpinner = row.refreshing || localRefreshing;
 
     return (
         <Button variant="secondary" size="icon" onClick={handleClick} disabled={showSpinner}>
