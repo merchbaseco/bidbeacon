@@ -47,7 +47,7 @@ export const ReportsTable = () => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Timestamp</TableHead>
+                            <TableHead>Period Start</TableHead>
                             <TableHead>Aggregation</TableHead>
                             <TableHead>Entity Type</TableHead>
                             <TableHead>Status</TableHead>
