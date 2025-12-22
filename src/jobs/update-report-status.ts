@@ -35,97 +35,102 @@ const jobInputSchema = z.object({
 export const updateReportStatusJob = boss
     .createJob('update-report-status')
     .input(jobInputSchema)
+    .options({
+        batchSize: 5, // Fetch and process 5 jobs per handler invocation
+    })
     .work(async jobs => {
-        for (const job of jobs) {
-            const { accountId, countryCode, timestamp, aggregation, entityType } = job.data;
-            const date = new Date(timestamp);
+        // Process all jobs in the batch concurrently
+        // Note: With batchSize: 1 (default), this will be a single job, but we handle batches
+        // in case batchSize is increased in the future
+        await Promise.all(
+            jobs.map(async job => {
+                const { accountId, countryCode, timestamp, aggregation, entityType } = job.data;
+                const date = new Date(timestamp);
 
-            // Create job-specific logger with context
-            const logger = createJobLogger('update-report-status', job.id, {
-                accountId,
-                countryCode,
-                aggregation,
-                entityType,
-                timestamp,
-            });
-
-            let action: string | undefined;
-            let reportDatum: InferSelectModel<typeof reportDatasetMetadata> | undefined;
-            try {
-                // Fetch current row once at the start
-                reportDatum = await db.query.reportDatasetMetadata.findFirst({
-                    where: and(
-                        eq(reportDatasetMetadata.accountId, accountId),
-                        eq(reportDatasetMetadata.periodStart, date),
-                        eq(reportDatasetMetadata.aggregation, aggregation),
-                        eq(reportDatasetMetadata.entityType, entityType)
-                    ),
+                // Create job-specific logger with context
+                const logger = createJobLogger('update-report-status', job.id, {
+                    accountId,
+                    countryCode,
+                    aggregation,
+                    entityType,
+                    timestamp,
                 });
 
-                if (!reportDatum) {
-                    return;
-                }
+                let action: string | undefined;
+                let reportDatum: InferSelectModel<typeof reportDatasetMetadata> | undefined;
+                try {
+                    // Fetch current row once at the start
+                    reportDatum = await db.query.reportDatasetMetadata.findFirst({
+                        where: and(
+                            eq(reportDatasetMetadata.accountId, accountId),
+                            eq(reportDatasetMetadata.periodStart, date),
+                            eq(reportDatasetMetadata.aggregation, aggregation),
+                            eq(reportDatasetMetadata.entityType, entityType)
+                        ),
+                    });
 
-                // Mark as refreshing immediately so UI updates ASAP
-                await setRefreshing(reportDatum, true);
-
-                // TODO: Remove this artificial delay after testing
-                await new Promise(resolve => setTimeout(resolve, 5000));
-
-                // Determine next action using state machine
-                // The state machine will fetch report status if reportId exists
-                action = await getNextAction(
-                    reportDatum.periodStart,
-                    reportDatum.aggregation as 'hourly' | 'daily',
-                    reportDatum.entityType as 'target' | 'product',
-                    reportDatum.lastReportCreatedAt,
-                    reportDatum.reportId,
-                    countryCode
-                );
-
-                switch (action) {
-                    case 'none': {
-                        await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
-                        await setRefreshing(reportDatum, false);
-                        break;
+                    if (!reportDatum) {
+                        return;
                     }
 
-                    case 'create': {
-                        const reportId = await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
-                        const updatedRow = await setReport(reportDatum, reportId);
-                        await setNextRefreshAt(updatedRow, getNextRefreshTime(updatedRow));
-                        await setStatus(updatedRow, 'fetching');
-                        await setRefreshing(updatedRow, false);
-                        break;
+                    // Mark as refreshing immediately so UI updates ASAP
+                    await setRefreshing(reportDatum, true);
+
+                    // Determine next action using state machine
+                    // The state machine will fetch report status if reportId exists
+                    action = await getNextAction(
+                        reportDatum.periodStart,
+                        reportDatum.aggregation as 'hourly' | 'daily',
+                        reportDatum.entityType as 'target' | 'product',
+                        reportDatum.lastReportCreatedAt,
+                        reportDatum.reportId,
+                        countryCode
+                    );
+
+                    switch (action) {
+                        case 'none': {
+                            await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
+                            await setRefreshing(reportDatum, false);
+                            break;
+                        }
+
+                        case 'create': {
+                            const reportId = await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
+                            const updatedRow = await setReport(reportDatum, reportId);
+                            await setNextRefreshAt(updatedRow, getNextRefreshTime(updatedRow));
+                            await setStatus(updatedRow, 'fetching');
+                            await setRefreshing(updatedRow, false);
+                            break;
+                        }
+
+                        case 'process': {
+                            // Set status to 'parsing' at the start of parsing
+                            await setStatus(reportDatum, 'parsing');
+                            await parseReport({ accountId, timestamp, aggregation, entityType });
+
+                            // Mark report as processed: clear reportId, set lastProcessedReportId
+                            await markReportProcessed(reportDatum, reportDatum.reportId);
+                            await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
+                            await setRefreshing(reportDatum, false);
+                            break;
+                        }
+
+                        default:
+                            throw new Error(`Unknown action received from state machine: ${action}`);
                     }
 
-                    case 'process': {
-                        // Set status to 'parsing' at the start of parsing
-                        await setStatus(reportDatum, 'parsing');
-                        await parseReport({ accountId, timestamp, aggregation, entityType });
-
-                        // Mark report as processed: clear reportId, set lastProcessedReportId
-                        await markReportProcessed(reportDatum, reportDatum.reportId);
-                        await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
-                        await setRefreshing(reportDatum, false);
-                        break;
+                    if (reportDatum.error) {
+                        await clearError(reportDatum);
                     }
-
-                    default:
-                        throw new Error(`Unknown action received from state machine: ${action}`);
+                } catch (error) {
+                    logger.error({ err: error }, 'Error encountered while updating state machine for report datum.');
+                    if (reportDatum) {
+                        await setNextRefreshAt(reportDatum, new Date(Date.now() + 5 * 60 * 1000));
+                        await setError(reportDatum, error);
+                    }
                 }
-
-                if (reportDatum.error) {
-                    await clearError(reportDatum);
-                }
-            } catch (error) {
-                logger.error({ err: error }, 'Error encountered while updating state machine for report datum.');
-                if (reportDatum) {
-                    await setNextRefreshAt(reportDatum, new Date(Date.now() + 5 * 60 * 1000));
-                    await setError(reportDatum, error);
-                }
-            }
-        }
+            })
+        );
     });
 
 // ============================================================================

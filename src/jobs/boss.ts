@@ -33,7 +33,7 @@ interface ScheduleOptions<T> {
 }
 
 interface WorkOptions {
-    batchSize?: number;
+    batchSize?: number; // Number of jobs to fetch and process per handler invocation
 }
 
 type WorkHandler<T> = (jobs: Array<{ id: string; data: T }>) => void | Promise<void>;
@@ -100,11 +100,18 @@ class Job<T extends JobData> {
     }
 
     /**
+     * Configure work options (batchSize, teamSize, etc.).
+     */
+    options(options: WorkOptions): this {
+        this.workOpts = { ...this.workOpts, ...options };
+        return this;
+    }
+
+    /**
      * Define the work function for this job.
      */
-    work(fn: WorkHandler<T>, options?: WorkOptions): this {
+    work(fn: WorkHandler<T>): this {
         this.workFn = fn;
-        this.workOpts = options;
         return this;
     }
 
@@ -118,7 +125,10 @@ class Job<T extends JobData> {
         }
 
         const pgBoss = this.bossWrapper.getInstance();
-        const workOptions = this.workOpts?.batchSize ? { batchSize: this.workOpts.batchSize } : undefined;
+        const workOptions: Record<string, unknown> = {};
+        if (this.workOpts?.batchSize) {
+            workOptions.batchSize = this.workOpts.batchSize;
+        }
 
         // pg-boss v10+ requires explicit queue creation before work() or schedule()
         await pgBoss.createQueue(this.jobName);
@@ -135,7 +145,7 @@ class Job<T extends JobData> {
         }
 
         // Register the worker with automatic tracking
-        await pgBoss.work<T>(this.jobName, workOptions ?? {}, async jobs => {
+        await pgBoss.work<T>(this.jobName, workOptions, async jobs => {
             const startTime = new Date();
             let success = false;
             let error: string | undefined;
