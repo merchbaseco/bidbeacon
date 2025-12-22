@@ -133,6 +133,7 @@ export const accountDatasetMetadata = pgTable(
 export const reportDatasetMetadata = pgTable(
     'report_dataset_metadata',
     {
+        uid: uuid('uid').primaryKey().defaultRandom(),
         accountId: text('account_id').notNull(),
         countryCode: text('country_code').notNull(),
         periodStart: timestamp('period_start', { withTimezone: false, mode: 'date' }).notNull(), // utc
@@ -146,7 +147,9 @@ export const reportDatasetMetadata = pgTable(
         lastProcessedReportId: text('last_processed_report_id'),
         error: text('error'),
     },
-    table => [primaryKey({ columns: [table.accountId, table.periodStart, table.aggregation, table.entityType] })]
+    table => [
+        uniqueIndex('report_dataset_metadata_unique_idx').on(table.accountId, table.periodStart, table.aggregation, table.entityType),
+    ]
 );
 
 /**

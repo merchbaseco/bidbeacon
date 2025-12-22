@@ -99,22 +99,6 @@ async function insertMetadata(args: {
 }): Promise<void> {
     const { accountId, countryCode, periodStart, aggregation, entityType, status, error } = args;
 
-    // Calculate next refresh time (no report created yet, so lastReportCreatedAt is null and reportId is null)
-    const nextRefreshAt = getNextRefreshTime({
-        accountId,
-        countryCode,
-        periodStart,
-        aggregation,
-        entityType,
-        status,
-        refreshing: false,
-        nextRefreshAt: null,
-        lastReportCreatedAt: null,
-        reportId: null,
-        lastProcessedReportId: null,
-        error: null,
-    });
-
     await db
         .insert(reportDatasetMetadata)
         .values({
@@ -124,7 +108,7 @@ async function insertMetadata(args: {
             aggregation,
             entityType,
             status,
-            nextRefreshAt,
+            nextRefreshAt: getNextRefreshTime({ reportId: null, periodStart, aggregation, lastReportCreatedAt: null }),
             reportId: null,
             error: error ?? null,
         })
@@ -160,16 +144,19 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
             )
         );
 
-    // For each record, first market it as refreshing.
-    await db
-        .update(reportDatasetMetadata)
-        .set({ refreshing: true })
-        .where(
-            inArray(
-                reportDatasetMetadata.accountId,
-                dueRecords.map(record => record.accountId)
-            )
-        );
+    // For each record, first mark it as refreshing.
+    // Use UIDs to ensure we only update the specific due records
+    if (dueRecords.length > 0) {
+        await db
+            .update(reportDatasetMetadata)
+            .set({ refreshing: true })
+            .where(
+                inArray(
+                    reportDatasetMetadata.uid,
+                    dueRecords.map(record => record.uid)
+                )
+            );
+    }
 
     // Then, enqueue an update-report-status job. This job will invoke the state machine
     // for the given dataset to determine the next action.

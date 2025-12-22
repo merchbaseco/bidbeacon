@@ -2,11 +2,13 @@ import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import websocket from '@fastify/websocket';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
+import { eq, or } from 'drizzle-orm';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { createContext } from '@/api/context.js';
 import { appRouter } from '@/api/router.js';
-import { testConnection } from '@/db/index.js';
+import { db, testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
+import { accountDatasetMetadata, reportDatasetMetadata } from '@/db/schema.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
 import { emitEvent } from '@/utils/events.js';
 import { logger } from '@/utils/logger';
@@ -32,6 +34,9 @@ async function main() {
     await runMigrations();
     await testConnection();
 
+    // Cleanup tasks
+    await performStartupCleanup();
+
     // Background jobs
     await startJobs();
 
@@ -50,6 +55,48 @@ main().catch(err => {
     logger.error({ err }, 'Failed to start server');
     process.exit(1);
 });
+
+// ============================================================================
+// Cleanup Tasks
+// ============================================================================
+
+async function performStartupCleanup() {
+    logger.info('Performing startup cleanup tasks');
+
+    try {
+        // Reset any stuck refreshing flags in report_dataset_metadata
+        // This handles cases where the server crashed or restarted while records were marked as refreshing
+        await db.update(reportDatasetMetadata).set({ refreshing: false }).where(eq(reportDatasetMetadata.refreshing, true));
+
+        // Reset stuck 'parsing' status to 'missing' to allow retry
+        // Note: 'fetching' doesn't need reset - state machine will check reportId and process when ready
+        await db.update(reportDatasetMetadata).set({ status: 'missing' }).where(eq(reportDatasetMetadata.status, 'parsing'));
+
+        // Reset any stuck fetching flags in account_dataset_metadata
+        // These flags indicate in-progress entity syncs that won't complete after a crash
+        await db
+            .update(accountDatasetMetadata)
+            .set({
+                fetchingCampaigns: false,
+                fetchingAdGroups: false,
+                fetchingAds: false,
+                fetchingTargets: false,
+            })
+            .where(
+                or(
+                    eq(accountDatasetMetadata.fetchingCampaigns, true),
+                    eq(accountDatasetMetadata.fetchingAdGroups, true),
+                    eq(accountDatasetMetadata.fetchingAds, true),
+                    eq(accountDatasetMetadata.fetchingTargets, true)
+                )
+            );
+
+        logger.info('Startup cleanup complete: reset stuck refreshing and fetching flags');
+    } catch (error) {
+        logger.error({ err: error }, 'Error during startup cleanup');
+        throw error;
+    }
+}
 
 // ============================================================================
 // Helpers

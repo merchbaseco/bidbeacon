@@ -1,0 +1,3 @@
+ALTER TABLE "report_dataset_metadata" DROP CONSTRAINT "report_dataset_metadata_account_id_period_start_aggregation_entity_type_pk";--> statement-breakpoint
+ALTER TABLE "report_dataset_metadata" ADD COLUMN "uid" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL;--> statement-breakpoint
+CREATE UNIQUE INDEX "report_dataset_metadata_unique_idx" ON "report_dataset_metadata" USING btree ("account_id","period_start","aggregation","entity_type");

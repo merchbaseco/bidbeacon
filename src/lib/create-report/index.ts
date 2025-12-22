@@ -108,11 +108,10 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
 
     // Calculate next refresh time using centralized logic (will return 5-minute poll since reportId is set)
     const nextRefreshAt = getNextRefreshTime({
+        reportId,
         periodStart: date,
         aggregation: input.aggregation,
         lastReportCreatedAt,
-        reportId,
-        countryCode: input.countryCode,
     });
 
     // Only insert/update metadata for daily target datasets

@@ -1,5 +1,3 @@
-import type { InferSelectModel } from 'drizzle-orm';
-import type { reportDatasetMetadata } from '@/db/schema.js';
 import type { AggregationType } from '@/types/reports';
 
 /**
@@ -79,19 +77,25 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
  * all eligible offsets have been reached and reports created.
  *
  * If a report is in-flight (reportId is non-null), returns a short poll interval (5 minutes).
+ *
+ * Can be called with a full row object or an object containing just the required fields.
  */
-export function getNextRefreshTime(row: InferSelectModel<typeof reportDatasetMetadata>): Date | null {
+export function getNextRefreshTime(row: {
+    reportId: string | null;
+    periodStart: Date;
+    aggregation: AggregationType | string;
+    lastReportCreatedAt: Date | null;
+}): Date | null {
+    const { reportId, periodStart, aggregation, lastReportCreatedAt } = row;
     const now = new Date();
 
     // If a report is in-flight, poll in 5 minutes to check its status
-    if (row.reportId) {
+    if (reportId) {
         return new Date(now.getTime() + 5 * 60 * 1000);
     }
 
-    const { periodStart, aggregation, lastReportCreatedAt } = row;
-
     // Get all eligible offsets in hours.
-    const eligibleOffsets = getEligibleOffsets(aggregation as AggregationType);
+    const eligibleOffsets = getEligibleOffsets(aggregation);
     const sortedOffsets = [...eligibleOffsets].sort((a, b) => a - b);
 
     // Calculate current age in hours
