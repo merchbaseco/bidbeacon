@@ -210,6 +210,10 @@ body {
 
 .font-mono {
   font-family: var(--font-mono);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'liga' 1, 'calt' 1;
 }
 
 #root {
