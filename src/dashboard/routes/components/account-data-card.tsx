@@ -21,7 +21,7 @@ export const AccountDataCard = () => {
     };
 
     return (
-        <Card className="p-3 space-y-0 gap-3">
+        <Card className="p-3 pb-1 space-y-0 gap-0">
             <div className="flex items-start justify-between pl-1 pb-1">
                 <div>
                     <div className="text-sm font-medium">Account Data</div>
@@ -45,9 +45,9 @@ const EntityRow = ({ label, count, isFetching }: { label: string; count: number 
         <div className="flex items-center justify-between py-1.5">
             <div className="flex items-center gap-2">
                 {isFetching ? <Spinner className="size-3 -ml-0.5 -mr-0.5" /> : <span className="size-2 rounded-full bg-emerald-500" />}
-                <span className="text-xs">{label}</span>
+                <span className="text-sm">{label}</span>
             </div>
-            <span className="text-xs text-muted-foreground tabular-nums">{count !== null ? count.toLocaleString() : '—'}</span>
+            <span className="text-sm text-muted-foreground tabular-nums">{count !== null ? count.toLocaleString() : '—'}</span>
         </div>
     );
 };

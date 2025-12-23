@@ -1,5 +1,3 @@
-import { HugeiconsIcon } from '@hugeicons/react';
-import ArrowExpandIcon from '@merchbaseco/icons/core-solid-rounded/ArrowExpandIcon';
 import { useAtomValue } from 'jotai';
 import { useMemo } from 'react';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
@@ -12,7 +10,6 @@ import { AccountEnabledSwitch } from './components/account-selector/account-enab
 import { ApiMetricsChart } from './components/ads-api-stats/api-metrics-chart';
 import { ApiMetricsTable } from './components/ads-api-stats/api-metrics-table';
 import { ChartCard } from './components/chart-card';
-import { DatasetHealthTracker } from './components/health-tracker';
 import { JobMetricsChart } from './components/job-metrics-chart';
 import { JobMetricsTable } from './components/job-metrics-table';
 import { ReportsTable } from './components/reports-table/reports-table';
@@ -67,21 +64,6 @@ export function IndexRoute() {
                         </div>
                     </Frame>
                 </div>
-
-                <Card className="p-3 space-y-0 gap-3">
-                    <div className="flex items-start justify-between px-2">
-                        <div className="text-sm font-medium">Daily Dataset Health</div>
-                        <HugeiconsIcon icon={ArrowExpandIcon} size={20} color="currentColor" />
-                    </div>
-                    <DatasetHealthTracker aggregation="daily" />
-                </Card>
-                <Card className="p-3 space-y-0 gap-3">
-                    <div className="flex items-start justify-between px-2">
-                        <div className="text-sm font-medium">Hourly Dataset Health</div>
-                        <HugeiconsIcon icon={ArrowExpandIcon} size={20} color="currentColor" />
-                    </div>
-                    <DatasetHealthTracker aggregation="hourly" />
-                </Card>
 
                 <ReportsTable />
             </div>
