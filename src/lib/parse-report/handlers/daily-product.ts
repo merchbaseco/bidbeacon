@@ -1,22 +1,19 @@
 import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
 import { z } from 'zod';
-import { reportConfigs } from '@/config/reports/configs';
 import { dailyReportRowSchema } from '@/config/reports/daily-product';
 import { db } from '@/db/index';
 import { performanceDaily } from '@/db/schema';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import type { ParseReportInput } from '../index';
-import { parseDailyTimestamp } from '../utils/parse-timestamps';
-import type { ReportMetadata } from '../validate-report-ready';
+import { parseDailyTimestamp } from '../utils/parse-period-start-timestamp';
+import type { ParseReportInput } from './input';
 
 const gunzipAsync = promisify(gunzip);
 
-export async function handleDailyProduct(input: ParseReportInput, metadata: ReportMetadata): Promise<{ rowsProcessed: number }> {
-    const reportConfig = reportConfigs[input.aggregation][input.entityType];
-    const timezone = getTimezoneForCountry(metadata.countryCode);
+export async function handleDailyProduct(input: ParseReportInput): Promise<{ rowsProcessed: number }> {
+    const timezone = getTimezoneForCountry(input.countryCode);
 
-    const response = await fetch(metadata.reportUrl, {
+    const response = await fetch(input.reportUrl, {
         signal: AbortSignal.timeout(60000),
     });
 
@@ -46,7 +43,7 @@ export async function handleDailyProduct(input: ParseReportInput, metadata: Repo
                 campaignId: row['campaign.id'],
                 adGroupId: row['adGroup.id'],
                 adId: row['ad.id'],
-                entityType: reportConfig.entityType,
+                entityType: input.reportConfig.entityType,
                 entityId,
                 targetMatchType: null,
                 impressions: row['metric.impressions'],

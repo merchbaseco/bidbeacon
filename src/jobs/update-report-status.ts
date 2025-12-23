@@ -106,7 +106,7 @@ export const updateReportStatusJob = boss
                         case 'process': {
                             // Set status to 'parsing' at the start of parsing
                             await setStatus(reportDatum, 'parsing');
-                            await parseReport({ accountId, timestamp, aggregation, entityType });
+                            await parseReport(reportDatum.uid);
 
                             // Mark report as processed: clear reportId, set lastProcessedReportId
                             await markReportProcessed(reportDatum, reportDatum.reportId);

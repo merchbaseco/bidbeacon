@@ -1,40 +1,54 @@
-import type { AggregationType, EntityType } from '@/types/reports';
+import { eq, type InferSelectModel } from 'drizzle-orm';
+import { reportConfigs } from '@/config/reports/configs';
+import { db } from '@/db';
+import { reportDatasetMetadata } from '@/db/schema';
 import { handleDailyProduct } from './handlers/daily-product';
 import { handleDailyTarget } from './handlers/daily-target';
 import { handleHourlyProduct } from './handlers/hourly-product';
 import { handleHourlyTarget } from './handlers/hourly-target';
+import type { ParseReportInput } from './handlers/input';
 import { validateReportReady } from './validate-report-ready';
 
-export type ParseReportInput = {
-    accountId: string;
-    timestamp: string;
-    aggregation: AggregationType;
-    entityType: EntityType;
-};
+export async function parseReport(reportUid: InferSelectModel<typeof reportDatasetMetadata>['uid']): Promise<{ rowsProcessed: number }> {
+    const reportMetadata = await db.query.reportDatasetMetadata.findFirst({
+        where: eq(reportDatasetMetadata.uid, reportUid),
+    });
 
-export async function parseReport(input: ParseReportInput): Promise<{ rowsProcessed: number }> {
+    if (!reportMetadata) {
+        throw new Error(`Report metadata not found.`);
+    }
+
+    if (!reportMetadata.reportId) {
+        throw new Error('No reportId found for this report. Create the report first.');
+    }
+
     // Validate report is ready to be processed
-    const reportMetadata = await validateReportReady(input);
+    const reportUrl = await validateReportReady(reportMetadata.reportId);
 
     // Farm out processing to the appropriate handler
-    const handler = getHandler(input.aggregation, input.entityType);
-    const result = await handler(input, reportMetadata);
+    const aggregation = reportMetadata.aggregation as 'hourly' | 'daily';
+    const entityType = reportMetadata.entityType as 'target' | 'product';
+    const reportConfig = reportConfigs[aggregation][entityType];
 
-    return result;
-}
+    const input: ParseReportInput = {
+        reportUid: reportMetadata.uid,
+        accountId: reportMetadata.accountId,
+        periodStart: reportMetadata.periodStart,
+        countryCode: reportMetadata.countryCode,
+        reportConfig,
+        reportUrl,
+    };
 
-function getHandler(aggregation: 'hourly' | 'daily', entityType: 'target' | 'product') {
-    if (aggregation === 'hourly' && entityType === 'target') {
-        return handleHourlyTarget;
+    switch (`${aggregation}-${entityType}`) {
+        case 'hourly-target':
+            return handleHourlyTarget(input);
+        case 'daily-target':
+            return handleDailyTarget(input);
+        case 'hourly-product':
+            return handleHourlyProduct(input);
+        case 'daily-product':
+            return handleDailyProduct(input);
     }
-    if (aggregation === 'hourly' && entityType === 'product') {
-        return handleHourlyProduct;
-    }
-    if (aggregation === 'daily' && entityType === 'target') {
-        return handleDailyTarget;
-    }
-    if (aggregation === 'daily' && entityType === 'product') {
-        return handleDailyProduct;
-    }
+
     throw new Error(`No handler found for aggregation: ${aggregation}, entityType: ${entityType}`);
 }

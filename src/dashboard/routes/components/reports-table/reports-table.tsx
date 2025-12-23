@@ -40,19 +40,17 @@ export const ReportsTable = () => {
                 <Table>
                     <TableHeader>
                         <TableRow>
-                            <TableHead>Period Start</TableHead>
-                            <TableHead>Aggregation</TableHead>
-                            <TableHead>Entity Type</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead>Next refresh</TableHead>
-                            <TableHead>Report ID</TableHead>
+                            <TableHead className="w-[280px]">Dataset</TableHead>
+                            <TableHead className="w-[120px]">Status</TableHead>
+                            <TableHead className="w-[150px]">Next refresh</TableHead>
+                            <TableHead className="">Report ID</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {rows.length === 0 && !isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                                <TableCell colSpan={5} className="text-center text-muted-foreground">
                                     No records found in this window.
                                 </TableCell>
                             </TableRow>

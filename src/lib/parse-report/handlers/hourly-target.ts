@@ -1,23 +1,20 @@
 import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
 import { z } from 'zod';
-import { reportConfigs } from '@/config/reports/configs';
 import { hourlyReportRowSchema } from '@/config/reports/hourly-target';
 import { db } from '@/db/index';
 import { performanceHourly } from '@/db/schema';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import type { ParseReportInput } from '../index';
-import { lookupTargetId } from '../utils/lookup-target-id';
-import { parseHourlyTimestamp } from '../utils/parse-timestamps';
-import type { ReportMetadata } from '../validate-report-ready';
+import { getNormalizedTarget } from '../utils/lookup-target-id';
+import { parseHourlyTimestamp } from '../utils/parse-period-start-timestamp';
+import type { ParseReportInput } from './input';
 
 const gunzipAsync = promisify(gunzip);
 
-export async function handleHourlyTarget(input: ParseReportInput, metadata: ReportMetadata): Promise<{ rowsProcessed: number }> {
-    const reportConfig = reportConfigs[input.aggregation][input.entityType];
-    const timezone = getTimezoneForCountry(metadata.countryCode);
+export async function handleHourlyTarget(input: ParseReportInput): Promise<{ rowsProcessed: number }> {
+    const timezone = getTimezoneForCountry(input.countryCode);
 
-    const response = await fetch(metadata.reportUrl, {
+    const response = await fetch(input.reportUrl, {
         signal: AbortSignal.timeout(60000),
     });
 
@@ -33,7 +30,7 @@ export async function handleHourlyTarget(input: ParseReportInput, metadata: Repo
 
     let insertedCount = 0;
     for (const row of rows) {
-        const { entityId, matchType } = await lookupTargetId(row);
+        const { entityId, matchType } = await getNormalizedTarget(row['adGroup.id'], row['target.value'], row['target.matchType']);
 
         const hourValue = row['hour.value'];
         const { bucketStart, bucketDate, bucketHour } = parseHourlyTimestamp(hourValue, timezone);
@@ -48,7 +45,7 @@ export async function handleHourlyTarget(input: ParseReportInput, metadata: Repo
                 campaignId: row['campaign.id'],
                 adGroupId: row['adGroup.id'],
                 adId: row['ad.id'],
-                entityType: reportConfig.entityType,
+                entityType: input.reportConfig.entityType,
                 entityId,
                 targetMatchType: matchType,
                 impressions: row['metric.impressions'],

@@ -1,14 +1,9 @@
 import { useState } from 'react';
-import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from '../../../components/ui/dialog';
 import type { ReportDatasetMetadata } from '../../hooks/use-reports';
 
-interface ErrorDialogProps {
-    row: ReportDatasetMetadata;
-}
-
-export function ErrorDialog({ row }: ErrorDialogProps) {
+export function ErrorDialog({ row, children }: { row: ReportDatasetMetadata; children: React.ReactNode }) {
     const [open, setOpen] = useState(false);
     const [copied, setCopied] = useState(false);
 
@@ -20,17 +15,9 @@ export function ErrorDialog({ row }: ErrorDialogProps) {
         }
     };
 
-    if (!row.error) {
-        return null;
-    }
-
     return (
         <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Badge variant="destructive" className="cursor-pointer">
-                    Error
-                </Badge>
-            </DialogTrigger>
+            <DialogTrigger disabled={!row.error}>{children}</DialogTrigger>
             <DialogPopup className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Error Details</DialogTitle>
@@ -47,7 +34,7 @@ export function ErrorDialog({ row }: ErrorDialogProps) {
                     <Button variant="outline" onClick={handleCopy}>
                         {copied ? 'Copied!' : 'Copy Error'}
                     </Button>
-                    <DialogClose asChild>
+                    <DialogClose>
                         <Button>Close</Button>
                     </DialogClose>
                 </DialogFooter>
@@ -55,4 +42,3 @@ export function ErrorDialog({ row }: ErrorDialogProps) {
         </Dialog>
     );
 }
-

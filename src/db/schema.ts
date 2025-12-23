@@ -147,10 +147,17 @@ export const reportDatasetMetadata = pgTable(
         lastProcessedReportId: text('last_processed_report_id'),
         error: text('error'),
     },
-    table => [
-        uniqueIndex('report_dataset_metadata_unique_idx').on(table.accountId, table.periodStart, table.aggregation, table.entityType),
-    ]
+    table => [uniqueIndex('report_dataset_metadata_unique_idx').on(table.accountId, table.periodStart, table.aggregation, table.entityType)]
 );
+
+export const reportDatasetErrorMetrics = pgTable('report_dataset_metrics', {
+    uid: uuid('uid').primaryKey().defaultRandom(),
+    reportDatasetMetadataId: uuid('report_dataset_metadata_id')
+        .notNull()
+        .references(() => reportDatasetMetadata.uid),
+    row: jsonb('row').notNull(),
+    error: text('error').notNull(),
+});
 
 /**
  * =====================================================================================

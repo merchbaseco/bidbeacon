@@ -119,20 +119,19 @@ async function insertMetadata(args: {
 
 /**
  * Enqueue update-report-status jobs for records that are due for refresh.
- * Queries for records where nextRefreshAt has passed and refreshing is false,
- * filtered by the specific account, aggregation, and entity type.
  *
- * To avoid overwhelming the system, we limit concurrent report fetches to 100.
- * The limit is computed as: 100 - (count of rows with an active reportId).
+ * We only enqueue jobs such that the total number of concurrent jobs is less than MAX_CONCURRENT_REPORTS.
+ * If already at capacity, the function returns early without enqueueing any more jobs.
  *
- * Eligible rows are sorted by most recent period first, then by nextRefreshAt
- * to ensure we prioritize recent data while still processing overdue refreshes.
+ * Eligible rows are sorted to prioritize rows with report IDs (in-progress reports that need continued
+ * processing), then by most recent period, then by nextRefreshAt. This ensures rows with report IDs always
+ * get included before the limit is applied.
  */
 async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
     const MAX_CONCURRENT_REPORTS = 5;
 
-    // Count how many rows already have a reportId (active report fetches)
-    const [activeReportsResult] = await db
+    // Count how many datasets are currently refreshing for this account/country/aggregation/entityType
+    const [refreshingCountResult] = await db
         .select({ count: count() })
         .from(reportDatasetMetadata)
         .where(
@@ -141,22 +140,22 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
                 eq(reportDatasetMetadata.countryCode, countryCode),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType),
-                isNotNull(reportDatasetMetadata.reportId)
+                eq(reportDatasetMetadata.refreshing, true)
             )
         );
 
-    const activeReportCount = activeReportsResult?.count ?? 0;
-    const availableSlots = MAX_CONCURRENT_REPORTS - activeReportCount;
+    const refreshingCount = refreshingCountResult?.count ?? 0;
+    const adjustedLimit = Math.max(0, MAX_CONCURRENT_REPORTS - refreshingCount);
 
-    // If we're at capacity, skip enqueueing new jobs
-    if (availableSlots <= 0) {
+    // If we're already at max capacity, don't query for more records
+    if (adjustedLimit === 0) {
         return;
     }
 
-    // Get eligible rows sorted by most recent period first, then by nextRefreshAt
-    // Include rows that are either:
-    // 1. Due for refresh (nextRefreshAt <= now, not currently refreshing), OR
-    // 2. Have a reportId (in-progress reports that need continued processing)
+    // Get eligible rows. Include rows that are either:
+    // 1. Have a reportId (in-progress reports that need continued processing)
+    // 2. Due for refresh (nextRefreshAt <= now, not currently refreshing)
+    // Rows are sorted to prioritize report IDs, then by most recent period, then by nextRefreshAt
     const dueRecords = await db
         .select()
         .from(reportDatasetMetadata)
@@ -169,8 +168,8 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
                 or(and(lte(reportDatasetMetadata.nextRefreshAt, now), eq(reportDatasetMetadata.refreshing, false)), isNotNull(reportDatasetMetadata.reportId))
             )
         )
-        .orderBy(desc(reportDatasetMetadata.periodStart), reportDatasetMetadata.nextRefreshAt)
-        .limit(availableSlots);
+        .orderBy(desc(reportDatasetMetadata.reportId), desc(reportDatasetMetadata.periodStart), reportDatasetMetadata.nextRefreshAt)
+        .limit(adjustedLimit);
 
     // For each record, first mark it as refreshing.
     // Use UIDs to ensure we only update the specific due records
