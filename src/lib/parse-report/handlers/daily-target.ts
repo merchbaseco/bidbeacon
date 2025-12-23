@@ -1,17 +1,19 @@
 import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
+import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { dailyReportRowSchema } from '@/config/reports/daily-target';
 import { db } from '@/db/index';
-import { performanceDaily, reportDatasetErrorMetrics } from '@/db/schema';
+import { performanceDaily, reportDatasetErrorMetrics, reportDatasetMetadata } from '@/db/schema';
+import { emitEvent } from '@/utils/events';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { getNormalizedTarget } from '../utils/lookup-target-id';
 import { parseDailyTimestamp } from '../utils/parse-period-start-timestamp';
-import type { ParseReportInput } from './input';
+import type { ParseReportInput, ParseReportOutput } from './input';
 
 const gunzipAsync = promisify(gunzip);
 
-export async function handleDailyTarget(input: ParseReportInput): Promise<{ rowsProcessed: number }> {
+export async function handleDailyTarget(input: ParseReportInput): Promise<ParseReportOutput> {
     const timezone = getTimezoneForCountry(input.countryCode);
 
     const response = await fetch(input.reportUrl, {
@@ -28,7 +30,8 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<{ rows
 
     const rows = z.array(dailyReportRowSchema).parse(rawJson);
 
-    let insertedCount = 0;
+    let successCount = 0;
+    let errorCount = 0;
     for (const row of rows) {
         try {
             const { entityId, matchType } = await getNormalizedTarget(row['adGroup.id'], row['target.value'], row['target.matchType']);
@@ -68,7 +71,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<{ rows
                     },
                 });
 
-            insertedCount++;
+            successCount++;
         } catch (error) {
             // Store the error and full row in reportDatasetErrorMetrics
             await db.insert(reportDatasetErrorMetrics).values({
@@ -76,8 +79,26 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<{ rows
                 row: row as unknown as Record<string, unknown>,
                 error: error instanceof Error ? error.message : String(error),
             });
+            errorCount++;
+        }
+
+        // Every 50 records, update the reportDatasetMetadata with the success and error counts.
+        const totalCount = successCount + errorCount;
+        if (totalCount % 50 === 0 || totalCount === rows.length) {
+            const [updatedRow] = await db
+                .update(reportDatasetMetadata)
+                .set({
+                    successRecords: successCount,
+                    errorRecords: errorCount,
+                })
+                .where(eq(reportDatasetMetadata.uid, input.reportUid))
+                .returning();
+            emitEvent({
+                type: 'report:refreshed',
+                row: updatedRow,
+            });
         }
     }
 
-    return { rowsProcessed: insertedCount };
+    return { successCount: successCount, errorCount: errorCount };
 }

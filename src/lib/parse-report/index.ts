@@ -6,10 +6,10 @@ import { handleDailyProduct } from './handlers/daily-product';
 import { handleDailyTarget } from './handlers/daily-target';
 import { handleHourlyProduct } from './handlers/hourly-product';
 import { handleHourlyTarget } from './handlers/hourly-target';
-import type { ParseReportInput } from './handlers/input';
+import type { ParseReportInput, ParseReportOutput } from './handlers/input';
 import { validateReportReady } from './validate-report-ready';
 
-export async function parseReport(reportUid: InferSelectModel<typeof reportDatasetMetadata>['uid']): Promise<{ rowsProcessed: number }> {
+export async function parseReport(reportUid: InferSelectModel<typeof reportDatasetMetadata>['uid']): Promise<ParseReportOutput> {
     const reportMetadata = await db.query.reportDatasetMetadata.findFirst({
         where: eq(reportDatasetMetadata.uid, reportUid),
     });

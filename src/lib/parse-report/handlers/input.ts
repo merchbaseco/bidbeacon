@@ -8,3 +8,8 @@ export type ParseReportInput = {
     countryCode: string;
     reportUrl: string;
 };
+
+export type ParseReportOutput = {
+    successCount: number;
+    errorCount: number;
+};

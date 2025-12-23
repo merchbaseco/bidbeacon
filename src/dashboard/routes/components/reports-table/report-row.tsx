@@ -1,5 +1,7 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import Clock05Icon from '@merchbaseco/icons/core-solid-rounded/Clock05Icon';
+import { Progress } from '@/dashboard/components/ui/progress.js';
+import { Spinner } from '@/dashboard/components/ui/spinner.js';
 import { cn } from '@/dashboard/lib/utils.js';
 import { Badge } from '../../../components/ui/badge.js';
 import { TableCell, TableRow } from '../../../components/ui/table.js';
@@ -34,6 +36,7 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
 
     const reportDate = formatDate(summary.periodStart, summary.aggregation === 'hourly');
     const statusBadgeType = report.status === 'completed' ? 'success' : 'warning';
+    const isParsingStatus = report.status === 'fetching';
     const { time: nextRefreshTime, severity: nextRefreshSeverity } = formatNextRefreshTime(report.nextRefreshAt);
 
     return (
@@ -50,16 +53,24 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
                 </div>
             </TableCell>
             <TableCell>
-                <ErrorDialog row={report}>
-                    <Badge variant={statusBadgeType} className="uppercase">
-                        {report.status}
+                {isParsingStatus ? (
+                    <Badge variant="secondary" className="gap-0">
+                        <Spinner className="size-3" />
+                        &nbsp;
+                        <Progress className="w-16" value={24} />
                     </Badge>
-                </ErrorDialog>
+                ) : (
+                    <ErrorDialog row={report}>
+                        <Badge variant={statusBadgeType} className="uppercase">
+                            {report.status}
+                        </Badge>
+                    </ErrorDialog>
+                )}
             </TableCell>
             <TableCell>
                 <div
                     className={cn(
-                        'flex items-center gap-1.5',
+                        'flex items-center gap-1.5 tracking-tight',
                         report.nextRefreshAt && (nextRefreshSeverity === 'overdue' ? 'text-red-400' : nextRefreshSeverity === 'soon' ? 'text-orange-400' : 'text-foreground')
                     )}
                 >
@@ -120,21 +131,21 @@ const formatNextRefreshTime = (
     // For future dates, show as "in X days" or "in X hours"
     if (diffDays > 0) {
         return {
-            time: `in ${diffDays} ${diffDays === 1 ? 'day' : 'days'}`,
+            time: `${diffDays} ${diffDays === 1 ? 'day' : 'days'}`,
             severity: 'later',
         };
     }
 
     if (diffHours > 0) {
         return {
-            time: `in ${diffHours} ${diffHours === 1 ? 'hour' : 'hours'}`,
+            time: `${diffHours} ${diffHours === 1 ? 'hour' : 'hours'}`,
             severity: 'later',
         };
     }
 
     if (diffMinutes > 0) {
         return {
-            time: `in ${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'}`,
+            time: `${diffMinutes} ${diffMinutes === 1 ? 'minute' : 'minutes'}`,
             severity: 'soon',
         };
     }
