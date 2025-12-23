@@ -45,12 +45,12 @@ export async function lookupTargetId(row: {
     'adGroup.id': string;
     'target.value': string;
     'target.matchType': string;
-    'searchTerm.value': string;
+    'matchedTarget.value': string;
 }): Promise<{ entityType: string; entityId: string; matchType: string | undefined }> {
     const adGroupId = row['adGroup.id'];
     const targetValue = row['target.value'];
     const matchType = row['target.matchType'];
-    const matchedTargetValue = keepOnlyAscii(row['searchTerm.value']);
+    const matchedTargetValue = keepOnlyAscii(row['matchedTarget.value']);
 
     const logger = createContextLogger({ component: 'parse-report', utility: 'lookup-target-id' });
 
@@ -58,7 +58,7 @@ export async function lookupTargetId(row: {
         if (!matchedTargetValue) {
             logger.error({ adGroupId, matchedTargetValue, row }, 'Failed to find target (fallback mode - all values empty)');
             throw new Error(
-                `Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty, but searchTerm.value is also empty)`
+                `Could not find target for adGroupId: ${adGroupId}, matchedTargetValue: ${matchedTargetValue} (fallback mode - target.value and target.matchType were empty, but matchedTarget.value is also empty)`
             );
         }
 
