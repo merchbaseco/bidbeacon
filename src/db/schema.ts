@@ -143,7 +143,7 @@ export const reportDatasetMetadata = pgTable(
         status: text('status').notNull(), // enum: missing, fetching, parsing, completed, failed
         refreshing: boolean('refreshing').notNull().default(false), // whether a refresh is currently in progress
         totalRecords: integer('total_records').notNull().default(0),
-        successRecords: integer('processed_records').notNull().default(0),
+        successRecords: integer('success_records').notNull().default(0),
         errorRecords: integer('error_records').notNull().default(0),
 
         nextRefreshAt: timestamp('next_refresh_at', { withTimezone: false, mode: 'date' }), // utc - when the next refresh should occur based on eligibility

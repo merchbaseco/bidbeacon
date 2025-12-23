@@ -89,7 +89,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
             const [updatedRow] = await db
                 .update(reportDatasetMetadata)
                 .set({
-                    totalRecords: totalCount,
+                    totalRecords: rows.length,
                     successRecords: successCount,
                     errorRecords: errorCount,
                 })

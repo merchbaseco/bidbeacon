@@ -1,0 +1,1 @@
+ALTER TABLE "report_dataset_metadata" RENAME COLUMN "processed_records" TO "success_records";

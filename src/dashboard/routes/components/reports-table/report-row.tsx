@@ -36,7 +36,7 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
 
     const reportDate = formatDate(summary.periodStart, summary.aggregation === 'hourly');
     const statusBadgeType = report.status === 'completed' ? 'success' : 'warning';
-    const isParsingStatus = report.status === 'fetching';
+    const isParsingStatus = report.status === 'parsing';
     const { time: nextRefreshTime, severity: nextRefreshSeverity } = formatNextRefreshTime(report.nextRefreshAt);
 
     return (
@@ -57,7 +57,7 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
                     <Badge variant="secondary" className="gap-0">
                         <Spinner className="size-3" />
                         &nbsp;
-                        <Progress className="w-16" value={24} />
+                        <Progress className="w-16" value={((report.successRecords + report.errorRecords) / report.totalRecords) * 100} />
                     </Badge>
                 ) : (
                     <ErrorDialog row={report}>
@@ -88,6 +88,7 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
                     )}
                 </div>
             </TableCell>
+            <TableCell>{report.errorRecords}</TableCell>
             <TableCell>{report.reportId ? <ReportIdDialog row={report} accountId={accountId} /> : <Badge variant="outline">—</Badge>}</TableCell>
             <TableCell className="text-right">
                 <ReportRefreshButton row={report} accountId={accountId} />
