@@ -16,7 +16,7 @@ export async function getNormalizedTarget(adGroupId: string, targetValue: string
             return getAutoKeywordTarget(adGroupId, targetValue);
 
         default:
-            throw new Error(`Failed to find targetId for matchType: ${matchType}`);
+            throw new Error(`Failed to find targetId due to missing matchType`);
     }
 }
 
@@ -27,7 +27,7 @@ async function getManualKeywordTarget(adGroupId: string, targetValue: string, ma
     });
 
     if (!result) {
-        throw new Error(`Could not find target for adGroupId: ${adGroupId}, targetKeyword: ${targetValue}, matchType: ${matchType}`);
+        throw new Error(`Failed to find targetId for targetKeyword: ${targetValue}, matchType: ${matchType}`);
     }
 
     return {
@@ -50,7 +50,7 @@ async function getProductTarget(adGroupId: string, targetValue: string): Promise
     });
 
     if (!result) {
-        throw new Error(`Could not find target for adGroupId: ${adGroupId}, asin: ${asin}, matchType: TARGETING_EXPRESSION (converted: ${targetExportMatchType})`);
+        throw new Error(`Failed to find targetId for asin: ${asin}, matchType: ${targetExportMatchType}`);
     }
 
     return {
@@ -72,7 +72,7 @@ async function getAutoKeywordTarget(adGroupId: string, targetValue: string): Pro
     });
 
     if (!result) {
-        throw new Error(`Could not find target for adGroupId: ${adGroupId}, matchType: TARGETING_EXPRESSION_PREDEFINED (converted: ${targetExportMatchType}), targetType: AUTO`);
+        throw new Error(`Failed to find targetId for matchType: ${targetExportMatchType}`);
     }
 
     return {
