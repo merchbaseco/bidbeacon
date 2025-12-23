@@ -83,11 +83,13 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
         }
 
         // Every 50 records, update the reportDatasetMetadata with the success and error counts.
+        // Also on the first and last iterations!
         const totalCount = successCount + errorCount;
-        if (totalCount % 50 === 0 || totalCount === rows.length) {
+        if (totalCount % 50 === 0 || totalCount === rows.length || totalCount === 1) {
             const [updatedRow] = await db
                 .update(reportDatasetMetadata)
                 .set({
+                    totalRecords: totalCount,
                     successRecords: successCount,
                     errorRecords: errorCount,
                 })
