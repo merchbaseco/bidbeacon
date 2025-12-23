@@ -109,9 +109,9 @@ export const updateReportStatusJob = boss
                             await parseReport(reportDatum.uid);
 
                             // Mark report as processed: clear reportId, set lastProcessedReportId
-                            await markReportProcessed(reportDatum, reportDatum.reportId);
-                            await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
-                            await setRefreshing(reportDatum, false);
+                            const processedRow = await markReportProcessed(reportDatum, reportDatum.reportId);
+                            await setNextRefreshAt(processedRow, getNextRefreshTime(processedRow));
+                            await setRefreshing(processedRow, false);
                             break;
                         }
 
@@ -189,8 +189,9 @@ async function setStatus(row: InferSelectModel<typeof reportDatasetMetadata>, st
 
 /**
  * Marks a report as processed: clears reportId, sets lastProcessedReportId, and emits update event.
+ * Returns the updated row.
  */
-async function markReportProcessed(row: InferSelectModel<typeof reportDatasetMetadata>, reportId: string | null): Promise<void> {
+async function markReportProcessed(row: InferSelectModel<typeof reportDatasetMetadata>, reportId: string | null): Promise<InferSelectModel<typeof reportDatasetMetadata>> {
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
         .set({
@@ -209,12 +210,16 @@ async function markReportProcessed(row: InferSelectModel<typeof reportDatasetMet
         )
         .returning();
 
-    if (updatedRow) {
-        emitEvent({
-            type: 'report:refreshed',
-            row: updatedRow,
-        });
+    if (!updatedRow) {
+        throw new Error(`Failed to mark report as processed for ${row.accountId}`);
     }
+
+    emitEvent({
+        type: 'report:refreshed',
+        row: updatedRow,
+    });
+
+    return updatedRow;
 }
 
 async function setNextRefreshAt(row: InferSelectModel<typeof reportDatasetMetadata>, nextRefreshAt: Date | null): Promise<void> {
