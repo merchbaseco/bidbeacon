@@ -129,7 +129,7 @@ async function insertMetadata(args: {
  * to ensure we prioritize recent data while still processing overdue refreshes.
  */
 async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<void> {
-    const MAX_CONCURRENT_REPORTS = 10;
+    const MAX_CONCURRENT_REPORTS = 5;
 
     // Count how many rows already have a reportId (active report fetches)
     const [activeReportsResult] = await db
