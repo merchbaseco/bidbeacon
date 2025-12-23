@@ -1,5 +1,6 @@
+import { HugeiconsIcon } from '@hugeicons/react';
+import SecondBracketSquareIcon from '@merchbaseco/icons/core-solid-rounded/SecondBracketSquareIcon';
 import { useState } from 'react';
-import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from '../../../components/ui/dialog';
 import { api } from '../../../lib/trpc.js';
@@ -23,8 +24,8 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
                 retrieveReportMutation.mutate({
                     accountId,
                     timestamp: row.periodStart,
-                    aggregation: row.aggregation,
-                    entityType: row.entityType,
+                    aggregation: row.aggregation as 'hourly' | 'daily',
+                    entityType: row.entityType as 'target' | 'product',
                 });
             }
         }
@@ -44,10 +45,11 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
-            <DialogTrigger asChild>
-                <Badge variant="outline" className="cursor-pointer hover:bg-accent">
-                    {row.reportId}
-                </Badge>
+            <DialogTrigger>
+                <Button size="sm" variant="secondary">
+                    <HugeiconsIcon icon={SecondBracketSquareIcon} size={16} />
+                    Report_{row.reportId ? row.reportId.slice(-6) : ''}
+                </Button>
             </DialogTrigger>
             <DialogPopup className="sm:max-w-2xl">
                 <DialogHeader>
@@ -69,7 +71,7 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
                     <Button variant="outline" onClick={handleCopy} disabled={retrieveReportMutation.isPending}>
                         {copied ? 'Copied!' : 'Copy JSON'}
                     </Button>
-                    <DialogClose asChild>
+                    <DialogClose>
                         <Button>Close</Button>
                     </DialogClose>
                 </DialogFooter>
@@ -77,4 +79,3 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
         </Dialog>
     );
 }
-

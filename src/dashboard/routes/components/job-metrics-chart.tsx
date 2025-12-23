@@ -2,7 +2,6 @@ import { format } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo } from 'react';
 import { Bar, BarStack, CartesianGrid, ComposedChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { formatTimeAgo } from '@/dashboard/lib/utils';
 import { useJobMetrics } from '../hooks/use-job-metrics';
 import { roundUpToNearestMinute } from '../utils';
 import { ChartTooltipPortal } from './chart-tooltip-portal';
@@ -156,7 +155,7 @@ export function JobMetricsChart() {
     // Custom tick formatter to show specific time labels
     const formatXAxisTick = (value: string, index: number) => {
         const totalTicks = chartData.length;
-        
+
         // Show specific labels at key intervals
         if (index === totalTicks - 1) {
             return 'now';

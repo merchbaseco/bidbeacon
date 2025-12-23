@@ -1,8 +1,10 @@
 import { HugeiconsIcon } from '@hugeicons/react';
+import ChartColumnIcon from '@merchbaseco/icons/core-solid-rounded/ChartColumnIcon';
 import Clock05Icon from '@merchbaseco/icons/core-solid-rounded/Clock05Icon';
+import TimeScheduleIcon from '@merchbaseco/icons/core-solid-rounded/TimeScheduleIcon';
+import AlarmClockIcon from '@merchbaseco/icons/core-stroke-rounded/AlarmClockIcon';
 import { Progress } from '@/dashboard/components/ui/progress.js';
 import { Spinner } from '@/dashboard/components/ui/spinner.js';
-import { cn } from '@/dashboard/lib/utils.js';
 import { Badge } from '../../../components/ui/badge.js';
 import { TableCell, TableRow } from '../../../components/ui/table.js';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '../../../components/ui/tooltip.js';
@@ -37,6 +39,7 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
     const reportDate = formatDate(summary.periodStart, summary.aggregation === 'hourly');
     const statusBadgeType = report.status === 'completed' ? 'success' : 'warning';
     const isParsingStatus = report.status === 'parsing';
+    const isRefreshing = report.refreshing;
     const { time: nextRefreshTime, severity: nextRefreshSeverity } = formatNextRefreshTime(report.nextRefreshAt);
 
     return (
@@ -59,6 +62,11 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
                         &nbsp;
                         <Progress className="w-16" value={((report.successRecords + report.errorRecords) / report.totalRecords) * 100} />
                     </Badge>
+                ) : isRefreshing ? (
+                    <Badge variant="secondary" className="gap-1.5">
+                        <Spinner className="size-3" />
+                        Refreshing
+                    </Badge>
                 ) : (
                     <ErrorDialog row={report}>
                         <Badge variant={statusBadgeType} className="uppercase">
@@ -68,28 +76,39 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
                 )}
             </TableCell>
             <TableCell>
-                <div
-                    className={cn(
-                        'flex items-center gap-1.5 tracking-tight',
-                        report.nextRefreshAt && (nextRefreshSeverity === 'overdue' ? 'text-red-400' : nextRefreshSeverity === 'soon' ? 'text-orange-400' : 'text-foreground')
+                <div className="flex items-center gap-1.5 tracking-tight">
+                    {report.refreshing && (
+                        <div className="flex gap-1.5 items-center">
+                            <HugeiconsIcon icon={TimeScheduleIcon} size={16} />
+                            <span className="cursor-help">Now</span>
+                        </div>
                     )}
-                >
-                    <HugeiconsIcon icon={Clock05Icon} size={16} />
-
-                    {report.nextRefreshAt ? (
+                    {report.nextRefreshAt && !report.refreshing && (
                         <Tooltip>
                             <TooltipTrigger>
-                                <span className="cursor-help">{nextRefreshTime}</span>
+                                <div className="flex gap-1.5 items-center">
+                                    {nextRefreshSeverity === 'overdue' ? <HugeiconsIcon icon={AlarmClockIcon} size={17} /> : <HugeiconsIcon icon={Clock05Icon} size={16} />}
+                                    <span className="cursor-help">{nextRefreshTime}</span>
+                                </div>
                             </TooltipTrigger>
                             <TooltipPopup>{formatDate(report.nextRefreshAt)}</TooltipPopup>
                         </Tooltip>
-                    ) : (
-                        '—'
                     )}
                 </div>
             </TableCell>
-            <TableCell>{report.errorRecords}</TableCell>
-            <TableCell>{report.reportId ? <ReportIdDialog row={report} accountId={accountId} /> : <Badge variant="outline">—</Badge>}</TableCell>
+            <TableCell>
+                <div className="flex items-center gap-1.5">
+                    <HugeiconsIcon icon={ChartColumnIcon} size={16} />
+                    {report.totalRecords}
+                </div>
+            </TableCell>
+            <TableCell>
+                <div className="flex items-center gap-1.5">
+                    <HugeiconsIcon icon={ChartColumnIcon} size={16} />
+                    {report.errorRecords}
+                </div>
+            </TableCell>
+            <TableCell>{report.reportId ? <ReportIdDialog row={report} accountId={accountId} /> : ''}</TableCell>
             <TableCell className="text-right">
                 <ReportRefreshButton row={report} accountId={accountId} />
             </TableCell>

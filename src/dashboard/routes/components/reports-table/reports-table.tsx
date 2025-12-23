@@ -43,8 +43,9 @@ export const ReportsTable = () => {
                             <TableHead className="w-[280px]">Dataset</TableHead>
                             <TableHead className="w-[150px]">Status</TableHead>
                             <TableHead className="w-[150px]">Next refresh</TableHead>
+                            <TableHead className="w-[100px]">Records</TableHead>
                             <TableHead className="w-[100px]">Errors</TableHead>
-                            <TableHead className="">Report ID</TableHead>
+                            <TableHead className="w-[200px]">Report ID</TableHead>
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>

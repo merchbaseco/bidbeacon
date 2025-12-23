@@ -1,7 +1,6 @@
 import { HugeiconsIcon } from '@hugeicons/react';
 import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
 import { Button } from '@/dashboard/components/ui/button.js';
-import { Spinner } from '../../../components/ui/spinner';
 import { api } from '../../../lib/trpc.js';
 import type { ReportDatasetMetadata } from '../../hooks/use-reports';
 
@@ -32,11 +31,9 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
         });
     };
 
-    const showSpinner = row.refreshing;
-
     return (
-        <Button variant="secondary" size="icon" onClick={handleClick} disabled={showSpinner}>
-            {showSpinner ? <Spinner /> : <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={20} />}
+        <Button variant="secondary" size="icon" onClick={handleClick} disabled={row.refreshing}>
+            <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={20} />
         </Button>
     );
 }
