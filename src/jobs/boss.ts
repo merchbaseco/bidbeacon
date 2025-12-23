@@ -133,14 +133,16 @@ class Job<T extends JobData> {
         // pg-boss v10+ requires explicit queue creation before work() or schedule()
         await pgBoss.createQueue(this.jobName);
 
+        // Always unschedule first (in case schedule was removed from code)
+        // This ensures that if a schedule is removed, it gets cleaned up on restart
+        try {
+            await pgBoss.unschedule(this.jobName);
+        } catch {
+            // Ignore if schedule doesn't exist
+        }
+
         // Set up schedule if configured
         if (this.scheduleOptions) {
-            try {
-                await pgBoss.unschedule(this.jobName);
-            } catch {
-                // Ignore if schedule doesn't exist
-            }
-
             await pgBoss.schedule(this.jobName, this.scheduleOptions.cron, this.scheduleOptions.data ?? {}, { tz: 'UTC' });
         }
 
