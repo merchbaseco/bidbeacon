@@ -67,7 +67,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
     }
 
     // Batch insert performance data with progress updates
-    const BATCH_SIZE = 1000;
+    const BATCH_SIZE = 5; // TODO: restore to 1000 after debugging
     let insertedCount = 0;
 
     for (let i = 0; i < valuesToInsert.length; i += BATCH_SIZE) {
