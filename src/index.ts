@@ -68,9 +68,8 @@ async function performStartupCleanup() {
         // This handles cases where the server crashed or restarted while records were marked as refreshing
         await db.update(reportDatasetMetadata).set({ refreshing: false }).where(eq(reportDatasetMetadata.refreshing, true));
 
-        // Reset stuck 'parsing' status to 'missing' to allow retry
-        // Note: 'fetching' doesn't need reset - state machine will check reportId and process when ready
-        await db.update(reportDatasetMetadata).set({ status: 'missing' }).where(eq(reportDatasetMetadata.status, 'parsing'));
+        // Reset stuck 'parsing' status back to 'fetching' to allow complete and successful retry of parsing.
+        await db.update(reportDatasetMetadata).set({ status: 'fetching' }).where(eq(reportDatasetMetadata.status, 'parsing'));
 
         // Reset any stuck fetching flags in account_dataset_metadata
         // These flags indicate in-progress entity syncs that won't complete after a crash

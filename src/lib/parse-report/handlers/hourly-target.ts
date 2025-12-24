@@ -1,11 +1,12 @@
 import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
+import { sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { hourlyReportRowSchema } from '@/config/reports/hourly-target';
 import { db } from '@/db/index';
 import { performanceHourly } from '@/db/schema';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import { getNormalizedTarget } from '../utils/lookup-target-id';
+import { TargetCache } from '../utils/target-cache';
 import { parseHourlyTimestamp } from '../utils/parse-period-start-timestamp';
 import type { ParseReportInput } from './input';
 
@@ -28,48 +29,54 @@ export async function handleHourlyTarget(input: ParseReportInput): Promise<{ row
 
     const rows = z.array(hourlyReportRowSchema).parse(rawJson);
 
-    let insertedCount = 0;
+    // Pre-fetch all targets for batch lookup
+    const uniqueAdGroupIds = [...new Set(rows.map(r => r['adGroup.id']))];
+    const targetCache = await TargetCache.build(uniqueAdGroupIds);
+
+    // Build insert values
+    const valuesToInsert: (typeof performanceHourly.$inferInsert)[] = [];
     for (const row of rows) {
-        const { entityId, matchType } = await getNormalizedTarget(row['adGroup.id'], row['target.value'], row['target.matchType']);
+        const entityId = targetCache.getTargetId(row['adGroup.id'], row['target.value'], row['target.matchType']);
+        const { bucketStart, bucketDate, bucketHour } = parseHourlyTimestamp(row['hour.value'], timezone);
 
-        const hourValue = row['hour.value'];
-        const { bucketStart, bucketDate, bucketHour } = parseHourlyTimestamp(hourValue, timezone);
+        valuesToInsert.push({
+            accountId: input.accountId,
+            bucketStart,
+            bucketDate,
+            bucketHour,
+            campaignId: row['campaign.id'],
+            adGroupId: row['adGroup.id'],
+            adId: row['ad.id'],
+            entityType: input.reportConfig.entityType,
+            entityId,
+            impressions: row['metric.impressions'],
+            clicks: row['metric.clicks'],
+            spend: String(row['metric.totalCost']),
+            sales: String(row['metric.sales']),
+            orders: row['metric.purchases'],
+        });
+    }
 
+    // Batch insert performance data
+    const BATCH_SIZE = 1000;
+    for (let i = 0; i < valuesToInsert.length; i += BATCH_SIZE) {
+        const batch = valuesToInsert.slice(i, i + BATCH_SIZE);
         await db
             .insert(performanceHourly)
-            .values({
-                accountId: input.accountId,
-                bucketStart,
-                bucketDate,
-                bucketHour,
-                campaignId: row['campaign.id'],
-                adGroupId: row['adGroup.id'],
-                adId: row['ad.id'],
-                entityType: input.reportConfig.entityType,
-                entityId,
-                targetMatchType: matchType,
-                impressions: row['metric.impressions'],
-                clicks: row['metric.clicks'],
-                spend: String(row['metric.totalCost']),
-                sales: String(row['metric.sales']),
-                orders: row['metric.purchases'],
-            })
+            .values(batch)
             .onConflictDoUpdate({
                 target: [performanceHourly.accountId, performanceHourly.bucketStart, performanceHourly.adId, performanceHourly.entityType, performanceHourly.entityId],
                 set: {
-                    campaignId: row['campaign.id'],
-                    adGroupId: row['adGroup.id'],
-                    targetMatchType: matchType,
-                    impressions: row['metric.impressions'],
-                    clicks: row['metric.clicks'],
-                    spend: String(row['metric.totalCost']),
-                    sales: String(row['metric.sales']),
-                    orders: row['metric.purchases'],
+                    campaignId: sql`excluded.campaign_id`,
+                    adGroupId: sql`excluded.ad_group_id`,
+                    impressions: sql`excluded.impressions`,
+                    clicks: sql`excluded.clicks`,
+                    spend: sql`excluded.spend`,
+                    sales: sql`excluded.sales`,
+                    orders: sql`excluded.orders`,
                 },
             });
-
-        insertedCount++;
     }
 
-    return { rowsProcessed: insertedCount };
+    return { rowsProcessed: valuesToInsert.length };
 }

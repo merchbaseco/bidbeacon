@@ -328,7 +328,7 @@ export const performanceAnnual = pgTable(
 
         entityType: text('entity_type').notNull(), // 'target' | 'asin' | 'search_term'
         entityId: text('entity_id').notNull(), // targetId, ASIN, or search term
-        targetMatchType: text('target_match_type'), // nullable for ASIN and search term rows
+        targetMatchType: text('target_match_type'), // nullable for 'target' and 'asin' entities
 
         impressions: integer('impressions').notNull(),
         clicks: integer('clicks').notNull(),

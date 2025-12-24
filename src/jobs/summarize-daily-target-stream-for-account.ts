@@ -41,7 +41,6 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                     adGroupId: amsSpTraffic.adGroupId,
                     adId: amsSpTraffic.adId,
                     keywordId: amsSpTraffic.keywordId,
-                    matchType: amsSpTraffic.matchType,
                     impressions: sql<number>`COALESCE(SUM(${amsSpTraffic.impressions}), 0)::int`,
                     clicks: sql<number>`COALESCE(SUM(${amsSpTraffic.clicks}), 0)::int`,
                     spend: sql<number>`COALESCE(SUM(${amsSpTraffic.cost}), 0)`,
@@ -76,7 +75,6 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                 adGroupId: string;
                 adId: string;
                 keywordId: string;
-                matchType: string | null;
                 impressions: number;
                 clicks: number;
                 spend: number;
@@ -104,7 +102,6 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                         adGroupId: conv.adGroupId,
                         adId: conv.adId,
                         keywordId: conv.keywordId,
-                        matchType: null,
                         impressions: 0,
                         clicks: 0,
                         spend: 0,
@@ -128,7 +125,6 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                 adId: row.adId,
                 entityType: 'target' as const,
                 entityId: row.keywordId, // keywordId is the same as targetId
-                targetMatchType: row.matchType,
                 impressions: row.impressions,
                 clicks: row.clicks,
                 spend: String(row.spend),
