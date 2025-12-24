@@ -239,6 +239,13 @@
       "when": 1766521855441,
       "tag": "0033_shocking_morph",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1766551041718,
+      "tag": "0034_large_jackal",
+      "breakpoints": true
     }
   ]
 }

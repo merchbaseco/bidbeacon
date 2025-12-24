@@ -233,7 +233,7 @@ export const performanceHourly = pgTable(
         clicks: integer('clicks').notNull(),
         spend: numeric('spend', { precision: 7, scale: 2 }).notNull(),
         sales: numeric('sales', { precision: 10, scale: 2 }).notNull(),
-        orders: integer('orders_14d').notNull(),
+        orders: integer('orders').notNull(),
     },
     table => [
         primaryKey({
@@ -268,7 +268,7 @@ export const performanceDaily = pgTable(
         clicks: integer('clicks').notNull(),
         spend: numeric('spend', { precision: 7, scale: 2 }).notNull(),
         sales: numeric('sales', { precision: 10, scale: 2 }).notNull(),
-        orders: integer('orders_14d').notNull(),
+        orders: integer('orders').notNull(),
     },
     table => [
         primaryKey({
@@ -302,7 +302,7 @@ export const performanceMonthly = pgTable(
         clicks: integer('clicks').notNull(),
         spend: numeric('spend', { precision: 7, scale: 2 }).notNull(),
         sales: numeric('sales', { precision: 10, scale: 2 }).notNull(),
-        orders: integer('orders_14d').notNull(),
+        orders: integer('orders').notNull(),
     },
     table => [
         primaryKey({
@@ -334,7 +334,7 @@ export const performanceAnnual = pgTable(
         clicks: integer('clicks').notNull(),
         spend: numeric('spend', { precision: 7, scale: 2 }).notNull(),
         sales: numeric('sales', { precision: 10, scale: 2 }).notNull(),
-        orders: integer('orders_14d').notNull(),
+        orders: integer('orders').notNull(),
     },
     table => [
         primaryKey({
