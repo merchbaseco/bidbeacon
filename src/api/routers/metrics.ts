@@ -5,7 +5,14 @@ import { apiMetrics, jobMetrics } from '@/db/schema';
 import { publicProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
-const SUPPORTED_JOBS = ['update-report-datasets', 'update-report-dataset-for-account', 'sync-ad-entities', 'update-report-status'] as const;
+const SUPPORTED_JOBS = [
+    'update-report-datasets',
+    'update-report-dataset-for-account',
+    'sync-ad-entities',
+    'update-report-status',
+    'summarize-daily-target-stream',
+    'summarize-daily-target-stream-for-account',
+] as const;
 
 export const metricsRouter = router({
     adsApi: publicProcedure
