@@ -8,6 +8,8 @@ import './update-report-status.js';
 import './update-report-dataset-for-account.js';
 import './update-report-datasets.js';
 import './sync-ad-entities.js';
+import './summarize-daily-target-stream-for-account.js';
+import './summarize-daily-target-stream.js';
 
 export async function startJobs(): Promise<void> {
     if (boss.isStarted) {
