@@ -38,10 +38,24 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
     const valuesToInsert: (typeof performanceDaily.$inferInsert)[] = [];
     const errors: { row: Record<string, unknown>; error: string }[] = [];
 
+    // TODO: Remove after debugging - track duplicates
+    const seenKeys = new Map<string, (typeof rows)[number]>();
+
     for (const row of rows) {
         try {
             const entityId = targetCache.getTargetId(row['adGroup.id'], row['target.value'], row['target.matchType']);
             const { bucketStart, bucketDate } = parseDailyTimestamp(row['date.value'], timezone);
+
+            // TODO: Remove after debugging - log duplicates
+            const key = `${input.accountId}:${bucketDate}:${row['ad.id']}:${input.reportConfig.entityType}:${entityId}`;
+            if (seenKeys.has(key)) {
+                console.log('=== DUPLICATE KEY FOUND ===');
+                console.log('Key:', key);
+                console.log('First row:', JSON.stringify(seenKeys.get(key), null, 2));
+                console.log('Duplicate row:', JSON.stringify(row, null, 2));
+                console.log('===========================');
+            }
+            seenKeys.set(key, row);
 
             valuesToInsert.push({
                 accountId: input.accountId,
@@ -67,7 +81,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
     }
 
     // Batch insert performance data with progress updates
-    const BATCH_SIZE = 5; // TODO: restore to 1000 after debugging
+    const BATCH_SIZE = 5;
     let insertedCount = 0;
 
     for (let i = 0; i < valuesToInsert.length; i += BATCH_SIZE) {
