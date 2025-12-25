@@ -8,7 +8,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
-import { amsSpConversion, amsSpTraffic, performanceDaily } from '@/db/schema.js';
+import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceDaily } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
 import { zonedNow, zonedStartOfDay } from '@/utils/date.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
@@ -34,6 +34,22 @@ export const summarizeDailyTargetStreamForAccountJob = boss
 
             console.log(`[summarize-daily-target-stream-for-account] Starting for account ${accountId} (${countryCode})`);
 
+            // Look up entityId from advertiserAccount table
+            // The accountId parameter is ads_account_id, but ams_sp_traffic stores entity_id as advertiser_id
+            const accountRecord = await db
+                .select({ entityId: advertiserAccount.entityId })
+                .from(advertiserAccount)
+                .where(and(eq(advertiserAccount.adsAccountId, accountId), eq(advertiserAccount.countryCode, countryCode)))
+                .limit(1);
+
+            if (!accountRecord[0]?.entityId) {
+                console.warn(`[summarize-daily-target-stream-for-account] Account ${accountId} (${countryCode}): No entityId found, skipping`);
+                continue;
+            }
+
+            const entityId = accountRecord[0].entityId;
+            console.log(`[summarize-daily-target-stream-for-account] Account ${accountId} (${countryCode}): Using entityId ${entityId}`);
+
             const timezone = getTimezoneForCountry(countryCode);
             const now = zonedNow(timezone);
             const todayStart = zonedStartOfDay(now, timezone);
@@ -54,7 +70,7 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                     spend: sql<number>`COALESCE(SUM(${amsSpTraffic.cost}), 0)`,
                 })
                 .from(amsSpTraffic)
-                .where(and(eq(amsSpTraffic.advertiserId, accountId), gte(amsSpTraffic.timeWindowStart, todayStart), lte(amsSpTraffic.timeWindowStart, todayEnd)))
+                .where(and(eq(amsSpTraffic.advertiserId, entityId), gte(amsSpTraffic.timeWindowStart, todayStart), lte(amsSpTraffic.timeWindowStart, todayEnd)))
                 .groupBy(amsSpTraffic.campaignId, amsSpTraffic.adGroupId, amsSpTraffic.adId, amsSpTraffic.keywordId);
 
             console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Found ${trafficAggregates.length} traffic aggregates`);
@@ -70,7 +86,7 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                     orders: sql<number>`COALESCE(SUM(${amsSpConversion.attributedConversions14d}), 0)::int`,
                 })
                 .from(amsSpConversion)
-                .where(and(eq(amsSpConversion.advertiserId, accountId), gte(amsSpConversion.timeWindowStart, todayStart), lte(amsSpConversion.timeWindowStart, todayEnd)))
+                .where(and(eq(amsSpConversion.advertiserId, entityId), gte(amsSpConversion.timeWindowStart, todayStart), lte(amsSpConversion.timeWindowStart, todayEnd)))
                 .groupBy(amsSpConversion.campaignId, amsSpConversion.adGroupId, amsSpConversion.adId, amsSpConversion.keywordId);
 
             console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Found ${conversionAggregates.length} conversion aggregates`);
