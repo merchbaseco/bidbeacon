@@ -183,7 +183,7 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                                 clicks: sql`excluded.clicks`,
                                 spend: sql`excluded.spend`,
                                 sales: sql`excluded.sales`,
-                                orders: sql`excluded.orders_14d`,
+                                orders: sql`excluded.orders`,
                             },
                         });
                     const batchTime = performance.now() - batchStart;
@@ -191,7 +191,10 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                     console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Batch ${insertedBatches} (${batch.length} rows) inserted in ${batchTime.toFixed(2)}ms`);
                 } catch (error) {
                     const batchTime = performance.now() - batchStart;
-                    console.error(`[summarize-daily-target-stream-for-account] Account ${accountId}: Batch ${insertedBatches + 1} (${batch.length} rows) FAILED after ${batchTime.toFixed(2)}ms:`, error);
+                    console.error(
+                        `[summarize-daily-target-stream-for-account] Account ${accountId}: Batch ${insertedBatches + 1} (${batch.length} rows) FAILED after ${batchTime.toFixed(2)}ms:`,
+                        error
+                    );
                     throw error;
                 }
             }
