@@ -1,12 +1,14 @@
 import { db } from '@/db/index.js';
 import { amsBudgetUsage } from '@/db/schema.js';
 import { createContextLogger } from '@/utils/logger';
+import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { budgetUsageSchema } from '../schemas.js';
 
 /**
  * Handle Budget Usage events
  */
 export async function handleBudgetUsage(payload: unknown): Promise<void> {
+    return trackAmsEvent('budgetUsage', async () => {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = budgetUsageSchema.safeParse(payload);
     if (!validationResult.success) {
@@ -45,4 +47,5 @@ export async function handleBudgetUsage(payload: unknown): Promise<void> {
                 budgetUsagePercentage: record.budgetUsagePercentage,
             },
         });
+    });
 }

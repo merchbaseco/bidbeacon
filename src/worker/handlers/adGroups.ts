@@ -1,12 +1,14 @@
 import { db } from '@/db/index.js';
 import { amsCmAdgroups } from '@/db/schema.js';
 import { createContextLogger } from '@/utils/logger';
+import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { adGroupSchema } from '../schemas.js';
 
 /**
  * Handle Campaign Management AdGroup events
  */
 export async function handleAdGroups(payload: unknown): Promise<void> {
+    return trackAmsEvent('adGroup', async () => {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = adGroupSchema.safeParse(payload);
     if (!validationResult.success) {
@@ -56,4 +58,5 @@ export async function handleAdGroups(payload: unknown): Promise<void> {
             target: [amsCmAdgroups.adGroupId, amsCmAdgroups.campaignId],
             set: record,
         });
+    });
 }

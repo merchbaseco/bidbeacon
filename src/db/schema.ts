@@ -589,6 +589,21 @@ export const amsBudgetUsage = pgTable(
     ]
 );
 
+export const amsMetrics = pgTable(
+    'ams_metrics',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        timestamp: timestamp('timestamp', { withTimezone: true, mode: 'date' }).notNull(),
+        entityType: text('entity_type').notNull(), // 'campaign' | 'adGroup' | 'ad' | 'target' | 'spTraffic' | 'spConversion' | 'budgetUsage'
+        success: boolean('success').notNull(),
+        durationMs: integer('duration_ms').notNull(),
+        error: text('error'), // Only populated on failure
+    },
+    table => [
+        index('ams_metrics_timestamp_idx').on(table.timestamp),
+    ]
+);
+
 /**
  * ----------------------------------------------------------------------------
  * Amazon Ads API Authentication & Account Management

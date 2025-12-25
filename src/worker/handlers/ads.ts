@@ -1,12 +1,14 @@
 import { db } from '@/db/index.js';
 import { amsCmAds } from '@/db/schema.js';
 import { createContextLogger } from '@/utils/logger';
+import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { adSchema } from '../schemas.js';
 
 /**
  * Handle Campaign Management Ad events
  */
 export async function handleAds(payload: unknown): Promise<void> {
+    return trackAmsEvent('ad', async () => {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = adSchema.safeParse(payload);
     if (!validationResult.success) {
@@ -46,4 +48,5 @@ export async function handleAds(payload: unknown): Promise<void> {
             target: [amsCmAds.adId],
             set: record,
         });
+    });
 }

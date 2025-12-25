@@ -1,12 +1,14 @@
 import { db } from '@/db/index.js';
 import { amsSpConversion } from '@/db/schema.js';
 import { createContextLogger } from '@/utils/logger';
+import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { spConversionSchema } from '../schemas.js';
 
 /**
  * Handle Sponsored Products Conversion events
  */
 export async function handleSpConversion(payload: unknown): Promise<void> {
+    return trackAmsEvent('spConversion', async () => {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = spConversionSchema.safeParse(payload);
     if (!validationResult.success) {
@@ -61,5 +63,6 @@ export async function handleSpConversion(payload: unknown): Promise<void> {
     await db.insert(amsSpConversion).values(record).onConflictDoUpdate({
         target: amsSpConversion.idempotencyId,
         set: record,
+    });
     });
 }

@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { apiMetrics, jobMetrics } from '@/db/schema';
+import { amsMetrics, apiMetrics, jobMetrics } from '@/db/schema';
 import { publicProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
@@ -179,6 +179,90 @@ export const metricsRouter = router({
                 jobNames,
                 from: from.toISOString(),
                 to: to.toISOString(),
+            };
+        }),
+    ams: publicProcedure
+        .input(
+            z.object({
+                from: z.string().datetime(),
+                to: z.string().datetime(),
+            })
+        )
+        .query(async ({ input }) => {
+            const from = new Date(input.from);
+            const to = new Date(input.to);
+
+            const data = await db
+                .select({
+                    interval: sql<string>`date_trunc('hour', ${amsMetrics.timestamp}) + floor(extract(minute from ${amsMetrics.timestamp}) / 5) * interval '5 minutes'`.as('interval'),
+                    entityType: amsMetrics.entityType,
+                    count: sql<number>`count(*)`.as('count'),
+                })
+                .from(amsMetrics)
+                .where(and(gte(amsMetrics.timestamp, from), lte(amsMetrics.timestamp, to)))
+                .groupBy(sql`date_trunc('hour', ${amsMetrics.timestamp}) + floor(extract(minute from ${amsMetrics.timestamp}) / 5) * interval '5 minutes'`, amsMetrics.entityType)
+                .orderBy(sql`date_trunc('hour', ${amsMetrics.timestamp}) + floor(extract(minute from ${amsMetrics.timestamp}) / 5) * interval '5 minutes'`, sql`${amsMetrics.entityType}`);
+
+            const entityTypes = ['campaign', 'adGroup', 'ad', 'target', 'spTraffic', 'spConversion', 'budgetUsage'] as const;
+
+            const chartData: Record<string, Array<{ interval: string; count: number }>> = {};
+
+            for (const entityType of entityTypes) {
+                chartData[entityType] = [];
+            }
+
+            for (const row of data) {
+                const interval = new Date(row.interval).toISOString();
+                if (!chartData[row.entityType]) {
+                    chartData[row.entityType] = [];
+                }
+                chartData[row.entityType].push({
+                    interval,
+                    count: Number(row.count),
+                });
+            }
+
+            return {
+                data: chartData,
+                entityTypes: [...entityTypes],
+            };
+        }),
+    aggregation: publicProcedure
+        .input(
+            z.object({
+                from: z.string().datetime(),
+                to: z.string().datetime(),
+            })
+        )
+        .query(async ({ input }) => {
+            const from = new Date(input.from);
+            const to = new Date(input.to);
+
+            const data = await db
+                .select({
+                    interval: sql<string>`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`.as('interval'),
+                    jobCount: sql<number>`count(*)`.as('job_count'),
+                    totalRowsInserted: sql<number>`COALESCE(sum(cast(${jobMetrics.metadata}->>'totalRowsInserted' as integer)), 0)`.as('total_rows_inserted'),
+                })
+                .from(jobMetrics)
+                .where(
+                    and(
+                        eq(jobMetrics.jobName, 'summarize-daily-target-stream-for-account'),
+                        gte(jobMetrics.endTime, from),
+                        lte(jobMetrics.endTime, to)
+                    )
+                )
+                .groupBy(sql`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`)
+                .orderBy(sql`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`);
+
+            const chartData = data.map(row => ({
+                interval: new Date(row.interval).toISOString(),
+                jobCount: Number(row.jobCount),
+                totalRowsInserted: Number(row.totalRowsInserted) || 0,
+            }));
+
+            return {
+                data: chartData,
             };
         }),
 });

@@ -246,6 +246,13 @@
       "when": 1766551041718,
       "tag": "0034_large_jackal",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1766696777076,
+      "tag": "0035_fuzzy_talkback",
+      "breakpoints": true
     }
   ]
 }

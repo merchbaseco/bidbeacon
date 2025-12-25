@@ -1,12 +1,14 @@
 import { db } from '@/db/index.js';
 import { amsSpTraffic } from '@/db/schema.js';
 import { createContextLogger } from '@/utils/logger';
+import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { spTrafficSchema } from '../schemas.js';
 
 /**
  * Handle Sponsored Products Traffic events
  */
 export async function handleSpTraffic(payload: unknown): Promise<void> {
+    return trackAmsEvent('spTraffic', async () => {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = spTrafficSchema.safeParse(payload);
     if (!validationResult.success) {
@@ -42,5 +44,6 @@ export async function handleSpTraffic(payload: unknown): Promise<void> {
     await db.insert(amsSpTraffic).values(record).onConflictDoUpdate({
         target: amsSpTraffic.idempotencyId,
         set: record,
+    });
     });
 }

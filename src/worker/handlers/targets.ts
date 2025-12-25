@@ -1,12 +1,14 @@
 import { db } from '@/db/index.js';
 import { amsCmTargets } from '@/db/schema.js';
 import { createContextLogger } from '@/utils/logger';
+import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { targetSchema } from '../schemas.js';
 
 /**
  * Handle Campaign Management Target events
  */
 export async function handleTargets(payload: unknown): Promise<void> {
+    return trackAmsEvent('target', async () => {
     // Validate payload with Zod (AMS uses snake_case)
     const validationResult = targetSchema.safeParse(payload);
     if (!validationResult.success) {
@@ -48,4 +50,5 @@ export async function handleTargets(payload: unknown): Promise<void> {
             target: [amsCmTargets.targetId],
             set: record,
         });
+    });
 }

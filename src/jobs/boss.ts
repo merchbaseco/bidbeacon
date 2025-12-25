@@ -36,7 +36,8 @@ interface WorkOptions {
     batchSize?: number; // Number of jobs to fetch and process per handler invocation
 }
 
-type WorkHandler<T> = (jobs: Array<{ id: string; data: T }>) => void | Promise<void>;
+type WorkHandlerResult = { metadata?: Record<string, unknown> } | void;
+type WorkHandler<T> = (jobs: Array<{ id: string; data: T }>) => WorkHandlerResult | Promise<WorkHandlerResult>;
 
 // ============================================================================
 // Job Builder
@@ -151,20 +152,24 @@ class Job<T extends JobData> {
             const startTime = new Date();
             let success = false;
             let error: string | undefined;
+            let workResult: WorkHandlerResult | undefined;
 
             try {
                 // Execute the work function with the jobs
-                await this.workFn?.(jobs.map(j => ({ id: j.id, data: j.data })));
+                workResult = await this.workFn?.(jobs.map(j => ({ id: j.id, data: j.data })));
                 success = true;
             } catch (err) {
                 error = err instanceof Error ? err.message : String(err);
                 throw err; // Re-throw to let pg-boss handle retries
             } finally {
                 const endTime = new Date();
-                // Track the job invocation (don't await to avoid blocking)
-                trackJobInvocation(this.jobName, startTime, endTime, success, error, {
+                // Merge default metadata with work function metadata
+                const metadata: Record<string, unknown> = {
                     jobCount: jobs.length,
-                }).catch(trackErr => {
+                    ...(workResult && typeof workResult === 'object' && 'metadata' in workResult ? workResult.metadata : {}),
+                };
+                // Track the job invocation (don't await to avoid blocking)
+                trackJobInvocation(this.jobName, startTime, endTime, success, error, metadata).catch(trackErr => {
                     // Silently fail tracking - don't break job execution
                     logger.error({ err: trackErr, jobName: this.jobName }, 'Failed to track job invocation');
                 });

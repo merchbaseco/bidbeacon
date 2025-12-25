@@ -26,13 +26,21 @@ export const summarizeDailyTargetStreamForAccountJob = boss
     .createJob('summarize-daily-target-stream-for-account')
     .input(jobInputSchema)
     .work(async jobs => {
+        const allMetadata: Array<{ accountId: string; bucketDate: string; trafficAggregates: number; conversionAggregates: number; rowsInserted: number }> = [];
+
         for (const job of jobs) {
+            const startTime = performance.now();
             const { accountId, countryCode } = job.data;
+
+            console.log(`[summarize-daily-target-stream-for-account] Starting for account ${accountId} (${countryCode})`);
 
             const timezone = getTimezoneForCountry(countryCode);
             const now = zonedNow(timezone);
             const todayStart = zonedStartOfDay(now, timezone);
             const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1); // End of day
+
+            const bucketDateStr = formatInTimeZone(todayStart, timezone, 'yyyy-MM-dd');
+            console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Querying data for bucketDate ${bucketDateStr} (${todayStart.toISOString()} to ${todayEnd.toISOString()})`);
 
             // Aggregate traffic data (impressions, clicks, spend, matchType), grouped by keywordId (aka targetId)
             const trafficAggregates = await db
@@ -49,6 +57,8 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                 .where(and(eq(amsSpTraffic.advertiserId, accountId), gte(amsSpTraffic.timeWindowStart, todayStart), lte(amsSpTraffic.timeWindowStart, todayEnd)))
                 .groupBy(amsSpTraffic.campaignId, amsSpTraffic.adGroupId, amsSpTraffic.adId, amsSpTraffic.keywordId);
 
+            console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Found ${trafficAggregates.length} traffic aggregates`);
+
             // Aggregate conversion data (sales, orders) separately, grouped by keywordId (aka targetId)
             const conversionAggregates = await db
                 .select({
@@ -62,6 +72,8 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                 .from(amsSpConversion)
                 .where(and(eq(amsSpConversion.advertiserId, accountId), gte(amsSpConversion.timeWindowStart, todayStart), lte(amsSpConversion.timeWindowStart, todayEnd)))
                 .groupBy(amsSpConversion.campaignId, amsSpConversion.adGroupId, amsSpConversion.adId, amsSpConversion.keywordId);
+
+            console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Found ${conversionAggregates.length} conversion aggregates`);
 
             // Create a map of conversion aggregates for quick lookup using keywordId as the unique key
             const conversionMap = new Map<string, { sales: number; orders: number }>();
@@ -111,9 +123,10 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                 }
             }
 
+            console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Combined into ${aggregatedData.length} aggregated rows`);
+
             // Convert todayStart to bucketDate (account-local day label)
             // bucketDate is the date string in YYYY-MM-DD format for the account's timezone
-            const bucketDateStr = formatInTimeZone(todayStart, timezone, 'yyyy-MM-dd');
 
             // Prepare batch insert values
             const insertValues = aggregatedData.map(row => ({
@@ -132,26 +145,61 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                 orders: row.orders,
             }));
 
+            console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Prepared ${insertValues.length} rows to insert for bucketDate ${bucketDateStr}`);
+
             // Batch insert/update performanceDaily rows in chunks of 1000
             const batchSize = 1000;
+            let insertedBatches = 0;
             for (let i = 0; i < insertValues.length; i += batchSize) {
                 const batch = insertValues.slice(i, i + batchSize);
-                await db
-                    .insert(performanceDaily)
-                    .values(batch)
-                    .onConflictDoUpdate({
-                        target: [performanceDaily.accountId, performanceDaily.bucketDate, performanceDaily.adId, performanceDaily.entityType, performanceDaily.entityId],
-                        set: {
-                            campaignId: sql`excluded.campaign_id`,
-                            adGroupId: sql`excluded.ad_group_id`,
-                            targetMatchType: sql`excluded.target_match_type`,
-                            impressions: sql`excluded.impressions`,
-                            clicks: sql`excluded.clicks`,
-                            spend: sql`excluded.spend`,
-                            sales: sql`excluded.sales`,
-                            orders: sql`excluded.orders_14d`,
-                        },
-                    });
+                const batchStart = performance.now();
+                try {
+                    await db
+                        .insert(performanceDaily)
+                        .values(batch)
+                        .onConflictDoUpdate({
+                            target: [performanceDaily.accountId, performanceDaily.bucketDate, performanceDaily.adId, performanceDaily.entityType, performanceDaily.entityId],
+                            set: {
+                                campaignId: sql`excluded.campaign_id`,
+                                adGroupId: sql`excluded.ad_group_id`,
+                                targetMatchType: sql`excluded.target_match_type`,
+                                impressions: sql`excluded.impressions`,
+                                clicks: sql`excluded.clicks`,
+                                spend: sql`excluded.spend`,
+                                sales: sql`excluded.sales`,
+                                orders: sql`excluded.orders_14d`,
+                            },
+                        });
+                    const batchTime = performance.now() - batchStart;
+                    insertedBatches++;
+                    console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Batch ${insertedBatches} (${batch.length} rows) inserted in ${batchTime.toFixed(2)}ms`);
+                } catch (error) {
+                    const batchTime = performance.now() - batchStart;
+                    console.error(`[summarize-daily-target-stream-for-account] Account ${accountId}: Batch ${insertedBatches + 1} (${batch.length} rows) FAILED after ${batchTime.toFixed(2)}ms:`, error);
+                    throw error;
+                }
             }
+
+            const totalTime = performance.now() - startTime;
+            console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Completed in ${totalTime.toFixed(2)}ms (${insertedBatches} batches, ${insertValues.length} total rows)`);
+
+            // Collect metadata for this job
+            allMetadata.push({
+                accountId,
+                bucketDate: bucketDateStr,
+                trafficAggregates: trafficAggregates.length,
+                conversionAggregates: conversionAggregates.length,
+                rowsInserted: insertValues.length,
+            });
         }
+
+        // Return aggregated metadata
+        const totalRowsInserted = allMetadata.reduce((sum, m) => sum + m.rowsInserted, 0);
+        return {
+            metadata: {
+                accountsProcessed: allMetadata.length,
+                totalRowsInserted,
+                accounts: allMetadata,
+            },
+        };
     });
