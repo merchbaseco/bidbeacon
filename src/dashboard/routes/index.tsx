@@ -11,6 +11,7 @@ import { AmsMetricsCard } from './components/ams-metrics-card';
 import { ApiMetricsChart } from './components/ads-api-stats/api-metrics-chart';
 import { ApiMetricsTable } from './components/ads-api-stats/api-metrics-table';
 import { ChartCard } from './components/chart-card';
+import { DailyPerformanceMetrics } from './components/daily-performance-metrics';
 import { JobMetricsChart } from './components/job-metrics-chart';
 import { JobMetricsTable } from './components/job-metrics-table';
 import { ReportsTable } from './components/reports-table/reports-table';
@@ -40,6 +41,8 @@ export function IndexRoute() {
                         <AmsMetricsCard />
                     </div>
                 </div>
+
+                <DailyPerformanceMetrics />
 
                 <div className="grid grid-cols-2 gap-1">
                     <Frame className="w-full overflow-visible">

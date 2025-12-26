@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { amsMetrics, apiMetrics, jobMetrics } from '@/db/schema';
+import { amsMetrics, apiMetrics, jobMetrics, performanceDaily } from '@/db/schema';
 import { publicProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
@@ -309,6 +309,94 @@ export const metricsRouter = router({
             return {
                 data: chartData,
                 entityTypes: [...entityTypes],
+            };
+        }),
+    dailyPerformance: publicProcedure
+        .input(
+            z.object({
+                accountId: z.string(),
+                days: z.number().min(1).max(30).default(14),
+            })
+        )
+        .query(async ({ input }) => {
+            // Calculate date range - last N days
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const startDate = new Date(today);
+            startDate.setDate(startDate.getDate() - input.days + 1); // Include today, so - (days - 1)
+
+            // Query aggregated daily performance data
+            const data = await db
+                .select({
+                    bucketDate: performanceDaily.bucketDate,
+                    impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
+                    clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
+                    orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                    spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
+                    sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
+                })
+                .from(performanceDaily)
+                .where(and(eq(performanceDaily.accountId, input.accountId), gte(performanceDaily.bucketDate, startDate.toISOString().split('T')[0]!)))
+                .groupBy(performanceDaily.bucketDate)
+                .orderBy(performanceDaily.bucketDate);
+
+            // Build a map of bucketDate -> metrics
+            const dataMap = new Map<string, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
+            for (const row of data) {
+                const dateStr = typeof row.bucketDate === 'string' ? row.bucketDate : row.bucketDate.toISOString().split('T')[0]!;
+                dataMap.set(dateStr, {
+                    impressions: Number(row.impressions),
+                    clicks: Number(row.clicks),
+                    orders: Number(row.orders),
+                    spend: Number(row.spend),
+                    sales: Number(row.sales),
+                });
+            }
+
+            // Generate all days in range, filling missing days with zeros
+            const chartData: Array<{
+                bucketDate: string;
+                impressions: number;
+                clicks: number;
+                orders: number;
+                spend: number;
+                acos: number;
+                ctr: number;
+                cpc: number;
+            }> = [];
+
+            for (let i = 0; i < input.days; i++) {
+                const date = new Date(startDate);
+                date.setDate(date.getDate() + i);
+                const dateStr = date.toISOString().split('T')[0]!;
+
+                const dayData = dataMap.get(dateStr) ?? {
+                    impressions: 0,
+                    clicks: 0,
+                    orders: 0,
+                    spend: 0,
+                    sales: 0,
+                };
+
+                // Calculate derived metrics
+                const acos = dayData.sales > 0 ? (dayData.spend / dayData.sales) * 100 : 0;
+                const ctr = dayData.impressions > 0 ? (dayData.clicks / dayData.impressions) * 100 : 0;
+                const cpc = dayData.clicks > 0 ? dayData.spend / dayData.clicks : 0;
+
+                chartData.push({
+                    bucketDate: dateStr,
+                    impressions: dayData.impressions,
+                    clicks: dayData.clicks,
+                    orders: dayData.orders,
+                    spend: dayData.spend,
+                    acos,
+                    ctr,
+                    cpc,
+                });
+            }
+
+            return {
+                data: chartData,
             };
         }),
 });

@@ -29,14 +29,7 @@ const Sparkline = ({ data }: { data: number[] }) => {
         <div className="h-8 w-24">
             <ResponsiveContainer width="100%" height="100%">
                 <LineChart data={chartData} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-                    <Line
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#10b981"
-                        strokeWidth={1.5}
-                        dot={false}
-                        isAnimationActive={false}
-                    />
+                    <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={1.5} dot={false} isAnimationActive={false} />
                 </LineChart>
             </ResponsiveContainer>
         </div>
@@ -139,52 +132,52 @@ export const AmsMetricsCard = () => {
 
         return [
             {
-                label: 'Campaign Changes',
+                label: 'Campaigns',
                 entityType: 'campaign',
                 sparklineData: campaignSparkline,
                 total: campaignSparkline.reduce((sum, val) => sum + val, 0),
             },
             {
-                label: 'Ad Group Changes',
+                label: 'Ad Groups',
                 entityType: 'adGroup',
                 sparklineData: adGroupSparkline,
                 total: adGroupSparkline.reduce((sum, val) => sum + val, 0),
             },
             {
-                label: 'Ad Changes',
+                label: 'Ads',
                 entityType: 'ad',
                 sparklineData: adSparkline,
                 total: adSparkline.reduce((sum, val) => sum + val, 0),
             },
             {
-                label: 'Target Changes',
+                label: 'Targets',
                 entityType: 'target',
                 sparklineData: targetSparkline,
                 total: targetSparkline.reduce((sum, val) => sum + val, 0),
             },
             {
-                label: 'Traffic Datapoints',
+                label: 'Traffic',
                 entityType: 'spTraffic',
                 sparklineData: trafficSparkline,
                 total: trafficSparkline.reduce((sum, val) => sum + val, 0),
             },
             {
-                label: 'Conversion Datapoints',
+                label: 'Conversions',
                 entityType: 'spConversion',
                 sparklineData: conversionSparkline,
                 total: conversionSparkline.reduce((sum, val) => sum + val, 0),
             },
             {
-                label: 'Errors (DLQ)',
-                entityType: 'dlq',
-                sparklineData: dlqSparkline,
-                total: dlqCurrent,
-            },
-            {
-                label: 'Total Metrics Ingested',
+                label: 'Total Messages',
                 entityType: 'total' as const,
                 sparklineData: totalIngestedSparkline,
                 total: totalIngestedSparkline.reduce((sum, val) => sum + val, 0),
+            },
+            {
+                label: 'Error Messages',
+                entityType: 'dlq',
+                sparklineData: dlqSparkline,
+                total: dlqCurrent,
             },
         ];
     }, [amsData, workerData]);
@@ -203,7 +196,7 @@ export const AmsMetricsCard = () => {
         <Card className="p-3 pb-1 space-y-0 gap-0">
             <div className="flex items-start justify-between pl-1 pb-1">
                 <div>
-                    <div className="text-sm font-medium">AMS Metrics (24h)</div>
+                    <div className="text-sm font-medium">AMS Metric Ingestion (24h)</div>
                 </div>
             </div>
             <div className="grid grid-cols-2 gap-x-4 px-1">
@@ -221,4 +214,3 @@ export const AmsMetricsCard = () => {
         </Card>
     );
 };
-
