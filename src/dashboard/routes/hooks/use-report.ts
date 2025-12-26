@@ -15,10 +15,12 @@ export const useReport = ({ uid }: UseReportOptions) => {
         }
     );
 
-    // Invalidate this specific report when it's refreshed
+    // Update this specific report's cache directly when it's refreshed
+    // Using setData instead of invalidate to avoid re-fetching - the event contains the full row data
+    // Note: dates are ISO strings (no superjson transformer on tRPC client)
     useWebSocketEvents('report:refreshed', event => {
         if (event.row.uid === uid) {
-            apiUtils.reports.get.invalidate({ uid: uid! });
+            apiUtils.reports.get.setData({ uid: uid! }, prev => (prev ? { ...prev, ...event.row } : undefined));
         }
     });
 

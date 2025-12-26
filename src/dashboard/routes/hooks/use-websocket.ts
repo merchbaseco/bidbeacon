@@ -103,6 +103,11 @@ export const useWebSocket = () => {
                             countryCode: data.countryCode,
                         });
                         break;
+                    case 'report:refreshed':
+                        // Update the individual report cache directly with the row data from the event
+                        // This avoids re-fetching and allows selective row updates in the UI
+                        utils.reports.get.setData({ uid: data.row.uid }, prev => (prev ? { ...prev, ...data.row } : undefined));
+                        break;
                 }
             } catch {
                 // Ignore malformed messages
