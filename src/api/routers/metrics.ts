@@ -265,4 +265,50 @@ export const metricsRouter = router({
                 data: chartData,
             };
         }),
+    amsHourly: publicProcedure
+        .input(
+            z.object({
+                from: z.string().datetime(),
+                to: z.string().datetime(),
+            })
+        )
+        .query(async ({ input }) => {
+            const from = new Date(input.from);
+            const to = new Date(input.to);
+
+            const data = await db
+                .select({
+                    interval: sql<string>`date_trunc('hour', ${amsMetrics.timestamp})`.as('interval'),
+                    entityType: amsMetrics.entityType,
+                    count: sql<number>`count(*)`.as('count'),
+                })
+                .from(amsMetrics)
+                .where(and(gte(amsMetrics.timestamp, from), lte(amsMetrics.timestamp, to)))
+                .groupBy(sql`date_trunc('hour', ${amsMetrics.timestamp})`, amsMetrics.entityType)
+                .orderBy(sql`date_trunc('hour', ${amsMetrics.timestamp})`, sql`${amsMetrics.entityType}`);
+
+            // We only care about these entity types for the metrics card
+            const entityTypes = ['campaign', 'adGroup', 'ad', 'target', 'spTraffic', 'spConversion'] as const;
+
+            const chartData: Record<string, Array<{ interval: string; count: number }>> = {};
+
+            for (const entityType of entityTypes) {
+                chartData[entityType] = [];
+            }
+
+            for (const row of data) {
+                const interval = new Date(row.interval).toISOString();
+                if (chartData[row.entityType]) {
+                    chartData[row.entityType].push({
+                        interval,
+                        count: Number(row.count),
+                    });
+                }
+            }
+
+            return {
+                data: chartData,
+                entityTypes: [...entityTypes],
+            };
+        }),
 });

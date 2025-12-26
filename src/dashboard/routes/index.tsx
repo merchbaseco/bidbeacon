@@ -7,8 +7,7 @@ import { Frame } from '../components/ui/frame';
 import { connectionStatusAtom } from './atoms';
 import { AccountDataCard } from './components/account-data-card';
 import { AccountEnabledSwitch } from './components/account-selector/account-enabled-switch';
-import { AggregationMetricsChart } from './components/aggregation-metrics-chart';
-import { AmsMetricsChart } from './components/ams-metrics-chart';
+import { AmsMetricsCard } from './components/ams-metrics-card';
 import { ApiMetricsChart } from './components/ads-api-stats/api-metrics-chart';
 import { ApiMetricsTable } from './components/ads-api-stats/api-metrics-table';
 import { ChartCard } from './components/chart-card';
@@ -37,11 +36,8 @@ export function IndexRoute() {
                     <div className="col-span-2">
                         <AccountDataCard />
                     </div>
-                    <div className="col-span-2">
-                        <Card></Card>
-                    </div>
-                    <div className="col-span-2">
-                        <Card></Card>
+                    <div className="col-span-4">
+                        <AmsMetricsCard />
                     </div>
                 </div>
 
@@ -67,19 +63,6 @@ export function IndexRoute() {
                     </Frame>
                 </div>
 
-                <div className="grid grid-cols-2 gap-1">
-                    <Frame className="w-full overflow-visible">
-                        <ChartCard title="AMS Ingest" legendItems={[]}>
-                            <AmsMetricsChart />
-                        </ChartCard>
-                    </Frame>
-
-                    <Frame className="w-full overflow-visible">
-                        <ChartCard title="Aggregation Pipeline" legendItems={[]}>
-                            <AggregationMetricsChart />
-                        </ChartCard>
-                    </Frame>
-                </div>
 
                 <ReportsTable />
             </div>
