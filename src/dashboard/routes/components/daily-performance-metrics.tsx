@@ -1,114 +1,107 @@
-import { format } from 'date-fns';
 import { useMemo } from 'react';
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Bar, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '@/dashboard/lib/trpc';
-import { Card } from '../../components/ui/card';
+import { cn } from '@/dashboard/lib/utils';
 import { Spinner } from '../../components/ui/spinner';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid';
 
 type MetricConfig = {
-    key: keyof NonNullable<ReturnType<typeof api.metrics.dailyPerformance.useQuery>['data']>['data'][number];
+    key: 'impressions' | 'clicks' | 'orders' | 'spend' | 'acos';
     label: string;
     formatter: (value: number) => string;
+    color?: string;
+    isGood?: 'up' | 'down'; // Whether increase is good (up) or bad (down)
 };
 
 const METRICS: MetricConfig[] = [
     {
         key: 'impressions',
         label: 'Impressions',
-        formatter: (value) => value.toLocaleString(),
+        formatter: value => value.toLocaleString(),
+        isGood: 'up',
     },
     {
         key: 'clicks',
         label: 'Clicks',
-        formatter: (value) => value.toLocaleString(),
+        formatter: value => value.toLocaleString(),
+        color: '#6366f1', // indigo-500
+        isGood: 'up',
     },
     {
         key: 'orders',
         label: 'Orders',
-        formatter: (value) => value.toLocaleString(),
+        formatter: value => value.toLocaleString(),
+        color: '#10b981', // emerald-500
+        isGood: 'up',
     },
     {
         key: 'spend',
         label: 'Spend',
-        formatter: (value) => `$${value.toFixed(2)}`,
+        formatter: value => `$${value.toFixed(2)}`,
+        color: '#f59e0b', // amber-500
+        isGood: 'down',
     },
     {
         key: 'acos',
         label: 'ACoS',
-        formatter: (value) => `${value.toFixed(2)}%`,
-    },
-    {
-        key: 'ctr',
-        label: 'CTR',
-        formatter: (value) => `${value.toFixed(2)}%`,
-    },
-    {
-        key: 'cpc',
-        label: 'CPC',
-        formatter: (value) => `$${value.toFixed(2)}`,
+        formatter: value => `${value.toFixed(1)}%`,
+        color: '#ef4444', // red-500
+        isGood: 'down',
     },
 ];
 
-const MetricChart = ({ metric, data }: { metric: MetricConfig; data: Array<{ bucketDate: string; [key: string]: string | number }> }) => {
-    const chartData = useMemo(() => {
-        return data.map(point => ({
-            ...point,
-            value: point[metric.key] as number,
-            dateLabel: format(new Date(point.bucketDate), 'M/d'),
-        }));
-    }, [data, metric.key]);
-
-    const formatXAxisTick = (value: string, index: number) => {
-        const totalTicks = chartData.length;
-        // Show first, last, and a few in between
-        if (index === 0 || index === totalTicks - 1) {
-            return value;
-        }
-        // Show every ~3rd day
-        if (index % 3 === 0) {
-            return value;
-        }
-        return '';
-    };
+const MetricLabel = ({ metric, value, change }: { metric: MetricConfig; value: number; change: number }) => {
+    const isPositiveChange = change > 0;
+    const isGoodChange = metric.isGood === 'up' ? isPositiveChange : !isPositiveChange;
+    const showDot = metric.color !== undefined;
 
     return (
-        <div className="w-full h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
-                    <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
-                    <XAxis
-                        dataKey="dateLabel"
-                        axisLine={false}
-                        tickLine={false}
-                        tick={{ fill: '#9CA3AF', fontSize: 11 }}
-                        tickFormatter={formatXAxisTick}
-                        interval={0}
-                    />
-                    <YAxis hide />
-                    <Tooltip
-                        content={({ active, payload }) => {
-                            if (!active || !payload || payload.length === 0) return null;
-                            const dataPoint = payload[0];
-                            if (!dataPoint) return null;
-                            return (
-                                <div className="bg-card border border-border rounded-lg shadow-lg p-2">
-                                    <div className="text-xs text-muted-foreground mb-1">{dataPoint.payload.bucketDate as string}</div>
-                                    <div className="text-sm font-medium">{metric.formatter(dataPoint.value as number)}</div>
-                                </div>
-                            );
-                        }}
-                    />
-                    <Line
-                        type="monotone"
-                        dataKey="value"
-                        stroke="#10b981"
-                        strokeWidth={2}
-                        dot={false}
-                        isAnimationActive={false}
-                    />
-                </LineChart>
-            </ResponsiveContainer>
+        <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-1.5">
+                <span className="text-sm text-muted-foreground">{metric.label}</span>
+                {showDot && <span className="size-2 rounded-full" style={{ backgroundColor: metric.color }} />}
+            </div>
+            <div className="flex items-baseline gap-2">
+                <span className="text-2xl font-semibold tracking-tight">{metric.formatter(value)}</span>
+                {change !== 0 && (
+                    <span className={cn('text-sm font-medium', isGoodChange ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>
+                        {isPositiveChange ? '+' : ''}
+                        {change.toFixed(0)}%
+                    </span>
+                )}
+            </div>
+        </div>
+    );
+};
+
+const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ dataKey: string; value: number; payload: Record<string, number | string> }> }) => {
+    if (!active || !payload || payload.length === 0) return null;
+
+    const dataPoint = payload[0]?.payload;
+    if (!dataPoint) return null;
+
+    return (
+        <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
+            <div className="text-sm font-medium text-foreground mb-2">{dataPoint.hourLabel}</div>
+            <div className="space-y-1.5">
+                {METRICS.map(metric => {
+                    const value = dataPoint[metric.key];
+                    if (typeof value !== 'number') return null;
+                    return (
+                        <div key={metric.key} className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-1.5">
+                                {metric.color ? (
+                                    <span className="size-2 rounded-full" style={{ backgroundColor: metric.color }} />
+                                ) : (
+                                    <span className="size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
+                                )}
+                                <span className="text-xs text-muted-foreground">{metric.label}</span>
+                            </div>
+                            <span className="text-xs font-medium">{metric.formatter(value)}</span>
+                        </div>
+                    );
+                })}
+            </div>
         </div>
     );
 };
@@ -116,47 +109,84 @@ const MetricChart = ({ metric, data }: { metric: MetricConfig; data: Array<{ buc
 export const DailyPerformanceMetrics = () => {
     const accountId = useSelectedAccountId();
 
-    const { data, isLoading, error } = api.metrics.dailyPerformance.useQuery(
-        { accountId, days: 14 },
+    const { data, isLoading, error } = api.metrics.hourlyPerformance.useQuery(
+        { accountId },
         {
-            refetchInterval: 300000, // 5 minutes
-            staleTime: 60000,
+            refetchInterval: 60000, // 1 minute for hourly data
+            staleTime: 30000,
         }
     );
 
+    const chartData = useMemo(() => data?.hourlyData ?? [], [data?.hourlyData]);
+    const currentHour = data?.currentHour ?? new Date().getHours();
+
+    // Custom tick formatter for X axis - only show 00:00, current hour, and 23:00
+    const formatXAxisTick = (value: string, index: number) => {
+        if (index === 0) return '00:00';
+        if (index === currentHour) return value;
+        if (index === 23) return '23:00';
+        return '';
+    };
+
     if (isLoading) {
         return (
-            <Card className="p-4">
-                <div className="flex items-center justify-center h-[200px]">
+            <div className="w-full">
+                <div className="flex items-center justify-center h-[340px]">
                     <Spinner />
                 </div>
-            </Card>
+            </div>
         );
     }
 
     if (error) {
         return (
-            <Card className="p-4">
-                <div className="flex items-center justify-center h-[200px] text-destructive text-sm">
-                    Error loading metrics: {error instanceof Error ? error.message : 'Unknown error'}
-                </div>
-            </Card>
+            <div className="w-full">
+                <div className="flex items-center justify-center h-[340px] text-destructive text-sm">Error loading metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>
+            </div>
         );
     }
 
-    const chartData = data?.data ?? [];
+    // Get current hour label for the reference line
+    const currentHourLabel = `${currentHour.toString().padStart(2, '0')}:00`;
 
     return (
-        <Card className="p-4">
-            <div className="grid grid-cols-7 gap-4">
+        <div className="w-full">
+            {/* Metric Labels */}
+            <div className="flex items-start justify-between gap-8 mb-4 px-2">
                 {METRICS.map(metric => (
-                    <div key={metric.key} className="flex flex-col">
-                        <div className="text-sm font-medium mb-2">{metric.label}</div>
-                        <MetricChart metric={metric} data={chartData} />
-                    </div>
+                    <MetricLabel key={metric.key} metric={metric} value={data?.totals[metric.key] ?? 0} change={data?.changes[metric.key] ?? 0} />
                 ))}
             </div>
-        </Card>
+
+            {/* Chart */}
+            <div className="w-full h-[280px] -mx-4">
+                <ResponsiveContainer width="100%" height="100%">
+                    <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 20, bottom: 10 }}>
+                        <XAxis dataKey="hourLabel" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} interval={0} />
+
+                        {/* Hidden Y axes for each metric to scale them independently */}
+                        <YAxis yAxisId="impressions" hide domain={[0, 'auto']} />
+                        <YAxis yAxisId="clicks" hide domain={[0, 'auto']} />
+                        <YAxis yAxisId="orders" hide domain={[0, 'auto']} />
+                        <YAxis yAxisId="spend" hide domain={[0, 'auto']} />
+                        <YAxis yAxisId="acos" hide domain={[0, 'auto']} />
+
+                        {/* Reference line for current hour */}
+                        <ReferenceLine x={currentHourLabel} stroke="#d1d5db" strokeDasharray="4 4" yAxisId="impressions" />
+
+                        <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+
+                        {/* Impressions as bars - subtle gray */}
+                        <Bar yAxisId="impressions" dataKey="impressions" fill="currentColor" className="text-zinc-200 dark:text-zinc-800" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+
+                        {/* Lines for each metric */}
+                        <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#6366f1" strokeWidth={2} dot={false} isAnimationActive={false} />
+                        <Line yAxisId="orders" type="monotone" dataKey="orders" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
+                        <Line yAxisId="spend" type="monotone" dataKey="spend" stroke="#f59e0b" strokeWidth={2} dot={false} isAnimationActive={false} />
+                        <Line yAxisId="acos" type="monotone" dataKey="acos" stroke="#ef4444" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    </ComposedChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
     );
 };
-

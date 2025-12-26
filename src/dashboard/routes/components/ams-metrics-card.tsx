@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Line, LineChart, ResponsiveContainer } from 'recharts';
 import { api } from '@/dashboard/lib/trpc';
 import { Card } from '../../components/ui/card';
@@ -12,6 +12,29 @@ type MetricRow = {
 };
 
 const Sparkline = ({ data }: { data: number[] }) => {
+    const [strokeColor, setStrokeColor] = useState('#66666F');
+
+    useEffect(() => {
+        // Get the computed color value from CSS variable
+        const element = document.documentElement;
+        const computedStyle = getComputedStyle(element);
+        const mutedForeground = computedStyle.getPropertyValue('--muted-foreground').trim();
+
+        // If it's a color-mix, try to get a fallback or use a computed value
+        // For now, we'll use a simpler approach: read from a test element
+        const testEl = document.createElement('div');
+        testEl.className = 'text-muted-foreground';
+        testEl.style.visibility = 'hidden';
+        testEl.style.position = 'absolute';
+        document.body.appendChild(testEl);
+        const color = getComputedStyle(testEl).color;
+        document.body.removeChild(testEl);
+
+        if (color && color !== 'rgba(0, 0, 0, 0)') {
+            setStrokeColor(color);
+        }
+    }, []);
+
     const chartData = useMemo(() => {
         return data.map((value, index) => ({
             value,
@@ -26,10 +49,10 @@ const Sparkline = ({ data }: { data: number[] }) => {
     }
 
     return (
-        <div className="h-8 w-24">
+        <div className="h-6 w-18">
             <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={chartData} margin={{ top: 2, right: 2, bottom: 2, left: 2 }}>
-                    <Line type="monotone" dataKey="value" stroke="#10b981" strokeWidth={1.5} dot={false} isAnimationActive={false} />
+                <LineChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                    <Line type="monotone" dataKey="value" stroke={strokeColor} strokeWidth={1.5} dot={false} isAnimationActive={false} />
                 </LineChart>
             </ResponsiveContainer>
         </div>
@@ -38,7 +61,7 @@ const Sparkline = ({ data }: { data: number[] }) => {
 
 const MetricRow = ({ label, sparklineData, total }: { label: string; sparklineData: number[]; total: number }) => {
     return (
-        <div className="flex items-center justify-between py-1.5">
+        <div className="flex items-center justify-between h-9">
             <div className="flex items-center gap-2">
                 <span className="size-2 rounded-full bg-emerald-500" />
                 <span className="text-sm">{label}</span>
@@ -194,7 +217,7 @@ export const AmsMetricsCard = () => {
 
     return (
         <Card className="p-3 pb-1 space-y-0 gap-0">
-            <div className="flex items-start justify-between pl-1 pb-1">
+            <div className="flex items-start justify-between pl-1 pb-3">
                 <div>
                     <div className="text-sm font-medium">AMS Metric Ingestion (24h)</div>
                 </div>

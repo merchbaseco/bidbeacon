@@ -42,7 +42,7 @@ export const AccountDataCard = () => {
 
 const EntityRow = ({ label, count, isFetching }: { label: string; count: number | null; isFetching: boolean }) => {
     return (
-        <div className="flex items-center justify-between py-1.5">
+        <div className="flex items-center justify-between h-9">
             <div className="flex items-center gap-2">
                 {isFetching ? <Spinner className="size-3 -ml-0.5 -mr-0.5" /> : <span className="size-2 rounded-full bg-emerald-500" />}
                 <span className="text-sm">{label}</span>

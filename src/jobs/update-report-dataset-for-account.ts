@@ -39,11 +39,14 @@ export const updateReportDatasetForAccountJob = boss
             const now = zonedNow(timezone);
 
             // Insert missing metadata records for daily target datasets within retention period
-            // Skip hourly datasets and daily product datasets
             await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
+
+            // Insert missing metadata records for hourly target datasets within retention period
+            await insertMissingMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
 
             // Enqueue update-report-status jobs for any rows that are due for refresh
             await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
+            await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'hourly', 'target');
 
             // Emit event when job completes
             emitEvent({

@@ -1,7 +1,7 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { amsMetrics, apiMetrics, jobMetrics, performanceDaily } from '@/db/schema';
+import { amsMetrics, apiMetrics, jobMetrics, performanceDaily, performanceHourly } from '@/db/schema';
 import { publicProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
@@ -12,6 +12,8 @@ const SUPPORTED_JOBS = [
     'update-report-status',
     'summarize-daily-target-stream',
     'summarize-daily-target-stream-for-account',
+    'summarize-hourly-target-stream',
+    'summarize-hourly-target-stream-for-account',
 ] as const;
 
 export const metricsRouter = router({
@@ -397,6 +399,159 @@ export const metricsRouter = router({
 
             return {
                 data: chartData,
+            };
+        }),
+    hourlyPerformance: publicProcedure
+        .input(
+            z.object({
+                accountId: z.string(),
+            })
+        )
+        .query(async ({ input }) => {
+            // Get today's date boundaries in local time
+            const now = new Date();
+            const todayStart = new Date(now);
+            todayStart.setHours(0, 0, 0, 0);
+            const todayEnd = new Date(now);
+            todayEnd.setHours(23, 59, 59, 999);
+
+            // Get yesterday's date boundaries for comparison
+            const yesterdayStart = new Date(todayStart);
+            yesterdayStart.setDate(yesterdayStart.getDate() - 1);
+            const yesterdayEnd = new Date(todayEnd);
+            yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
+
+            const todayDateStr = todayStart.toISOString().split('T')[0]!;
+            const yesterdayDateStr = yesterdayStart.toISOString().split('T')[0]!;
+
+            // Query today's hourly data
+            const todayData = await db
+                .select({
+                    bucketHour: performanceHourly.bucketHour,
+                    impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                    clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                    orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                    spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                    sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                })
+                .from(performanceHourly)
+                .where(and(eq(performanceHourly.accountId, input.accountId), eq(performanceHourly.bucketDate, todayDateStr)))
+                .groupBy(performanceHourly.bucketHour)
+                .orderBy(performanceHourly.bucketHour);
+
+            // Query yesterday's aggregated data for comparison
+            const [yesterdayTotals] = await db
+                .select({
+                    impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                    clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                    orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                    spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                    sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                })
+                .from(performanceHourly)
+                .where(and(eq(performanceHourly.accountId, input.accountId), eq(performanceHourly.bucketDate, yesterdayDateStr)));
+
+            // Build hourly data map
+            const hourlyMap = new Map<number, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
+            for (const row of todayData) {
+                hourlyMap.set(row.bucketHour, {
+                    impressions: Number(row.impressions),
+                    clicks: Number(row.clicks),
+                    orders: Number(row.orders),
+                    spend: Number(row.spend),
+                    sales: Number(row.sales),
+                });
+            }
+
+            // Generate all 24 hours with zeros filled
+            const currentHour = now.getHours();
+            const hourlyChartData: Array<{
+                hour: number;
+                hourLabel: string;
+                impressions: number;
+                clicks: number;
+                orders: number;
+                spend: number;
+                sales: number;
+                acos: number;
+            }> = [];
+
+            // Calculate totals for today
+            let todayTotals = {
+                impressions: 0,
+                clicks: 0,
+                orders: 0,
+                spend: 0,
+                sales: 0,
+            };
+
+            for (let hour = 0; hour < 24; hour++) {
+                const hourData = hourlyMap.get(hour) ?? {
+                    impressions: 0,
+                    clicks: 0,
+                    orders: 0,
+                    spend: 0,
+                    sales: 0,
+                };
+
+                // Accumulate totals
+                todayTotals.impressions += hourData.impressions;
+                todayTotals.clicks += hourData.clicks;
+                todayTotals.orders += hourData.orders;
+                todayTotals.spend += hourData.spend;
+                todayTotals.sales += hourData.sales;
+
+                // Calculate ACoS for this hour
+                const acos = hourData.sales > 0 ? (hourData.spend / hourData.sales) * 100 : 0;
+
+                hourlyChartData.push({
+                    hour,
+                    hourLabel: `${hour.toString().padStart(2, '0')}:00`,
+                    impressions: hourData.impressions,
+                    clicks: hourData.clicks,
+                    orders: hourData.orders,
+                    spend: hourData.spend,
+                    sales: hourData.sales,
+                    acos,
+                });
+            }
+
+            // Calculate derived metrics for totals
+            const todayAcos = todayTotals.sales > 0 ? (todayTotals.spend / todayTotals.sales) * 100 : 0;
+
+            // Calculate yesterday's derived metrics
+            const yesterdayData = {
+                impressions: Number(yesterdayTotals?.impressions ?? 0),
+                clicks: Number(yesterdayTotals?.clicks ?? 0),
+                orders: Number(yesterdayTotals?.orders ?? 0),
+                spend: Number(yesterdayTotals?.spend ?? 0),
+                sales: Number(yesterdayTotals?.sales ?? 0),
+            };
+            const yesterdayAcos = yesterdayData.sales > 0 ? (yesterdayData.spend / yesterdayData.sales) * 100 : 0;
+
+            // Calculate percent changes
+            const calculateChange = (today: number, yesterday: number) => {
+                if (yesterday === 0) return today > 0 ? 100 : 0;
+                return ((today - yesterday) / yesterday) * 100;
+            };
+
+            return {
+                hourlyData: hourlyChartData,
+                currentHour,
+                totals: {
+                    impressions: todayTotals.impressions,
+                    clicks: todayTotals.clicks,
+                    orders: todayTotals.orders,
+                    spend: todayTotals.spend,
+                    acos: todayAcos,
+                },
+                changes: {
+                    impressions: calculateChange(todayTotals.impressions, yesterdayData.impressions),
+                    clicks: calculateChange(todayTotals.clicks, yesterdayData.clicks),
+                    orders: calculateChange(todayTotals.orders, yesterdayData.orders),
+                    spend: calculateChange(todayTotals.spend, yesterdayData.spend),
+                    acos: calculateChange(todayAcos, yesterdayAcos),
+                },
             };
         }),
 });
