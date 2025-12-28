@@ -253,6 +253,13 @@
       "when": 1766696777076,
       "tag": "0035_fuzzy_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1766900348291,
+      "tag": "0036_crazy_sally_floyd",
+      "breakpoints": true
     }
   ]
 }

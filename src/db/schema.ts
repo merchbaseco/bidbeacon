@@ -159,7 +159,7 @@ export const reportDatasetErrorMetrics = pgTable('report_dataset_metrics', {
     uid: uuid('uid').primaryKey().defaultRandom(),
     reportDatasetMetadataId: uuid('report_dataset_metadata_id')
         .notNull()
-        .references(() => reportDatasetMetadata.uid),
+        .references(() => reportDatasetMetadata.uid, { onDelete: 'cascade' }),
     row: jsonb('row').notNull(),
     error: text('error').notNull(),
 });

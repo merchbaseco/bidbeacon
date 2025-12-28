@@ -1,0 +1,3 @@
+ALTER TABLE "report_dataset_metrics" DROP CONSTRAINT "report_dataset_metrics_report_dataset_metadata_id_report_dataset_metadata_uid_fk";
+--> statement-breakpoint
+ALTER TABLE "report_dataset_metrics" ADD CONSTRAINT "report_dataset_metrics_report_dataset_metadata_id_report_dataset_metadata_uid_fk" FOREIGN KEY ("report_dataset_metadata_id") REFERENCES "public"."report_dataset_metadata"("uid") ON DELETE cascade ON UPDATE no action;
