@@ -62,8 +62,8 @@ export async function getNextAction(
     }
 
     // No report - check eligibility
-    // Only allow creation for TARGETS + DAILY (other report types aren't ready yet)
-    if (isEligibleForReport(timestamp, aggregation, lastReportCreatedAt, countryCode, now) && entityType === 'target' && aggregation === 'daily') {
+    // Only allow creation for TARGETS (product reports aren't ready yet)
+    if (isEligibleForReport(timestamp, aggregation, lastReportCreatedAt, countryCode, now) && entityType === 'target') {
         return 'create';
     }
 
