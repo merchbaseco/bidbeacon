@@ -308,6 +308,69 @@ export const metricsRouter = router({
                 entityTypes: [...entityTypes],
             };
         }),
+    // Real-time AMS metrics with 5-minute granularity for the last 60 minutes
+    amsRecent: publicProcedure.query(async () => {
+        const now = new Date();
+        const from = new Date(now.getTime() - 60 * 60 * 1000); // 60 minutes ago
+
+        const data = await db
+            .select({
+                // Truncate to 5-minute intervals
+                interval: sql<string>`date_trunc('hour', ${amsMetrics.timestamp}) + 
+                    INTERVAL '5 minutes' * FLOOR(EXTRACT(MINUTE FROM ${amsMetrics.timestamp}) / 5)`.as('interval'),
+                entityType: amsMetrics.entityType,
+                count: sql<number>`count(*)`.as('count'),
+            })
+            .from(amsMetrics)
+            .where(and(gte(amsMetrics.timestamp, from), lte(amsMetrics.timestamp, now)))
+            .groupBy(
+                sql`date_trunc('hour', ${amsMetrics.timestamp}) + 
+                    INTERVAL '5 minutes' * FLOOR(EXTRACT(MINUTE FROM ${amsMetrics.timestamp}) / 5)`,
+                amsMetrics.entityType
+            )
+            .orderBy(
+                sql`date_trunc('hour', ${amsMetrics.timestamp}) + 
+                    INTERVAL '5 minutes' * FLOOR(EXTRACT(MINUTE FROM ${amsMetrics.timestamp}) / 5)`
+            );
+
+        const entityTypes = ['campaign', 'adGroup', 'ad', 'target', 'spTraffic', 'spConversion'] as const;
+
+        const chartData: Record<string, Array<{ interval: string; count: number }>> = {};
+        for (const entityType of entityTypes) {
+            chartData[entityType] = [];
+        }
+
+        for (const row of data) {
+            const interval = new Date(row.interval).toISOString();
+            if (chartData[row.entityType]) {
+                chartData[row.entityType].push({
+                    interval,
+                    count: Number(row.count),
+                });
+            }
+        }
+
+        // Also return the last message timestamp for each entity type
+        const lastActivity = await db
+            .select({
+                entityType: amsMetrics.entityType,
+                lastTimestamp: sql<string>`max(${amsMetrics.timestamp})`.as('last_timestamp'),
+            })
+            .from(amsMetrics)
+            .where(gte(amsMetrics.timestamp, from))
+            .groupBy(amsMetrics.entityType);
+
+        const lastActivityMap: Record<string, string> = {};
+        for (const row of lastActivity) {
+            lastActivityMap[row.entityType] = new Date(row.lastTimestamp).toISOString();
+        }
+
+        return {
+            data: chartData,
+            entityTypes: [...entityTypes],
+            lastActivity: lastActivityMap,
+        };
+    }),
     dailyPerformance: publicProcedure
         .input(
             z.object({

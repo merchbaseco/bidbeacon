@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Line, LineChart, ResponsiveContainer } from 'recharts';
+import { Bar, BarChart, ResponsiveContainer } from 'recharts';
 import { api } from '@/dashboard/lib/trpc';
 import { Card } from '../../components/ui/card';
 import { Spinner } from '../../components/ui/spinner';
@@ -9,19 +9,14 @@ type MetricRow = {
     entityType: 'campaign' | 'adGroup' | 'ad' | 'target' | 'spTraffic' | 'spConversion' | 'dlq' | 'total';
     sparklineData: number[];
     total: number;
+    lastActivity?: string;
 };
 
 const Sparkline = ({ data }: { data: number[] }) => {
-    const [strokeColor, setStrokeColor] = useState('#66666F');
+    const [fillColor, setFillColor] = useState('#66666F');
 
     useEffect(() => {
         // Get the computed color value from CSS variable
-        const element = document.documentElement;
-        const computedStyle = getComputedStyle(element);
-        const mutedForeground = computedStyle.getPropertyValue('--muted-foreground').trim();
-
-        // If it's a color-mix, try to get a fallback or use a computed value
-        // For now, we'll use a simpler approach: read from a test element
         const testEl = document.createElement('div');
         testEl.className = 'text-muted-foreground';
         testEl.style.visibility = 'hidden';
@@ -31,7 +26,7 @@ const Sparkline = ({ data }: { data: number[] }) => {
         document.body.removeChild(testEl);
 
         if (color && color !== 'rgba(0, 0, 0, 0)') {
-            setStrokeColor(color);
+            setFillColor(color);
         }
     }, []);
 
@@ -51,19 +46,35 @@ const Sparkline = ({ data }: { data: number[] }) => {
     return (
         <div className="h-6 w-18">
             <ResponsiveContainer width="100%" height="100%" debounce={300}>
-                <LineChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                    <Line type="monotone" dataKey="value" stroke={strokeColor} strokeWidth={1.5} dot={false} isAnimationActive={false} />
-                </LineChart>
+                <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
+                    <Bar dataKey="value" fill={fillColor} radius={[1, 1, 0, 0]} isAnimationActive={false} />
+                </BarChart>
             </ResponsiveContainer>
         </div>
     );
 };
 
-const MetricRow = ({ label, sparklineData, total }: { label: string; sparklineData: number[]; total: number }) => {
+// Format relative time like "2m ago" or "45m ago"
+const formatRelativeTime = (isoString: string | undefined): string => {
+    if (!isoString) return '—';
+    const now = new Date();
+    const then = new Date(isoString);
+    const diffMs = now.getTime() - then.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return 'now';
+    if (diffMins < 60) return `${diffMins}m`;
+    const diffHours = Math.floor(diffMins / 60);
+    return `${diffHours}h`;
+};
+
+const MetricRow = ({ label, sparklineData, total, lastActivity }: { label: string; sparklineData: number[]; total: number; lastActivity?: string }) => {
+    const isRecent = lastActivity && (new Date().getTime() - new Date(lastActivity).getTime()) < 5 * 60 * 1000; // Within 5 minutes
+
     return (
         <div className="flex items-center justify-between h-9">
             <div className="flex items-center gap-2">
-                <span className="size-2 rounded-full bg-emerald-500" />
+                <span className={`size-2 rounded-full ${isRecent ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
                 <span className="text-sm">{label}</span>
             </div>
             <div className="flex items-center gap-3">
@@ -75,16 +86,7 @@ const MetricRow = ({ label, sparklineData, total }: { label: string; sparklineDa
 };
 
 export const AmsMetricsCard = () => {
-    const dateRange = useMemo(() => {
-        const to = new Date();
-        const from = new Date(to.getTime() - 24 * 60 * 60 * 1000); // 24 hours ago
-        return {
-            from: from.toISOString(),
-            to: to.toISOString(),
-        };
-    }, []);
-
-    const { data: amsData, isLoading: isLoadingAms } = api.metrics.amsHourly.useQuery(dateRange, {
+    const { data: amsData, isLoading: isLoadingAms } = api.metrics.amsRecent.useQuery(undefined, {
         refetchInterval: 60000, // 1 minute
         staleTime: 30000,
     });
@@ -101,13 +103,14 @@ export const AmsMetricsCard = () => {
             return [];
         }
 
-        // Generate all 24 hourly intervals
+        // Generate 12 five-minute intervals for the last 60 minutes
         const now = new Date();
-        const hours: string[] = [];
-        for (let i = 23; i >= 0; i--) {
-            const hour = new Date(now.getTime() - i * 60 * 60 * 1000);
-            hour.setMinutes(0, 0, 0);
-            hours.push(hour.toISOString());
+        const intervals: string[] = [];
+        for (let i = 11; i >= 0; i--) {
+            const interval = new Date(now.getTime() - i * 5 * 60 * 1000);
+            // Round down to nearest 5 minutes
+            interval.setMinutes(Math.floor(interval.getMinutes() / 5) * 5, 0, 0);
+            intervals.push(interval.toISOString());
         }
 
         // Build maps for quick lookup
@@ -122,36 +125,33 @@ export const AmsMetricsCard = () => {
         }
 
         // Build sparklines and totals
-        const campaignSparkline = hours.map(h => dataMaps.campaign.get(h) ?? 0);
-        const adGroupSparkline = hours.map(h => dataMaps.adGroup.get(h) ?? 0);
-        const adSparkline = hours.map(h => dataMaps.ad.get(h) ?? 0);
-        const targetSparkline = hours.map(h => dataMaps.target.get(h) ?? 0);
-        const trafficSparkline = hours.map(h => dataMaps.spTraffic.get(h) ?? 0);
-        const conversionSparkline = hours.map(h => dataMaps.spConversion.get(h) ?? 0);
+        const campaignSparkline = intervals.map(i => dataMaps.campaign.get(i) ?? 0);
+        const adGroupSparkline = intervals.map(i => dataMaps.adGroup.get(i) ?? 0);
+        const adSparkline = intervals.map(i => dataMaps.ad.get(i) ?? 0);
+        const targetSparkline = intervals.map(i => dataMaps.target.get(i) ?? 0);
+        const trafficSparkline = intervals.map(i => dataMaps.spTraffic.get(i) ?? 0);
+        const conversionSparkline = intervals.map(i => dataMaps.spConversion.get(i) ?? 0);
 
-        // DLQ sparkline - approximateVisible is the current queue size
-        // We don't have 24-hour historical data, so we'll use the current value
-        // and pad with zeros. Alternatively, we could use the last hour's sparkline
-        // data (which is per-minute) and aggregate it, but for simplicity we'll
-        // just show the current size
+        // DLQ sparkline
         const dlqCurrent = workerData.dlq?.approximateVisible ?? 0;
-        const dlqSparkline = new Array(24).fill(0);
-        // Set the most recent hour to current value
+        const dlqSparkline = new Array(12).fill(0);
         if (dlqCurrent > 0) {
-            dlqSparkline[23] = dlqCurrent;
+            dlqSparkline[11] = dlqCurrent;
         }
 
-        // Total metrics ingested - sum all entity types for each hour
-        const totalIngestedSparkline = hours.map(h => {
+        // Total metrics ingested - sum all entity types for each interval
+        const totalIngestedSparkline = intervals.map(i => {
             return (
-                (dataMaps.campaign.get(h) ?? 0) +
-                (dataMaps.adGroup.get(h) ?? 0) +
-                (dataMaps.ad.get(h) ?? 0) +
-                (dataMaps.target.get(h) ?? 0) +
-                (dataMaps.spTraffic.get(h) ?? 0) +
-                (dataMaps.spConversion.get(h) ?? 0)
+                (dataMaps.campaign.get(i) ?? 0) +
+                (dataMaps.adGroup.get(i) ?? 0) +
+                (dataMaps.ad.get(i) ?? 0) +
+                (dataMaps.target.get(i) ?? 0) +
+                (dataMaps.spTraffic.get(i) ?? 0) +
+                (dataMaps.spConversion.get(i) ?? 0)
             );
         });
+
+        const lastActivity = amsData.lastActivity;
 
         return [
             {
@@ -159,36 +159,42 @@ export const AmsMetricsCard = () => {
                 entityType: 'campaign',
                 sparklineData: campaignSparkline,
                 total: campaignSparkline.reduce((sum, val) => sum + val, 0),
+                lastActivity: lastActivity?.campaign,
             },
             {
                 label: 'Ad Groups',
                 entityType: 'adGroup',
                 sparklineData: adGroupSparkline,
                 total: adGroupSparkline.reduce((sum, val) => sum + val, 0),
+                lastActivity: lastActivity?.adGroup,
             },
             {
                 label: 'Ads',
                 entityType: 'ad',
                 sparklineData: adSparkline,
                 total: adSparkline.reduce((sum, val) => sum + val, 0),
+                lastActivity: lastActivity?.ad,
             },
             {
                 label: 'Targets',
                 entityType: 'target',
                 sparklineData: targetSparkline,
                 total: targetSparkline.reduce((sum, val) => sum + val, 0),
+                lastActivity: lastActivity?.target,
             },
             {
                 label: 'Traffic',
                 entityType: 'spTraffic',
                 sparklineData: trafficSparkline,
                 total: trafficSparkline.reduce((sum, val) => sum + val, 0),
+                lastActivity: lastActivity?.spTraffic,
             },
             {
                 label: 'Conversions',
                 entityType: 'spConversion',
                 sparklineData: conversionSparkline,
                 total: conversionSparkline.reduce((sum, val) => sum + val, 0),
+                lastActivity: lastActivity?.spConversion,
             },
             {
                 label: 'Total Messages',
@@ -219,18 +225,18 @@ export const AmsMetricsCard = () => {
         <Card className="p-3 pb-1 space-y-0 gap-0">
             <div className="flex items-start justify-between pl-1 pb-3">
                 <div>
-                    <div className="text-sm font-medium">AMS Metric Ingestion (24h)</div>
+                    <div className="text-sm font-medium">AMS Metric Ingestion (60m)</div>
                 </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 px-1">
                 <div className="divide-y">
                     {metrics.slice(0, 4).map(metric => (
-                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} />
+                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} lastActivity={metric.lastActivity} />
                     ))}
                 </div>
                 <div className="divide-y">
                     {metrics.slice(4, 8).map(metric => (
-                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} />
+                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} lastActivity={metric.lastActivity} />
                     ))}
                 </div>
             </div>
