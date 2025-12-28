@@ -50,7 +50,7 @@ const Sparkline = ({ data }: { data: number[] }) => {
 
     return (
         <div className="h-6 w-18">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer width="100%" height="100%" debounce={300}>
                 <LineChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                     <Line type="monotone" dataKey="value" stroke={strokeColor} strokeWidth={1.5} dot={false} isAnimationActive={false} />
                 </LineChart>
@@ -222,13 +222,13 @@ export const AmsMetricsCard = () => {
                     <div className="text-sm font-medium">AMS Metric Ingestion (24h)</div>
                 </div>
             </div>
-            <div className="grid grid-cols-2 gap-x-4 px-1">
-                <div className="col-span-1 divide-y">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 px-1">
+                <div className="divide-y">
                     {metrics.slice(0, 4).map(metric => (
                         <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} />
                     ))}
                 </div>
-                <div className="col-span-1 divide-y">
+                <div className="divide-y">
                     {metrics.slice(4, 8).map(metric => (
                         <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} />
                     ))}

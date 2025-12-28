@@ -86,7 +86,7 @@
 :root {
   --radius: 0.625rem;
   --font-mono: 'Geist Mono', monospace;
-  --background: var(--color-white);
+  --background: oklch(0.98 0 0);
   --foreground: var(--color-zinc-800);
   --card: var(--color-white);
   --card-foreground: var(--color-zinc-800);
@@ -262,6 +262,13 @@ html.dark {
           )
       )
       0 / 1px 100% no-repeat;
+}
+
+/* Hide background frame on narrow screens */
+@media (max-width: 768px) {
+  .background-frame {
+    display: none;
+  }
 }
 
 .recharts-wrapper *:focus {

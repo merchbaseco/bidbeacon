@@ -2,11 +2,12 @@ import { useMemo } from 'react';
 import { Table, TableBody, TableCell, TableRow } from '@/dashboard/components/ui/table';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { useJobMetrics } from '@/dashboard/routes/hooks/use-job-metrics';
+import { cn } from '@/dashboard/lib/utils';
 
 /**
  * Job Metrics Table - Shows totals for each job with visual bars
  */
-export function JobMetricsTable() {
+export function JobMetricsTable({ className }: { className?: string }) {
     const dateRange = useMemo(() => {
         const to = new Date();
         const from = new Date(to.getTime() - 3 * 60 * 60 * 1000); // 3 hours
@@ -42,7 +43,7 @@ export function JobMetricsTable() {
     }, [jobTotals]);
 
     return (
-        <div className="overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible">
+        <div className={cn('overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible', className)}>
             <Table>
                 <TableBody>
                     {rowsToRender.map((job, index) => {

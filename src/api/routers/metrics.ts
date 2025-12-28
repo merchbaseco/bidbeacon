@@ -1,7 +1,9 @@
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
+import { formatInTimeZone } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { amsMetrics, apiMetrics, jobMetrics, performanceDaily, performanceHourly } from '@/db/schema';
+import { getTimezoneForCountry } from '@/utils/timezones';
 import { publicProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
@@ -247,13 +249,7 @@ export const metricsRouter = router({
                     totalRowsInserted: sql<number>`COALESCE(sum(cast(${jobMetrics.metadata}->>'totalRowsInserted' as integer)), 0)`.as('total_rows_inserted'),
                 })
                 .from(jobMetrics)
-                .where(
-                    and(
-                        eq(jobMetrics.jobName, 'summarize-daily-target-stream-for-account'),
-                        gte(jobMetrics.endTime, from),
-                        lte(jobMetrics.endTime, to)
-                    )
-                )
+                .where(and(eq(jobMetrics.jobName, 'summarize-daily-target-stream-for-account'), gte(jobMetrics.endTime, from), lte(jobMetrics.endTime, to)))
                 .groupBy(sql`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`)
                 .orderBy(sql`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`);
 
@@ -405,24 +401,21 @@ export const metricsRouter = router({
         .input(
             z.object({
                 accountId: z.string(),
+                countryCode: z.string(),
             })
         )
         .query(async ({ input }) => {
-            // Get today's date boundaries in local time
+            // Get timezone for the account's country
+            const timezone = getTimezoneForCountry(input.countryCode);
             const now = new Date();
-            const todayStart = new Date(now);
-            todayStart.setHours(0, 0, 0, 0);
-            const todayEnd = new Date(now);
-            todayEnd.setHours(23, 59, 59, 999);
 
-            // Get yesterday's date boundaries for comparison
-            const yesterdayStart = new Date(todayStart);
-            yesterdayStart.setDate(yesterdayStart.getDate() - 1);
-            const yesterdayEnd = new Date(todayEnd);
-            yesterdayEnd.setDate(yesterdayEnd.getDate() - 1);
+            // Calculate today's and yesterday's date strings in the account's timezone
+            const todayDateStr = formatInTimeZone(now, timezone, 'yyyy-MM-dd');
+            const yesterdayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+            const yesterdayDateStr = formatInTimeZone(yesterdayDate, timezone, 'yyyy-MM-dd');
 
-            const todayDateStr = todayStart.toISOString().split('T')[0]!;
-            const yesterdayDateStr = yesterdayStart.toISOString().split('T')[0]!;
+            // Get current hour in the account's timezone
+            const currentHourInTimezone = parseInt(formatInTimeZone(now, timezone, 'H'), 10);
 
             // Query today's hourly data
             const todayData = await db
@@ -451,6 +444,18 @@ export const metricsRouter = router({
                 .from(performanceHourly)
                 .where(and(eq(performanceHourly.accountId, input.accountId), eq(performanceHourly.bucketDate, yesterdayDateStr)));
 
+            // Query yesterday's last hour (hour 23) for the leading bar
+            const [yesterdayLastHour] = await db
+                .select({
+                    impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                    clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                    orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                    spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                    sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                })
+                .from(performanceHourly)
+                .where(and(eq(performanceHourly.accountId, input.accountId), eq(performanceHourly.bucketDate, yesterdayDateStr), eq(performanceHourly.bucketHour, 23)));
+
             // Build hourly data map
             const hourlyMap = new Map<number, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
             for (const row of todayData) {
@@ -464,7 +469,6 @@ export const metricsRouter = router({
             }
 
             // Generate all 24 hours with zeros filled
-            const currentHour = now.getHours();
             const hourlyChartData: Array<{
                 hour: number;
                 hourLabel: string;
@@ -477,7 +481,7 @@ export const metricsRouter = router({
             }> = [];
 
             // Calculate totals for today
-            let todayTotals = {
+            const todayTotals = {
                 impressions: 0,
                 clicks: 0,
                 orders: 0,
@@ -535,9 +539,30 @@ export const metricsRouter = router({
                 return ((today - yesterday) / yesterday) * 100;
             };
 
+            // Build yesterday's last hour data point
+            const yesterdayLastHourData = {
+                impressions: Number(yesterdayLastHour?.impressions ?? 0),
+                clicks: Number(yesterdayLastHour?.clicks ?? 0),
+                orders: Number(yesterdayLastHour?.orders ?? 0),
+                spend: Number(yesterdayLastHour?.spend ?? 0),
+                sales: Number(yesterdayLastHour?.sales ?? 0),
+            };
+            const yesterdayLastHourAcos = yesterdayLastHourData.sales > 0 ? (yesterdayLastHourData.spend / yesterdayLastHourData.sales) * 100 : 0;
+
             return {
                 hourlyData: hourlyChartData,
-                currentHour,
+                currentHour: currentHourInTimezone,
+                // Yesterday's hour 23 as a leading bar (hour -1)
+                leadingHour: {
+                    hour: -1,
+                    hourLabel: '',
+                    impressions: yesterdayLastHourData.impressions,
+                    clicks: yesterdayLastHourData.clicks,
+                    orders: yesterdayLastHourData.orders,
+                    spend: yesterdayLastHourData.spend,
+                    sales: yesterdayLastHourData.sales,
+                    acos: yesterdayLastHourAcos,
+                },
                 totals: {
                     impressions: todayTotals.impressions,
                     clicks: todayTotals.clicks,

@@ -2,7 +2,6 @@ import { useAtomValue } from 'jotai';
 import { useMemo } from 'react';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { ConnectionStatusBadge } from '../components/connection-status-badge';
-import { Card } from '../components/ui/card';
 import { Frame } from '../components/ui/frame';
 import { connectionStatusAtom } from './atoms';
 import { AccountDataCard } from './components/account-data-card';
@@ -27,48 +26,39 @@ export function IndexRoute() {
     }, []);
 
     return (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between gap-2 py-1">
+        <div>
+            <div className="flex items-center justify-between gap-2 py-1 max-w-background-frame-max mx-auto px-4 pt-3">
                 <AccountEnabledSwitch />
                 <ConnectionStatusBadge status={connectionStatus} className="mt-0.5" />
             </div>
-            <div className="space-y-10">
-                <div className="grid grid-cols-6 gap-4">
-                    <div className="col-span-2">
-                        <AccountDataCard />
-                    </div>
-                    <div className="col-span-4">
-                        <AmsMetricsCard />
-                    </div>
+
+            <DailyPerformanceMetrics className="mt-4" />
+
+            <div className="grid grid-cols-1 md:grid-cols-6 gap-4 max-w-background-frame-max mx-auto px-4 mt-4">
+                <div className="md:col-span-2">
+                    <AccountDataCard />
                 </div>
-
-                <DailyPerformanceMetrics />
-
-                <div className="grid grid-cols-2 gap-1">
-                    <Frame className="w-full overflow-visible">
-                        <div className="grid grid-cols-1 gap-1">
-                            <ChartCard title="Ads API Invocations" legendItems={legendItems}>
-                                <ApiMetricsChart />
-                            </ChartCard>
-                            <div>
-                                <ApiMetricsTable />
-                            </div>
-                        </div>
-                    </Frame>
-
-                    <Frame className="w-full overflow-visible">
-                        <div className="grid grid-cols-1 gap-1">
-                            <ChartCard title="Job Invocations" legendItems={[]}>
-                                <JobMetricsChart />
-                            </ChartCard>
-                            <JobMetricsTable />
-                        </div>
-                    </Frame>
+                <div className="md:col-span-4">
+                    <AmsMetricsCard />
                 </div>
-
-
-                <ReportsTable />
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-background-frame-max mx-auto px-4 mt-4">
+                <Frame>
+                    <ChartCard title="Ads API Invocations" legendItems={legendItems}>
+                        <ApiMetricsChart />
+                    </ChartCard>
+                    <ApiMetricsTable className="pt-1.5" />
+                </Frame>
+                <Frame>
+                    <ChartCard title="Job Invocations" legendItems={[]}>
+                        <JobMetricsChart />
+                    </ChartCard>
+                    <JobMetricsTable className="pt-1.5" />
+                </Frame>
+            </div>
+
+            <ReportsTable className="max-w-background-frame-max mx-auto px-4 mt-6" />
         </div>
     );
 }

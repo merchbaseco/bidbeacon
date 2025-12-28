@@ -27,14 +27,14 @@ export const StatusFilter = () => {
                 }
             }}
         >
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger size="sm" className="w-[140px] md:w-[180px] text-xs md:text-sm h-7 md:h-8">
                 <SelectValue>
                     {value => {
                         const option = STATUS_OPTIONS.find(opt => opt.value === value);
                         if (!option) return null;
                         return (
-                            <span className="flex items-center gap-2">
-                                <option.icon className="size-4 opacity-72" />
+                            <span className="flex items-center gap-1.5">
+                                <option.icon className="size-3.5 opacity-72" />
                                 <span className="truncate">{option.label}</span>
                             </span>
                         );

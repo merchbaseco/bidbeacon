@@ -12,8 +12,9 @@ import { ReportRow } from './report-row.js';
 import { StatusFilter } from './status-filter.js';
 import { TablePagination } from './table-pagination.js';
 import { TableResultsRange } from './table-results-range.js';
+import { cn } from '@/dashboard/lib/utils.js';
 
-export const ReportsTable = () => {
+export const ReportsTable = ({ className }: { className?: string }) => {
     const limit = useAtomValue(limitAtom);
     const [offset, setOffset] = useAtom(offsetAtom);
     const { data: rows = [], total, isLoading } = useReports();
@@ -27,12 +28,12 @@ export const ReportsTable = () => {
     };
 
     return (
-        <>
-            <div className="mb-4 flex items-center gap-2">
+        <div className={cn('w-full', className)}>
+            <div className="mb-2 flex flex-wrap items-center gap-2">
                 <EntityAggregationFilter />
-                <ButtonGroupSeparator />
+                <ButtonGroupSeparator className="hidden md:block" />
                 <EntityTypeFilter />
-                <ButtonGroupSeparator />
+                <ButtonGroupSeparator className="hidden md:block" />
                 <StatusFilter />
                 <RefreshButton />
             </div>
@@ -70,6 +71,6 @@ export const ReportsTable = () => {
                     </FrameFooter>
                 )}
             </Frame>
-        </>
+        </div>
     );
 };

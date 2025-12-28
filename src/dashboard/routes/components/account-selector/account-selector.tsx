@@ -65,7 +65,7 @@ export function AccountSelector() {
     return (
         <div className="flex items-center justify-between gap-4">
             <Select value={selectedValue} onValueChange={handleValueChange} disabled={isLoading || !!error || !selectOptions.length}>
-                <SelectTrigger className="w-[300px]">
+                <SelectTrigger className="w-[240px]">
                     <SelectValue>
                         {_v =>
                             selectedRow ? (

@@ -14,7 +14,6 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import LighthouseIcon from '@merchbaseco/icons/core-solid-rounded/LighthouseIcon';
 import { Outlet } from 'react-router';
 import { MoreMenu } from './components/more-menu';
-import { ThemeToggle } from './components/theme-toggle';
 import { Toaster } from './components/ui/toast';
 import { api } from './lib/trpc';
 import { createTRPCClient } from './lib/trpc-client';
@@ -26,30 +25,32 @@ export function RootRoute() {
     useWebSocket();
 
     return (
-        <div className="relative isolate min-h-screen bg-neutral-50/50 dark:bg-zinc-950">
+        <div className="relative isolate min-h-screen bg-background">
             <div aria-hidden className="background-frame" />
 
             <div className="relative z-10">
                 <header className="border-b border-border">
                     <div className="mx-auto max-w-background-frame-max p-4">
-                        <div className="grid grid-cols-3 items-center">
-                            <div className="flex items-center gap-4 justify-start">
+                        <div className="flex items-center justify-between gap-4 md:grid md:grid-cols-3">
+                            <div className="hidden md:flex items-center gap-4">
                                 <AccountSelector />
                             </div>
-                            <div className="flex gap-2 items-center justify-center text-neutral-950 dark:text-neutral-50">
+                            <div className="flex gap-2 items-center md:justify-center text-neutral-950 dark:text-neutral-50">
                                 <HugeiconsIcon icon={LighthouseIcon} size={28} />
-                                <p className="font-mono text-2xl font-bold">BidBeacon</p>
+                                <p className="font-mono text-xl md:text-2xl font-bold">BidBeacon</p>
                             </div>
                             <div className="flex items-center gap-2 justify-end">
+                                <div className="md:hidden">
+                                    <AccountSelector />
+                                </div>
                                 <MoreMenu />
-                                <ThemeToggle />
                             </div>
                         </div>
                     </div>
                 </header>
 
                 <main>
-                    <div className="mx-auto max-w-background-frame-max p-4 pt-2 font-mono pb-24">
+                    <div className="font-mono pb-24">
                         <Outlet />
                     </div>
                 </main>

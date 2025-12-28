@@ -1,11 +1,14 @@
 import { HugeiconsIcon } from '@hugeicons/react';
+import Moon02Icon from '@merchbaseco/icons/core-solid-rounded/Moon02Icon';
 import MoreVerticalIcon from '@merchbaseco/icons/core-solid-rounded/MoreVerticalIcon';
+import Sun03Icon from '@merchbaseco/icons/core-solid-rounded/Sun03Icon';
 import DatabaseSync01Icon from '@merchbaseco/icons/core-stroke-rounded/DatabaseSync01Icon';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { toast } from 'sonner';
 import { api } from '../lib/trpc';
 import { cn } from '../lib/utils';
 import { syncAccountsInProgressAtom } from '../routes/atoms';
+import { useTheme } from '../routes/hooks/use-theme';
 import { buttonVariants } from './ui/button';
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from './ui/menu';
 
@@ -13,6 +16,7 @@ export function MoreMenu() {
     const utils = api.useUtils();
     const isSyncing = useAtomValue(syncAccountsInProgressAtom);
     const setIsSyncing = useSetAtom(syncAccountsInProgressAtom);
+    const { theme, toggleTheme } = useTheme();
 
     const syncMutation = api.accounts.sync.useMutation({
         onSuccess: () => {
@@ -58,6 +62,10 @@ export function MoreMenu() {
                 <MenuItem onClick={handleSyncAccounts} disabled={isSyncing}>
                     <HugeiconsIcon icon={DatabaseSync01Icon} size={20} />
                     {isSyncing ? 'Syncing...' : 'Sync accounts'}
+                </MenuItem>
+                <MenuItem onClick={toggleTheme}>
+                    <HugeiconsIcon icon={theme === 'dark' ? Sun03Icon : Moon02Icon} size={20} />
+                    {theme === 'dark' ? 'Light mode' : 'Dark mode'}
                 </MenuItem>
             </MenuPopup>
         </Menu>

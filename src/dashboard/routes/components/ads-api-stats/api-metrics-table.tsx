@@ -2,11 +2,12 @@ import { useMemo } from 'react';
 import { Table, TableBody, TableCell, TableRow } from '@/dashboard/components/ui/table';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { useAdsApiMetrics } from '@/dashboard/routes/hooks/use-ads-api-metrics';
+import { cn } from '@/dashboard/lib/utils';
 
 /**
  * API Metrics Table - Shows totals for each API endpoint with visual bars
  */
-export function ApiMetricsTable() {
+export function ApiMetricsTable({ className }: { className?: string }) {
     const dateRange = useMemo(() => {
         const to = new Date();
         const from = new Date(to.getTime() - 3 * 60 * 60 * 1000); // 3 hours
@@ -41,7 +42,7 @@ export function ApiMetricsTable() {
     }, [apiTotals]);
 
     return (
-        <div className="overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible">
+        <div className={cn('overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible', className)}>
             <Table>
                 <TableBody>
                     {rowsToRender.map((api, index) => {
