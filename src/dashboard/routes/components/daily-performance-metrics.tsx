@@ -4,7 +4,6 @@ import { api } from '@/dashboard/lib/trpc';
 import { cn } from '@/dashboard/lib/utils';
 import { Spinner } from '../../components/ui/spinner';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid';
-import { useSelectedCountryCode } from '../hooks/use-selected-country-code';
 
 type MetricConfig = {
     key: 'impressions' | 'clicks' | 'orders' | 'spend' | 'acos';
@@ -12,6 +11,14 @@ type MetricConfig = {
     formatter: (value: number) => string;
     color?: string;
     isGood?: 'up' | 'down'; // Whether increase is good (up) or bad (down)
+};
+
+const formatHourAmPm = (hourLabel: string): string => {
+    const hour = parseInt(hourLabel.split(':')[0] ?? '0', 10);
+    if (hour === 0) return '12am';
+    if (hour === 12) return '12pm';
+    if (hour < 12) return `${hour}am`;
+    return `${hour - 12}pm`;
 };
 
 const METRICS: MetricConfig[] = [
@@ -81,9 +88,11 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
     const dataPoint = payload[0]?.payload;
     if (!dataPoint) return null;
 
+    const hourLabel = typeof dataPoint.hourLabel === 'string' ? dataPoint.hourLabel : '';
+
     return (
         <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
-            <div className="text-sm font-medium text-foreground mb-2">{dataPoint.hourLabel}</div>
+            <div className="text-sm font-medium text-foreground mb-2">{formatHourAmPm(hourLabel)}</div>
             <div className="space-y-1.5">
                 {METRICS.map(metric => {
                     const value = dataPoint[metric.key];
@@ -109,12 +118,11 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
 
 export const DailyPerformanceMetrics = ({ className }: { className?: string }) => {
     const accountId = useSelectedAccountId();
-    const countryCode = useSelectedCountryCode();
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     const { data, isLoading, error } = api.metrics.hourlyPerformance.useQuery(
-        { accountId, countryCode },
+        { accountId, timezone },
         {
-            enabled: !!countryCode,
             refetchInterval: 60000, // 1 minute for hourly data
             staleTime: 30000,
         }

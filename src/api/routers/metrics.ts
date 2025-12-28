@@ -3,7 +3,6 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { amsMetrics, apiMetrics, jobMetrics, performanceDaily, performanceHourly } from '@/db/schema';
-import { getTimezoneForCountry } from '@/utils/timezones';
 import { publicProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
@@ -401,12 +400,11 @@ export const metricsRouter = router({
         .input(
             z.object({
                 accountId: z.string(),
-                countryCode: z.string(),
+                timezone: z.string(),
             })
         )
         .query(async ({ input }) => {
-            // Get timezone for the account's country
-            const timezone = getTimezoneForCountry(input.countryCode);
+            const timezone = input.timezone;
             const now = new Date();
 
             // Calculate today's and yesterday's date strings in the account's timezone
