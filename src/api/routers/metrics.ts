@@ -400,25 +400,38 @@ export const metricsRouter = router({
         .input(
             z.object({
                 accountId: z.string(),
-                timezone: z.string(),
+                timezone: z.string(), // Browser timezone - used for display
             })
         )
         .query(async ({ input }) => {
-            const timezone = input.timezone;
+            const browserTimezone = input.timezone;
             const now = new Date();
 
-            // Calculate today's and yesterday's date strings in the account's timezone
-            const todayDateStr = formatInTimeZone(now, timezone, 'yyyy-MM-dd');
+            // Calculate "today" in the browser's timezone as a UTC time range
+            // This ensures we query the correct data regardless of account timezone
+            const todayDateStr = formatInTimeZone(now, browserTimezone, 'yyyy-MM-dd');
             const yesterdayDate = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-            const yesterdayDateStr = formatInTimeZone(yesterdayDate, timezone, 'yyyy-MM-dd');
+            const yesterdayDateStr = formatInTimeZone(yesterdayDate, browserTimezone, 'yyyy-MM-dd');
 
-            // Get current hour in the account's timezone
-            const currentHourInTimezone = parseInt(formatInTimeZone(now, timezone, 'H'), 10);
+            // Calculate UTC boundaries for "today" in browser timezone
+            // Today starts at 00:00 in browser timezone, ends at 23:59:59
+            const todayStartUtc = new Date(`${todayDateStr}T00:00:00`);
+            // Adjust for timezone offset - we need to convert local midnight to UTC
+            const tzOffsetMs = todayStartUtc.getTime() - new Date(formatInTimeZone(todayStartUtc, browserTimezone, "yyyy-MM-dd'T'HH:mm:ss")).getTime();
+            const todayStartUtcAdjusted = new Date(todayStartUtc.getTime() - tzOffsetMs);
+            const todayEndUtcAdjusted = new Date(todayStartUtcAdjusted.getTime() + 24 * 60 * 60 * 1000);
 
-            // Query today's hourly data
+            // Yesterday's boundaries
+            const yesterdayStartUtcAdjusted = new Date(todayStartUtcAdjusted.getTime() - 24 * 60 * 60 * 1000);
+            const yesterdayEndUtcAdjusted = todayStartUtcAdjusted;
+
+            // Get current hour in the browser's timezone
+            const currentHourInTimezone = parseInt(formatInTimeZone(now, browserTimezone, 'H'), 10);
+
+            // Query today's hourly data using bucket_start (UTC) and group by hour in browser timezone
             const todayData = await db
                 .select({
-                    bucketHour: performanceHourly.bucketHour,
+                    bucketHour: sql<number>`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${browserTimezone})::int`.as('bucket_hour'),
                     impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
                     clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
                     orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
@@ -426,9 +439,9 @@ export const metricsRouter = router({
                     sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                 })
                 .from(performanceHourly)
-                .where(and(eq(performanceHourly.accountId, input.accountId), eq(performanceHourly.bucketDate, todayDateStr)))
-                .groupBy(performanceHourly.bucketHour)
-                .orderBy(performanceHourly.bucketHour);
+                .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, todayStartUtcAdjusted), lte(performanceHourly.bucketStart, todayEndUtcAdjusted)))
+                .groupBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${browserTimezone})`)
+                .orderBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${browserTimezone})`);
 
             // Query yesterday's aggregated data for comparison
             const [yesterdayTotals] = await db
@@ -440,9 +453,11 @@ export const metricsRouter = router({
                     sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                 })
                 .from(performanceHourly)
-                .where(and(eq(performanceHourly.accountId, input.accountId), eq(performanceHourly.bucketDate, yesterdayDateStr)));
+                .where(
+                    and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, yesterdayStartUtcAdjusted), lte(performanceHourly.bucketStart, yesterdayEndUtcAdjusted))
+                );
 
-            // Query yesterday's last hour (hour 23) for the leading bar
+            // Query yesterday's last hour (hour 23 in browser timezone) for the leading bar
             const [yesterdayLastHour] = await db
                 .select({
                     impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
@@ -452,7 +467,14 @@ export const metricsRouter = router({
                     sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                 })
                 .from(performanceHourly)
-                .where(and(eq(performanceHourly.accountId, input.accountId), eq(performanceHourly.bucketDate, yesterdayDateStr), eq(performanceHourly.bucketHour, 23)));
+                .where(
+                    and(
+                        eq(performanceHourly.accountId, input.accountId),
+                        gte(performanceHourly.bucketStart, yesterdayStartUtcAdjusted),
+                        lte(performanceHourly.bucketStart, yesterdayEndUtcAdjusted),
+                        sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${browserTimezone}) = 23`
+                    )
+                );
 
             // Build hourly data map
             const hourlyMap = new Map<number, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();

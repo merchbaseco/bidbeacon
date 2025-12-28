@@ -109,3 +109,46 @@ TanStack Start app with file-based routing in `src/dashboard/routes/`.
 ### Component Library
 
 Use coss ui (Base UI + Tailwind). Copy-paste components, accessible by default.
+
+---
+
+## Timezone Architecture
+
+### Storage Model
+
+- **`ams_sp_*` tables** - Store `time_window_start` in UTC with timezone.
+- **`performance_hourly`** - Dual storage:
+  - `bucket_start`: UTC timestamp (canonical, use for queries)
+  - `bucket_date`/`bucket_hour`: Account's local timezone (for human-readable grouping)
+- **Account timezone** - Derived from `advertiser_account.country_code` via `getTimezoneForCountry()`.
+
+### Query Patterns
+
+- **Display in browser timezone**: Query by `bucket_start` (UTC range), group with `AT TIME ZONE` in SQL.
+- **Display in account timezone**: Query by `bucket_date`/`bucket_hour` directly.
+- **Never mix**: Don't use browser timezone to query `bucket_date` columns—they're stored in account timezone.
+
+### Common Pitfalls
+
+- Browser timezone ≠ account timezone. A US account (PST) viewed from EST shows different "today".
+- Job metadata varies by job. Check `job_name` in `job_metrics` to identify which job produced which metadata.
+
+---
+
+## Debugging Tips
+
+### Verifying Data Flow
+
+1. **Check raw stream data**: Query `ams_sp_traffic` by `advertiser_id` (entity_id, not ads_account_id).
+2. **Check aggregated data**: Query `performance_hourly` by `account_id` (ads_account_id).
+3. **Map account → entity**: `advertiser_account` table links `ads_account_id` to `entity_id`.
+
+### Job Inspection
+
+- **Recent runs**: `SELECT * FROM job_metrics WHERE job_name = '...' ORDER BY end_time DESC LIMIT 5`
+- **Distinguish jobs**: `summarize-hourly-*` → `performance_hourly`, `summarize-daily-*` → `performance_daily`
+- **Metadata differences**: Daily jobs include `bucketDate`, hourly jobs include `window: "trailing 24h"`.
+
+### SSH Access
+
+Ask the user for the SSH key path to access the production server at `merchbase.co`.
