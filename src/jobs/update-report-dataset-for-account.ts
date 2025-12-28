@@ -169,8 +169,11 @@ async function insertMetadata(args: {
 async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType, logger: Logger): Promise<void> {
     const MAX_CONCURRENT_REPORTS = 5;
 
-    // Count how many datasets are currently refreshing for this account/country/aggregation/entityType
-    const [refreshingCountResult] = await db
+    // Count how many datasets are currently in-flight for this account/country/aggregation/entityType
+    // This includes:
+    // - refreshing = true: a job is actively processing this record
+    // - status = 'fetching': a report has been created and we're waiting for Amazon to complete it
+    const [inFlightCountResult] = await db
         .select({ count: count() })
         .from(reportDatasetMetadata)
         .where(
@@ -179,23 +182,23 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
                 eq(reportDatasetMetadata.countryCode, countryCode),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType),
-                eq(reportDatasetMetadata.refreshing, true)
+                or(eq(reportDatasetMetadata.refreshing, true), eq(reportDatasetMetadata.status, 'fetching'))
             )
         );
 
-    const refreshingCount = refreshingCountResult?.count ?? 0;
-    const adjustedLimit = Math.max(0, MAX_CONCURRENT_REPORTS - refreshingCount);
+    const inFlightCount = inFlightCountResult?.count ?? 0;
+    const adjustedLimit = Math.max(0, MAX_CONCURRENT_REPORTS - inFlightCount);
 
     logger.info(
         {
             aggregation,
             entityType,
-            refreshingCount,
+            inFlightCount,
             maxConcurrent: MAX_CONCURRENT_REPORTS,
             adjustedLimit,
             now: now.toISOString(),
         },
-        'Checked current refreshing count'
+        'Checked current in-flight count'
     );
 
     // If we're already at max capacity, don't query for more records
