@@ -138,6 +138,20 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
         }
         return hourlyData;
     }, [data?.hourlyData, data?.leadingHour]);
+
+    // Calculate Y-axis domains from TODAY's data only (exclude leading hour)
+    // This prevents yesterday's potentially much larger values from crushing today's bars
+    const yAxisDomains = useMemo(() => {
+        const hourlyData = data?.hourlyData ?? [];
+        const maxImpressions = Math.max(...hourlyData.map(d => d.impressions), 1);
+        const maxClicks = Math.max(...hourlyData.map(d => d.clicks), 1);
+        const maxOrders = Math.max(...hourlyData.map(d => d.orders), 1);
+        return {
+            impressions: [0, maxImpressions * 1.1] as [number, number],
+            clicks: [0, maxClicks * 1.1] as [number, number],
+            orders: [0, maxOrders * 1.1] as [number, number],
+        };
+    }, [data?.hourlyData]);
     const currentHour = data?.currentHour ?? new Date().getHours();
 
     // Custom tick formatter for X axis - only show 00:00, current hour, and 23:00
@@ -202,10 +216,11 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
 
                             <XAxis dataKey="hourLabel" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} interval={0} />
 
-                            {/* Hidden Y axes for each metric to scale them independently */}
-                            <YAxis yAxisId="impressions" hide domain={[0, 'auto']} />
-                            <YAxis yAxisId="clicks" hide domain={[0, 'auto']} />
-                            <YAxis yAxisId="orders" hide domain={[0, 'auto']} />
+                            {/* Hidden Y axes for each metric - domains based on TODAY's data only */}
+                            {/* allowDataOverflow clips yesterday's leading bar if it exceeds today's scale */}
+                            <YAxis yAxisId="impressions" hide domain={yAxisDomains.impressions} allowDataOverflow />
+                            <YAxis yAxisId="clicks" hide domain={yAxisDomains.clicks} allowDataOverflow />
+                            <YAxis yAxisId="orders" hide domain={yAxisDomains.orders} allowDataOverflow />
 
                             {/* Reference line for current hour */}
                             <ReferenceLine x={currentHourLabel} stroke="#d1d5db" strokeDasharray="4 4" yAxisId="impressions" />

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { Bar, BarChart, ResponsiveContainer } from 'recharts';
+import { useMemo } from 'react';
+import { Bar, BarChart, ResponsiveContainer, YAxis } from 'recharts';
 import { api } from '@/dashboard/lib/trpc';
 import { Card } from '../../components/ui/card';
 import { Spinner } from '../../components/ui/spinner';
@@ -12,63 +12,53 @@ type MetricRow = {
     lastActivity?: string;
 };
 
-const Sparkline = ({ data }: { data: number[] }) => {
-    const [fillColor, setFillColor] = useState('#66666F');
+const Sparkline = ({ data, globalMax }: { data: number[]; globalMax?: number }) => {
+    const localMax = Math.max(...data);
+    // Use global max if provided, otherwise use local max with a minimum of 10
+    // This ensures zero-only sparklines show tiny bars
+    const maxValue = globalMax ?? Math.max(localMax, 10);
 
-    useEffect(() => {
-        // Get the computed color value from CSS variable
-        const testEl = document.createElement('div');
-        testEl.className = 'text-muted-foreground';
-        testEl.style.visibility = 'hidden';
-        testEl.style.position = 'absolute';
-        document.body.appendChild(testEl);
-        const color = getComputedStyle(testEl).color;
-        document.body.removeChild(testEl);
-
-        if (color && color !== 'rgba(0, 0, 0, 0)') {
-            setFillColor(color);
-        }
-    }, []);
-
+    // Transform data: ensure minimum bar height and calculate opacity based on value
     const chartData = useMemo(() => {
-        return data.map((value, index) => ({
-            value,
-            index,
-        }));
-    }, [data]);
+        return data.map((value, index) => {
+            // Normalize value to 0-1 range for opacity
+            const intensity = value / maxValue;
+            // Min opacity 0.15 for zero values, max 1.0 for highest value
+            const opacity = value === 0 ? 0.15 : 0.2 + intensity * 0.8;
+            // Ensure a minimum visible bar height
+            const displayValue = value === 0 ? maxValue * 0.08 : value;
 
-    const hasData = data.some(v => v > 0);
-
-    if (!hasData) {
-        return <div className="h-8 w-24 flex items-center justify-center text-xs text-muted-foreground">—</div>;
-    }
+            return {
+                value: displayValue,
+                originalValue: value,
+                opacity,
+                index,
+            };
+        });
+    }, [data, maxValue]);
 
     return (
         <div className="h-6 w-18">
             <ResponsiveContainer width="100%" height="100%" debounce={300}>
                 <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                    <Bar dataKey="value" fill={fillColor} radius={[1, 1, 0, 0]} isAnimationActive={false} />
+                    <YAxis domain={[0, maxValue]} hide />
+                    <Bar
+                        dataKey="value"
+                        radius={[2, 2, 0, 0]}
+                        isAnimationActive={false}
+                        shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { opacity: number } }) => {
+                            const { x = 0, y = 0, width = 0, height = 0, payload } = props;
+                            const opacity = payload?.opacity ?? 0.5;
+                            return <rect x={x} y={y} width={width} height={height} fill="currentColor" opacity={opacity} rx={2} className="text-indigo-500" />;
+                        }}
+                    />
                 </BarChart>
             </ResponsiveContainer>
         </div>
     );
 };
 
-// Format relative time like "2m ago" or "45m ago"
-const formatRelativeTime = (isoString: string | undefined): string => {
-    if (!isoString) return '—';
-    const now = new Date();
-    const then = new Date(isoString);
-    const diffMs = now.getTime() - then.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-
-    if (diffMins < 1) return 'now';
-    if (diffMins < 60) return `${diffMins}m`;
-    const diffHours = Math.floor(diffMins / 60);
-    return `${diffHours}h`;
-};
-
-const MetricRow = ({ label, sparklineData, total, lastActivity }: { label: string; sparklineData: number[]; total: number; lastActivity?: string }) => {
+const MetricRow = ({ label, sparklineData, total, lastActivity, globalMax }: { label: string; sparklineData: number[]; total: number; lastActivity?: string; globalMax: number }) => {
     const isRecent = lastActivity && (new Date().getTime() - new Date(lastActivity).getTime()) < 5 * 60 * 1000; // Within 5 minutes
 
     return (
@@ -78,7 +68,7 @@ const MetricRow = ({ label, sparklineData, total, lastActivity }: { label: strin
                 <span className="text-sm">{label}</span>
             </div>
             <div className="flex items-center gap-3">
-                <Sparkline data={sparklineData} />
+                <Sparkline data={sparklineData} globalMax={globalMax} />
                 <span className="text-sm text-muted-foreground tabular-nums w-16 text-right">{total.toLocaleString()}</span>
             </div>
         </div>
@@ -98,9 +88,9 @@ export const AmsMetricsCard = () => {
 
     const isLoading = isLoadingAms || isLoadingWorker;
 
-    const metrics = useMemo((): MetricRow[] => {
+    const { metrics, globalMax } = useMemo((): { metrics: MetricRow[]; globalMax: number } => {
         if (!amsData || !workerData) {
-            return [];
+            return { metrics: [], globalMax: 10 };
         }
 
         // Generate 12 five-minute intervals for the last 60 minutes
@@ -134,7 +124,7 @@ export const AmsMetricsCard = () => {
 
         // DLQ sparkline
         const dlqCurrent = workerData.dlq?.approximateVisible ?? 0;
-        const dlqSparkline = new Array(12).fill(0);
+        const dlqSparkline = new Array(12).fill(0) as number[];
         if (dlqCurrent > 0) {
             dlqSparkline[11] = dlqCurrent;
         }
@@ -151,9 +141,22 @@ export const AmsMetricsCard = () => {
             );
         });
 
+        // Calculate global max across all sparklines (minimum 10 to ensure tiny bars for zeros)
+        const allValues = [
+            ...campaignSparkline,
+            ...adGroupSparkline,
+            ...adSparkline,
+            ...targetSparkline,
+            ...trafficSparkline,
+            ...conversionSparkline,
+            ...totalIngestedSparkline,
+            ...dlqSparkline,
+        ];
+        const calculatedMax = Math.max(...allValues, 10);
+
         const lastActivity = amsData.lastActivity;
 
-        return [
+        return { globalMax: calculatedMax, metrics: [
             {
                 label: 'Campaigns',
                 entityType: 'campaign',
@@ -208,7 +211,7 @@ export const AmsMetricsCard = () => {
                 sparklineData: dlqSparkline,
                 total: dlqCurrent,
             },
-        ];
+        ]};
     }, [amsData, workerData]);
 
     if (isLoading) {
@@ -231,12 +234,12 @@ export const AmsMetricsCard = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 px-1">
                 <div className="divide-y">
                     {metrics.slice(0, 4).map(metric => (
-                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} lastActivity={metric.lastActivity} />
+                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} lastActivity={metric.lastActivity} globalMax={globalMax} />
                     ))}
                 </div>
                 <div className="divide-y">
                     {metrics.slice(4, 8).map(metric => (
-                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} lastActivity={metric.lastActivity} />
+                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} lastActivity={metric.lastActivity} globalMax={globalMax} />
                     ))}
                 </div>
             </div>
