@@ -16,10 +16,9 @@ import { updateReportDatasetForAccountJob } from './update-report-dataset-for-ac
 
 export const updateReportDatasetsJob = boss
     .createJob('update-report-datasets')
-    // Temporarily disabled
-    // .schedule({
-    //     cron: '*/5 * * * *', // Run every 5 minutes
-    // })
+    .schedule({
+        cron: '*/5 * * * *', // Run every 5 minutes
+    })
     .work(async () => {
         // Query all enabled advertiser accounts
         const enabledAccounts = await db
