@@ -16,7 +16,7 @@ import { cn } from '@/dashboard/lib/utils.js';
 export const ReportsTable = ({ className }: { className?: string }) => {
     const limit = useAtomValue(limitAtom);
     const [offset, setOffset] = useAtom(offsetAtom);
-    const { data: rows = [], total, isLoading } = useReports();
+    const { data: rows = [], total, isLoading, isFetching } = useReports();
 
     // Calculate current page from offset/limit for pagination components
     const currentPage = useMemo(() => Math.floor(offset / limit) + 1, [offset, limit]);
@@ -47,7 +47,7 @@ export const ReportsTable = ({ className }: { className?: string }) => {
                             <TableHead className="text-right">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
-                    <TableBody>
+                    <TableBody className={cn(isFetching && !isLoading && 'opacity-50 transition-opacity')}>
                         {rows.length === 0 && !isLoading ? (
                             <TableRow>
                                 <TableCell colSpan={5} className="text-center text-muted-foreground">

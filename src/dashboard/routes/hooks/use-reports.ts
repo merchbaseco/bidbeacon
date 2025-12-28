@@ -1,3 +1,4 @@
+import { keepPreviousData } from '@tanstack/react-query';
 import { useAtomValue } from 'jotai';
 import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
@@ -32,7 +33,7 @@ export const useReports = () => {
         return { from: from.toISOString(), to: roundedNow.toISOString() };
     }, [days]);
 
-    const { data, isLoading, ...rest } = api.reports.summary.useQuery(
+    const { data, isLoading, isFetching, ...rest } = api.reports.summary.useQuery(
         {
             accountId,
             countryCode,
@@ -47,6 +48,7 @@ export const useReports = () => {
         {
             enabled: !!countryCode,
             staleTime: Infinity, // Never refetch due to staleness - rely on WebSocket events for invalidation
+            placeholderData: keepPreviousData, // Keep previous page visible while fetching new page
         }
     );
 
@@ -65,6 +67,7 @@ export const useReports = () => {
         data: data?.data ?? [],
         total: data?.total ?? 0,
         isLoading,
+        isFetching,
         ...rest,
     };
 };

@@ -6,7 +6,7 @@ import { offsetAtom, statusFilterAtom } from './atoms';
 const STATUS_OPTIONS = [
     { icon: FilterIcon, label: 'All Statuses', value: 'all' },
     { icon: CheckCircleIcon, label: 'Completed', value: 'completed' },
-    { icon: AlertCircleIcon, label: 'Failed', value: 'failed' },
+    { icon: AlertCircleIcon, label: 'Error', value: 'error' },
     { icon: Loader2Icon, label: 'Fetching', value: 'fetching' },
     { icon: Loader2Icon, label: 'Parsing', value: 'parsing' },
     { icon: AlertTriangleIcon, label: 'Missing', value: 'missing' },
