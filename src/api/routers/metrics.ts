@@ -424,9 +424,11 @@ export const metricsRouter = router({
             const currentHourInTimezone = parseInt(formatInTimeZone(now, browserTimezone, 'H'), 10);
 
             // Query today's hourly data using bucket_start (UTC) and group by hour in browser timezone
+            // Use sql.raw() for timezone to avoid parameterization issues with AT TIME ZONE
+            const tzLiteral = sql.raw(`'${browserTimezone.replace(/'/g, "''")}'`);
             const todayData = await db
                 .select({
-                    bucketHour: sql<number>`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${browserTimezone})::int`.as('bucket_hour'),
+                    bucketHour: sql<number>`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})::int`.as('bucket_hour'),
                     impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
                     clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
                     orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
@@ -437,8 +439,8 @@ export const metricsRouter = router({
                 .where(
                     and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, todayStartUtc), lt(performanceHourly.bucketStart, new Date(todayEndUtc.getTime() + 1000)))
                 )
-                .groupBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${browserTimezone})`)
-                .orderBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${browserTimezone})`);
+                .groupBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`)
+                .orderBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`);
 
             // Query yesterday's aggregated data for comparison
             const [yesterdayTotals] = await db
@@ -473,7 +475,7 @@ export const metricsRouter = router({
                         eq(performanceHourly.accountId, input.accountId),
                         gte(performanceHourly.bucketStart, yesterdayStartUtc),
                         lt(performanceHourly.bucketStart, new Date(yesterdayEndUtc.getTime() + 1000)),
-                        sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${browserTimezone}) = 23`
+                        sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral}) = 23`
                     )
                 );
 
