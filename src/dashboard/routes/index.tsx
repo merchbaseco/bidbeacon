@@ -1,29 +1,18 @@
 import { useAtomValue } from 'jotai';
-import { useMemo } from 'react';
-import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
 import { ConnectionStatusBadge } from '../components/connection-status-badge';
-import { Frame } from '../components/ui/frame';
 import { connectionStatusAtom } from './atoms';
 import { AccountDataCard } from './components/account-data-card';
 import { AccountEnabledSwitch } from './components/account-selector/account-enabled-switch';
 import { AmsMetricsCard } from './components/ams-metrics-card';
-import { ApiMetricsChart } from './components/ads-api-stats/api-metrics-chart';
-import { ApiMetricsTable } from './components/ads-api-stats/api-metrics-table';
-import { ChartCard } from './components/chart-card';
 import { DailyPerformanceMetrics } from './components/daily-performance-metrics';
-import { JobMetricsChart } from './components/job-metrics-chart';
-import { JobMetricsTable } from './components/job-metrics-table';
 import { ReportsTable } from './components/reports-table/reports-table';
+import { ApiHealthCard } from './components/health/api-health-card';
+import { DataFreshnessCard } from './components/health/data-freshness-card';
+import { ErrorStatusCard } from './components/health/error-status-card';
+import { MessageThroughputCard } from './components/health/message-throughput-card';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
-
-    const legendItems = useMemo(() => {
-        return [
-            { label: 'API', value: '', color: 'rainbow' },
-            { label: '429', value: '', color: LEGEND_COLORS[5] }, // Red
-        ];
-    }, []);
 
     return (
         <div>
@@ -43,19 +32,11 @@ export function IndexRoute() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-background-frame-max mx-auto px-4 mt-4">
-                <Frame>
-                    <ChartCard title="Ads API Invocations" legendItems={legendItems}>
-                        <ApiMetricsChart />
-                    </ChartCard>
-                    <ApiMetricsTable className="pt-1.5" />
-                </Frame>
-                <Frame>
-                    <ChartCard title="Job Invocations" legendItems={[]}>
-                        <JobMetricsChart />
-                    </ChartCard>
-                    <JobMetricsTable className="pt-1.5" />
-                </Frame>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-background-frame-max mx-auto px-4 mt-4">
+                <MessageThroughputCard />
+                <DataFreshnessCard />
+                <ErrorStatusCard />
+                <ApiHealthCard />
             </div>
 
             <ReportsTable className="max-w-background-frame-max mx-auto px-4 mt-6" />

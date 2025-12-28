@@ -665,4 +665,98 @@ export const metricsRouter = router({
                 },
             };
         }),
+    messageThroughput: publicProcedure.query(async () => {
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+        const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
+
+        // Get total messages in last hour (current hour)
+        const currentHourTotal = await db
+            .select({
+                count: sql<number>`count(*)`.as('count'),
+            })
+            .from(amsMetrics)
+            .where(and(gte(amsMetrics.timestamp, oneHourAgo), lte(amsMetrics.timestamp, now)));
+
+        // Get total messages in previous hour
+        const previousHourTotal = await db
+            .select({
+                count: sql<number>`count(*)`.as('count'),
+            })
+            .from(amsMetrics)
+            .where(and(gte(amsMetrics.timestamp, twoHoursAgo), lt(amsMetrics.timestamp, oneHourAgo)));
+
+        // Get 5-minute interval data for sparkline (last 60 minutes)
+        const sparklineData = await db
+            .select({
+                interval: sql<string>`date_trunc('hour', ${amsMetrics.timestamp}) + 
+                    INTERVAL '5 minutes' * FLOOR(EXTRACT(MINUTE FROM ${amsMetrics.timestamp}) / 5)`.as('interval'),
+                count: sql<number>`count(*)`.as('count'),
+            })
+            .from(amsMetrics)
+            .where(and(gte(amsMetrics.timestamp, oneHourAgo), lte(amsMetrics.timestamp, now)))
+            .groupBy(sql`date_trunc('hour', ${amsMetrics.timestamp}) + 
+                INTERVAL '5 minutes' * FLOOR(EXTRACT(MINUTE FROM ${amsMetrics.timestamp}) / 5)`)
+            .orderBy(sql`date_trunc('hour', ${amsMetrics.timestamp}) + 
+                INTERVAL '5 minutes' * FLOOR(EXTRACT(MINUTE FROM ${amsMetrics.timestamp}) / 5)`);
+
+        // Generate all 12 five-minute intervals for the last 60 minutes
+        const intervals: string[] = [];
+        for (let i = 11; i >= 0; i--) {
+            const interval = new Date(now.getTime() - i * 5 * 60 * 1000);
+            interval.setMinutes(Math.floor(interval.getMinutes() / 5) * 5, 0, 0);
+            intervals.push(interval.toISOString());
+        }
+
+        // Build sparkline array with zeros filled
+        const sparklineMap = new Map<string, number>();
+        for (const row of sparklineData) {
+            sparklineMap.set(new Date(row.interval).toISOString(), Number(row.count));
+        }
+
+        const sparkline = intervals.map(i => sparklineMap.get(i) ?? 0);
+
+        const currentCount = Number(currentHourTotal[0]?.count ?? 0);
+        const previousCount = Number(previousHourTotal[0]?.count ?? 0);
+
+        // Calculate percent change
+        const percentChange = previousCount === 0 ? (currentCount > 0 ? 100 : 0) : ((currentCount - previousCount) / previousCount) * 100;
+
+        return {
+            currentHourTotal: currentCount,
+            previousHourTotal: previousCount,
+            percentChange,
+            sparkline,
+        };
+    }),
+    apiHealth: publicProcedure.query(async () => {
+        const now = new Date();
+        const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
+        // Get total API calls, success count, and 429 count in last hour
+        const healthData = await db
+            .select({
+                total: sql<number>`count(*)`.as('total'),
+                successCount: sql<number>`sum(case when ${apiMetrics.success} then 1 else 0 end)`.as('success_count'),
+                errorCount: sql<number>`sum(case when ${apiMetrics.success} then 0 else 1 end)`.as('error_count'),
+                rateLimitCount: sql<number>`sum(case when ${apiMetrics.statusCode} = 429 then 1 else 0 end)`.as('rate_limit_count'),
+            })
+            .from(apiMetrics)
+            .where(and(gte(apiMetrics.timestamp, oneHourAgo), lte(apiMetrics.timestamp, now)));
+
+        const total = Number(healthData[0]?.total ?? 0);
+        const successCount = Number(healthData[0]?.successCount ?? 0);
+        const errorCount = Number(healthData[0]?.errorCount ?? 0);
+        const rateLimitCount = Number(healthData[0]?.rateLimitCount ?? 0);
+
+        const successRate = total > 0 ? (successCount / total) * 100 : 100;
+
+        return {
+            successRate,
+            total,
+            successCount,
+            errorCount,
+            rateLimitCount,
+        };
+    }),
 });
