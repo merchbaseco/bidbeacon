@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Bar, ComposedChart, Line, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { Area, Bar, ComposedChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { api } from '@/dashboard/lib/trpc';
 import { cn } from '@/dashboard/lib/utils';
 import { Spinner } from '../../components/ui/spinner';
@@ -23,12 +23,6 @@ const formatHourAmPm = (hourLabel: string): string => {
 
 const METRICS: MetricConfig[] = [
     {
-        key: 'impressions',
-        label: 'Impressions',
-        formatter: value => value.toLocaleString(),
-        isGood: 'up',
-    },
-    {
         key: 'clicks',
         label: 'Clicks',
         formatter: value => value.toLocaleString(),
@@ -43,17 +37,21 @@ const METRICS: MetricConfig[] = [
         isGood: 'up',
     },
     {
+        key: 'impressions',
+        label: 'Impressions',
+        formatter: value => value.toLocaleString(),
+        isGood: 'up',
+    },
+    {
         key: 'spend',
         label: 'Spend',
         formatter: value => `$${value.toFixed(2)}`,
-        color: '#f59e0b', // amber-500
         isGood: 'down',
     },
     {
         key: 'acos',
         label: 'ACoS',
         formatter: value => `${value.toFixed(1)}%`,
-        color: '#ef4444', // red-500
         isGood: 'down',
     },
 ];
@@ -82,6 +80,9 @@ const MetricLabel = ({ metric, value, change }: { metric: MetricConfig; value: n
     );
 };
 
+// Metrics that are displayed on the chart (for tooltip)
+const CHARTED_METRICS = METRICS.filter(m => m.key === 'impressions' || m.key === 'clicks' || m.key === 'orders');
+
 const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ dataKey: string; value: number; payload: Record<string, number | string> }> }) => {
     if (!active || !payload || payload.length === 0) return null;
 
@@ -94,7 +95,7 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
         <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
             <div className="text-sm font-medium text-foreground mb-2">{formatHourAmPm(hourLabel)}</div>
             <div className="space-y-1.5">
-                {METRICS.map(metric => {
+                {CHARTED_METRICS.map(metric => {
                     const value = dataPoint[metric.key];
                     if (typeof value !== 'number') return null;
                     return (
@@ -173,7 +174,7 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
     return (
         <div className={cn('w-full', className)}>
             {/* Metric Labels */}
-            <div className="flex items-start justify-between gap-4 md:gap-8 mb-4 px-4 max-w-background-frame-max mx-auto overflow-x-auto">
+            <div className="flex items-start justify-start gap-6 md:gap-12 mb-4 px-4 max-w-background-frame-max mx-auto overflow-x-auto">
                 {METRICS.map(metric => (
                     <MetricLabel key={metric.key} metric={metric} value={data?.totals[metric.key] ?? 0} change={data?.changes[metric.key] ?? 0} />
                 ))}
@@ -188,28 +189,43 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
                 <div className="absolute inset-0 -left-[3.5%]" style={{ width: 'calc(100% + 3.5%)' }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+                            <defs>
+                                <linearGradient id="clicksGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
+                                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
+                                </linearGradient>
+                                <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
+                                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+
                             <XAxis dataKey="hourLabel" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} interval={0} />
 
                             {/* Hidden Y axes for each metric to scale them independently */}
                             <YAxis yAxisId="impressions" hide domain={[0, 'auto']} />
                             <YAxis yAxisId="clicks" hide domain={[0, 'auto']} />
                             <YAxis yAxisId="orders" hide domain={[0, 'auto']} />
-                            <YAxis yAxisId="spend" hide domain={[0, 'auto']} />
-                            <YAxis yAxisId="acos" hide domain={[0, 'auto']} />
 
                             {/* Reference line for current hour */}
                             <ReferenceLine x={currentHourLabel} stroke="#d1d5db" strokeDasharray="4 4" yAxisId="impressions" />
 
                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
 
-                            {/* Impressions as bars - subtle gray */}
-                            <Bar yAxisId="impressions" dataKey="impressions" fill="currentColor" className="text-zinc-200 dark:text-zinc-800" radius={[2, 2, 0, 0]} isAnimationActive={false} />
+                            {/* Impressions as bars - subtle gray (zIndex 0 = behind) */}
+                            <Bar
+                                yAxisId="impressions"
+                                dataKey="impressions"
+                                fill="currentColor"
+                                className="text-zinc-200 dark:text-zinc-800"
+                                radius={[2, 2, 0, 0]}
+                                isAnimationActive={false}
+                                zIndex={0}
+                            />
 
-                            {/* Lines for each metric */}
-                            <Line yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#6366f1" strokeWidth={2} dot={false} isAnimationActive={false} />
-                            <Line yAxisId="orders" type="monotone" dataKey="orders" stroke="#10b981" strokeWidth={2} dot={false} isAnimationActive={false} />
-                            <Line yAxisId="spend" type="monotone" dataKey="spend" stroke="#f59e0b" strokeWidth={2} dot={false} isAnimationActive={false} />
-                            <Line yAxisId="acos" type="monotone" dataKey="acos" stroke="#ef4444" strokeWidth={2} dot={false} isAnimationActive={false} />
+                            {/* Area charts for clicks and orders with gradient fill (zIndex 1-2 = on top) */}
+                            <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#6366f1" strokeWidth={2} fill="url(#clicksGradient)" dot={false} isAnimationActive={false} zIndex={1} />
+                            <Area yAxisId="orders" type="monotone" dataKey="orders" stroke="#10b981" strokeWidth={2} fill="url(#ordersGradient)" dot={false} isAnimationActive={false} zIndex={2} />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>

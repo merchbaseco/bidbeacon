@@ -1,6 +1,5 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useMemo } from 'react';
-import { ButtonGroupSeparator } from '../../../components/ui/button-group.js';
 import { Frame, FrameFooter } from '../../../components/ui/frame.js';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table.js';
 import { useReports } from '../../hooks/use-reports.js';
@@ -31,9 +30,7 @@ export const ReportsTable = ({ className }: { className?: string }) => {
         <div className={cn('w-full', className)}>
             <div className="mb-2 flex flex-wrap items-center gap-2">
                 <EntityAggregationFilter />
-                <ButtonGroupSeparator className="hidden md:block" />
                 <EntityTypeFilter />
-                <ButtonGroupSeparator className="hidden md:block" />
                 <StatusFilter />
                 <RefreshButton />
             </div>

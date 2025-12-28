@@ -14,13 +14,12 @@ export const EntityTypeFilter = () => {
 
     return (
         <ButtonGroup>
-            <Button size="xs" variant={entityType === 'target' ? 'default' : 'outline'} onClick={() => handleChange('target')}>
+            <Button size="sm" variant={entityType === 'target' ? 'default' : 'outline'} onClick={() => handleChange('target')}>
                 Target
             </Button>
-            <Button size="xs" variant={entityType === 'product' ? 'default' : 'outline'} onClick={() => handleChange('product')}>
+            <Button size="sm" variant={entityType === 'product' ? 'default' : 'outline'} onClick={() => handleChange('product')}>
                 Product
             </Button>
         </ButtonGroup>
     );
 };
-
