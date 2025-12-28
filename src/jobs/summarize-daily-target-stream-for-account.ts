@@ -91,10 +91,12 @@ export const summarizeDailyTargetStreamForAccountJob = boss
 
             console.log(`[summarize-daily-target-stream-for-account] Account ${accountId}: Found ${conversionAggregates.length} conversion aggregates`);
 
-            // Create a map of conversion aggregates for quick lookup using keywordId as the unique key
+            // Create a map of conversion aggregates for quick lookup
+            // Key must match traffic grouping: campaignId + adGroupId + adId + keywordId
             const conversionMap = new Map<string, { sales: number; orders: number }>();
             for (const conv of conversionAggregates) {
-                conversionMap.set(conv.keywordId, { sales: conv.sales, orders: conv.orders });
+                const key = `${conv.campaignId}|${conv.adGroupId}|${conv.adId}|${conv.keywordId}`;
+                conversionMap.set(key, { sales: conv.sales, orders: conv.orders });
             }
 
             // Combine traffic and conversion aggregates
@@ -111,7 +113,7 @@ export const summarizeDailyTargetStreamForAccountJob = boss
             };
 
             const aggregatedData: AggregatedRow[] = trafficAggregates.map(traffic => {
-                const key = traffic.keywordId;
+                const key = `${traffic.campaignId}|${traffic.adGroupId}|${traffic.adId}|${traffic.keywordId}`;
                 const conversion = conversionMap.get(key) ?? { sales: 0, orders: 0 };
                 return {
                     ...traffic,
@@ -122,9 +124,10 @@ export const summarizeDailyTargetStreamForAccountJob = boss
 
             // Also add conversion-only rows (no traffic data). This is probably unlikely, but if the conversion
             // data comes in async from the traffic data, it's probably possible.
-            const trafficKeys = new Set(trafficAggregates.map(t => t.keywordId));
+            const trafficKeys = new Set(trafficAggregates.map(t => `${t.campaignId}|${t.adGroupId}|${t.adId}|${t.keywordId}`));
             for (const conv of conversionAggregates) {
-                if (!trafficKeys.has(conv.keywordId)) {
+                const key = `${conv.campaignId}|${conv.adGroupId}|${conv.adId}|${conv.keywordId}`;
+                if (!trafficKeys.has(key)) {
                     aggregatedData.push({
                         campaignId: conv.campaignId,
                         adGroupId: conv.adGroupId,

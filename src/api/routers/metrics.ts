@@ -553,7 +553,7 @@ export const metricsRouter = router({
                 // Yesterday's hour 23 as a leading bar (hour -1)
                 leadingHour: {
                     hour: -1,
-                    hourLabel: '',
+                    hourLabel: '23:00',
                     impressions: yesterdayLastHourData.impressions,
                     clicks: yesterdayLastHourData.clicks,
                     orders: yesterdayLastHourData.orders,

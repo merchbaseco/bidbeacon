@@ -1,7 +1,8 @@
 /**
  * Job: Summarize hourly target stream data from AMS into performanceHourly table for a specific account.
- * Aggregates delta data from amsSpConversion and amsSpTraffic for the current day
- * (in account timezone) into performanceHourly, grouped by hour.
+ * Aggregates delta data from amsSpConversion and amsSpTraffic for the trailing 24 hours
+ * into performanceHourly, grouped by hour. Each row's bucketDate/bucketHour is derived from
+ * its timestamp in the account's timezone.
  */
 
 import { formatInTimeZone } from 'date-fns-tz';
@@ -10,7 +11,6 @@ import { z } from 'zod';
 import { db } from '@/db/index';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceHourly } from '@/db/schema';
 import { boss } from '@/jobs/boss';
-import { zonedNow, zonedStartOfDay } from '@/utils/date';
 import { getTimezoneForCountry } from '@/utils/timezones';
 
 // ============================================================================
@@ -26,7 +26,7 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
     .createJob('summarize-hourly-target-stream-for-account')
     .input(jobInputSchema)
     .work(async jobs => {
-        const allMetadata: Array<{ accountId: string; bucketDate: string; trafficAggregates: number; conversionAggregates: number; rowsInserted: number }> = [];
+        const allMetadata: Array<{ accountId: string; window: string; trafficAggregates: number; conversionAggregates: number; rowsInserted: number }> = [];
 
         for (const job of jobs) {
             const startTime = performance.now();
@@ -51,12 +51,12 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
             console.log(`[summarize-hourly-target-stream-for-account] Account ${accountId} (${countryCode}): Using entityId ${entityId}`);
 
             const timezone = getTimezoneForCountry(countryCode);
-            const now = zonedNow(timezone);
-            const todayStart = zonedStartOfDay(now, timezone);
-            const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1); // End of day
 
-            const bucketDateStr = formatInTimeZone(todayStart, timezone, 'yyyy-MM-dd');
-            console.log(`[summarize-hourly-target-stream-for-account] Account ${accountId}: Querying data for bucketDate ${bucketDateStr} (${todayStart.toISOString()} to ${todayEnd.toISOString()})`);
+            // Use a trailing 24-hour window to catch any late-arriving data
+            const windowEnd = new Date();
+            const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1000);
+
+            console.log(`[summarize-hourly-target-stream-for-account] Account ${accountId}: Querying trailing 24h (${windowStart.toISOString()} to ${windowEnd.toISOString()})`);
 
             // Aggregate traffic data by hour (impressions, clicks, spend), grouped by keywordId and hour
             const trafficAggregates = await db
@@ -71,7 +71,7 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
                     spend: sql<number>`COALESCE(SUM(${amsSpTraffic.cost}), 0)`,
                 })
                 .from(amsSpTraffic)
-                .where(and(eq(amsSpTraffic.advertiserId, entityId), gte(amsSpTraffic.timeWindowStart, todayStart), lte(amsSpTraffic.timeWindowStart, todayEnd)))
+                .where(and(eq(amsSpTraffic.advertiserId, entityId), gte(amsSpTraffic.timeWindowStart, windowStart), lte(amsSpTraffic.timeWindowStart, windowEnd)))
                 .groupBy(amsSpTraffic.campaignId, amsSpTraffic.adGroupId, amsSpTraffic.adId, amsSpTraffic.keywordId, sql`date_trunc('hour', ${amsSpTraffic.timeWindowStart})`);
 
             console.log(`[summarize-hourly-target-stream-for-account] Account ${accountId}: Found ${trafficAggregates.length} hourly traffic aggregates`);
@@ -88,15 +88,16 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
                     orders: sql<number>`COALESCE(SUM(${amsSpConversion.attributedConversions14d}), 0)::int`,
                 })
                 .from(amsSpConversion)
-                .where(and(eq(amsSpConversion.advertiserId, entityId), gte(amsSpConversion.timeWindowStart, todayStart), lte(amsSpConversion.timeWindowStart, todayEnd)))
+                .where(and(eq(amsSpConversion.advertiserId, entityId), gte(amsSpConversion.timeWindowStart, windowStart), lte(amsSpConversion.timeWindowStart, windowEnd)))
                 .groupBy(amsSpConversion.campaignId, amsSpConversion.adGroupId, amsSpConversion.adId, amsSpConversion.keywordId, sql`date_trunc('hour', ${amsSpConversion.timeWindowStart})`);
 
             console.log(`[summarize-hourly-target-stream-for-account] Account ${accountId}: Found ${conversionAggregates.length} hourly conversion aggregates`);
 
-            // Create a map of conversion aggregates for quick lookup using keywordId + hourStart as composite key
+            // Create a map of conversion aggregates for quick lookup
+            // Key must match traffic grouping: campaignId + adGroupId + adId + keywordId + hourStart
             const conversionMap = new Map<string, { sales: number; orders: number }>();
             for (const conv of conversionAggregates) {
-                const key = `${conv.keywordId}|${new Date(conv.hourStart).toISOString()}`;
+                const key = `${conv.campaignId}|${conv.adGroupId}|${conv.adId}|${conv.keywordId}|${new Date(conv.hourStart).toISOString()}`;
                 conversionMap.set(key, { sales: conv.sales, orders: conv.orders });
             }
 
@@ -115,7 +116,7 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
             };
 
             const aggregatedData: AggregatedRow[] = trafficAggregates.map(traffic => {
-                const key = `${traffic.keywordId}|${new Date(traffic.hourStart).toISOString()}`;
+                const key = `${traffic.campaignId}|${traffic.adGroupId}|${traffic.adId}|${traffic.keywordId}|${new Date(traffic.hourStart).toISOString()}`;
                 const conversion = conversionMap.get(key) ?? { sales: 0, orders: 0 };
                 return {
                     ...traffic,
@@ -127,9 +128,9 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
 
             // Also add conversion-only rows (no traffic data). This is probably unlikely, but if the conversion
             // data comes in async from the traffic data, it's probably possible.
-            const trafficKeys = new Set(trafficAggregates.map(t => `${t.keywordId}|${new Date(t.hourStart).toISOString()}`));
+            const trafficKeys = new Set(trafficAggregates.map(t => `${t.campaignId}|${t.adGroupId}|${t.adId}|${t.keywordId}|${new Date(t.hourStart).toISOString()}`));
             for (const conv of conversionAggregates) {
-                const key = `${conv.keywordId}|${new Date(conv.hourStart).toISOString()}`;
+                const key = `${conv.campaignId}|${conv.adGroupId}|${conv.adId}|${conv.keywordId}|${new Date(conv.hourStart).toISOString()}`;
                 if (!trafficKeys.has(key)) {
                     aggregatedData.push({
                         campaignId: conv.campaignId,
@@ -150,13 +151,14 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
 
             // Prepare batch insert values
             const insertValues = aggregatedData.map(row => {
-                // Extract hour from hourStart in the account's timezone
+                // Extract hour and date from hourStart in the account's timezone
                 const hourInTimezone = parseInt(formatInTimeZone(row.hourStart, timezone, 'H'), 10);
+                const rowBucketDate = formatInTimeZone(row.hourStart, timezone, 'yyyy-MM-dd');
 
                 return {
                     accountId,
                     bucketStart: row.hourStart,
-                    bucketDate: bucketDateStr,
+                    bucketDate: rowBucketDate,
                     bucketHour: hourInTimezone,
                     campaignId: row.campaignId,
                     adGroupId: row.adGroupId,
@@ -171,7 +173,7 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
                 };
             });
 
-            console.log(`[summarize-hourly-target-stream-for-account] Account ${accountId}: Prepared ${insertValues.length} rows to insert for bucketDate ${bucketDateStr}`);
+            console.log(`[summarize-hourly-target-stream-for-account] Account ${accountId}: Prepared ${insertValues.length} rows to insert`);
 
             // Batch insert/update performanceHourly rows in chunks of 1000
             const batchSize = 1000;
@@ -217,7 +219,7 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
             // Collect metadata for this job
             allMetadata.push({
                 accountId,
-                bucketDate: bucketDateStr,
+                window: 'trailing 24h',
                 trafficAggregates: trafficAggregates.length,
                 conversionAggregates: conversionAggregates.length,
                 rowsInserted: insertValues.length,
@@ -234,4 +236,3 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
             },
         };
     });
-
