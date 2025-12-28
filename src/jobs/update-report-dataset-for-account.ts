@@ -1,4 +1,4 @@
-import { and, count, desc, eq, inArray, isNotNull, lte, or } from 'drizzle-orm';
+import { and, count, desc, eq, inArray, isNotNull, isNull, lte } from 'drizzle-orm';
 import type { Logger } from 'pino';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
@@ -169,10 +169,8 @@ async function insertMetadata(args: {
 async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType, logger: Logger): Promise<void> {
     const MAX_CONCURRENT_REPORTS = 5;
 
-    // Count how many datasets are currently in-flight for this account/country/aggregation/entityType
-    // This includes:
-    // - refreshing = true: a job is actively processing this record
-    // - status = 'fetching': a report has been created and we're waiting for Amazon to complete it
+    // Count how many reports are currently in-flight (reportId IS NOT NULL)
+    // reportId is set when a report is created and cleared when parsing completes
     const [inFlightCountResult] = await db
         .select({ count: count() })
         .from(reportDatasetMetadata)
@@ -182,12 +180,12 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
                 eq(reportDatasetMetadata.countryCode, countryCode),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType),
-                or(eq(reportDatasetMetadata.refreshing, true), eq(reportDatasetMetadata.status, 'fetching'))
+                isNotNull(reportDatasetMetadata.reportId)
             )
         );
 
     const inFlightCount = inFlightCountResult?.count ?? 0;
-    const adjustedLimit = Math.max(0, MAX_CONCURRENT_REPORTS - inFlightCount);
+    const slotsForNewReports = Math.max(0, MAX_CONCURRENT_REPORTS - inFlightCount);
 
     logger.info(
         {
@@ -195,23 +193,15 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
             entityType,
             inFlightCount,
             maxConcurrent: MAX_CONCURRENT_REPORTS,
-            adjustedLimit,
+            slotsForNewReports,
             now: now.toISOString(),
         },
-        'Checked current in-flight count'
+        'Checked in-flight report count'
     );
 
-    // If we're already at max capacity, don't query for more records
-    if (adjustedLimit === 0) {
-        logger.info({ aggregation, entityType }, 'At max capacity, skipping enqueue');
-        return;
-    }
-
-    // Get eligible rows. Include rows that are either:
-    // 1. Have a reportId (in-progress reports that need continued processing)
-    // 2. Due for refresh (nextRefreshAt <= now, not currently refreshing)
-    // Rows are sorted to prioritize report IDs, then by most recent period, then by nextRefreshAt
-    const dueRecords = await db
+    // First, always get records with reportId that need polling (not currently being processed)
+    // These must be processed regardless of the slot limit - they're already created
+    const recordsWithReportId = await db
         .select()
         .from(reportDatasetMetadata)
         .where(
@@ -220,28 +210,54 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
                 eq(reportDatasetMetadata.countryCode, countryCode),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType),
-                or(and(lte(reportDatasetMetadata.nextRefreshAt, now), eq(reportDatasetMetadata.refreshing, false)), isNotNull(reportDatasetMetadata.reportId))
+                eq(reportDatasetMetadata.refreshing, false),
+                isNotNull(reportDatasetMetadata.reportId)
             )
         )
-        .orderBy(desc(reportDatasetMetadata.reportId), desc(reportDatasetMetadata.periodStart), reportDatasetMetadata.nextRefreshAt)
-        .limit(adjustedLimit);
+        .orderBy(desc(reportDatasetMetadata.periodStart));
+
+    // Then, get records due for new report creation (only up to available slots)
+    let recordsDueForNewReport: typeof recordsWithReportId = [];
+    if (slotsForNewReports > 0) {
+        recordsDueForNewReport = await db
+            .select()
+            .from(reportDatasetMetadata)
+            .where(
+                and(
+                    eq(reportDatasetMetadata.accountId, accountId),
+                    eq(reportDatasetMetadata.countryCode, countryCode),
+                    eq(reportDatasetMetadata.aggregation, aggregation),
+                    eq(reportDatasetMetadata.entityType, entityType),
+                    eq(reportDatasetMetadata.refreshing, false),
+                    lte(reportDatasetMetadata.nextRefreshAt, now),
+                    // Exclude records that already have a reportId (handled above)
+                    isNull(reportDatasetMetadata.reportId)
+                )
+            )
+            .orderBy(desc(reportDatasetMetadata.periodStart))
+            .limit(slotsForNewReports);
+    }
+
+    const recordsNeedingWork = [...recordsWithReportId, ...recordsDueForNewReport];
 
     logger.info(
         {
             aggregation,
             entityType,
-            dueRecordsCount: dueRecords.length,
-            dueRecords: dueRecords.map(r => ({
+            recordsWithReportIdCount: recordsWithReportId.length,
+            recordsDueForNewReportCount: recordsDueForNewReport.length,
+            totalRecordsNeedingWork: recordsNeedingWork.length,
+            records: recordsNeedingWork.map(r => ({
                 uid: r.uid,
                 periodStart: r.periodStart.toISOString(),
                 nextRefreshAt: r.nextRefreshAt?.toISOString() ?? null,
                 reportId: r.reportId,
-                refreshing: r.refreshing,
-                status: r.status,
             })),
         },
-        'Fetched due records for enqueue'
+        'Fetched records needing work'
     );
+
+    const dueRecords = recordsNeedingWork;
 
     if (dueRecords.length === 0) {
         logger.info({ aggregation, entityType }, 'No records due for refresh');
