@@ -69,7 +69,7 @@ export const updateReportStatusJob = boss
                         ),
                     });
 
-                    if (!reportDatum) {
+                    if (!reportDatum || reportDatum.refreshing) {
                         return;
                     }
 
