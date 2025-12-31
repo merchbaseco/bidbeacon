@@ -147,7 +147,6 @@ export async function withJobSession<T>(options: StartJobSessionOptions, handler
     await insertJobEvent(handle, {
         eventType: 'session',
         headline: formatSessionHeadline('started', handle.jobName, handle.context),
-        detail: 'Job session started',
         status: 'running',
         context: handle.context,
     });
@@ -161,7 +160,6 @@ export async function withJobSession<T>(options: StartJobSessionOptions, handler
         await insertJobEvent(handle, {
             eventType: 'session',
             headline: formatSessionHeadline('succeeded', handle.jobName, recorder.getContext()),
-            detail: 'Job session completed',
             status: 'succeeded',
             durationMs,
             context: recorder.getContext(),
@@ -176,7 +174,6 @@ export async function withJobSession<T>(options: StartJobSessionOptions, handler
         await insertJobEvent(handle, {
             eventType: 'session',
             headline: formatSessionHeadline('failed', handle.jobName, recorder.getContext()),
-            detail: message,
             status: 'failed',
             durationMs,
             context: recorder.getContext(),
@@ -304,7 +301,7 @@ function formatSessionHeadline(state: 'started' | 'succeeded' | 'failed', jobNam
     const jobCopy = JOB_TITLES[jobName] ?? { label: jobName };
     const verb = jobCopy.verbs?.[state] ?? DEFAULT_VERBS[state];
     const accountSegment = formatAccountTag(context);
-    return `${verb} ${jobCopy.label}${accountSegment ? ` for ${accountSegment}` : ''}`;
+    return `${verb} ${jobCopy.label}${accountSegment ? ` ${accountSegment}` : ''}`;
 }
 
 function formatDateLabel(value?: string | Date | null) {

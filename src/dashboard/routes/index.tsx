@@ -6,10 +6,6 @@ import { AccountEnabledSwitch } from './components/account-selector/account-enab
 import { AmsMetricsCard } from './components/ams-metrics-card';
 import { DailyPerformanceMetrics } from './components/daily-performance-metrics';
 import { ReportsTable } from './components/reports-table/reports-table';
-import { ApiHealthCard } from './components/health/api-health-card';
-import { DataFreshnessCard } from './components/health/data-freshness-card';
-import { ErrorStatusCard } from './components/health/error-status-card';
-import { MessageThroughputCard } from './components/health/message-throughput-card';
 import { JobEventsFeed } from './components/job-events-feed';
 
 export function IndexRoute() {
@@ -31,13 +27,6 @@ export function IndexRoute() {
                 <div className="md:col-span-4">
                     <AmsMetricsCard />
                 </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 max-w-background-frame-max mx-auto px-4 mt-4">
-                <MessageThroughputCard />
-                <DataFreshnessCard />
-                <ErrorStatusCard />
-                <ApiHealthCard />
             </div>
 
             <div className="max-w-background-frame-max mx-auto px-4 mt-4">

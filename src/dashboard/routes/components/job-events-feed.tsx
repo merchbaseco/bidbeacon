@@ -156,11 +156,10 @@ export function JobEventsFeed() {
                                                         <span className="text-muted-foreground/40">•</span>
                                                         <span className="text-emerald-600 dark:text-emerald-300">{timestamp.relativeShort}</span>
                                                     </span>
-                                                    <span className="text-foreground">{primary.headline ?? primary.jobName}</span>
-                                                    {primary.detail && <span className="text-muted-foreground">{primary.detail}</span>}
-                                                    {primary.status && <Tag>{primary.status}</Tag>}
-                                                </div>
+                                                <span className="text-foreground">{primary.headline ?? primary.jobName}</span>
+                                                {primary.status && <Tag>{primary.status}</Tag>}
                                             </div>
+                                        </div>
                                             {rest.length > 0 && (
                                                 <ul className="ml-4 mt-1 border-l border-dashed border-muted-foreground/40 pl-3">
                                                     {rest.map(event => {
