@@ -135,7 +135,7 @@ async function insertMetadata(args: {
             aggregation,
             entityType,
             status,
-            nextRefreshAt: getNextRefreshTime({ reportId: null, periodStart, aggregation, lastReportCreatedAt: null }),
+            nextRefreshAt: getNextRefreshTime({ reportId: null, periodStart, aggregation, lastReportCreatedAt: null, countryCode }),
             reportId: null,
             error: error ?? null,
         })
@@ -172,8 +172,7 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
                 lte(reportDatasetMetadata.nextRefreshAt, now)
             )
         )
-        .orderBy(desc(reportDatasetMetadata.periodStart))
-        .limit(MAX_CONCURRENT_REPORTS);
+        .orderBy(desc(reportDatasetMetadata.periodStart));
 
     // Enqueue update-report-status jobs for records that do not have a reportId, but are
     // overdue.

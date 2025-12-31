@@ -1,4 +1,6 @@
+import { fromZonedTime } from 'date-fns-tz';
 import type { AggregationType } from '@/types/reports';
+import { getTimezoneForCountry } from '@/utils/timezones';
 
 /**
  * Eligible time offsets for report refresh (in hours).
@@ -26,8 +28,8 @@ export function getEligibleOffsets(aggregation: AggregationType): readonly numbe
  * The eligible offsets represent thresholds where the ads server likely has updated report data.
  * If we already fetched data at a threshold, we don't fetch it again.
  */
-export function isEligibleForReport(timestamp: Date, aggregation: AggregationType, lastReportCreatedAt: Date | null, _countryCode: string, now: Date = new Date()): boolean {
-    // Calculate age in hours - timezone doesn't matter for relative comparisons
+export function isEligibleForReport(timestamp: Date, aggregation: AggregationType, lastReportCreatedAt: Date | null, countryCode: string, now: Date = new Date()): boolean {
+    // Calculate age in hours using UTC timestamps
     const ageMs = now.getTime() - timestamp.getTime();
     const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
 
@@ -53,14 +55,14 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
     }
 
     // Check if a report was already created at this offset
-    if (!lastReportCreatedAt) {
+    const lastReportCreatedAtUtc = toUtcFromLocal(lastReportCreatedAt, countryCode);
+    if (!lastReportCreatedAtUtc) {
         // No report created yet, so eligible (age is past threshold and no previous report)
         return true;
     }
 
-    // Calculate when the last report was created relative to the datum timestamp
-    // Timezone doesn't matter for relative comparisons
-    const lastCreatedAgeMs = lastReportCreatedAt.getTime() - timestamp.getTime();
+    // Calculate when the last report was created relative to the datum timestamp (UTC)
+    const lastCreatedAgeMs = lastReportCreatedAtUtc.getTime() - timestamp.getTime();
     const lastCreatedAgeHours = Math.floor(lastCreatedAgeMs / (1000 * 60 * 60));
 
     // Check if lastReportCreatedAt was set before reaching the matching offset
@@ -85,8 +87,9 @@ export function getNextRefreshTime(row: {
     periodStart: Date;
     aggregation: AggregationType | string;
     lastReportCreatedAt: Date | null;
+    countryCode: string;
 }): Date | null {
-    const { reportId, periodStart, aggregation, lastReportCreatedAt } = row;
+    const { reportId, periodStart, aggregation, lastReportCreatedAt, countryCode } = row;
     const now = new Date();
 
     // If a report is in-flight, poll in 5 minutes to check its status
@@ -103,7 +106,8 @@ export function getNextRefreshTime(row: {
     const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
 
     // Calculate last report created age if it exists
-    const lastCreatedAgeHours = lastReportCreatedAt ? Math.floor((lastReportCreatedAt.getTime() - periodStart.getTime()) / (1000 * 60 * 60)) : null;
+    const lastReportCreatedAtUtc = toUtcFromLocal(lastReportCreatedAt, countryCode);
+    const lastCreatedAgeHours = lastReportCreatedAtUtc ? Math.floor((lastReportCreatedAtUtc.getTime() - periodStart.getTime()) / (1000 * 60 * 60)) : null;
 
     // Find the next offset that either:
     // 1. Hasn't been reached yet (ageHours < offset), OR
@@ -125,3 +129,12 @@ export function getNextRefreshTime(row: {
     // All offsets have been reached and reports created - no more refreshes needed
     return null;
 }
+
+const toUtcFromLocal = (timestamp: Date | null, countryCode: string): Date | null => {
+    if (!timestamp) {
+        return null;
+    }
+
+    const timezone = getTimezoneForCountry(countryCode);
+    return fromZonedTime(timestamp, timezone);
+};
