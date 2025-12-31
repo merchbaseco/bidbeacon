@@ -105,7 +105,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
         }
     }
 
-    return { successCount: valuesToInsert.length, errorCount: errors.length };
+    return { successCount: valuesToInsert.length, errorCount: errors.length, rowsProcessed: valuesToInsert.length + errors.length };
 }
 
 async function updateProgress(reportUid: string, totalRecords: number, successRecords: number, errorRecords: number) {

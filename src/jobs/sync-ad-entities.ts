@@ -18,7 +18,7 @@ import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, targe
 import { boss } from '@/jobs/boss.js';
 import { utcNow } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
-import { createJobLogger } from '@/utils/logger';
+import { withJobSession } from '@/utils/job-events.js';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -186,500 +186,530 @@ export const syncAdEntitiesJob = boss
         for (const job of jobs) {
             const { accountId, countryCode } = job.data;
 
-            // Create job-specific logger with context
-            const logger = createJobLogger('sync-ad-entities', job.id, {
-                accountId,
-                countryCode,
-            });
-
-            // Update metadata to indicate sync is starting
-            await db
-                .insert(accountDatasetMetadata)
-                .values({
-                    accountId,
-                    countryCode,
-                    lastSyncStarted: utcNow(),
-                    error: null,
-                    fetchingCampaigns: true,
-                    fetchingCampaignsPollCount: 0,
-                    fetchingAdGroups: true,
-                    fetchingAdGroupsPollCount: 0,
-                    fetchingAds: true,
-                    fetchingAdsPollCount: 0,
-                    fetchingTargets: true,
-                    fetchingTargetsPollCount: 0,
-                })
-                .onConflictDoUpdate({
-                    target: [accountDatasetMetadata.accountId, accountDatasetMetadata.countryCode],
-                    set: {
-                        lastSyncStarted: utcNow(),
-                        error: null,
-                        fetchingCampaigns: true,
-                        fetchingCampaignsPollCount: 0,
-                        fetchingAdGroups: true,
-                        fetchingAdGroupsPollCount: 0,
-                        fetchingAds: true,
-                        fetchingAdsPollCount: 0,
-                        fetchingTargets: true,
-                        fetchingTargetsPollCount: 0,
+            await withJobSession(
+                {
+                    jobName: 'sync-ad-entities',
+                    bossJobId: job.id,
+                    context: {
+                        accountId,
+                        countryCode,
                     },
-                });
-
-            // Emit event when metadata is updated
-            emitEvent({
-                type: 'account-dataset-metadata:updated',
-                accountId,
-                countryCode,
-            });
-
-            try {
-                // Look up advertiser account to get profileId
-                const account = await db.query.advertiserAccount.findFirst({
-                    where: eq(advertiserAccount.adsAccountId, accountId),
-                    columns: {
-                        adsAccountId: true,
-                        profileId: true,
-                    },
-                });
-
-                if (!account) {
-                    throw new Error(`Advertiser account not found: ${accountId}`);
-                }
-
-                if (!account.profileId) {
-                    throw new Error(`Profile ID not found for account: ${accountId}`);
-                }
-
-                const profileId = Number(account.profileId);
-
-                // Step 1: Create all exports in parallel
-                const [campaignsExport, adGroupsExport, adsExport, targetsExport] = await Promise.all([
-                    exportCampaigns({
-                        profileId,
-                        adProductFilter: ['SPONSORED_PRODUCTS'],
-                    }),
-                    exportAdGroups({
-                        profileId,
-                        adProductFilter: ['SPONSORED_PRODUCTS'],
-                    }),
-                    exportAds({
-                        profileId,
-                        adProductFilter: ['SPONSORED_PRODUCTS'],
-                    }),
-                    exportTargets({
-                        profileId,
-                        adProductFilter: ['SPONSORED_PRODUCTS'],
-                    }),
-                ]);
-
-                // Initialize export states
-                const exports: ExportState[] = [
-                    {
-                        entityType: 'campaigns',
-                        exportId: campaignsExport.exportId,
-                        contentType: 'application/vnd.campaignsexport.v1+json',
-                        status: campaignsExport.status,
-                        url: campaignsExport.url,
-                    },
-                    {
-                        entityType: 'adGroups',
-                        exportId: adGroupsExport.exportId,
-                        contentType: 'application/vnd.adgroupsexport.v1+json',
-                        status: adGroupsExport.status,
-                        url: adGroupsExport.url,
-                    },
-                    {
-                        entityType: 'ads',
-                        exportId: adsExport.exportId,
-                        contentType: 'application/vnd.adsexport.v1+json',
-                        status: adsExport.status,
-                        url: adsExport.url,
-                    },
-                    {
-                        entityType: 'targets',
-                        exportId: targetsExport.exportId,
-                        contentType: 'application/vnd.targetsexport.v1+json',
-                        status: targetsExport.status,
-                        url: targetsExport.url,
-                    },
-                ];
-
-                // Step 2: Poll for all exports to complete
-                let pollCount = 0;
-                while (pollCount < MAX_POLLS) {
-                    const pendingExports = exports.filter(e => e.status === 'PROCESSING');
-
-                    if (pendingExports.length === 0) {
-                        break;
-                    }
-
-                    await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
-
-                    // Track which exports just completed this poll cycle
-                    const justCompleted: EntityType[] = [];
-
-                    // Poll all pending exports in parallel
-                    await Promise.all(
-                        pendingExports.map(async exportState => {
-                            const previousStatus = exportState.status;
-                            const status = await getExportStatus(
-                                {
-                                    profileId,
-                                    exportId: exportState.exportId,
-                                    contentType: exportState.contentType,
-                                },
-                                'na'
-                            );
-
-                            exportState.status = status.status;
-                            exportState.url = status.url;
-
-                            if (status.status === 'FAILED') {
-                                exportState.error = status.error?.message ?? 'Unknown error';
-                                logger.error({ entityType: exportState.entityType, error: exportState.error }, 'Export failed');
-                            }
-
-                            // Track if this export just completed
-                            if (previousStatus === 'PROCESSING' && status.status === 'COMPLETED') {
-                                justCompleted.push(exportState.entityType);
-                            }
+                },
+                async recorder => {
+                    // Update metadata to indicate sync is starting
+                    await db
+                        .insert(accountDatasetMetadata)
+                        .values({
+                            accountId,
+                            countryCode,
+                            lastSyncStarted: utcNow(),
+                            error: null,
+                            fetchingCampaigns: true,
+                            fetchingCampaignsPollCount: 0,
+                            fetchingAdGroups: true,
+                            fetchingAdGroupsPollCount: 0,
+                            fetchingAds: true,
+                            fetchingAdsPollCount: 0,
+                            fetchingTargets: true,
+                            fetchingTargetsPollCount: 0,
                         })
-                    );
-
-                    pollCount++;
-
-                    // Update poll counts and fetching flags for each export type
-                    const updateData: Partial<{
-                        fetchingCampaigns: boolean;
-                        fetchingCampaignsPollCount: number;
-                        fetchingAdGroups: boolean;
-                        fetchingAdGroupsPollCount: number;
-                        fetchingAds: boolean;
-                        fetchingAdsPollCount: number;
-                        fetchingTargets: boolean;
-                        fetchingTargetsPollCount: number;
-                    }> = {};
-
-                    const campaignsExport = exports.find(e => e.entityType === 'campaigns');
-                    if (campaignsExport?.status === 'PROCESSING') {
-                        updateData.fetchingCampaignsPollCount = pollCount;
-                    }
-                    if (justCompleted.includes('campaigns')) {
-                        updateData.fetchingCampaigns = false;
-                    }
-
-                    const adGroupsExport = exports.find(e => e.entityType === 'adGroups');
-                    if (adGroupsExport?.status === 'PROCESSING') {
-                        updateData.fetchingAdGroupsPollCount = pollCount;
-                    }
-                    if (justCompleted.includes('adGroups')) {
-                        updateData.fetchingAdGroups = false;
-                    }
-
-                    const adsExport = exports.find(e => e.entityType === 'ads');
-                    if (adsExport?.status === 'PROCESSING') {
-                        updateData.fetchingAdsPollCount = pollCount;
-                    }
-                    if (justCompleted.includes('ads')) {
-                        updateData.fetchingAds = false;
-                    }
-
-                    const targetsExport = exports.find(e => e.entityType === 'targets');
-                    if (targetsExport?.status === 'PROCESSING') {
-                        updateData.fetchingTargetsPollCount = pollCount;
-                    }
-                    if (justCompleted.includes('targets')) {
-                        updateData.fetchingTargets = false;
-                    }
-
-                    if (Object.keys(updateData).length > 0) {
-                        await db
-                            .update(accountDatasetMetadata)
-                            .set(updateData)
-                            .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
-
-                        // Emit event when metadata is updated
-                        emitEvent({
-                            type: 'account-dataset-metadata:updated',
-                            accountId,
-                            countryCode,
+                        .onConflictDoUpdate({
+                            target: [accountDatasetMetadata.accountId, accountDatasetMetadata.countryCode],
+                            set: {
+                                lastSyncStarted: utcNow(),
+                                error: null,
+                                fetchingCampaigns: true,
+                                fetchingCampaignsPollCount: 0,
+                                fetchingAdGroups: true,
+                                fetchingAdGroupsPollCount: 0,
+                                fetchingAds: true,
+                                fetchingAdsPollCount: 0,
+                                fetchingTargets: true,
+                                fetchingTargetsPollCount: 0,
+                            },
                         });
-                    }
+
+                    // Emit event when metadata is updated
+                    emitEvent({
+                        type: 'account-dataset-metadata:updated',
+                        accountId,
+                        countryCode,
+                    });
+
+                    try {
+                                    // Look up advertiser account to get profileId
+                                    const account = await db.query.advertiserAccount.findFirst({
+                                        where: eq(advertiserAccount.adsAccountId, accountId),
+                                        columns: {
+                                            adsAccountId: true,
+                                            profileId: true,
+                                        },
+                                    });
+
+                                    if (!account) {
+                                        throw new Error(`Advertiser account not found: ${accountId}`);
+                                    }
+
+                                    if (!account.profileId) {
+                                        throw new Error(`Profile ID not found for account: ${accountId}`);
+                                    }
+
+                                    const profileId = Number(account.profileId);
+
+                                    // Step 1: Create all exports in parallel
+                                    const [campaignsExport, adGroupsExport, adsExport, targetsExport] = await Promise.all([
+                                        exportCampaigns({
+                                            profileId,
+                                            adProductFilter: ['SPONSORED_PRODUCTS'],
+                                        }),
+                                        exportAdGroups({
+                                            profileId,
+                                            adProductFilter: ['SPONSORED_PRODUCTS'],
+                                        }),
+                                        exportAds({
+                                            profileId,
+                                            adProductFilter: ['SPONSORED_PRODUCTS'],
+                                        }),
+                                        exportTargets({
+                                            profileId,
+                                            adProductFilter: ['SPONSORED_PRODUCTS'],
+                                        }),
+                                    ]);
+
+                                    // Initialize export states
+                                    const exports: ExportState[] = [
+                                        {
+                                            entityType: 'campaigns',
+                                            exportId: campaignsExport.exportId,
+                                            contentType: 'application/vnd.campaignsexport.v1+json',
+                                            status: campaignsExport.status,
+                                            url: campaignsExport.url,
+                                        },
+                                        {
+                                            entityType: 'adGroups',
+                                            exportId: adGroupsExport.exportId,
+                                            contentType: 'application/vnd.adgroupsexport.v1+json',
+                                            status: adGroupsExport.status,
+                                            url: adGroupsExport.url,
+                                        },
+                                        {
+                                            entityType: 'ads',
+                                            exportId: adsExport.exportId,
+                                            contentType: 'application/vnd.adsexport.v1+json',
+                                            status: adsExport.status,
+                                            url: adsExport.url,
+                                        },
+                                        {
+                                            entityType: 'targets',
+                                            exportId: targetsExport.exportId,
+                                            contentType: 'application/vnd.targetsexport.v1+json',
+                                            status: targetsExport.status,
+                                            url: targetsExport.url,
+                                        },
+                                    ];
+
+                                    // Step 2: Poll for all exports to complete
+                                    let pollCount = 0;
+                                    while (pollCount < MAX_POLLS) {
+                                        const pendingExports = exports.filter(e => e.status === 'PROCESSING');
+
+                                        if (pendingExports.length === 0) {
+                                            break;
+                                        }
+
+                                        await new Promise(resolve => setTimeout(resolve, POLL_INTERVAL_MS));
+
+                                        // Track which exports just completed this poll cycle
+                                        const justCompleted: EntityType[] = [];
+
+                                        // Poll all pending exports in parallel
+                                        await Promise.all(
+                                            pendingExports.map(async exportState => {
+                                                const previousStatus = exportState.status;
+                                                const status = await getExportStatus(
+                                                    {
+                                                        profileId,
+                                                        exportId: exportState.exportId,
+                                                        contentType: exportState.contentType,
+                                                    },
+                                                    'na'
+                                                );
+
+                                                exportState.status = status.status;
+                                                exportState.url = status.url;
+
+                                                if (status.status === 'FAILED') {
+                                                    exportState.error = status.error?.message ?? 'Unknown error';
+                                                    await recorder.event({
+                                                        eventType: 'entity-sync',
+                                                        headline: `Export failed for ${exportState.entityType}`,
+                                                        detail: exportState.error ?? undefined,
+                                                        context: { accountId, countryCode },
+                                                    });
+                                                }
+
+                                                // Track if this export just completed
+                                                if (previousStatus === 'PROCESSING' && status.status === 'COMPLETED') {
+                                                    justCompleted.push(exportState.entityType);
+                                                }
+                                            })
+                                        );
+
+                                        pollCount++;
+
+                                        // Update poll counts and fetching flags for each export type
+                                        const updateData: Partial<{
+                                            fetchingCampaigns: boolean;
+                                            fetchingCampaignsPollCount: number;
+                                            fetchingAdGroups: boolean;
+                                            fetchingAdGroupsPollCount: number;
+                                            fetchingAds: boolean;
+                                            fetchingAdsPollCount: number;
+                                            fetchingTargets: boolean;
+                                            fetchingTargetsPollCount: number;
+                                        }> = {};
+
+                                        const campaignsExport = exports.find(e => e.entityType === 'campaigns');
+                                        if (campaignsExport?.status === 'PROCESSING') {
+                                            updateData.fetchingCampaignsPollCount = pollCount;
+                                        }
+                                        if (justCompleted.includes('campaigns')) {
+                                            updateData.fetchingCampaigns = false;
+                                        }
+
+                                        const adGroupsExport = exports.find(e => e.entityType === 'adGroups');
+                                        if (adGroupsExport?.status === 'PROCESSING') {
+                                            updateData.fetchingAdGroupsPollCount = pollCount;
+                                        }
+                                        if (justCompleted.includes('adGroups')) {
+                                            updateData.fetchingAdGroups = false;
+                                        }
+
+                                        const adsExport = exports.find(e => e.entityType === 'ads');
+                                        if (adsExport?.status === 'PROCESSING') {
+                                            updateData.fetchingAdsPollCount = pollCount;
+                                        }
+                                        if (justCompleted.includes('ads')) {
+                                            updateData.fetchingAds = false;
+                                        }
+
+                                        const targetsExport = exports.find(e => e.entityType === 'targets');
+                                        if (targetsExport?.status === 'PROCESSING') {
+                                            updateData.fetchingTargetsPollCount = pollCount;
+                                        }
+                                        if (justCompleted.includes('targets')) {
+                                            updateData.fetchingTargets = false;
+                                        }
+
+                                        if (Object.keys(updateData).length > 0) {
+                                            await db
+                                                .update(accountDatasetMetadata)
+                                                .set(updateData)
+                                                .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                                            // Emit event when metadata is updated
+                                            emitEvent({
+                                                type: 'account-dataset-metadata:updated',
+                                                accountId,
+                                                countryCode,
+                                            });
+                                        }
+                                    }
+
+                                    // Check for failures
+                                    const failedExports = exports.filter(e => e.status === 'FAILED');
+                                    if (failedExports.length > 0) {
+                                        // Set fetching flags to false for failed exports
+                                        const updateData: Partial<{
+                                            fetchingCampaigns: boolean;
+                                            fetchingAdGroups: boolean;
+                                            fetchingAds: boolean;
+                                            fetchingTargets: boolean;
+                                        }> = {};
+
+                                        if (failedExports.some(e => e.entityType === 'campaigns')) {
+                                            updateData.fetchingCampaigns = false;
+                                        }
+                                        if (failedExports.some(e => e.entityType === 'adGroups')) {
+                                            updateData.fetchingAdGroups = false;
+                                        }
+                                        if (failedExports.some(e => e.entityType === 'ads')) {
+                                            updateData.fetchingAds = false;
+                                        }
+                                        if (failedExports.some(e => e.entityType === 'targets')) {
+                                            updateData.fetchingTargets = false;
+                                        }
+
+                                        if (Object.keys(updateData).length > 0) {
+                                            await db
+                                                .update(accountDatasetMetadata)
+                                                .set(updateData)
+                                                .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                                            emitEvent({
+                                                type: 'account-dataset-metadata:updated',
+                                                accountId,
+                                                countryCode,
+                                            });
+                                        }
+
+                                        throw new Error(`Exports failed: ${failedExports.map(e => `${e.entityType}: ${e.error}`).join(', ')}`);
+                                    }
+
+                                    const incompleteExports = exports.filter(e => e.status !== 'COMPLETED');
+                                    if (incompleteExports.length > 0) {
+                                        // Set fetching flags to false for incomplete exports
+                                        const updateData: Partial<{
+                                            fetchingCampaigns: boolean;
+                                            fetchingAdGroups: boolean;
+                                            fetchingAds: boolean;
+                                            fetchingTargets: boolean;
+                                        }> = {};
+
+                                        if (incompleteExports.some(e => e.entityType === 'campaigns')) {
+                                            updateData.fetchingCampaigns = false;
+                                        }
+                                        if (incompleteExports.some(e => e.entityType === 'adGroups')) {
+                                            updateData.fetchingAdGroups = false;
+                                        }
+                                        if (incompleteExports.some(e => e.entityType === 'ads')) {
+                                            updateData.fetchingAds = false;
+                                        }
+                                        if (incompleteExports.some(e => e.entityType === 'targets')) {
+                                            updateData.fetchingTargets = false;
+                                        }
+
+                                        if (Object.keys(updateData).length > 0) {
+                                            await db
+                                                .update(accountDatasetMetadata)
+                                                .set(updateData)
+                                                .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                                            emitEvent({
+                                                type: 'account-dataset-metadata:updated',
+                                                accountId,
+                                                countryCode,
+                                            });
+                                        }
+
+                                        throw new Error(`Exports did not complete within timeout: ${incompleteExports.map(e => e.entityType).join(', ')}`);
+                                    }
+
+                                    // Step 3: Download and parse all exports in parallel
+                                    // Helper to get URL safely (we've already verified all exports are COMPLETED)
+                                    const getExportUrl = (entityType: EntityType): string => {
+                                        const exportState = exports.find(e => e.entityType === entityType);
+                                        if (!exportState?.url) {
+                                            throw new Error(`Missing URL for ${entityType} export`);
+                                        }
+                                        return exportState.url;
+                                    };
+
+                                    const [campaignsData, adGroupsData, adsData, targetsData] = await Promise.all([
+                                        downloadAndParse(getExportUrl('campaigns'), campaignsExportSchema),
+                                        downloadAndParse(getExportUrl('adGroups'), adGroupsExportSchema),
+                                        downloadAndParse(getExportUrl('ads'), adsExportSchema),
+                                        downloadAndParse(getExportUrl('targets'), targetsExportSchema),
+                                    ]);
+
+                                    // Update metadata to indicate downloads are complete (set fetching flags to false)
+                                    await db
+                                        .update(accountDatasetMetadata)
+                                        .set({
+                                            fetchingCampaigns: false,
+                                            fetchingAdGroups: false,
+                                            fetchingAds: false,
+                                            fetchingTargets: false,
+                                        })
+                                        .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                                    // Emit event when metadata is updated
+                                    emitEvent({
+                                        type: 'account-dataset-metadata:updated',
+                                        accountId,
+                                        countryCode,
+                                    });
+
+                                    // Step 4: Transform and insert into database
+                                    // Extract IDs from export data to scope deletions to this account only
+                                    const campaignIds = campaignsData.map(c => c.campaignId);
+                                    const adGroupIds = adGroupsData.map(ag => ag.adGroupId);
+                                    const adIds = adsData.map(a => a.adId);
+                                    const targetIds = targetsData.map(t => t.targetId);
+
+                                    await db.transaction(async tx => {
+                                        // Delete existing data for this account only (scoped to exported IDs)
+                                        // Delete in reverse dependency order to respect foreign key constraints
+                                        if (targetIds.length > 0) {
+                                            await tx.delete(target).where(inArray(target.targetId, targetIds));
+                                        }
+                                        if (adIds.length > 0) {
+                                            await tx.delete(ad).where(inArray(ad.adId, adIds));
+                                        }
+                                        if (adGroupIds.length > 0) {
+                                            await tx.delete(adGroup).where(inArray(adGroup.adGroupId, adGroupIds));
+                                        }
+                                        if (campaignIds.length > 0) {
+                                            await tx.delete(campaign).where(inArray(campaign.campaignId, campaignIds));
+                                        }
+
+                                        // Insert campaigns
+                                        if (campaignsData.length > 0) {
+                                            const campaignRecords: InferInsertModel<typeof campaign>[] = campaignsData.map(c => ({
+                                                id: c.campaignId,
+                                                campaignId: c.campaignId,
+                                                accountId,
+                                                countryCode,
+                                                name: c.name,
+                                                adProduct: c.adProduct,
+                                                state: c.state,
+                                                deliveryStatus: c.deliveryStatus,
+                                                startDate: c.startDate,
+                                                endDate: c.endDate ?? null,
+                                                targetingSettings: c.targetingSettings,
+                                                bidStrategy: c.optimization?.bidStrategy ?? null,
+                                                budgetType: c.budgetCaps?.budgetType ?? null,
+                                                budgetPeriod: c.budgetCaps?.recurrenceTimePeriod ?? null,
+                                                budgetAmount: c.budgetCaps?.budgetValue?.monetaryBudget?.amount?.toString() ?? null,
+                                                creationDateTime: new Date(c.creationDateTime),
+                                                lastUpdatedDateTime: new Date(c.lastUpdatedDateTime),
+                                            }));
+
+                                            await batchInsert(tx, campaign, campaignRecords);
+                                        }
+
+                                        // Insert ad groups
+                                        if (adGroupsData.length > 0) {
+                                            const adGroupRecords: InferInsertModel<typeof adGroup>[] = adGroupsData.map(ag => ({
+                                                id: ag.adGroupId,
+                                                adGroupId: ag.adGroupId,
+                                                campaignId: ag.campaignId,
+                                                name: ag.name,
+                                                adProduct: ag.adProduct,
+                                                state: ag.state,
+                                                deliveryStatus: ag.deliveryStatus,
+                                                bidAmount: ag.bid?.defaultBid?.toString() ?? null,
+                                                creationDateTime: new Date(ag.creationDateTime),
+                                                lastUpdatedDateTime: new Date(ag.lastUpdatedDateTime),
+                                            }));
+
+                                            await batchInsert(tx, adGroup, adGroupRecords);
+                                        }
+
+                                        // Insert ads
+                                        if (adsData.length > 0) {
+                                            const adRecords: InferInsertModel<typeof ad>[] = adsData.map(a => ({
+                                                id: a.adId,
+                                                adId: a.adId,
+                                                adGroupId: a.adGroupId,
+                                                campaignId: a.campaignId,
+                                                adProduct: a.adProduct,
+                                                adType: a.adType,
+                                                state: a.state,
+                                                deliveryStatus: a.deliveryStatus,
+                                                productAsin: a.creative.products[0]?.productId ?? null,
+                                                creationDateTime: new Date(a.creationDateTime),
+                                                lastUpdatedDateTime: new Date(a.lastUpdatedDateTime),
+                                            }));
+
+                                            await batchInsert(tx, ad, adRecords);
+                                        }
+
+                                        // Insert targets
+                                        if (targetsData.length > 0) {
+                                            const targetRecords: InferInsertModel<typeof target>[] = targetsData.map(t => {
+                                                // Handle bid amount - could be number or bid object with currencyCode and bid
+                                                let bidAmount: string | null = null;
+                                                if (t.bid !== undefined) {
+                                                    if (typeof t.bid === 'number') {
+                                                        bidAmount = t.bid.toString();
+                                                    } else if (typeof t.bid === 'object' && t.bid !== null) {
+                                                        bidAmount = t.bid.bid.toString();
+                                                    }
+                                                }
+
+                                                return {
+                                                    id: t.targetId,
+                                                    campaignId: t.campaignId,
+                                                    targetId: t.targetId,
+                                                    adGroupId: t.adGroupId ?? null,
+                                                    adProduct: t.adProduct,
+                                                    state: t.state,
+                                                    negative: t.negative,
+                                                    bidAmount,
+                                                    targetMatchType: t.targetDetails.matchType,
+                                                    targetAsin: t.targetDetails.asin ?? null,
+                                                    targetKeyword: t.targetDetails.keyword ?? null,
+                                                    targetType: t.targetType,
+                                                    deliveryStatus: t.deliveryStatus,
+                                                    creationDateTime: new Date(t.creationDateTime),
+                                                    lastUpdatedDateTime: new Date(t.lastUpdatedDateTime),
+                                                };
+                                            });
+
+                                            await batchInsert(tx, target, targetRecords);
+                                        }
+                                    });
+
+                                        // Update metadata with success
+                                        await db
+                                            .update(accountDatasetMetadata)
+                                            .set({
+                                                lastSyncCompleted: utcNow(),
+                                                campaignsCount: campaignsData.length,
+                                                adGroupsCount: adGroupsData.length,
+                                                adsCount: adsData.length,
+                                                targetsCount: targetsData.length,
+                                                error: null,
+                                            })
+                                            .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                                        // Emit event when metadata is updated
+                                        emitEvent({
+                                            type: 'account-dataset-metadata:updated',
+                                            accountId,
+                                            countryCode,
+                                        });
+
+                                        const syncTotals = {
+                                            campaigns: campaignsData.length,
+                                            adGroups: adGroupsData.length,
+                                            ads: adsData.length,
+                                            targets: targetsData.length,
+                                        };
+                                        const totalRecords = syncTotals.campaigns + syncTotals.adGroups + syncTotals.ads + syncTotals.targets;
+
+                                        await recorder.event({
+                                            eventType: 'entity-sync',
+                                            headline: `Imported ${syncTotals.campaigns} campaigns, ${syncTotals.adGroups} ad groups, ${syncTotals.ads} ads, ${syncTotals.targets} targets`,
+                                            detail: 'Account entity sync completed successfully',
+                                            context: { accountId, countryCode },
+                                        });
+
+                                        recorder.setFinalFields({
+                                            recordsProcessed: totalRecords,
+                                            metadata: syncTotals,
+                                        });
+                } catch (error) {
+                    // Update metadata with error
+                    await db
+                        .update(accountDatasetMetadata)
+                        .set({
+                            error: error instanceof Error ? error.message : 'Unknown error',
+                        })
+                        .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
+
+                    // Emit event when metadata is updated
+                    emitEvent({
+                        type: 'account-dataset-metadata:updated',
+                        accountId,
+                        countryCode,
+                    });
+
+                    recorder.markFailure(error instanceof Error ? error.message : String(error));
+                    throw error;
                 }
-
-                // Check for failures
-                const failedExports = exports.filter(e => e.status === 'FAILED');
-                if (failedExports.length > 0) {
-                    // Set fetching flags to false for failed exports
-                    const updateData: Partial<{
-                        fetchingCampaigns: boolean;
-                        fetchingAdGroups: boolean;
-                        fetchingAds: boolean;
-                        fetchingTargets: boolean;
-                    }> = {};
-
-                    if (failedExports.some(e => e.entityType === 'campaigns')) {
-                        updateData.fetchingCampaigns = false;
-                    }
-                    if (failedExports.some(e => e.entityType === 'adGroups')) {
-                        updateData.fetchingAdGroups = false;
-                    }
-                    if (failedExports.some(e => e.entityType === 'ads')) {
-                        updateData.fetchingAds = false;
-                    }
-                    if (failedExports.some(e => e.entityType === 'targets')) {
-                        updateData.fetchingTargets = false;
-                    }
-
-                    if (Object.keys(updateData).length > 0) {
-                        await db
-                            .update(accountDatasetMetadata)
-                            .set(updateData)
-                            .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
-
-                        emitEvent({
-                            type: 'account-dataset-metadata:updated',
-                            accountId,
-                            countryCode,
-                        });
-                    }
-
-                    throw new Error(`Exports failed: ${failedExports.map(e => `${e.entityType}: ${e.error}`).join(', ')}`);
-                }
-
-                const incompleteExports = exports.filter(e => e.status !== 'COMPLETED');
-                if (incompleteExports.length > 0) {
-                    // Set fetching flags to false for incomplete exports
-                    const updateData: Partial<{
-                        fetchingCampaigns: boolean;
-                        fetchingAdGroups: boolean;
-                        fetchingAds: boolean;
-                        fetchingTargets: boolean;
-                    }> = {};
-
-                    if (incompleteExports.some(e => e.entityType === 'campaigns')) {
-                        updateData.fetchingCampaigns = false;
-                    }
-                    if (incompleteExports.some(e => e.entityType === 'adGroups')) {
-                        updateData.fetchingAdGroups = false;
-                    }
-                    if (incompleteExports.some(e => e.entityType === 'ads')) {
-                        updateData.fetchingAds = false;
-                    }
-                    if (incompleteExports.some(e => e.entityType === 'targets')) {
-                        updateData.fetchingTargets = false;
-                    }
-
-                    if (Object.keys(updateData).length > 0) {
-                        await db
-                            .update(accountDatasetMetadata)
-                            .set(updateData)
-                            .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
-
-                        emitEvent({
-                            type: 'account-dataset-metadata:updated',
-                            accountId,
-                            countryCode,
-                        });
-                    }
-
-                    throw new Error(`Exports did not complete within timeout: ${incompleteExports.map(e => e.entityType).join(', ')}`);
-                }
-
-                // Step 3: Download and parse all exports in parallel
-                // Helper to get URL safely (we've already verified all exports are COMPLETED)
-                const getExportUrl = (entityType: EntityType): string => {
-                    const exportState = exports.find(e => e.entityType === entityType);
-                    if (!exportState?.url) {
-                        throw new Error(`Missing URL for ${entityType} export`);
-                    }
-                    return exportState.url;
-                };
-
-                const [campaignsData, adGroupsData, adsData, targetsData] = await Promise.all([
-                    downloadAndParse(getExportUrl('campaigns'), campaignsExportSchema),
-                    downloadAndParse(getExportUrl('adGroups'), adGroupsExportSchema),
-                    downloadAndParse(getExportUrl('ads'), adsExportSchema),
-                    downloadAndParse(getExportUrl('targets'), targetsExportSchema),
-                ]);
-
-                // Update metadata to indicate downloads are complete (set fetching flags to false)
-                await db
-                    .update(accountDatasetMetadata)
-                    .set({
-                        fetchingCampaigns: false,
-                        fetchingAdGroups: false,
-                        fetchingAds: false,
-                        fetchingTargets: false,
-                    })
-                    .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
-
-                // Emit event when metadata is updated
-                emitEvent({
-                    type: 'account-dataset-metadata:updated',
-                    accountId,
-                    countryCode,
-                });
-
-                // Step 4: Transform and insert into database
-                // Extract IDs from export data to scope deletions to this account only
-                const campaignIds = campaignsData.map(c => c.campaignId);
-                const adGroupIds = adGroupsData.map(ag => ag.adGroupId);
-                const adIds = adsData.map(a => a.adId);
-                const targetIds = targetsData.map(t => t.targetId);
-
-                await db.transaction(async tx => {
-                    // Delete existing data for this account only (scoped to exported IDs)
-                    // Delete in reverse dependency order to respect foreign key constraints
-                    if (targetIds.length > 0) {
-                        await tx.delete(target).where(inArray(target.targetId, targetIds));
-                    }
-                    if (adIds.length > 0) {
-                        await tx.delete(ad).where(inArray(ad.adId, adIds));
-                    }
-                    if (adGroupIds.length > 0) {
-                        await tx.delete(adGroup).where(inArray(adGroup.adGroupId, adGroupIds));
-                    }
-                    if (campaignIds.length > 0) {
-                        await tx.delete(campaign).where(inArray(campaign.campaignId, campaignIds));
-                    }
-
-                    // Insert campaigns
-                    if (campaignsData.length > 0) {
-                        const campaignRecords: InferInsertModel<typeof campaign>[] = campaignsData.map(c => ({
-                            id: c.campaignId,
-                            campaignId: c.campaignId,
-                            accountId,
-                            countryCode,
-                            name: c.name,
-                            adProduct: c.adProduct,
-                            state: c.state,
-                            deliveryStatus: c.deliveryStatus,
-                            startDate: c.startDate,
-                            endDate: c.endDate ?? null,
-                            targetingSettings: c.targetingSettings,
-                            bidStrategy: c.optimization?.bidStrategy ?? null,
-                            budgetType: c.budgetCaps?.budgetType ?? null,
-                            budgetPeriod: c.budgetCaps?.recurrenceTimePeriod ?? null,
-                            budgetAmount: c.budgetCaps?.budgetValue?.monetaryBudget?.amount?.toString() ?? null,
-                            creationDateTime: new Date(c.creationDateTime),
-                            lastUpdatedDateTime: new Date(c.lastUpdatedDateTime),
-                        }));
-
-                        await batchInsert(tx, campaign, campaignRecords);
-                    }
-
-                    // Insert ad groups
-                    if (adGroupsData.length > 0) {
-                        const adGroupRecords: InferInsertModel<typeof adGroup>[] = adGroupsData.map(ag => ({
-                            id: ag.adGroupId,
-                            adGroupId: ag.adGroupId,
-                            campaignId: ag.campaignId,
-                            name: ag.name,
-                            adProduct: ag.adProduct,
-                            state: ag.state,
-                            deliveryStatus: ag.deliveryStatus,
-                            bidAmount: ag.bid?.defaultBid?.toString() ?? null,
-                            creationDateTime: new Date(ag.creationDateTime),
-                            lastUpdatedDateTime: new Date(ag.lastUpdatedDateTime),
-                        }));
-
-                        await batchInsert(tx, adGroup, adGroupRecords);
-                    }
-
-                    // Insert ads
-                    if (adsData.length > 0) {
-                        const adRecords: InferInsertModel<typeof ad>[] = adsData.map(a => ({
-                            id: a.adId,
-                            adId: a.adId,
-                            adGroupId: a.adGroupId,
-                            campaignId: a.campaignId,
-                            adProduct: a.adProduct,
-                            adType: a.adType,
-                            state: a.state,
-                            deliveryStatus: a.deliveryStatus,
-                            productAsin: a.creative.products[0]?.productId ?? null,
-                            creationDateTime: new Date(a.creationDateTime),
-                            lastUpdatedDateTime: new Date(a.lastUpdatedDateTime),
-                        }));
-
-                        await batchInsert(tx, ad, adRecords);
-                    }
-
-                    // Insert targets
-                    if (targetsData.length > 0) {
-                        const targetRecords: InferInsertModel<typeof target>[] = targetsData.map(t => {
-                            // Handle bid amount - could be number or bid object with currencyCode and bid
-                            let bidAmount: string | null = null;
-                            if (t.bid !== undefined) {
-                                if (typeof t.bid === 'number') {
-                                    bidAmount = t.bid.toString();
-                                } else if (typeof t.bid === 'object' && t.bid !== null) {
-                                    bidAmount = t.bid.bid.toString();
-                                }
-                            }
-
-                            return {
-                                id: t.targetId,
-                                campaignId: t.campaignId,
-                                targetId: t.targetId,
-                                adGroupId: t.adGroupId ?? null,
-                                adProduct: t.adProduct,
-                                state: t.state,
-                                negative: t.negative,
-                                bidAmount,
-                                targetMatchType: t.targetDetails.matchType,
-                                targetAsin: t.targetDetails.asin ?? null,
-                                targetKeyword: t.targetDetails.keyword ?? null,
-                                targetType: t.targetType,
-                                deliveryStatus: t.deliveryStatus,
-                                creationDateTime: new Date(t.creationDateTime),
-                                lastUpdatedDateTime: new Date(t.lastUpdatedDateTime),
-                            };
-                        });
-
-                        await batchInsert(tx, target, targetRecords);
-                    }
-                });
-
-                // Update metadata with success
-                await db
-                    .update(accountDatasetMetadata)
-                    .set({
-                        lastSyncCompleted: utcNow(),
-                        campaignsCount: campaignsData.length,
-                        adGroupsCount: adGroupsData.length,
-                        adsCount: adsData.length,
-                        targetsCount: targetsData.length,
-                        error: null,
-                    })
-                    .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
-
-                // Emit event when metadata is updated
-                emitEvent({
-                    type: 'account-dataset-metadata:updated',
-                    accountId,
-                    countryCode,
-                });
-            } catch (error) {
-                // Update metadata with error
-                await db
-                    .update(accountDatasetMetadata)
-                    .set({
-                        error: error instanceof Error ? error.message : 'Unknown error',
-                    })
-                    .where(and(eq(accountDatasetMetadata.accountId, accountId), eq(accountDatasetMetadata.countryCode, countryCode)));
-
-                // Emit event when metadata is updated
-                emitEvent({
-                    type: 'account-dataset-metadata:updated',
-                    accountId,
-                    countryCode,
-                });
-
-                logger.error({ err: error }, 'Failed job');
-                throw error;
-            }
+            });
         }
     });
 

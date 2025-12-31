@@ -161,12 +161,22 @@ export const reportsRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            const result = await parseReport({
-                accountId: input.accountId,
-                timestamp: input.timestamp,
-                aggregation: input.aggregation,
-                entityType: input.entityType,
+            const periodStart = new Date(input.timestamp);
+            const metadata = await db.query.reportDatasetMetadata.findFirst({
+                where: and(
+                    eq(reportDatasetMetadata.accountId, input.accountId),
+                    eq(reportDatasetMetadata.countryCode, input.countryCode),
+                    eq(reportDatasetMetadata.periodStart, periodStart),
+                    eq(reportDatasetMetadata.aggregation, input.aggregation),
+                    eq(reportDatasetMetadata.entityType, input.entityType)
+                ),
             });
+
+            if (!metadata) {
+                throw new Error('Report metadata not found for the requested dataset');
+            }
+
+            const result = await parseReport(metadata.uid);
             return { rowsProcessed: result.rowsProcessed };
         }),
 

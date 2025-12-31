@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../../components/ui/button';
-import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
 
 interface ReportResponseDialogProps {
     open: boolean;
@@ -38,9 +38,7 @@ export function ReportResponseDialog({ open, onOpenChange, title, data, error }:
                     <Button variant="outline" onClick={handleCopy}>
                         {copied ? 'Copied!' : 'Copy JSON'}
                     </Button>
-                    <DialogClose asChild>
-                        <Button>Close</Button>
-                    </DialogClose>
+                    <Button onClick={() => onOpenChange(false)}>Close</Button>
                 </DialogFooter>
             </DialogPopup>
         </Dialog>

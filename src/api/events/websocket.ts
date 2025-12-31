@@ -1,9 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 import { registerWebSocketConnection } from '@/utils/events.js';
-import { createContextLogger } from '@/utils/logger';
-
-const logger = createContextLogger({ component: 'websocket' });
 
 export function registerWebSocketRoute(fastify: FastifyInstance) {
     // #region agent log
@@ -36,7 +33,7 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
         }).catch(() => {});
         // #endregion
         socket.on('error', error => {
-            logger.error({ err: error }, 'Connection error');
+            console.error('WebSocket connection error', error);
         });
 
         if (socket.readyState !== 1) {

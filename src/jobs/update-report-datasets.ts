@@ -9,6 +9,7 @@ import { db } from '@/db/index.js';
 import { advertiserAccount } from '@/db/schema.js';
 import { boss } from '@/jobs/boss.js';
 import { updateReportDatasetForAccountJob } from './update-report-dataset-for-account.js';
+import { withJobSession } from '@/utils/job-events.js';
 
 // ============================================================================
 // Job Definition
@@ -19,25 +20,46 @@ export const updateReportDatasetsJob = boss
     .schedule({
         cron: '*/5 * * * *', // Run every 5 minutes
     })
-    .work(async () => {
-        // Query all enabled advertiser accounts
-        const enabledAccounts = await db
-            .select({
-                adsAccountId: advertiserAccount.adsAccountId,
-                countryCode: advertiserAccount.countryCode,
-            })
-            .from(advertiserAccount)
-            .where(eq(advertiserAccount.enabled, true));
+    .work(async jobs => {
+        await Promise.all(
+            jobs.map(job =>
+                withJobSession(
+                    {
+                        jobName: 'update-report-datasets',
+                        bossJobId: job.id,
+                    },
+                    async recorder => {
+                        const enabledAccounts = await db
+                            .select({
+                                adsAccountId: advertiserAccount.adsAccountId,
+                                countryCode: advertiserAccount.countryCode,
+                            })
+                            .from(advertiserAccount)
+                            .where(eq(advertiserAccount.enabled, true));
 
-        // Enqueue a separate job to update report datasets for each enabled
-        // account.
-        const accountJobPromises = enabledAccounts.map(async account => {
-            const jobId = await updateReportDatasetForAccountJob.emit({
-                accountId: account.adsAccountId,
-                countryCode: account.countryCode,
-            });
-            return jobId;
-        });
+                        const accountJobPromises = enabledAccounts.map(async account => {
+                            await updateReportDatasetForAccountJob.emit({
+                                accountId: account.adsAccountId,
+                                countryCode: account.countryCode,
+                            });
+                        });
 
-        await Promise.all(accountJobPromises);
+                        await Promise.all(accountJobPromises);
+
+                        recorder.setFinalFields({
+                            recordsProcessed: enabledAccounts.length,
+                            metadata: {
+                                accountsEnqueued: enabledAccounts.length,
+                            },
+                        });
+
+                        await recorder.event({
+                            eventType: 'reports:enqueue',
+                            headline: `Queued ${enabledAccounts.length} account dataset jobs`,
+                            detail: 'Triggered update-report-dataset-for-account per enabled advertiser',
+                        });
+                    }
+                )
+            )
+        );
     });

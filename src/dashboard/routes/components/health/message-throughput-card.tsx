@@ -32,8 +32,8 @@ const Sparkline = ({ data }: { data: number[] }) => {
                         dataKey="value"
                         radius={[2, 2, 0, 0]}
                         isAnimationActive={false}
-                        shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { opacity: number } }) => {
-                            const { x = 0, y = 0, width = 0, height = 0, payload } = props;
+                        shape={(props: any) => {
+                            const { x = 0, y = 0, width = 0, height = 0, payload } = props ?? {};
                             const opacity = payload?.opacity ?? 0.5;
                             return <rect x={x} y={y} width={width} height={height} fill="currentColor" opacity={opacity} rx={2} className="text-indigo-500" />;
                         }}
@@ -98,4 +98,3 @@ export const MessageThroughputCard = () => {
         </Card>
     );
 };
-

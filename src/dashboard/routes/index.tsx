@@ -10,6 +10,7 @@ import { ApiHealthCard } from './components/health/api-health-card';
 import { DataFreshnessCard } from './components/health/data-freshness-card';
 import { ErrorStatusCard } from './components/health/error-status-card';
 import { MessageThroughputCard } from './components/health/message-throughput-card';
+import { JobEventsFeed } from './components/job-events-feed';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
@@ -37,6 +38,10 @@ export function IndexRoute() {
                 <DataFreshnessCard />
                 <ErrorStatusCard />
                 <ApiHealthCard />
+            </div>
+
+            <div className="max-w-background-frame-max mx-auto px-4 mt-4">
+                <JobEventsFeed />
             </div>
 
             <ReportsTable className="max-w-background-frame-max mx-auto px-4 mt-6" />

@@ -2,7 +2,6 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { workerControl } from '@/db/schema';
-import { logger } from '@/utils/logger';
 import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqsClient';
 import { publicProcedure, router } from '../trpc';
 
@@ -30,53 +29,43 @@ export const workerRouter = router({
     }),
 
     start: publicProcedure.mutation(async () => {
-        try {
-            const result = await db
-                .insert(workerControl)
-                .values({ id: 'main', enabled: true, messagesPerSecond: 0 })
-                .onConflictDoUpdate({
-                    target: workerControl.id,
-                    set: {
-                        enabled: true,
-                        updatedAt: new Date(),
-                    },
-                })
-                .returning();
+        const result = await db
+            .insert(workerControl)
+            .values({ id: 'main', enabled: true, messagesPerSecond: 0 })
+            .onConflictDoUpdate({
+                target: workerControl.id,
+                set: {
+                    enabled: true,
+                    updatedAt: new Date(),
+                },
+            })
+            .returning();
 
-            return {
-                enabled: result[0].enabled,
-                messagesPerSecond: result[0].messagesPerSecond ?? 0,
-                updatedAt: result[0].updatedAt,
-            };
-        } catch (error) {
-            logger.error({ err: error }, 'Error starting queue');
-            throw error;
-        }
+        return {
+            enabled: result[0].enabled,
+            messagesPerSecond: result[0].messagesPerSecond ?? 0,
+            updatedAt: result[0].updatedAt,
+        };
     }),
 
     stop: publicProcedure.mutation(async () => {
-        try {
-            const result = await db
-                .insert(workerControl)
-                .values({ id: 'main', enabled: false, messagesPerSecond: 0 })
-                .onConflictDoUpdate({
-                    target: workerControl.id,
-                    set: {
-                        enabled: false,
-                        updatedAt: new Date(),
-                    },
-                })
-                .returning();
+        const result = await db
+            .insert(workerControl)
+            .values({ id: 'main', enabled: false, messagesPerSecond: 0 })
+            .onConflictDoUpdate({
+                target: workerControl.id,
+                set: {
+                    enabled: false,
+                    updatedAt: new Date(),
+                },
+            })
+            .returning();
 
-            return {
-                enabled: result[0].enabled,
-                messagesPerSecond: result[0].messagesPerSecond ?? 0,
-                updatedAt: result[0].updatedAt,
-            };
-        } catch (error) {
-            logger.error({ err: error }, 'Error stopping queue');
-            throw error;
-        }
+        return {
+            enabled: result[0].enabled,
+            messagesPerSecond: result[0].messagesPerSecond ?? 0,
+            updatedAt: result[0].updatedAt,
+        };
     }),
 
     speed: publicProcedure
@@ -86,28 +75,23 @@ export const workerRouter = router({
             })
         )
         .mutation(async ({ input }) => {
-            try {
-                const result = await db
-                    .insert(workerControl)
-                    .values({ id: 'main', messagesPerSecond: input.messagesPerSecond })
-                    .onConflictDoUpdate({
-                        target: workerControl.id,
-                        set: {
-                            messagesPerSecond: input.messagesPerSecond,
-                            updatedAt: new Date(),
-                        },
-                    })
-                    .returning();
+            const result = await db
+                .insert(workerControl)
+                .values({ id: 'main', messagesPerSecond: input.messagesPerSecond })
+                .onConflictDoUpdate({
+                    target: workerControl.id,
+                    set: {
+                        messagesPerSecond: input.messagesPerSecond,
+                        updatedAt: new Date(),
+                    },
+                })
+                .returning();
 
-                return {
-                    enabled: result[0].enabled,
-                    messagesPerSecond: result[0].messagesPerSecond ?? 0,
-                    updatedAt: result[0].updatedAt,
-                };
-            } catch (error) {
-                logger.error({ err: error }, 'Error setting rate limit');
-                throw error;
-            }
+            return {
+                enabled: result[0].enabled,
+                messagesPerSecond: result[0].messagesPerSecond ?? 0,
+                updatedAt: result[0].updatedAt,
+            };
         }),
 
     metrics: publicProcedure.query(async () => {
@@ -128,15 +112,8 @@ export const workerRouter = router({
                 const errorMessage = error instanceof Error ? error.message : String(error);
                 const isAccessDenied = errorMessage.includes('not authorized') || errorMessage.includes('AccessDenied');
 
-                if (isAccessDenied) {
-                    logger.error(
-                        {
-                            err: error,
-                        },
-                        'DLQ access denied'
-                    );
-                } else {
-                    logger.error({ err: error }, 'Error getting DLQ metrics');
+                if (!isAccessDenied) {
+                    console.error('Error getting DLQ metrics', error);
                 }
 
                 dlqMetrics = {

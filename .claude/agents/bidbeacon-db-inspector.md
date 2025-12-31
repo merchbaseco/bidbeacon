@@ -37,7 +37,7 @@ ssh -i "/Users/zknicker/Library/Mobile Documents/com~apple~CloudDocs/Business/Me
 - `performance_hourly` - Hourly metrics (bucket_start)
 - `performance_daily` - Daily metrics (bucket_date)
 - `report_dataset_metadata` - Report status tracking
-- `job_metrics` - Background job history
+- `job_sessions` / `job_events` - Background job history + timeline
 - `advertiser_account` - Account info
 
 ## Rules

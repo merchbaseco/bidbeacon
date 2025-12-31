@@ -148,7 +148,7 @@ export async function handleHourlyTarget(input: ParseReportInput): Promise<Parse
     const totalTime = performance.now() - startTime;
     console.log(`[handleHourlyTarget] Total time: ${totalTime.toFixed(2)}ms`);
 
-    return { successCount: valuesToInsert.length, errorCount: errors.length };
+    return { successCount: valuesToInsert.length, errorCount: errors.length, rowsProcessed: valuesToInsert.length + errors.length };
 }
 
 async function updateProgress(reportUid: string, totalRecords: number, successRecords: number, errorRecords: number) {

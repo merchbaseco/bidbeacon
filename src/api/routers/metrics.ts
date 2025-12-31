@@ -1,8 +1,8 @@
-import { and, eq, gte, lt, lte, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, lte, sql, isNotNull } from 'drizzle-orm';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { amsMetrics, apiMetrics, jobMetrics, performanceDaily, performanceHourly } from '@/db/schema';
+import { amsMetrics, apiMetrics, jobEvents, jobSessions, performanceDaily, performanceHourly } from '@/db/schema';
 import { publicProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
@@ -135,25 +135,25 @@ export const metricsRouter = router({
             const from = new Date(input.from);
             const to = new Date(input.to);
 
-            const conditions = [gte(jobMetrics.endTime, from), lte(jobMetrics.endTime, to)];
+            const conditions = [isNotNull(jobSessions.finishedAt), gte(jobSessions.finishedAt, from), lte(jobSessions.finishedAt, to)];
 
             if (input.jobName) {
-                conditions.push(eq(jobMetrics.jobName, input.jobName));
+                conditions.push(eq(jobSessions.jobName, input.jobName));
             }
 
             const data = await db
                 .select({
-                    interval: sql<string>`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`.as('interval'),
-                    jobName: jobMetrics.jobName,
+                    interval: sql<string>`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`.as('interval'),
+                    jobName: jobSessions.jobName,
                     count: sql<number>`count(*)`.as('count'),
-                    avgDuration: sql<number>`avg(extract(epoch from (${jobMetrics.endTime} - ${jobMetrics.startTime})) * 1000)`.as('avg_duration'),
-                    successCount: sql<number>`sum(case when ${jobMetrics.success} then 1 else 0 end)`.as('success_count'),
-                    errorCount: sql<number>`sum(case when ${jobMetrics.success} then 0 else 1 end)`.as('error_count'),
+                    avgDuration: sql<number>`avg(${jobSessions.durationMs})`.as('avg_duration'),
+                    successCount: sql<number>`sum(case when ${jobSessions.status} = 'succeeded' then 1 else 0 end)`.as('success_count'),
+                    errorCount: sql<number>`sum(case when ${jobSessions.status} = 'failed' then 1 else 0 end)`.as('error_count'),
                 })
-                .from(jobMetrics)
+                .from(jobSessions)
                 .where(and(...conditions))
-                .groupBy(sql`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`, jobMetrics.jobName)
-                .orderBy(sql`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`, sql`${jobMetrics.jobName}`);
+                .groupBy(sql`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`, jobSessions.jobName)
+                .orderBy(sql`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`, sql`${jobSessions.jobName}`);
 
             const chartData: Record<string, Array<{ interval: string; count: number; avgDuration: number; successCount: number; errorCount: number }>> = {};
 
@@ -183,6 +183,83 @@ export const metricsRouter = router({
                 from: from.toISOString(),
                 to: to.toISOString(),
             };
+        }),
+    jobEvents: publicProcedure
+        .input(
+            z
+                .object({
+                    limit: z.number().min(1).max(200).default(50),
+                    jobName: z.string().optional(),
+                    since: z.string().datetime().optional(),
+                })
+                .optional()
+        )
+        .query(async ({ input }) => {
+            const limit = input?.limit ?? 50;
+            const conditions = [];
+
+            if (input?.jobName) {
+                conditions.push(eq(jobEvents.jobName, input.jobName));
+            }
+            if (input?.since) {
+                conditions.push(gte(jobEvents.occurredAt, new Date(input.since)));
+            }
+
+            const baseQuery = db
+                .select({
+                    id: jobEvents.id,
+                    sessionId: jobEvents.sessionId,
+                    jobName: jobEvents.jobName,
+                    bossJobId: jobEvents.bossJobId,
+                    occurredAt: jobEvents.occurredAt,
+                    eventType: jobEvents.eventType,
+                    headline: jobEvents.headline,
+                    detail: jobEvents.detail,
+                    stage: jobEvents.stage,
+                    status: jobEvents.status,
+                    durationMs: jobEvents.durationMs,
+                    rowCount: jobEvents.rowCount,
+                    retryCount: jobEvents.retryCount,
+                    apiName: jobEvents.apiName,
+                    accountId: jobEvents.accountId,
+                    countryCode: jobEvents.countryCode,
+                    datasetId: jobEvents.datasetId,
+                    entityType: jobEvents.entityType,
+                    aggregation: jobEvents.aggregation,
+                    bucketDate: jobEvents.bucketDate,
+                    bucketStart: jobEvents.bucketStart,
+                    metadata: jobEvents.metadata,
+                })
+                .from(jobEvents);
+
+            const queryWithFilters = conditions.length > 0 ? baseQuery.where(and(...conditions)) : baseQuery;
+
+            const rows = await queryWithFilters.orderBy(desc(jobEvents.occurredAt)).limit(limit);
+
+            return rows.map(row => ({
+                id: row.id,
+                sessionId: row.sessionId,
+                jobName: row.jobName,
+                bossJobId: row.bossJobId,
+                occurredAt: row.occurredAt.toISOString(),
+                eventType: row.eventType,
+                headline: row.headline,
+                detail: row.detail,
+                stage: row.stage,
+                status: row.status,
+                durationMs: row.durationMs,
+                rowCount: row.rowCount,
+                retryCount: row.retryCount,
+                apiName: row.apiName,
+                accountId: row.accountId,
+                countryCode: row.countryCode,
+                datasetId: row.datasetId,
+                entityType: row.entityType,
+                aggregation: row.aggregation,
+                bucketDate: row.bucketDate ? new Date(row.bucketDate).toISOString().slice(0, 10) : null,
+                bucketStart: row.bucketStart ? row.bucketStart.toISOString() : null,
+                metadata: (row.metadata ?? null) as Record<string, unknown> | null,
+            }));
         }),
     ams: publicProcedure
         .input(
@@ -243,14 +320,21 @@ export const metricsRouter = router({
 
             const data = await db
                 .select({
-                    interval: sql<string>`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`.as('interval'),
+                    interval: sql<string>`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`.as('interval'),
                     jobCount: sql<number>`count(*)`.as('job_count'),
-                    totalRowsInserted: sql<number>`COALESCE(sum(cast(${jobMetrics.metadata}->>'totalRowsInserted' as integer)), 0)`.as('total_rows_inserted'),
+                    totalRowsInserted: sql<number>`COALESCE(sum(cast(${jobSessions.metadata}->>'totalRowsInserted' as integer)), 0)`.as('total_rows_inserted'),
                 })
-                .from(jobMetrics)
-                .where(and(eq(jobMetrics.jobName, 'summarize-daily-target-stream-for-account'), gte(jobMetrics.endTime, from), lte(jobMetrics.endTime, to)))
-                .groupBy(sql`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`)
-                .orderBy(sql`date_trunc('hour', ${jobMetrics.endTime}) + floor(extract(minute from ${jobMetrics.endTime}) / 5) * interval '5 minutes'`);
+                .from(jobSessions)
+                .where(
+                    and(
+                        eq(jobSessions.jobName, 'summarize-daily-target-stream-for-account'),
+                        isNotNull(jobSessions.finishedAt),
+                        gte(jobSessions.finishedAt, from),
+                        lte(jobSessions.finishedAt, to)
+                    )
+                )
+                .groupBy(sql`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`)
+                .orderBy(sql`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`);
 
             const chartData = data.map(row => ({
                 interval: new Date(row.interval).toISOString(),
@@ -403,7 +487,8 @@ export const metricsRouter = router({
             // Build a map of bucketDate -> metrics
             const dataMap = new Map<string, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
             for (const row of data) {
-                const dateStr = typeof row.bucketDate === 'string' ? row.bucketDate : row.bucketDate.toISOString().split('T')[0]!;
+                const dateStr =
+                    typeof row.bucketDate === 'string' ? row.bucketDate : (row.bucketDate as Date).toISOString().split('T')[0]!;
                 dataMap.set(dateStr, {
                     impressions: Number(row.impressions),
                     clicks: Number(row.clicks),

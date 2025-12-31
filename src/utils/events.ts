@@ -1,9 +1,6 @@
 import type { InferSelectModel } from 'drizzle-orm';
 import type { WebSocket } from 'ws';
 import type { reportDatasetMetadata } from '@/db/schema';
-import { createContextLogger } from './logger';
-
-const logger = createContextLogger({ component: 'events' });
 
 export type EventType =
     | 'error'
@@ -11,6 +8,7 @@ export type EventType =
     | 'reports:refreshed'
     | 'api-metrics:updated'
     | 'job-metrics:updated'
+    | 'job-events:updated'
     | 'account-dataset-metadata:updated'
     | 'report:refreshed'
     | 'report-dataset-metadata:error';
@@ -56,6 +54,34 @@ export interface JobMetricsUpdatedEvent extends BaseEvent {
     jobName: string;
 }
 
+export interface JobEventsUpdatedEvent extends BaseEvent {
+    type: 'job-events:updated';
+    jobName: string;
+    event: {
+        id: string;
+        sessionId: string;
+        bossJobId: string;
+        occurredAt: string;
+        eventType: string;
+        headline: string;
+        detail: string | null;
+        stage: string | null;
+        status: string | null;
+        durationMs: number | null;
+        rowCount: number | null;
+        retryCount: number | null;
+        apiName: string | null;
+        accountId: string | null;
+        countryCode: string | null;
+        datasetId: string | null;
+        entityType: string | null;
+        aggregation: string | null;
+        bucketDate: string | null;
+        bucketStart: string | null;
+        metadata: Record<string, unknown> | null;
+    };
+}
+
 export interface AccountDatasetMetadataUpdatedEvent extends BaseEvent {
     type: 'account-dataset-metadata:updated';
     accountId: string;
@@ -85,6 +111,7 @@ export type Event =
     | ReportsRefreshedEvent
     | ApiMetricsUpdatedEvent
     | JobMetricsUpdatedEvent
+    | JobEventsUpdatedEvent
     | AccountDatasetMetadataUpdatedEvent
     | ReportRefreshedEvent
     | ReportDatasetMetadataErrorEvent;
@@ -115,7 +142,7 @@ class EventEmitter {
         });
 
         socket.on('error', error => {
-            logger.error({ err: error }, 'WebSocket error');
+            console.error('WebSocket error', error);
             this.connections.delete(socket);
         });
 
@@ -140,7 +167,7 @@ class EventEmitter {
                     this.connections.delete(socket);
                 }
             } catch (error) {
-                logger.error({ err: error, eventType: event.type }, 'Failed to send message');
+                console.error(`Failed to send websocket message for event ${event.type}`, error);
                 this.connections.delete(socket);
             }
         }
@@ -159,6 +186,7 @@ export function emitEvent(event: Omit<AccountUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<JobMetricsUpdatedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<JobEventsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportDatasetMetadataErrorEvent, 'timestamp'>): void;

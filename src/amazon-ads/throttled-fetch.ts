@@ -6,7 +6,6 @@
  */
 
 import Bottleneck from 'bottleneck';
-import { logger } from '@/utils/logger.js';
 
 // Singleton bottleneck instance shared across all API calls
 const limiter = new Bottleneck({
@@ -59,14 +58,11 @@ function handleRetryAfter(retryAfterMs: number): void {
 
     limiter.updateSettings({ minTime });
 
-    logger.warn({ retryAfterMs, minTime }, 'Rate limit hit, adjusting throttler based on Retry-After header');
-
     // Gradually reduce back to default after the retry period
     // This allows us to resume normal operation once the rate limit window passes
     setTimeout(() => {
         limiter.updateSettings({ minTime: DEFAULT_MIN_TIME });
         lastRetryAfter = null;
-        logger.info('Throttler reset to default rate after Retry-After period');
     }, retryAfterMs);
 }
 
@@ -95,7 +91,6 @@ export async function throttledFetch(url: string | URL | Request, options?: Requ
                 } else {
                     // If Retry-After is missing or invalid, use exponential backoff
                     const backoffMs = lastRetryAfter ? lastRetryAfter * 2 : 5000;
-                    logger.warn({ backoffMs }, 'Rate limit hit but no valid Retry-After header, using exponential backoff');
                     handleRetryAfter(backoffMs);
                 }
             }

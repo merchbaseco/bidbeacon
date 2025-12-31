@@ -684,27 +684,72 @@ export const apiMetrics = pgTable(
 
 /**
  * ----------------------------------------------------------------------------
- * Job Metrics Tracking
+ * Job Session Timeline
  * ----------------------------------------------------------------------------
  *
- * Tracks invocations of background jobs (e.g., update-report-datasets) for monitoring
- * and analytics purposes. Aggregated by 5-minute intervals for efficient querying.
+ * Job sessions capture end-to-end metadata for each pg-boss job execution.
+ * Job events capture the narrative timeline for each session.
  */
-export const jobMetrics = pgTable(
-    'job_metrics',
+export const jobSessions = pgTable(
+    'job_sessions',
     {
         id: uuid('id').primaryKey().defaultRandom(),
-        jobName: text('job_name').notNull(), // e.g., 'update-report-datasets', 'update-report-dataset-for-account'
-        success: boolean('success').notNull(), // Whether the job succeeded
-        startTime: timestamp('start_time', { withTimezone: true, mode: 'date' }).notNull(), // When the job started
-        endTime: timestamp('end_time', { withTimezone: true, mode: 'date' }).notNull(), // When the job completed
-        error: text('error'), // Error message if job failed
-        metadata: jsonb('metadata'), // Optional job-specific metadata (e.g., { accountCount: 5, jobCount: 5 })
+        jobName: text('job_name').notNull(),
+        bossJobId: text('boss_job_id').notNull(),
+        status: text('status').notNull().default('running'), // running, succeeded, failed
+        startedAt: timestamp('started_at', { withTimezone: true, mode: 'date' }).notNull(),
+        finishedAt: timestamp('finished_at', { withTimezone: true, mode: 'date' }),
+        durationMs: integer('duration_ms'),
+        errorCode: text('error_code'),
+        errorMessage: text('error_message'),
+        accountId: text('account_id'),
+        countryCode: text('country_code'),
+        datasetId: text('dataset_id'),
+        entityType: text('entity_type'),
+        aggregation: text('aggregation'),
+        bucketDate: date('bucket_date'),
+        bucketStart: timestamp('bucket_start', { withTimezone: true, mode: 'date' }),
+        recordsProcessed: integer('records_processed'),
+        recordsFailed: integer('records_failed'),
+        metadata: jsonb('metadata'),
     },
     table => [
-        // Index for querying metrics by job name and time range (using endTime for completion time)
-        index('job_metrics_job_name_end_time_idx').on(table.jobName, table.endTime),
-        // Index for querying by endTime (for time-series queries)
-        index('job_metrics_end_time_idx').on(table.endTime),
+        index('job_sessions_job_name_started_idx').on(table.jobName, table.startedAt),
+        index('job_sessions_account_started_idx').on(table.accountId, table.startedAt),
+    ]
+);
+
+export const jobEvents = pgTable(
+    'job_events',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        sessionId: uuid('session_id')
+            .notNull()
+            .references(() => jobSessions.id, { onDelete: 'cascade' }),
+        jobName: text('job_name').notNull(),
+        bossJobId: text('boss_job_id').notNull(),
+        occurredAt: timestamp('occurred_at', { withTimezone: true, mode: 'date' }).notNull(),
+        eventType: text('event_type').notNull(),
+        headline: text('headline').notNull(),
+        detail: text('detail'),
+        stage: text('stage'),
+        status: text('status'),
+        durationMs: integer('duration_ms'),
+        rowCount: integer('row_count'),
+        retryCount: integer('retry_count'),
+        apiName: text('api_name'),
+        accountId: text('account_id'),
+        countryCode: text('country_code'),
+        datasetId: text('dataset_id'),
+        entityType: text('entity_type'),
+        aggregation: text('aggregation'),
+        bucketDate: date('bucket_date'),
+        bucketStart: timestamp('bucket_start', { withTimezone: true, mode: 'date' }),
+        metadata: jsonb('metadata'),
+    },
+    table => [
+        index('job_events_session_occurred_idx').on(table.sessionId, table.occurredAt),
+        index('job_events_job_name_occurred_idx').on(table.jobName, table.occurredAt),
+        index('job_events_account_occurred_idx').on(table.accountId, table.occurredAt),
     ]
 );

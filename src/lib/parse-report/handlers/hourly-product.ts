@@ -6,11 +6,11 @@ import { db } from '@/db/index';
 import { performanceHourly } from '@/db/schema';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { normalizeHourlyValue, parseHourlyTimestamp } from '../utils/parse-period-start-timestamp';
-import type { ParseReportInput } from './input';
+import type { ParseReportInput, ParseReportOutput } from './input';
 
 const gunzipAsync = promisify(gunzip);
 
-export async function handleHourlyProduct(input: ParseReportInput): Promise<{ rowsProcessed: number }> {
+export async function handleHourlyProduct(input: ParseReportInput): Promise<ParseReportOutput> {
     const timezone = getTimezoneForCountry(input.countryCode);
 
     const response = await fetch(input.reportUrl, {
@@ -70,5 +70,5 @@ export async function handleHourlyProduct(input: ParseReportInput): Promise<{ ro
         insertedCount++;
     }
 
-    return { rowsProcessed: insertedCount };
+    return { rowsProcessed: insertedCount, successCount: insertedCount, errorCount: rows.length - insertedCount };
 }

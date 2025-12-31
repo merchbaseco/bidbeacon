@@ -13,6 +13,34 @@ type Event =
       }
     | { type: 'job-metrics:updated'; jobName: string; timestamp: string }
     | {
+          type: 'job-events:updated';
+          jobName: string;
+          event: {
+              id: string;
+              sessionId: string;
+              bossJobId: string;
+              occurredAt: string;
+              eventType: string;
+              headline: string;
+              detail: string | null;
+              stage: string | null;
+              status: string | null;
+              durationMs: number | null;
+              rowCount: number | null;
+              retryCount: number | null;
+              apiName: string | null;
+              accountId: string | null;
+              countryCode: string | null;
+              datasetId: string | null;
+              entityType: string | null;
+              aggregation: string | null;
+              bucketDate: string | null;
+              bucketStart: string | null;
+              metadata: Record<string, unknown> | null;
+          };
+          timestamp: string;
+      }
+    | {
           type: 'report-dataset-metadata:error';
           data: {
               accountId: string;

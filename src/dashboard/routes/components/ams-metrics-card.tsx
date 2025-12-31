@@ -42,16 +42,16 @@ const Sparkline = ({ data, globalMax }: { data: number[]; globalMax?: number }) 
             <ResponsiveContainer width="100%" height="100%" debounce={300}>
                 <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                     <YAxis domain={[0, maxValue]} hide />
-                    <Bar
-                        dataKey="value"
-                        radius={[2, 2, 0, 0]}
-                        isAnimationActive={false}
-                        shape={(props: { x?: number; y?: number; width?: number; height?: number; payload?: { opacity: number } }) => {
-                            const { x = 0, y = 0, width = 0, height = 0, payload } = props;
-                            const opacity = payload?.opacity ?? 0.5;
-                            return <rect x={x} y={y} width={width} height={height} fill="currentColor" opacity={opacity} rx={2} className="text-indigo-500" />;
-                        }}
-                    />
+                        <Bar
+                            dataKey="value"
+                            radius={[2, 2, 0, 0]}
+                            isAnimationActive={false}
+                            shape={(props: any) => {
+                                const { x = 0, y = 0, width = 0, height = 0, payload } = props ?? {};
+                                const opacity = payload?.opacity ?? 0.5;
+                                return <rect x={x} y={y} width={width} height={height} fill="currentColor" opacity={opacity} rx={2} className="text-indigo-500" />;
+                            }}
+                        />
                 </BarChart>
             </ResponsiveContainer>
         </div>

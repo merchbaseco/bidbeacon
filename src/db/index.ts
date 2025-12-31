@@ -1,6 +1,5 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { logger } from '@/utils/logger';
 import * as schema from './schema.js';
 
 // Create postgres connection
@@ -31,7 +30,7 @@ export const testConnection = async () => {
         await db.execute('SELECT 1');
         return true;
     } catch (error) {
-        logger.error({ err: error }, 'Unable to connect to database');
+        console.error('Unable to connect to database', error);
         throw error;
     }
 };

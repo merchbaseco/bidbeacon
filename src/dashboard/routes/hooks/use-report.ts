@@ -20,7 +20,13 @@ export const useReport = ({ uid }: UseReportOptions) => {
     // Note: dates are ISO strings (no superjson transformer on tRPC client)
     useWebSocketEvents('report:refreshed', event => {
         if (event.row.uid === uid) {
-            apiUtils.reports.get.setData({ uid: uid! }, prev => (prev ? { ...prev, ...event.row } : undefined));
+            const serializedRow = {
+                ...event.row,
+                periodStart: event.row.periodStart.toISOString(),
+                nextRefreshAt: event.row.nextRefreshAt ? event.row.nextRefreshAt.toISOString() : null,
+                lastReportCreatedAt: event.row.lastReportCreatedAt ? event.row.lastReportCreatedAt.toISOString() : null,
+            };
+            apiUtils.reports.get.setData({ uid: uid! }, prev => (prev ? { ...prev, ...serializedRow } : undefined));
         }
     });
 
@@ -30,4 +36,3 @@ export const useReport = ({ uid }: UseReportOptions) => {
         ...rest,
     };
 };
-

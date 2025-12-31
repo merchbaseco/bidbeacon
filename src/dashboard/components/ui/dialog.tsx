@@ -2,6 +2,7 @@
 
 import { Dialog as DialogPrimitive } from '@base-ui-components/react/dialog';
 import { XIcon } from 'lucide-react';
+import { cloneElement, isValidElement } from 'react';
 import { cn } from '../../lib/utils';
 import { ScrollArea } from './scroll-area';
 
@@ -13,8 +14,22 @@ function DialogTrigger(props: DialogPrimitive.Trigger.Props) {
     return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
-function DialogClose(props: DialogPrimitive.Close.Props) {
-    return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
+function DialogClose({ children, ...props }: DialogPrimitive.Close.Props) {
+    if (isValidElement(children)) {
+        return (
+            <DialogPrimitive.Close
+                data-slot="dialog-close"
+                {...props}
+                render={renderProps => cloneElement(children, renderProps)}
+            />
+        );
+    }
+
+    return (
+        <DialogPrimitive.Close data-slot="dialog-close" {...props}>
+            {children}
+        </DialogPrimitive.Close>
+    );
 }
 
 function DialogBackdrop({ className, ...props }: DialogPrimitive.Backdrop.Props) {

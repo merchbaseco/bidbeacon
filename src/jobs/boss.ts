@@ -3,8 +3,6 @@
  */
 import { PgBoss } from 'pg-boss';
 import type { z } from 'zod';
-import { trackJobInvocation } from '@/utils/job-tracker';
-import { logger } from '@/utils/logger';
 
 // ============================================================================
 // Types
@@ -149,31 +147,7 @@ class Job<T extends JobData> {
 
         // Register the worker with automatic tracking
         await pgBoss.work<T>(this.jobName, workOptions, async jobs => {
-            const startTime = new Date();
-            let success = false;
-            let error: string | undefined;
-            let workResult: WorkHandlerResult | undefined;
-
-            try {
-                // Execute the work function with the jobs
-                workResult = await this.workFn?.(jobs.map(j => ({ id: j.id, data: j.data })));
-                success = true;
-            } catch (err) {
-                error = err instanceof Error ? err.message : String(err);
-                throw err; // Re-throw to let pg-boss handle retries
-            } finally {
-                const endTime = new Date();
-                // Merge default metadata with work function metadata
-                const metadata: Record<string, unknown> = {
-                    jobCount: jobs.length,
-                    ...(workResult && typeof workResult === 'object' && 'metadata' in workResult ? workResult.metadata : {}),
-                };
-                // Track the job invocation (don't await to avoid blocking)
-                trackJobInvocation(this.jobName, startTime, endTime, success, error, metadata).catch(trackErr => {
-                    // Silently fail tracking - don't break job execution
-                    logger.error({ err: trackErr, jobName: this.jobName }, 'Failed to track job invocation');
-                });
-            }
+            await this.workFn?.(jobs.map(j => ({ id: j.id, data: j.data })));
         });
     }
 
@@ -257,7 +231,7 @@ class BossWrapper {
 
         // Handle errors to prevent unhandled error crashes
         this.instance.on('error', error => {
-            logger.error({ err: error }, 'PgBoss error');
+            console.error('PgBoss error', error);
         });
 
         await this.instance.start();

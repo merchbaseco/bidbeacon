@@ -1,5 +1,5 @@
 import { fromZonedTime } from 'date-fns-tz';
-import type { AggregationType } from '@/types/reports';
+import { AGGREGATION_TYPES, type AggregationType } from '@/types/reports';
 import { getTimezoneForCountry } from '@/utils/timezones';
 
 /**
@@ -34,7 +34,11 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
     const ageHours = Math.floor(ageMs / (1000 * 60 * 60));
 
     // Check if age matches any eligible offset
-    const eligibleOffsets = getEligibleOffsets(aggregation);
+    const aggregationType = isAggregationType(aggregation) ? aggregation : null;
+    if (!aggregationType) {
+        return false;
+    }
+    const eligibleOffsets = getEligibleOffsets(aggregationType);
 
     // Find the highest eligible offset that the report age has reached or exceeded
     const sortedOffsets = [...eligibleOffsets].sort((a, b) => a - b);
@@ -98,7 +102,11 @@ export function getNextRefreshTime(row: {
     }
 
     // Get all eligible offsets in hours.
-    const eligibleOffsets = getEligibleOffsets(aggregation);
+    const aggregationType = isAggregationType(aggregation) ? aggregation : null;
+    if (!aggregationType) {
+        return null;
+    }
+    const eligibleOffsets = getEligibleOffsets(aggregationType);
     const sortedOffsets = [...eligibleOffsets].sort((a, b) => a - b);
 
     // Calculate current age in hours
@@ -137,4 +145,8 @@ const toUtcFromLocal = (timestamp: Date | null, countryCode: string): Date | nul
 
     const timezone = getTimezoneForCountry(countryCode);
     return fromZonedTime(timestamp, timezone);
+};
+
+const isAggregationType = (value: string | AggregationType): value is AggregationType => {
+    return AGGREGATION_TYPES.includes(value as AggregationType);
 };

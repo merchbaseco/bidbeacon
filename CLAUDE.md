@@ -139,7 +139,7 @@ Jobs run on the API server via pg-boss:
 ### Common Issues
 - Browser timezone ≠ account timezone (e.g., US account in PST viewed from EST)
 - Timestamps stored timezone-less represent local time—compare in local timezone
-- Job metadata varies by `job_name` in `job_metrics` table
+- Job metadata lives in `job_sessions`/`job_events` (filter by `job_name`, `account_id`, timestamps)
 
 ## Code Formatting
 

@@ -1,52 +1,80 @@
-/**
- * Structured logging utility using pino.
- * Outputs pretty, human-readable logs using pino-pretty.
- */
+type LogLevel = 'info' | 'warn' | 'error';
 
-import pino from 'pino';
+interface SimpleLogger {
+    info: LogMethod;
+    warn: LogMethod;
+    error: LogMethod;
+    child: (childContext: Record<string, unknown>) => SimpleLogger;
+}
 
-// Base logger - outputs pretty formatted logs
-const baseLogger = pino({
-    level: process.env.LOG_LEVEL || 'info',
-    transport: {
-        target: 'pino-pretty',
-        options: {
-            colorize: true,
-            translateTime: 'HH:MM:ss.l',
-            ignore: 'pid,hostname',
-        },
-    },
-});
+type LogMethod = (...args: unknown[]) => void;
 
-/**
- * Create a child logger with job-specific context.
- * This makes it easy to filter logs by jobId, jobName, etc. in Dozzle.
- *
- * @example
- * const logger = createJobLogger('update-report-status', job.id, { accountId, countryCode });
- * logger.info('Starting job');
- * // Output: {"level":30,"time":1234567890,"jobName":"update-report-status","jobId":"abc123","accountId":"123","countryCode":"US","msg":"Starting job"}
- */
-export function createJobLogger(jobName: string, jobId: string, context?: Record<string, unknown>): pino.Logger {
-    return baseLogger.child({
+const formatContext = (context?: Record<string, unknown>) => {
+    if (!context || Object.keys(context).length === 0) {
+        return '';
+    }
+
+    const parts = Object.entries(context).map(([key, value]) => `${key}=${serialize(value)}`);
+    return `[${parts.join(' ')}] `;
+};
+
+const serialize = (value: unknown) => {
+    if (value === null || value === undefined) {
+        return String(value);
+    }
+    if (typeof value === 'object') {
+        try {
+            return JSON.stringify(value);
+        } catch {
+            return '[object]';
+        }
+    }
+    return String(value);
+};
+
+const createLogger = (context?: Record<string, unknown>): SimpleLogger => {
+    const prefix = formatContext(context);
+
+    const write =
+        (level: LogLevel): LogMethod =>
+        (...args: unknown[]) => {
+            const writer = level === 'info' ? console.log : level === 'warn' ? console.warn : console.error;
+
+            if (args.length === 0) {
+                writer(prefix.trimEnd());
+                return;
+            }
+
+            if (typeof args[0] === 'object' && typeof args[1] === 'string') {
+                writer(`${prefix}${args[1]}`, args[0]);
+                return;
+            }
+
+            if (typeof args[0] === 'string') {
+                writer(`${prefix}${args[0]}`, ...args.slice(1));
+                return;
+            }
+
+            writer(prefix, ...args);
+        };
+
+    const child = (childContext: Record<string, unknown>) => createLogger({ ...(context ?? {}), ...childContext });
+
+    return {
+        info: write('info'),
+        warn: write('warn'),
+        error: write('error'),
+        child,
+    };
+};
+
+export const createJobLogger = (jobName: string, jobId: string, context?: Record<string, unknown>) =>
+    createLogger({
         jobName,
         jobId,
         ...context,
     });
-}
 
-/**
- * Create a child logger with custom context (for non-job contexts like worker, API, etc.).
- *
- * @example
- * const logger = createContextLogger({ component: 'worker', messageId: 'msg-123' });
- * logger.info('Processing message');
- */
-export function createContextLogger(context: Record<string, unknown>): pino.Logger {
-    return baseLogger.child(context);
-}
+export const createContextLogger = (context: Record<string, unknown>) => createLogger(context);
 
-/**
- * Base logger for general use (e.g., entry points, utils).
- */
-export const logger = baseLogger;
+export const logger = createLogger();

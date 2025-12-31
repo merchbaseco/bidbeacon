@@ -11,7 +11,6 @@ import { runMigrations } from '@/db/migrate.js';
 import { accountDatasetMetadata, reportDatasetMetadata } from '@/db/schema.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
 import { emitEvent } from '@/utils/events.js';
-import { logger } from '@/utils/logger';
 
 const PORT = Number(process.env.PORT) || 8080;
 
@@ -20,7 +19,7 @@ const PORT = Number(process.env.PORT) || 8080;
 // ============================================================================
 
 async function main() {
-    logger.info('Starting BidBeacon Server');
+    console.log('Starting BidBeacon Server');
 
     const fastify = Fastify({ logger: false });
 
@@ -43,16 +42,11 @@ async function main() {
     // Start server
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
 
-    logger.info(
-        {
-            port: PORT,
-        },
-        'BidBeacon Server Ready'
-    );
+    console.log(`BidBeacon Server ready on port ${PORT}`);
 }
 
 main().catch(err => {
-    logger.error({ err }, 'Failed to start server');
+    console.error('Failed to start server', err);
     process.exit(1);
 });
 
@@ -61,7 +55,7 @@ main().catch(err => {
 // ============================================================================
 
 async function performStartupCleanup() {
-    logger.info('Performing startup cleanup tasks');
+    console.log('Performing startup cleanup tasks');
 
     try {
         // Reset any stuck refreshing flags in report_dataset_metadata
@@ -90,9 +84,9 @@ async function performStartupCleanup() {
                 )
             );
 
-        logger.info('Startup cleanup complete: reset stuck refreshing and fetching flags');
+        console.log('Startup cleanup complete: reset stuck refreshing and fetching flags');
     } catch (error) {
-        logger.error({ err: error }, 'Error during startup cleanup');
+        console.error('Error during startup cleanup', error);
         throw error;
     }
 }
@@ -164,7 +158,7 @@ function registerErrorHandlers(fastify: FastifyInstance) {
         const errorMessage = error instanceof Error ? error.message : 'Internal server error';
         const errorStack = error instanceof Error ? error.stack : undefined;
 
-        logger.error({ err: error }, 'Unhandled error');
+        console.error('Unhandled error', error);
 
         emitEvent({
             type: 'error',
@@ -179,15 +173,15 @@ function registerErrorHandlers(fastify: FastifyInstance) {
 
 function registerShutdownHandlers(fastify: FastifyInstance) {
     const shutdown = async (signal: string) => {
-        logger.info({ signal }, 'Received shutdown signal, shutting down gracefully');
+        console.log(`Received shutdown signal (${signal}), shutting down gracefully`);
 
         try {
             await stopJobs();
             await fastify.close();
-            logger.info('Shutdown complete');
+            console.log('Shutdown complete');
             process.exit(0);
         } catch (error) {
-            logger.error({ err: error }, 'Error during shutdown');
+            console.error('Error during shutdown', error);
             process.exit(1);
         }
     };

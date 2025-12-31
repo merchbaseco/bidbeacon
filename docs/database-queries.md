@@ -78,7 +78,8 @@ Key tables (see `src/db/schema.ts` for complete schema):
 - `ams_cm_campaigns` / `ams_cm_ad_groups` / `ams_cm_ads` / `ams_cm_targets` - Campaign Manager entities
 
 ### Tracking Tables
-- `job_metrics` - Background job execution (job_name, start_time, end_time, success, metadata)
+- `job_sessions` - Background job runs (job_name, boss_job_id, started_at, finished_at, status, counters)
+- `job_events` - Timeline of wide events for each job session (stage/headline/context metadata)
 - `api_metrics` - API call tracking (api_name, timestamp, success, duration_ms)
 - `ams_metrics` - AMS stream processing metrics
 

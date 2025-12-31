@@ -9,6 +9,7 @@ import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zoned
 import { emitEvent } from '@/utils/events.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
 import { updateReportStatusJob } from './update-report-status.js';
+import { withJobSession } from '@/utils/job-events.js';
 
 // Amazon Ads API data retention periods
 const HOURLY_RETENTION_DAYS = 14;
@@ -32,51 +33,57 @@ export const updateReportDatasetForAccountJob = boss
     .createJob('update-report-dataset-for-account')
     .input(jobInputSchema)
     .work(async jobs => {
-        const metadataEntries: Array<{
-            accountId: string;
-            countryCode: string;
-            dailyEnqueuedCount: number;
-            hourlyEnqueuedCount: number;
-        }> = [];
+        await Promise.all(
+            jobs.map(job =>
+                withJobSession(
+                    {
+                        jobName: 'update-report-dataset-for-account',
+                        bossJobId: job.id,
+                        context: {
+                            accountId: job.data.accountId,
+                            countryCode: job.data.countryCode,
+                        },
+                    },
+                    async recorder => {
+                        const { accountId, countryCode } = job.data;
 
-        for (const job of jobs) {
-            const { accountId, countryCode } = job.data;
+                        const timezone = getTimezoneForCountry(countryCode);
+                        const now = zonedNow(timezone);
 
-            const timezone = getTimezoneForCountry(countryCode);
-            const now = zonedNow(timezone);
+                        await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
+                        await insertMissingMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
 
-            // Insert missing metadata records for daily target datasets within retention period
-            await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
+                        const dailyEnqueuedCount = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
+                        const hourlyEnqueuedCount = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'hourly', 'target');
 
-            // Insert missing metadata records for hourly target datasets within retention period
-            await insertMissingMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
+                        emitEvent({
+                            type: 'reports:refreshed',
+                            accountId,
+                        });
 
-            // Enqueue update-report-status jobs for any rows that are due for refresh
-            const dailyEnqueuedCount = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
+                        recorder.setFinalFields({
+                            metadata: {
+                                accountId,
+                                countryCode,
+                                dailyEnqueuedCount,
+                                hourlyEnqueuedCount,
+                            },
+                            recordsProcessed: dailyEnqueuedCount + hourlyEnqueuedCount,
+                        });
 
-            const hourlyEnqueuedCount = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'hourly', 'target');
-
-            // Emit event when job completes
-            emitEvent({
-                type: 'reports:refreshed',
-                accountId,
-            });
-
-            metadataEntries.push({
-                accountId,
-                countryCode,
-                dailyEnqueuedCount,
-                hourlyEnqueuedCount,
-            });
-        }
-
-        if (metadataEntries.length > 0) {
-            return {
-                metadata: {
-                    accounts: metadataEntries,
-                },
-            };
-        }
+                        await recorder.event({
+                            eventType: 'report-datasets',
+                            headline: `Prepared report windows for ${accountId} (${countryCode})`,
+                            detail: `Daily jobs: ${dailyEnqueuedCount}, hourly jobs: ${hourlyEnqueuedCount}`,
+                            context: {
+                                accountId,
+                                countryCode,
+                            },
+                        });
+                    }
+                )
+            )
+        );
     });
 
 // ============================================================================

@@ -16,7 +16,7 @@ import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibilit
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
 import { utcNow } from '@/utils/date.js';
 import { emitEvent } from '@/utils/events.js';
-import { createJobLogger } from '@/utils/logger';
+import { withJobSession } from '@/utils/job-events.js';
 import { getTimezoneForCountry } from '@/utils/timezones.js';
 import { boss } from './boss.js';
 
@@ -43,25 +43,29 @@ export const updateReportStatusJob = boss
         // Note: With batchSize: 1 (default), this will be a single job, but we handle batches
         // in case batchSize is increased in the future
         await Promise.all(
-            jobs.map(async job => {
+            jobs.map(job => {
                 const { accountId, countryCode, timestamp, aggregation, entityType } = job.data;
                 const date = new Date(timestamp);
 
-                // Create job-specific logger with context
-                const logger = createJobLogger('update-report-status', job.id, {
-                    accountId,
-                    countryCode,
-                    aggregation,
-                    entityType,
-                    timestamp,
-                });
-
-                let action: string | undefined;
-                let reportDatum: InferSelectModel<typeof reportDatasetMetadata> | undefined;
-                try {
-                    // Fetch current row once at the start
-                    reportDatum = await db.query.reportDatasetMetadata.findFirst({
-                        where: and(
+                return withJobSession(
+                    {
+                        jobName: 'update-report-status',
+                        bossJobId: job.id,
+                        context: {
+                            accountId,
+                            countryCode,
+                            aggregation,
+                            entityType,
+                            bucketDate: date,
+                        },
+                    },
+                    async recorder => {
+                        let action: string | undefined;
+                        let reportDatum: InferSelectModel<typeof reportDatasetMetadata> | undefined;
+                        try {
+                            // Fetch current row once at the start
+                            reportDatum = await db.query.reportDatasetMetadata.findFirst({
+                                where: and(
                             eq(reportDatasetMetadata.accountId, accountId),
                             eq(reportDatasetMetadata.periodStart, date),
                             eq(reportDatasetMetadata.aggregation, aggregation),
@@ -87,48 +91,87 @@ export const updateReportStatusJob = boss
                         countryCode
                     );
 
-                    switch (action) {
-                        case 'none': {
-                            await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
-                            await setRefreshing(reportDatum, false);
-                            break;
+                        switch (action) {
+                            case 'none': {
+                                await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
+                                await setRefreshing(reportDatum, false);
+                                await recorder.event({
+                                    eventType: 'report-status',
+                                    headline: formatReportHeadline('checked', aggregation, entityType, date, accountId, countryCode),
+                                    detail: 'Report state machine checked, no action required.',
+                                    context: {
+                                        accountId,
+                                        countryCode,
+                                        aggregation,
+                                        entityType,
+                                        bucketDate: date,
+                                    },
+                                });
+                                break;
+                            }
+
+                            case 'create': {
+                                const reportId = await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
+                                const updatedRow = await setReport(reportDatum, reportId);
+                                await setNextRefreshAt(updatedRow, getNextRefreshTime(updatedRow));
+                                await setStatus(updatedRow, 'fetching');
+                                await setRefreshing(updatedRow, false);
+                                await recorder.event({
+                                    eventType: 'report-status',
+                                    headline: formatReportHeadline('queued', aggregation, entityType, date, accountId, countryCode),
+                                    detail: `Requested Amazon report ${reportId}`,
+                                    context: {
+                                        accountId,
+                                        countryCode,
+                                        aggregation,
+                                        entityType,
+                                        bucketDate: date,
+                                    },
+                                });
+                                break;
+                            }
+
+                            case 'process': {
+                                // Set status to 'parsing' at the start of parsing
+                                await setStatus(reportDatum, 'parsing');
+                                await parseReport(reportDatum.uid);
+
+                                // Mark report as processed: clear reportId, set lastProcessedReportId
+                                const processedRow = await markReportProcessed(reportDatum, reportDatum.reportId);
+                                await setNextRefreshAt(processedRow, getNextRefreshTime(processedRow));
+                                await setRefreshing(processedRow, false);
+                                await recorder.event({
+                                    eventType: 'report-status',
+                                    headline: formatReportHeadline('processed', aggregation, entityType, date, accountId, countryCode),
+                                    detail: reportDatum.reportId ? `Processed report ${reportDatum.reportId}` : undefined,
+                                    context: {
+                                        accountId,
+                                        countryCode,
+                                        aggregation,
+                                        entityType,
+                                        bucketDate: date,
+                                    },
+                                });
+                                break;
+                            }
+
+                            default:
+                                throw new Error(`Unknown action received from state machine: ${action}`);
                         }
 
-                        case 'create': {
-                            const reportId = await createReportForDataset({ accountId, countryCode, timestamp, aggregation, entityType });
-                            const updatedRow = await setReport(reportDatum, reportId);
-                            await setNextRefreshAt(updatedRow, getNextRefreshTime(updatedRow));
-                            await setStatus(updatedRow, 'fetching');
-                            await setRefreshing(updatedRow, false);
-                            break;
+                        if (reportDatum.error) {
+                            await clearError(reportDatum);
                         }
-
-                        case 'process': {
-                            // Set status to 'parsing' at the start of parsing
-                            await setStatus(reportDatum, 'parsing');
-                            await parseReport(reportDatum.uid);
-
-                            // Mark report as processed: clear reportId, set lastProcessedReportId
-                            const processedRow = await markReportProcessed(reportDatum, reportDatum.reportId);
-                            await setNextRefreshAt(processedRow, getNextRefreshTime(processedRow));
-                            await setRefreshing(processedRow, false);
-                            break;
+                        } catch (error) {
+                            const message = error instanceof Error ? error.message : String(error);
+                            recorder.markFailure(message);
+                            if (reportDatum) {
+                                await setNextRefreshAt(reportDatum, new Date(Date.now() + 5 * 60 * 1000));
+                                await setError(reportDatum, error);
+                            }
                         }
-
-                        default:
-                            throw new Error(`Unknown action received from state machine: ${action}`);
                     }
-
-                    if (reportDatum.error) {
-                        await clearError(reportDatum);
-                    }
-                } catch (error) {
-                    logger.error({ err: error }, 'Error encountered while updating state machine for report datum.');
-                    if (reportDatum) {
-                        await setNextRefreshAt(reportDatum, new Date(Date.now() + 5 * 60 * 1000));
-                        await setError(reportDatum, error);
-                    }
-                }
+                );
             })
         );
     });
@@ -333,4 +376,27 @@ async function clearError(row: InferSelectModel<typeof reportDatasetMetadata>): 
             row: updatedRow,
         });
     }
+}
+
+function formatReportHeadline(
+    action: 'checked' | 'queued' | 'processed',
+    aggregation: string,
+    entityType: string,
+    date: Date,
+    accountId: string,
+    countryCode: string
+) {
+    const prefix = action === 'queued' ? 'Queued' : action === 'processed' ? 'Processed' : 'Checked';
+    const agg = capitalize(aggregation);
+    const entity = capitalize(entityType);
+    const descriptor = `${agg} ${entity} report for ${formatDateLabel(date)}`;
+    return `${prefix} ${descriptor} for ${accountId} (${countryCode})`;
+}
+
+function formatDateLabel(date: Date) {
+    return new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(date);
+}
+
+function capitalize(value: string) {
+    return value.charAt(0).toUpperCase() + value.slice(1);
 }
