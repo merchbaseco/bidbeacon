@@ -297,23 +297,14 @@ function toDate(value: string | Date): Date | null {
 }
 
 function formatSessionHeadline(state: 'started' | 'succeeded' | 'failed', jobName: string, context?: JobSessionContext) {
-    const verb = state === 'started' ? 'Started' : state === 'succeeded' ? 'Completed' : 'Failed';
-
-    if (context?.aggregation && context?.entityType && context?.bucketDate) {
-        const dateLabel = formatDateLabel(context.bucketDate);
-        const agg = capitalize(context.aggregation);
-        const entity = capitalize(context.entityType);
-        if (context.accountId && context.countryCode) {
-            return `${verb} ${agg} ${entity} job for ${context.accountId} (${context.countryCode})${dateLabel ? ` on ${dateLabel}` : ''}`;
-        }
-        return `${verb} ${agg} ${entity} job${dateLabel ? ` for ${dateLabel}` : ''}`;
+    if (state === 'started') {
+        return 'Started job';
     }
 
-    if (context?.accountId && context?.countryCode) {
-        return `${verb} ${jobName} for ${context.accountId} (${context.countryCode})`;
-    }
-
-    return `${verb} job ${jobName}`;
+    const jobCopy = JOB_TITLES[jobName] ?? { label: jobName };
+    const verb = jobCopy.verbs?.[state] ?? DEFAULT_VERBS[state];
+    const accountSegment = formatAccountTag(context);
+    return `${verb} ${jobCopy.label}${accountSegment ? ` for ${accountSegment}` : ''}`;
 }
 
 function formatDateLabel(value?: string | Date | null) {
@@ -331,6 +322,41 @@ function capitalize(value?: string | null) {
     if (!value) return '';
     return value.charAt(0).toUpperCase() + value.slice(1);
 }
+
+function formatAccountTag(context?: JobSessionContext) {
+    if (!context?.accountId) {
+        return '';
+    }
+    const segments = context.accountId.split('.');
+    const last = segments[segments.length - 1] ?? context.accountId;
+    const shortId = last.slice(-6).toUpperCase();
+    const region = context.countryCode ? `/${context.countryCode}` : '';
+    return `(${shortId}${region})`;
+}
+
+const DEFAULT_VERBS: Record<'started' | 'succeeded' | 'failed', string> = {
+    started: 'Started job',
+    succeeded: 'Completed',
+    failed: 'Failed',
+};
+
+const JOB_TITLES: Record<
+    string,
+    {
+        label: string;
+        verbs?: Partial<Record<'started' | 'succeeded' | 'failed', string>>;
+    }
+> = {
+    'update-report-dataset-for-account': { label: 'reports dataset', verbs: { succeeded: 'Updated' } },
+    'update-report-datasets': { label: 'dataset queue', verbs: { succeeded: 'Queued' } },
+    'update-report-status': { label: 'report status', verbs: { succeeded: 'Updated' } },
+    'summarize-daily-target-stream-for-account': { label: 'daily targets', verbs: { succeeded: 'Summarized' } },
+    'summarize-hourly-target-stream-for-account': { label: 'hourly targets', verbs: { succeeded: 'Summarized' } },
+    'summarize-daily-target-stream': { label: 'daily summary', verbs: { succeeded: 'Summarized' } },
+    'summarize-hourly-target-stream': { label: 'hourly summary', verbs: { succeeded: 'Summarized' } },
+    'sync-ad-entities': { label: 'ad entities', verbs: { succeeded: 'Synced' } },
+    'cleanup-ams-metrics': { label: 'AMS metrics', verbs: { succeeded: 'Cleaned' } },
+};
 
 function serializeJobEvent(event: typeof jobEvents.$inferSelect): JobEventsUpdatedEvent['event'] {
     return {

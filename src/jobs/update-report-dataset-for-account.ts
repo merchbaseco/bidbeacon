@@ -73,8 +73,7 @@ export const updateReportDatasetForAccountJob = boss
 
                         await recorder.event({
                             eventType: 'report-datasets',
-                            headline: `Prepared report windows for ${accountId} (${countryCode})`,
-                            detail: `Daily jobs: ${dailyEnqueuedCount}, hourly jobs: ${hourlyEnqueuedCount}`,
+                            headline: `Updated status on ${dailyEnqueuedCount} daily jobs, ${hourlyEnqueuedCount} hourly jobs`,
                             context: {
                                 accountId,
                                 countryCode,

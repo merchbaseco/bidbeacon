@@ -1,6 +1,6 @@
 import { api } from '../../lib/trpc';
 
-const DEFAULT_LIMIT = 40;
+const DEFAULT_LIMIT = 20;
 
 type UseJobEventsParams = {
     limit?: number;

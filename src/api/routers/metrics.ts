@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, lt, lte, sql, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, gte, inArray, lt, lte, sql, isNotNull } from 'drizzle-orm';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
@@ -15,6 +15,14 @@ const SUPPORTED_JOBS = [
     'summarize-daily-target-stream-for-account',
     'summarize-hourly-target-stream',
     'summarize-hourly-target-stream-for-account',
+] as const;
+const VISIBLE_JOB_EVENTS = [
+    'update-report-dataset-for-account',
+    'update-report-status',
+    'summarize-daily-target-stream-for-account',
+    'summarize-hourly-target-stream-for-account',
+    'sync-ad-entities',
+    'cleanup-ams-metrics',
 ] as const;
 
 export const metricsRouter = router({
@@ -197,9 +205,10 @@ export const metricsRouter = router({
         .query(async ({ input }) => {
             const limit = input?.limit ?? 50;
             const conditions = [];
+            const jobNamesFilter = input?.jobName ? [input.jobName] : [...VISIBLE_JOB_EVENTS];
 
-            if (input?.jobName) {
-                conditions.push(eq(jobEvents.jobName, input.jobName));
+            if (jobNamesFilter.length > 0) {
+                conditions.push(inArray(jobEvents.jobName, jobNamesFilter));
             }
             if (input?.since) {
                 conditions.push(gte(jobEvents.occurredAt, new Date(input.since)));

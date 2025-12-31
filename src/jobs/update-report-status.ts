@@ -378,19 +378,18 @@ async function clearError(row: InferSelectModel<typeof reportDatasetMetadata>): 
     }
 }
 
-function formatReportHeadline(
-    action: 'checked' | 'queued' | 'processed',
-    aggregation: string,
-    entityType: string,
-    date: Date,
-    accountId: string,
-    countryCode: string
-) {
+function formatReportHeadline(action: 'checked' | 'queued' | 'processed', aggregation: string, entityType: string, date: Date, accountId: string, countryCode: string) {
     const prefix = action === 'queued' ? 'Queued' : action === 'processed' ? 'Processed' : 'Checked';
     const agg = capitalize(aggregation);
     const entity = capitalize(entityType);
-    const descriptor = `${agg} ${entity} report for ${formatDateLabel(date)}`;
-    return `${prefix} ${descriptor} for ${accountId} (${countryCode})`;
+    const accountTag = formatAccountTag(accountId, countryCode);
+    return `${prefix} ${agg} ${entity} report · ${formatDateLabel(date)} ${accountTag}`;
+}
+
+function formatAccountTag(accountId: string, countryCode: string) {
+    const segments = accountId.split('.');
+    const shortId = (segments[segments.length - 1] ?? accountId).slice(-6).toUpperCase();
+    return `(${shortId}/${countryCode})`;
 }
 
 function formatDateLabel(date: Date) {
