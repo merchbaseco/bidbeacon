@@ -8,7 +8,7 @@ import { performanceHourly, reportDatasetErrorMetrics, reportDatasetMetadata } f
 import { emitEvent } from '@/utils/events';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { TargetCache } from '../utils/target-cache';
-import { parseHourlyTimestamp } from '../utils/parse-period-start-timestamp';
+import { normalizeHourlyValue, parseHourlyTimestamp } from '../utils/parse-period-start-timestamp';
 import type { ParseReportInput, ParseReportOutput } from './input';
 
 const gunzipAsync = promisify(gunzip);
@@ -57,7 +57,8 @@ export async function handleHourlyTarget(input: ParseReportInput): Promise<Parse
     for (const row of rows) {
         try {
             const entityId = targetCache.getTargetId(row['adGroup.id'], row['target.value'], row['target.matchType']);
-            const { bucketStart, bucketDate, bucketHour } = parseHourlyTimestamp(row['hour.value'], timezone);
+            const normalizedHourValue = normalizeHourlyValue(row['hour.value'], row['date.value']);
+            const { bucketStart, bucketDate, bucketHour } = parseHourlyTimestamp(normalizedHourValue, timezone);
 
             valuesToInsert.push({
                 accountId: input.accountId,

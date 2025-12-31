@@ -5,7 +5,7 @@ import { hourlyReportRowSchema } from '@/config/reports/hourly-product';
 import { db } from '@/db/index';
 import { performanceHourly } from '@/db/schema';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import { parseHourlyTimestamp } from '../utils/parse-period-start-timestamp';
+import { normalizeHourlyValue, parseHourlyTimestamp } from '../utils/parse-period-start-timestamp';
 import type { ParseReportInput } from './input';
 
 const gunzipAsync = promisify(gunzip);
@@ -31,8 +31,8 @@ export async function handleHourlyProduct(input: ParseReportInput): Promise<{ ro
     for (const row of rows) {
         // For product reports, entityId is the advertised product ID
         const entityId = row['advertisedProduct.id'];
-        const hourValue = row['hour.value'];
-        const { bucketStart, bucketDate, bucketHour } = parseHourlyTimestamp(hourValue, timezone);
+        const normalizedHourValue = normalizeHourlyValue(row['hour.value'], row['date.value']);
+        const { bucketStart, bucketDate, bucketHour } = parseHourlyTimestamp(normalizedHourValue, timezone);
 
         await db
             .insert(performanceHourly)

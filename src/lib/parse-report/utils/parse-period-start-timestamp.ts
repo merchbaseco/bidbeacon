@@ -43,3 +43,21 @@ export function parseDailyTimestamp(dateValue: string, timezone: string): { buck
     const { bucketStart } = parseHourlyTimestamp(`${dateValue}T00:00:00`, timezone);
     return { bucketStart, bucketDate };
 }
+
+export function normalizeHourlyValue(hourValue: string, dateValue?: string): string {
+    if (hourValue.includes('T')) {
+        return hourValue;
+    }
+
+    if (!dateValue) {
+        throw new Error(`Missing date.value for hour.value: ${hourValue}`);
+    }
+
+    const numericHour = Number(hourValue);
+    if (!Number.isFinite(numericHour)) {
+        throw new Error(`Invalid hour.value format: ${hourValue}`);
+    }
+
+    const paddedHour = String(Math.trunc(numericHour)).padStart(2, '0');
+    return `${dateValue}T${paddedHour}:00:00`;
+}
