@@ -1,11 +1,16 @@
 import { format, formatDistanceToNow } from 'date-fns';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { useAtomValue } from 'jotai';
 import { HugeiconsIcon } from '@hugeicons/react';
 import AlertCircleIcon from '@merchbaseco/icons/core-solid-rounded/AlertCircleIcon';
 import TickDouble03Icon from '@merchbaseco/icons/core-solid-rounded/TickDouble03Icon';
 import ComputerTerminal01Icon from '@merchbaseco/icons/core-solid-rounded/ComputerTerminal01Icon';
 import RemoveCircleIcon from '@merchbaseco/icons/core-solid-rounded/RemoveCircleIcon';
 import TimeScheduleIcon from '@merchbaseco/icons/core-solid-rounded/TimeScheduleIcon';
+import DatabaseAddIcon from '@merchbaseco/icons/core-stroke-rounded/DatabaseAddIcon';
+import Queue01Icon from '@merchbaseco/icons/core-stroke-rounded/Queue01Icon';
+import ChartBarLineIcon from '@merchbaseco/icons/core-stroke-rounded/ChartBarLineIcon';
+import FolderInfoIcon from '@merchbaseco/icons/core-stroke-rounded/FolderInfoIcon';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { Button } from '../../components/ui/button';
 import { Badge } from '../../components/ui/badge';
@@ -14,18 +19,31 @@ import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, Dia
 import { Spinner } from '../../components/ui/spinner';
 import { cn } from '../../lib/utils';
 import { useJobEvents } from '../hooks/use-job-events';
+import { selectedAccountIdAtom, selectedCountryCodeAtom } from './account-selector/atoms';
 
 type JobEvent = RouterOutputs['metrics']['jobEvents'][number];
 
-const TIMELINE_MARKERS = {
-    failed: { icon: RemoveCircleIcon, className: 'border-red-400 bg-red-100 text-red-600 dark:border-red-400/70 dark:bg-red-400/10 dark:text-red-200' },
-    succeeded: { icon: TickDouble03Icon, className: 'border-emerald-400 bg-emerald-100 text-emerald-700 dark:border-emerald-400/70 dark:bg-emerald-400/10 dark:text-emerald-200' },
-    running: { icon: TimeScheduleIcon, className: 'border-amber-400 bg-amber-100 text-amber-700 dark:border-amber-400/70 dark:bg-amber-400/10 dark:text-amber-200' },
+const SESSION_MARKERS = {
+    failed: { icon: RemoveCircleIcon, className: 'border-red-400 text-red-600 dark:border-red-500 dark:text-red-200' },
+    succeeded: { icon: TickDouble03Icon, className: 'border-emerald-400 text-emerald-700 dark:border-emerald-400/70 dark:text-emerald-200' },
+    running: { icon: TimeScheduleIcon, className: 'border-amber-400 text-amber-600 dark:border-amber-400/70 dark:text-amber-200' },
 } as const;
 
 const DEFAULT_MARKER = {
     icon: ComputerTerminal01Icon,
-    className: 'border-muted-foreground/40 bg-muted text-muted-foreground dark:border-white/20 dark:bg-white/10 dark:text-white/70',
+    className: 'border-muted-foreground/40 text-muted-foreground dark:border-white/20 dark:text-white/70',
+};
+
+const EVENT_MARKERS: Record<
+    string,
+    {
+        icon: ComponentType;
+        className: string;
+    }
+> = {
+    'report-datasets': { icon: DatabaseAddIcon, className: 'border-emerald-300 text-emerald-600 dark:border-emerald-400/80 dark:text-emerald-200' },
+    'reports:enqueue': { icon: Queue01Icon, className: 'border-sky-300 text-sky-600 dark:border-sky-400/80 dark:text-sky-200' },
+    'ams-summary': { icon: ChartBarLineIcon, className: 'border-purple-300 text-purple-600 dark:border-purple-400/80 dark:text-purple-200' },
 };
 
 const formatTimestamp = (value: string) => {
@@ -86,37 +104,65 @@ const DEFAULT_VERBS: Record<SessionState, string> = {
     failed: 'Failed',
 };
 
-function getMarker(status?: string | null) {
+const DEFAULT_EVENT_MARKER = { icon: FolderInfoIcon, className: 'border-muted-foreground/40 text-muted-foreground' };
+
+function getSessionMarker(status?: string | null) {
     if (!status) {
         return DEFAULT_MARKER;
     }
-    if (status in TIMELINE_MARKERS) {
-        return TIMELINE_MARKERS[status as keyof typeof TIMELINE_MARKERS];
+    if (status in SESSION_MARKERS) {
+        return SESSION_MARKERS[status as keyof typeof SESSION_MARKERS];
     }
     return DEFAULT_MARKER;
 }
 
+function getEventMarker(eventType: string) {
+    if (eventType in EVENT_MARKERS) {
+        return EVENT_MARKERS[eventType as keyof typeof EVENT_MARKERS];
+    }
+    return DEFAULT_EVENT_MARKER;
+}
+
 export function JobEventsFeed() {
-    const { data, isLoading, isFetching, error, refetch } = useJobEvents({ limit: 20 });
+    const accountId = useAtomValue(selectedAccountIdAtom);
+    const countryCode = useAtomValue(selectedCountryCodeAtom);
+    const hasSelection = Boolean(accountId && countryCode);
+
+    const { data, isLoading, isFetching, error, refetch } = useJobEvents({
+        limit: 20,
+        accountId: accountId || undefined,
+        countryCode: countryCode || undefined,
+        enabled: hasSelection,
+    });
     const [selectedEvent, setSelectedEvent] = useState<JobEvent | null>(null);
 
     const events = data ?? [];
-    const groupedEvents = useMemo(() => {
-        const groups = new Map<string, { sessionId: string; events: JobEvent[] }>();
+    const timelineRows = useMemo(() => {
+        const groups = new Map<string, JobEvent[]>();
         const order: string[] = [];
 
         for (const event of events) {
             const existing = groups.get(event.sessionId);
             if (existing) {
-                existing.events.push(event);
+                existing.push(event);
             } else {
-                const group = { sessionId: event.sessionId, events: [event] };
-                groups.set(event.sessionId, group);
+                groups.set(event.sessionId, [event]);
                 order.push(event.sessionId);
             }
         }
 
-        return order.map(sessionId => groups.get(sessionId)!);
+        const rows: Array<{ event: JobEvent; depth: number; isSession: boolean }> = [];
+        order.forEach(sessionId => {
+            const groupEvents = groups.get(sessionId)!;
+            groupEvents.forEach((event, index) => {
+                rows.push({
+                    event,
+                    depth: index === 0 ? 0 : 1,
+                    isSession: index === 0,
+                });
+            });
+        });
+        return rows;
     }, [events]);
 
     const handleSelect = (event: JobEvent) => {
@@ -131,7 +177,11 @@ export function JobEventsFeed() {
                         <div className="text-sm font-medium">Event Stream</div>
                     </div>
                 </div>
-                {isLoading ? (
+                {!hasSelection ? (
+                    <div className="rounded-lg border border-dashed border-muted px-4 py-6 text-center font-mono text-xs text-muted-foreground">
+                        Select an account to view job events.
+                    </div>
+                ) : isLoading ? (
                     <div className="flex items-center justify-center py-12">
                         <Spinner className="size-6 text-muted-foreground" />
                     </div>
@@ -140,59 +190,15 @@ export function JobEventsFeed() {
                         <HugeiconsIcon icon={AlertCircleIcon} size={16} color="currentColor" />
                         <span>Failed to load job events. {error instanceof Error ? error.message : 'Unknown error'}.</span>
                     </div>
-                ) : groupedEvents.length === 0 ? (
+                ) : timelineRows.length === 0 ? (
                     <div className="rounded-lg border border-dashed border-muted px-4 py-6 text-center font-mono text-xs text-muted-foreground">No job events recorded yet.</div>
                 ) : (
                     <div className="relative">
                         <span className="pointer-events-none absolute left-6 top-0 h-full w-px bg-muted-foreground/30" aria-hidden />
-                        <ul className="space-y-0.5">
-                            {groupedEvents.map(group => {
-                                const [primary, ...rest] = group.events;
-                                const timestamp = formatTimestamp(primary.occurredAt);
-                                const marker = getMarker(primary.status);
-
-                                return (
-                                    <li key={group.sessionId} className="relative rounded py-2 pl-9 pr-3 hover:bg-muted/40">
-                                        <div className="flex cursor-pointer flex-wrap items-center gap-2 font-mono text-[13px] text-foreground" onClick={() => handleSelect(primary)}>
-                                            <span
-                                                className={cn(
-                                                    'absolute left-6 top-4 grid size-5 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full border text-[10px]',
-                                                    marker.className
-                                                )}
-                                            >
-                                                <HugeiconsIcon icon={marker.icon} size={14} color="currentColor" />
-                                            </span>
-                                            <div className="pl-5 flex flex-wrap items-center gap-2">
-                                                <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                                                    {timestamp.absolute}
-                                                    <span className="text-muted-foreground/40">•</span>
-                                                    <span className="text-emerald-600 dark:text-emerald-300">{timestamp.relativeShort}</span>
-                                                </span>
-                                                <span className="text-foreground">{formatEventHeadline(primary)}</span>
-                                                {primary.status && <Tag>{primary.status}</Tag>}
-                                            </div>
-                                        </div>
-                                        {rest.length > 0 && (
-                                            <ul className="ml-4 mt-1 border-l border-dashed border-muted-foreground/40 pl-3">
-                                                {rest.map(event => {
-                                                    const nestedTimestamp = formatTimestamp(event.occurredAt);
-                                                    return (
-                                                        <li
-                                                            key={event.id}
-                                                            className="flex cursor-pointer flex-wrap items-center gap-2 py-1 text-xs text-muted-foreground"
-                                                            onClick={() => handleSelect(event)}
-                                                        >
-                                                            <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{nestedTimestamp.relativeShort}</span>
-                                                            <span className="font-mono text-[12px] text-foreground">{formatEventHeadline(event)}</span>
-                                                            {event.detail && <span className="font-mono text-[11px] text-muted-foreground">{event.detail}</span>}
-                                                        </li>
-                                                    );
-                                                })}
-                                            </ul>
-                                        )}
-                                    </li>
-                                );
-                            })}
+                        <ul className="space-y-1">
+                            {timelineRows.map(row => (
+                                <EventRow key={row.event.id} row={row} onSelect={handleSelect} />
+                            ))}
                         </ul>
                     </div>
                 )}
@@ -249,13 +255,9 @@ function formatSessionHeadline(event: JobEvent) {
     const jobCopy = JOB_TITLES[event.jobName] ?? { label: event.jobName };
     const verb = jobCopy.verbs?.[stateMetadata] ?? DEFAULT_VERBS[stateMetadata];
     const bucket = formatBucketLabel(event);
-    const account = formatAccountTag(event.accountId, event.countryCode);
     const parts = [`${verb} ${jobCopy.label}`];
     if (bucket) {
         parts.push(`for ${bucket}`);
-    }
-    if (account) {
-        parts.push(account);
     }
     return parts.join(' ');
 }
@@ -270,12 +272,41 @@ function formatBucketLabel(event: JobEvent) {
     return '';
 }
 
-function formatAccountTag(accountId?: string | null, countryCode?: string | null) {
-    if (!accountId) {
-        return '';
-    }
-    const segments = accountId.split('.');
-    const last = segments[segments.length - 1] ?? accountId;
-    const shortId = last.slice(-6).toUpperCase();
-    return `(${shortId}${countryCode ? `/${countryCode}` : ''})`;
+type TimelineRow = {
+    event: JobEvent;
+    depth: number;
+    isSession: boolean;
+};
+
+function EventRow({ row, onSelect }: { row: TimelineRow; onSelect: (event: JobEvent) => void }) {
+    const { event, depth, isSession } = row;
+    const timestamp = formatTimestamp(event.occurredAt);
+    const marker = isSession ? getSessionMarker(event.status) : getEventMarker(event.eventType);
+
+    return (
+        <li
+            className={cn(
+                'flex cursor-pointer items-center gap-2 rounded pl-10 pr-3 font-mono text-[13px] hover:bg-muted/40',
+                depth > 0 ? 'text-muted-foreground pl-14' : 'text-foreground font-semibold'
+            )}
+            onClick={() => onSelect(event)}
+        >
+            <span
+                className={cn(
+                    'mr-1 flex size-5 -translate-x-5 items-center justify-center rounded-full border bg-background text-[10px]',
+                    depth > 0 && '-translate-x-9',
+                    marker.className
+                )}
+            >
+                <HugeiconsIcon icon={marker.icon} size={14} color="currentColor" />
+            </span>
+            <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
+                {timestamp.absolute}
+                <span className="text-muted-foreground/40">•</span>
+                <span className="text-emerald-600 dark:text-emerald-300">{timestamp.relativeShort}</span>
+            </span>
+            <span className={cn('truncate', depth > 0 ? 'font-normal text-foreground' : '')}>{formatEventHeadline(event)}</span>
+            {isSession && event.status && <Tag>{event.status}</Tag>}
+        </li>
+    );
 }

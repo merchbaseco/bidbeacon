@@ -6,6 +6,9 @@ type UseJobEventsParams = {
     limit?: number;
     jobName?: string;
     since?: string;
+    accountId?: string | null;
+    countryCode?: string | null;
+    enabled?: boolean;
 };
 
 export const useJobEvents = (params?: UseJobEventsParams) => {
@@ -13,9 +16,12 @@ export const useJobEvents = (params?: UseJobEventsParams) => {
         limit: params?.limit ?? DEFAULT_LIMIT,
         jobName: params?.jobName,
         since: params?.since,
+        accountId: params?.accountId || undefined,
+        countryCode: params?.countryCode || undefined,
     };
 
     return api.metrics.jobEvents.useQuery(input, {
+        enabled: params?.enabled ?? true,
         refetchInterval: 60000,
         staleTime: 30000,
     });

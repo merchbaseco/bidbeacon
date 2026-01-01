@@ -199,6 +199,8 @@ export const metricsRouter = router({
                     limit: z.number().min(1).max(200).default(50),
                     jobName: z.string().optional(),
                     since: z.string().datetime().optional(),
+                    accountId: z.string().optional(),
+                    countryCode: z.string().optional(),
                 })
                 .optional()
         )
@@ -212,6 +214,12 @@ export const metricsRouter = router({
             }
             if (input?.since) {
                 conditions.push(gte(jobEvents.occurredAt, new Date(input.since)));
+            }
+            if (input?.accountId) {
+                conditions.push(eq(jobEvents.accountId, input.accountId));
+            }
+            if (input?.countryCode) {
+                conditions.push(eq(jobEvents.countryCode, input.countryCode));
             }
 
             const baseQuery = db
