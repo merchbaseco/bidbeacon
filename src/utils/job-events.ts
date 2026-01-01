@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { jobEvents, jobSessions } from '@/db/schema.js';
@@ -294,14 +295,24 @@ function toDate(value: string | Date): Date | null {
 }
 
 function formatSessionHeadline(state: 'started' | 'succeeded' | 'failed', jobName: string, context?: JobSessionContext) {
-    if (state === 'started') {
-        return 'Started job';
+    const jobCopy = JOB_TITLES[jobName] ?? { label: jobName };
+    const accountSegment = formatAccountTag(context);
+    const bucketLabel = formatBucketLabel(context);
+    const suffixParts = [];
+
+    if (bucketLabel) {
+        suffixParts.push(`for ${bucketLabel}`);
+    }
+    if (accountSegment) {
+        suffixParts.push(accountSegment);
     }
 
-    const jobCopy = JOB_TITLES[jobName] ?? { label: jobName };
+    if (state === 'started') {
+        return `Started ${jobCopy.label}${suffixParts.length ? ` ${suffixParts.join(' ')}` : ''}`;
+    }
+
     const verb = jobCopy.verbs?.[state] ?? DEFAULT_VERBS[state];
-    const accountSegment = formatAccountTag(context);
-    return `${verb} ${jobCopy.label}${accountSegment ? ` ${accountSegment}` : ''}`;
+    return `${verb} ${jobCopy.label}${suffixParts.length ? ` ${suffixParts.join(' ')}` : ''}`;
 }
 
 function formatDateLabel(value?: string | Date | null) {
@@ -329,6 +340,19 @@ function formatAccountTag(context?: JobSessionContext) {
     const shortId = last.slice(-6).toUpperCase();
     const region = context.countryCode ? `/${context.countryCode}` : '';
     return `(${shortId}${region})`;
+}
+
+function formatBucketLabel(context?: JobSessionContext) {
+    if (!context) {
+        return '';
+    }
+    if (context.bucketStart) {
+        return format(new Date(context.bucketStart), 'MM/dd h:mmaaa');
+    }
+    if (context.bucketDate) {
+        return format(new Date(context.bucketDate), 'MM/dd');
+    }
+    return '';
 }
 
 const DEFAULT_VERBS: Record<'started' | 'succeeded' | 'failed', string> = {

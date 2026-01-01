@@ -1,3 +1,4 @@
+import { format } from 'date-fns';
 import { and, desc, eq, isNotNull, isNull, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index.js';
@@ -53,8 +54,10 @@ export const updateReportDatasetForAccountJob = boss
                         await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
                         await insertMissingMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
 
-                        const dailyEnqueuedCount = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
-                        const hourlyEnqueuedCount = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'hourly', 'target');
+                        const dailyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
+                        const hourlyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'hourly', 'target');
+                        const totalDatasets = dailyResult.count + hourlyResult.count;
+                        const datasetLabels = [...dailyResult.labels, ...hourlyResult.labels].slice(0, 5);
 
                         emitEvent({
                             type: 'reports:refreshed',
@@ -65,15 +68,22 @@ export const updateReportDatasetForAccountJob = boss
                             metadata: {
                                 accountId,
                                 countryCode,
-                                dailyEnqueuedCount,
-                                hourlyEnqueuedCount,
+                                dailyEnqueuedCount: dailyResult.count,
+                                hourlyEnqueuedCount: hourlyResult.count,
                             },
-                            recordsProcessed: dailyEnqueuedCount + hourlyEnqueuedCount,
+                            recordsProcessed: totalDatasets,
                         });
 
                         await recorder.event({
                             eventType: 'report-datasets',
-                            headline: `Updated status on ${dailyEnqueuedCount} daily jobs, ${hourlyEnqueuedCount} hourly jobs`,
+                            headline:
+                                totalDatasets > 0
+                                    ? `Updated status on ${totalDatasets} datasets`
+                                    : 'Checked datasets (no work required)',
+                            detail:
+                                totalDatasets > 0 && datasetLabels.length > 0
+                                    ? datasetLabels.map(label => `(${label})`).join(' ')
+                                    : undefined,
                             context: {
                                 accountId,
                                 countryCode,
@@ -160,7 +170,7 @@ async function insertMetadata(args: {
  * processing), then by most recent period, then by nextRefreshAt. This ensures rows with report IDs always
  * get included before the limit is applied.
  */
-async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<number> {
+async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<{ count: number; labels: string[] }> {
     const MAX_CONCURRENT_REPORTS = 5;
 
     // Enqueue update-report-status jobs for records that already have a reportId and nextRefreshAt
@@ -201,7 +211,7 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
 
     const recordsNeedingWork = [...recordsWithActiveReport, ...recordsDueForNewReport];
     if (recordsNeedingWork.length === 0) {
-        return 0;
+        return { count: 0, labels: [] };
     }
 
     const jobIds = await Promise.all(
@@ -216,5 +226,17 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
         )
     );
 
-    return jobIds.length;
+    const labels = recordsNeedingWork.map(record => formatDatasetLabel(record.periodStart, aggregation)).slice(0, 5);
+
+    return {
+        count: jobIds.length,
+        labels,
+    };
+}
+
+function formatDatasetLabel(date: Date, aggregation: AggregationType) {
+    if (aggregation === 'daily') {
+        return format(date, 'MMM d');
+    }
+    return format(date, 'MMM d h:mmaaa');
 }
