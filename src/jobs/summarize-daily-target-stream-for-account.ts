@@ -65,7 +65,7 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
     if (!entityId) {
         await recorder.event({
             eventType: 'ams-summary',
-            headline: `Skipped daily summary for ${accountId} (${countryCode})`,
+            message: `Skipped daily summary for ${accountId} (${countryCode})`,
             detail: 'No advertiser entityId found.',
             status: 'skipped',
             context: { accountId, countryCode },
@@ -198,7 +198,7 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
 
     await recorder.event({
         eventType: 'ams-summary',
-        headline: `Summarized daily AMS data for ${accountId}`,
+        message: `Summarized daily AMS data for ${accountId}`,
         detail: `Inserted ${insertValues.length} rows for ${bucketDateStr}`,
         rowCount: insertValues.length,
         context: {

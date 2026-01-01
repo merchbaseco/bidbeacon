@@ -342,7 +342,7 @@ export const syncAdEntitiesJob = boss
                                                     exportState.error = status.error?.message ?? 'Unknown error';
                                                     await recorder.event({
                                                         eventType: 'entity-sync',
-                                                        headline: `Export failed for ${exportState.entityType}`,
+                                                        message: `Export failed for ${exportState.entityType}`,
                                                         detail: exportState.error ?? undefined,
                                                         context: { accountId, countryCode },
                                                     });
@@ -681,7 +681,7 @@ export const syncAdEntitiesJob = boss
 
                                         await recorder.event({
                                             eventType: 'entity-sync',
-                                            headline: `Imported ${syncTotals.campaigns} campaigns, ${syncTotals.adGroups} ad groups, ${syncTotals.ads} ads, ${syncTotals.targets} targets`,
+                                            message: `Imported ${syncTotals.campaigns} campaigns, ${syncTotals.adGroups} ad groups, ${syncTotals.ads} ads, ${syncTotals.targets} targets`,
                                             detail: 'Account entity sync completed successfully',
                                             context: { accountId, countryCode },
                                         });

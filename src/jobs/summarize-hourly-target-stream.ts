@@ -55,7 +55,7 @@ export const summarizeHourlyTargetStreamJob = boss
 
                         await recorder.event({
                             eventType: 'ams-summary',
-                            headline: `Queued hourly AMS summarization for ${enabledAccounts.length} accounts`,
+                            message: `Queued hourly AMS summarization for ${enabledAccounts.length} accounts`,
                             detail: 'Trailing 24h summaries scheduled',
                         });
                     }

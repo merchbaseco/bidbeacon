@@ -55,7 +55,7 @@ export const updateReportDatasetsJob = boss
 
                         await recorder.event({
                             eventType: 'reports:enqueue',
-                            headline: `Queued ${enabledAccounts.length} account datasets`,
+                            message: `Queued ${enabledAccounts.length} account datasets`,
                         });
                     }
                 )

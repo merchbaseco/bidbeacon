@@ -55,7 +55,7 @@ export const summarizeDailyTargetStreamJob = boss
 
                         await recorder.event({
                             eventType: 'ams-summary',
-                            headline: `Queued daily AMS summarization for ${enabledAccounts.length} accounts`,
+                            message: `Queued daily AMS summarization for ${enabledAccounts.length} accounts`,
                             detail: 'Summaries run every 15 minutes',
                         });
                     }

@@ -146,7 +146,7 @@ Use coss ui (Base UI + Tailwind). Copy-paste components, accessible by default.
 ### Job Inspection
 
 - **Recent runs**: `SELECT * FROM job_sessions WHERE job_name = '...' ORDER BY started_at DESC LIMIT 5`
-- **Timeline**: Join or filter `job_events` by `session_id` to see each stage/headline for that run.
+- **Timeline**: Join or filter `job_events` by `session_id` to see each stage/message for that run.
 - **Distinguish jobs**: `summarize-hourly-*` → `performance_hourly`, `summarize-daily-*` → `performance_daily`
 - **Metadata differences**: Daily jobs include `bucketDate`, hourly jobs include `window: "trailing 24h"`.
 

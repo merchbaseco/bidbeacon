@@ -1,4 +1,3 @@
-import { format } from 'date-fns';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { jobEvents, jobSessions } from '@/db/schema.js';
@@ -32,7 +31,7 @@ export interface JobSessionUpdate {
 
 export interface RecordJobEventInput {
     eventType: string;
-    headline: string;
+    message?: string;
     detail?: string;
     stage?: string;
     status?: string;
@@ -147,8 +146,11 @@ export async function withJobSession<T>(options: StartJobSessionOptions, handler
     const handle = await startJobSession(options);
     await insertJobEvent(handle, {
         eventType: 'session',
-        headline: formatSessionHeadline('started', handle.jobName, handle.context),
+        message: 'job:started',
         status: 'running',
+        metadata: {
+            sessionState: 'started',
+        },
         context: handle.context,
     });
 
@@ -160,9 +162,12 @@ export async function withJobSession<T>(options: StartJobSessionOptions, handler
         const durationMs = Date.now() - handle.startedAt.getTime();
         await insertJobEvent(handle, {
             eventType: 'session',
-            headline: formatSessionHeadline('succeeded', handle.jobName, recorder.getContext()),
+            message: 'job:succeeded',
             status: 'succeeded',
             durationMs,
+            metadata: {
+                sessionState: 'succeeded',
+            },
             context: recorder.getContext(),
         });
         return result;
@@ -174,9 +179,12 @@ export async function withJobSession<T>(options: StartJobSessionOptions, handler
         const durationMs = Date.now() - handle.startedAt.getTime();
         await insertJobEvent(handle, {
             eventType: 'session',
-            headline: formatSessionHeadline('failed', handle.jobName, recorder.getContext()),
+            message: 'job:failed',
             status: 'failed',
             durationMs,
+            metadata: {
+                sessionState: 'failed',
+            },
             context: recorder.getContext(),
         });
         throw error;
@@ -237,7 +245,7 @@ async function insertJobEvent(handle: JobSessionHandle, input: RecordJobEventInp
             bossJobId: handle.bossJobId,
             occurredAt,
             eventType: input.eventType,
-            headline: input.headline,
+            headline: input.message ?? input.eventType,
             detail: input.detail ?? null,
             stage: input.stage ?? null,
             status: input.status ?? null,
@@ -294,91 +302,6 @@ function toDate(value: string | Date): Date | null {
     return Number.isNaN(candidate.getTime()) ? null : candidate;
 }
 
-function formatSessionHeadline(state: 'started' | 'succeeded' | 'failed', jobName: string, context?: JobSessionContext) {
-    const jobCopy = JOB_TITLES[jobName] ?? { label: jobName };
-    const accountSegment = formatAccountTag(context);
-    const bucketLabel = formatBucketLabel(context);
-    const suffixParts = [];
-
-    if (bucketLabel) {
-        suffixParts.push(`for ${bucketLabel}`);
-    }
-    if (accountSegment) {
-        suffixParts.push(accountSegment);
-    }
-
-    if (state === 'started') {
-        return `Started ${jobCopy.label}${suffixParts.length ? ` ${suffixParts.join(' ')}` : ''}`;
-    }
-
-    const verb = jobCopy.verbs?.[state] ?? DEFAULT_VERBS[state];
-    return `${verb} ${jobCopy.label}${suffixParts.length ? ` ${suffixParts.join(' ')}` : ''}`;
-}
-
-function formatDateLabel(value?: string | Date | null) {
-    if (!value) {
-        return '';
-    }
-    const date = value instanceof Date ? value : new Date(value);
-    if (Number.isNaN(date.getTime())) {
-        return '';
-    }
-    return new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(date);
-}
-
-function capitalize(value?: string | null) {
-    if (!value) return '';
-    return value.charAt(0).toUpperCase() + value.slice(1);
-}
-
-function formatAccountTag(context?: JobSessionContext) {
-    if (!context?.accountId) {
-        return '';
-    }
-    const segments = context.accountId.split('.');
-    const last = segments[segments.length - 1] ?? context.accountId;
-    const shortId = last.slice(-6).toUpperCase();
-    const region = context.countryCode ? `/${context.countryCode}` : '';
-    return `(${shortId}${region})`;
-}
-
-function formatBucketLabel(context?: JobSessionContext) {
-    if (!context) {
-        return '';
-    }
-    if (context.bucketStart) {
-        return format(new Date(context.bucketStart), 'MM/dd h:mmaaa');
-    }
-    if (context.bucketDate) {
-        return format(new Date(context.bucketDate), 'MM/dd');
-    }
-    return '';
-}
-
-const DEFAULT_VERBS: Record<'started' | 'succeeded' | 'failed', string> = {
-    started: 'Started job',
-    succeeded: 'Completed',
-    failed: 'Failed',
-};
-
-const JOB_TITLES: Record<
-    string,
-    {
-        label: string;
-        verbs?: Partial<Record<'started' | 'succeeded' | 'failed', string>>;
-    }
-> = {
-    'update-report-dataset-for-account': { label: 'reports dataset', verbs: { succeeded: 'Updated' } },
-    'update-report-datasets': { label: 'dataset queue', verbs: { succeeded: 'Queued' } },
-    'update-report-status': { label: 'report status', verbs: { succeeded: 'Updated' } },
-    'summarize-daily-target-stream-for-account': { label: 'daily targets', verbs: { succeeded: 'Summarized' } },
-    'summarize-hourly-target-stream-for-account': { label: 'hourly targets', verbs: { succeeded: 'Summarized' } },
-    'summarize-daily-target-stream': { label: 'daily summary', verbs: { succeeded: 'Summarized' } },
-    'summarize-hourly-target-stream': { label: 'hourly summary', verbs: { succeeded: 'Summarized' } },
-    'sync-ad-entities': { label: 'ad entities', verbs: { succeeded: 'Synced' } },
-    'cleanup-ams-metrics': { label: 'AMS metrics', verbs: { succeeded: 'Cleaned' } },
-};
-
 function serializeJobEvent(event: typeof jobEvents.$inferSelect): JobEventsUpdatedEvent['event'] {
     return {
         id: event.id,
@@ -386,7 +309,7 @@ function serializeJobEvent(event: typeof jobEvents.$inferSelect): JobEventsUpdat
         bossJobId: event.bossJobId,
         occurredAt: event.occurredAt.toISOString(),
         eventType: event.eventType,
-        headline: event.headline,
+        message: event.headline,
         detail: event.detail,
         stage: event.stage,
         status: event.status,

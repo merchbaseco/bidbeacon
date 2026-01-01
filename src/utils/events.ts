@@ -63,7 +63,7 @@ export interface JobEventsUpdatedEvent extends BaseEvent {
         bossJobId: string;
         occurredAt: string;
         eventType: string;
-        headline: string;
+        message: string;
         detail: string | null;
         stage: string | null;
         status: string | null;

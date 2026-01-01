@@ -79,7 +79,7 @@ Key tables (see `src/db/schema.ts` for complete schema):
 
 ### Tracking Tables
 - `job_sessions` - Background job runs (job_name, boss_job_id, started_at, finished_at, status, counters)
-- `job_events` - Timeline of wide events for each job session (stage/headline/context metadata)
+- `job_events` - Timeline of wide events for each job session (stage/message/context metadata)
 - `api_metrics` - API call tracking (api_name, timestamp, success, duration_ms)
 - `ams_metrics` - AMS stream processing metrics
 

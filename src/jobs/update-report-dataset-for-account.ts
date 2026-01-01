@@ -76,7 +76,7 @@ export const updateReportDatasetForAccountJob = boss
 
                         await recorder.event({
                             eventType: 'report-datasets',
-                            headline:
+                            message:
                                 totalDatasets > 0
                                     ? `Updated status on ${totalDatasets} datasets`
                                     : 'Checked datasets (no work required)',

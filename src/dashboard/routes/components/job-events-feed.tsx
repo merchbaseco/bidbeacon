@@ -60,6 +60,32 @@ const Tag = ({ children }: { children: ReactNode }) => (
     </Badge>
 );
 
+type SessionState = 'started' | 'succeeded' | 'failed';
+
+const JOB_TITLES: Record<
+    string,
+    {
+        label: string;
+        verbs?: Partial<Record<SessionState, string>>;
+    }
+> = {
+    'update-report-dataset-for-account': { label: 'reports dataset', verbs: { started: 'Started', succeeded: 'Updated', failed: 'Failed' } },
+    'update-report-datasets': { label: 'dataset queue', verbs: { started: 'Started', succeeded: 'Queued', failed: 'Failed' } },
+    'update-report-status': { label: 'report status', verbs: { started: 'Started', succeeded: 'Updated', failed: 'Failed' } },
+    'summarize-daily-target-stream-for-account': { label: 'daily targets', verbs: { started: 'Started', succeeded: 'Summarized', failed: 'Failed' } },
+    'summarize-hourly-target-stream-for-account': { label: 'hourly targets', verbs: { started: 'Started', succeeded: 'Summarized', failed: 'Failed' } },
+    'summarize-daily-target-stream': { label: 'daily summary', verbs: { started: 'Started', succeeded: 'Summarized', failed: 'Failed' } },
+    'summarize-hourly-target-stream': { label: 'hourly summary', verbs: { started: 'Started', succeeded: 'Summarized', failed: 'Failed' } },
+    'sync-ad-entities': { label: 'ad entities', verbs: { started: 'Started', succeeded: 'Synced', failed: 'Failed' } },
+    'cleanup-ams-metrics': { label: 'AMS metrics', verbs: { started: 'Started', succeeded: 'Cleaned', failed: 'Failed' } },
+};
+
+const DEFAULT_VERBS: Record<SessionState, string> = {
+    started: 'Started job',
+    succeeded: 'Completed',
+    failed: 'Failed',
+};
+
 function getMarker(status?: string | null) {
     if (!status) {
         return DEFAULT_MARKER;
@@ -137,7 +163,7 @@ export function JobEventsFeed() {
                                                     <span className="text-muted-foreground/40">•</span>
                                                     <span className="text-emerald-600 dark:text-emerald-300">{timestamp.relativeShort}</span>
                                                 </span>
-                                                <span className="text-foreground">{primary.headline ?? primary.jobName}</span>
+                                                <span className="text-foreground">{formatEventHeadline(primary)}</span>
                                                 {primary.status && <Tag>{primary.status}</Tag>}
                                             </div>
                                         </div>
@@ -152,7 +178,7 @@ export function JobEventsFeed() {
                                                             onClick={() => handleSelect(event)}
                                                         >
                                                             <span className="font-mono text-[10px] uppercase tracking-[0.12em] text-muted-foreground">{nestedTimestamp.relativeShort}</span>
-                                                            <span className="font-mono text-[12px] text-foreground">{event.headline ?? event.eventType}</span>
+                                                            <span className="font-mono text-[12px] text-foreground">{formatEventHeadline(event)}</span>
                                                             {event.detail && <span className="font-mono text-[11px] text-muted-foreground">{event.detail}</span>}
                                                         </li>
                                                     );
@@ -170,7 +196,7 @@ export function JobEventsFeed() {
             <Dialog open={Boolean(selectedEvent)} onOpenChange={(open: boolean) => !open && setSelectedEvent(null)}>
                 <DialogPopup className="sm:max-w-3xl">
                     <DialogHeader>
-                        <DialogTitle className="font-mono text-base tracking-wide">{selectedEvent?.headline ?? 'Job Event'}</DialogTitle>
+                        <DialogTitle className="font-mono text-base tracking-wide">{selectedEvent ? formatEventHeadline(selectedEvent) : 'Job Event'}</DialogTitle>
                         <DialogDescription className="font-mono text-xs uppercase tracking-[0.3em]">Full payload for this job event.</DialogDescription>
                     </DialogHeader>
                     {selectedEvent && (
@@ -204,4 +230,47 @@ export function JobEventsFeed() {
             </Dialog>
         </>
     );
+}
+
+function formatEventHeadline(event: JobEvent) {
+    if (event.eventType === 'session') {
+        return formatSessionHeadline(event);
+    }
+    return event.message ?? event.eventType;
+}
+
+function formatSessionHeadline(event: JobEvent) {
+    const stateMetadata = (event.metadata?.sessionState as SessionState | undefined) ?? (event.status === 'succeeded' ? 'succeeded' : event.status === 'failed' ? 'failed' : 'started');
+    const jobCopy = JOB_TITLES[event.jobName] ?? { label: event.jobName };
+    const verb = jobCopy.verbs?.[stateMetadata] ?? DEFAULT_VERBS[stateMetadata];
+    const bucket = formatBucketLabel(event);
+    const account = formatAccountTag(event.accountId, event.countryCode);
+    const parts = [`${verb} ${jobCopy.label}`];
+    if (bucket) {
+        parts.push(`for ${bucket}`);
+    }
+    if (account) {
+        parts.push(account);
+    }
+    return parts.join(' ');
+}
+
+function formatBucketLabel(event: JobEvent) {
+    if (event.bucketStart) {
+        return format(new Date(event.bucketStart), 'MM/dd h:mmaaa');
+    }
+    if (event.bucketDate) {
+        return format(new Date(event.bucketDate), 'MM/dd');
+    }
+    return '';
+}
+
+function formatAccountTag(accountId?: string | null, countryCode?: string | null) {
+    if (!accountId) {
+        return '';
+    }
+    const segments = accountId.split('.');
+    const last = segments[segments.length - 1] ?? accountId;
+    const shortId = last.slice(-6).toUpperCase();
+    return `(${shortId}${countryCode ? `/${countryCode}` : ''})`;
 }

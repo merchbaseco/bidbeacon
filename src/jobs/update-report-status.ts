@@ -97,7 +97,7 @@ export const updateReportStatusJob = boss
                                 await setRefreshing(reportDatum, false);
                                 await recorder.event({
                                     eventType: 'report-status',
-                                    headline: formatReportHeadline('checked', aggregation, entityType, date, accountId, countryCode),
+                                    message: formatReportHeadline('checked', aggregation, entityType, date, accountId, countryCode),
                                     detail: 'Report state machine checked, no action required.',
                                     context: {
                                         accountId,
@@ -118,7 +118,7 @@ export const updateReportStatusJob = boss
                                 await setRefreshing(updatedRow, false);
                                 await recorder.event({
                                     eventType: 'report-status',
-                                    headline: formatReportHeadline('queued', aggregation, entityType, date, accountId, countryCode),
+                                    message: formatReportHeadline('queued', aggregation, entityType, date, accountId, countryCode),
                                     detail: `Requested Amazon report ${reportId}`,
                                     context: {
                                         accountId,
@@ -142,7 +142,7 @@ export const updateReportStatusJob = boss
                                 await setRefreshing(processedRow, false);
                                 await recorder.event({
                                     eventType: 'report-status',
-                                    headline: formatReportHeadline('processed', aggregation, entityType, date, accountId, countryCode),
+                                    message: formatReportHeadline('processed', aggregation, entityType, date, accountId, countryCode),
                                     detail: reportDatum.reportId ? `Processed report ${reportDatum.reportId}` : undefined,
                                     context: {
                                         accountId,

@@ -65,7 +65,7 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
     if (!entityId) {
         await recorder.event({
             eventType: 'ams-summary',
-            headline: `Skipped hourly summary for ${accountId} (${countryCode})`,
+            message: `Skipped hourly summary for ${accountId} (${countryCode})`,
             detail: 'No advertiser entityId found.',
             status: 'skipped',
             context: { accountId, countryCode },
@@ -200,7 +200,7 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
 
     await recorder.event({
         eventType: 'ams-summary',
-        headline: `Summarized hourly AMS data for ${accountId}`,
+        message: `Summarized hourly AMS data for ${accountId}`,
         detail: `Inserted ${insertValues.length} rows over trailing 24 hours`,
         rowCount: insertValues.length,
         context: {
