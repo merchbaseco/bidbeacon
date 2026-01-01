@@ -102,16 +102,21 @@ export function JobEventsFeed() {
 
     const events = data ?? [];
     const groupedEvents = useMemo(() => {
-        const groups: Array<{ sessionId: string; events: JobEvent[] }> = [];
+        const groups = new Map<string, { sessionId: string; events: JobEvent[] }>();
+        const order: string[] = [];
+
         for (const event of events) {
-            const last = groups[groups.length - 1];
-            if (last && last.sessionId === event.sessionId) {
-                last.events.push(event);
+            const existing = groups.get(event.sessionId);
+            if (existing) {
+                existing.events.push(event);
             } else {
-                groups.push({ sessionId: event.sessionId, events: [event] });
+                const group = { sessionId: event.sessionId, events: [event] };
+                groups.set(event.sessionId, group);
+                order.push(event.sessionId);
             }
         }
-        return groups;
+
+        return order.map(sessionId => groups.get(sessionId)!);
     }, [events]);
 
     const handleSelect = (event: JobEvent) => {

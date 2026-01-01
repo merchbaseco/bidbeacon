@@ -288,7 +288,14 @@ function normalizeContext(context?: JobSessionContext): Record<string, unknown> 
         values.aggregation = context.aggregation ?? null;
     }
     if (context.bucketDate !== undefined) {
-        values.bucketDate = context.bucketDate === null ? null : toDate(context.bucketDate);
+        if (context.bucketDate === null) {
+            values.bucketDate = null;
+        } else if (context.bucketDate instanceof Date) {
+            values.bucketDate = formatDateColumn(context.bucketDate);
+        } else {
+            const normalized = toDate(context.bucketDate);
+            values.bucketDate = normalized ? formatDateColumn(normalized) : null;
+        }
     }
     if (context.bucketStart !== undefined) {
         values.bucketStart = context.bucketStart ?? null;
