@@ -3,14 +3,14 @@ import { db } from '@/db/index';
 import { jobSessions } from '@/db/schema';
 import { emitEvent, type JobSessionsUpdatedEvent } from '@/utils/events';
 
-export type JobSessionStatus = 'running' | 'succeeded' | 'failed';
+type JobSessionStatus = 'running' | 'succeeded' | 'failed';
 
-export type JobSessionAction = {
+type JobSessionAction = {
     type: string;
     at?: string | Date;
 } & Record<string, unknown>;
 
-export interface StartJobSessionOptions {
+interface StartJobSessionOptions {
     jobName: string;
     bossJobId: string;
     input?: Record<string, unknown> | null;

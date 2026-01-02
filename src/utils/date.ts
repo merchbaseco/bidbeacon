@@ -3,7 +3,7 @@
  * All functions work with UTC timezone by default.
  */
 
-import { addDays, addHours, startOfDay, startOfHour, subDays, subHours } from 'date-fns';
+import { addDays, addHours, startOfDay, startOfHour, subDays, subHours, subMonths } from 'date-fns';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 
 /**
@@ -176,6 +176,15 @@ export function zonedAddDays(date: Date, days: number, timezone: string): Date {
 export function zonedSubtractDays(date: Date, days: number, timezone: string): Date {
     const zonedDate = toZonedTime(date, timezone);
     const subtracted = subDays(zonedDate, days);
+    return fromZonedTime(subtracted, timezone);
+}
+
+/**
+ * Subtract months from a date in the specified timezone.
+ */
+export function zonedSubtractMonths(date: Date, months: number, timezone: string): Date {
+    const zonedDate = toZonedTime(date, timezone);
+    const subtracted = subMonths(zonedDate, months);
     return fromZonedTime(subtracted, timezone);
 }
 

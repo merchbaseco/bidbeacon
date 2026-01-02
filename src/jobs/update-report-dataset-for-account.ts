@@ -1,11 +1,11 @@
-import { and, desc, eq, isNotNull, isNull, lte } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, lt, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { reportDatasetMetadata } from '@/db/schema';
 import { boss } from '@/jobs/boss';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
 import type { AggregationType, EntityType } from '@/types/reports';
-import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date';
+import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedSubtractMonths, zonedTopOfHour } from '@/utils/date';
 import { emitEvent } from '@/utils/events';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { updateReportStatusJob } from './update-report-status';
@@ -14,7 +14,6 @@ import { withJobSession } from '@/utils/job-sessions';
 // Amazon Ads API data retention periods
 const HOURLY_RETENTION_DAYS = 14;
 const DAILY_RETENTION_MONTHS = 15;
-const DAILY_RETENTION_DAYS = DAILY_RETENTION_MONTHS * 30; // Approximate: 15 months * 30 days
 
 // ============================================================================
 // Job Definition
@@ -47,8 +46,55 @@ export const updateReportDatasetForAccountJob = boss
                         const timezone = getTimezoneForCountry(countryCode);
                         const now = zonedNow(timezone);
 
-                        await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
-                        await insertMissingMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
+                        const dailyCleanup = await cleanupOutOfBoundsMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
+                        const hourlyCleanup = await cleanupOutOfBoundsMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
+
+                        await recorder.addAction({
+                            type: 'report-dataset-cleanup',
+                            accountId,
+                            countryCode,
+                            aggregation: 'daily',
+                            entityType: 'target',
+                            cutoff: dailyCleanup.cutoff.toISOString(),
+                            deletedCount: dailyCleanup.deletedCount,
+                        });
+
+                        await recorder.addAction({
+                            type: 'report-dataset-cleanup',
+                            accountId,
+                            countryCode,
+                            aggregation: 'hourly',
+                            entityType: 'target',
+                            cutoff: hourlyCleanup.cutoff.toISOString(),
+                            deletedCount: hourlyCleanup.deletedCount,
+                        });
+
+                        const dailyInsert = await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
+                        const hourlyInsert = await insertMissingMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
+
+                        await recorder.addAction({
+                            type: 'report-dataset-backfill',
+                            accountId,
+                            countryCode,
+                            aggregation: 'daily',
+                            entityType: 'target',
+                            insertedCount: dailyInsert.insertedCount,
+                            totalPeriods: dailyInsert.totalPeriods,
+                            windowStart: dailyInsert.earliestPeriodStart.toISOString(),
+                            windowEnd: dailyInsert.latestPeriodStart.toISOString(),
+                        });
+
+                        await recorder.addAction({
+                            type: 'report-dataset-backfill',
+                            accountId,
+                            countryCode,
+                            aggregation: 'hourly',
+                            entityType: 'target',
+                            insertedCount: hourlyInsert.insertedCount,
+                            totalPeriods: hourlyInsert.totalPeriods,
+                            windowStart: hourlyInsert.earliestPeriodStart.toISOString(),
+                            windowEnd: hourlyInsert.latestPeriodStart.toISOString(),
+                        });
 
                         const dailyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
                         const hourlyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'hourly', 'target');
@@ -84,20 +130,29 @@ export const updateReportDatasetForAccountJob = boss
  * Creates missing rows starting from the most recent period and working backwards
  * until the retention limit is reached. Existing records are ignored via onConflictDoNothing.
  */
-async function insertMissingMetadataRecords(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType, timezone: string): Promise<void> {
+async function insertMissingMetadataRecords(
+    accountId: string,
+    countryCode: string,
+    now: Date,
+    aggregation: AggregationType,
+    entityType: EntityType,
+    timezone: string
+): Promise<{ insertedCount: number; totalPeriods: number; earliestPeriodStart: Date; latestPeriodStart: Date }> {
     const isHourly = aggregation === 'hourly';
     const currentPeriodStart = isHourly ? zonedTopOfHour(now, timezone) : zonedStartOfDay(now, timezone);
-    const retentionDays = isHourly ? HOURLY_RETENTION_DAYS : DAILY_RETENTION_DAYS;
-    const earliestPeriodStart = isHourly ? zonedSubtractHours(currentPeriodStart, retentionDays * 24, timezone) : zonedSubtractDays(currentPeriodStart, retentionDays, timezone);
-
-    const totalPeriods = isHourly ? retentionDays * 24 : retentionDays;
+    const earliestPeriodStart = isHourly
+        ? zonedSubtractHours(currentPeriodStart, HOURLY_RETENTION_DAYS * 24, timezone)
+        : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
+    let insertedCount = 0;
+    let totalPeriods = 0;
 
     // Start from the most recent period and work backwards
     let periodStart = currentPeriodStart;
     const earliestTime = earliestPeriodStart.getTime();
     while (periodStart.getTime() >= earliestTime) {
+        totalPeriods += 1;
         // Insert metadata row for this time period (ignores if already exists)
-        await insertMetadata({
+        const inserted = await insertMetadata({
             accountId,
             countryCode,
             periodStart,
@@ -106,10 +161,54 @@ async function insertMissingMetadataRecords(accountId: string, countryCode: stri
             status: 'missing',
             error: null,
         });
+        if (inserted) {
+            insertedCount += 1;
+        }
 
         // Move to the previous period
         periodStart = isHourly ? zonedSubtractHours(periodStart, 1, timezone) : zonedSubtractDays(periodStart, 1, timezone);
     }
+
+    return {
+        insertedCount,
+        totalPeriods,
+        earliestPeriodStart,
+        latestPeriodStart: currentPeriodStart,
+    };
+}
+
+async function cleanupOutOfBoundsMetadataRecords(
+    accountId: string,
+    countryCode: string,
+    now: Date,
+    aggregation: AggregationType,
+    entityType: EntityType,
+    timezone: string
+): Promise<{ deletedCount: number; cutoff: Date }> {
+    const isHourly = aggregation === 'hourly';
+    const currentPeriodStart = isHourly ? zonedTopOfHour(now, timezone) : zonedStartOfDay(now, timezone);
+    const cutoff = isHourly
+        ? zonedSubtractHours(currentPeriodStart, HOURLY_RETENTION_DAYS * 24, timezone)
+        : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
+
+    const deletedRows = await db
+        .delete(reportDatasetMetadata)
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, accountId),
+                eq(reportDatasetMetadata.countryCode, countryCode),
+                eq(reportDatasetMetadata.aggregation, aggregation),
+                eq(reportDatasetMetadata.entityType, entityType),
+                eq(reportDatasetMetadata.status, 'missing'),
+                lt(reportDatasetMetadata.periodStart, cutoff)
+            )
+        )
+        .returning({ uid: reportDatasetMetadata.uid });
+
+    return {
+        deletedCount: deletedRows.length,
+        cutoff,
+    };
 }
 
 async function insertMetadata(args: {
@@ -120,10 +219,10 @@ async function insertMetadata(args: {
     entityType: EntityType;
     status: 'missing' | 'fetching' | 'parsing' | 'completed' | 'error';
     error?: string | null;
-}): Promise<void> {
+}): Promise<boolean> {
     const { accountId, countryCode, periodStart, aggregation, entityType, status, error } = args;
 
-    await db
+    const inserted = await db
         .insert(reportDatasetMetadata)
         .values({
             accountId,
@@ -138,7 +237,10 @@ async function insertMetadata(args: {
         })
         .onConflictDoNothing({
             target: [reportDatasetMetadata.accountId, reportDatasetMetadata.periodStart, reportDatasetMetadata.aggregation, reportDatasetMetadata.entityType],
-        });
+        })
+        .returning({ uid: reportDatasetMetadata.uid });
+
+    return inserted.length > 0;
 }
 
 /**

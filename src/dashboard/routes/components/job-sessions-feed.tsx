@@ -48,6 +48,8 @@ const ACTION_MARKERS: Record<
     }
 > = {
     'report-dataset-scan': { icon: DatabaseAddIcon, className: 'border-emerald-300 text-emerald-600 dark:border-emerald-400/80 dark:text-emerald-200' },
+    'report-dataset-cleanup': { icon: RemoveCircleIcon, className: 'border-amber-300 text-amber-600 dark:border-amber-400/70 dark:text-amber-200' },
+    'report-dataset-backfill': { icon: DatabaseAddIcon, className: 'border-emerald-300 text-emerald-600 dark:border-emerald-400/80 dark:text-emerald-200' },
     'report-dataset-enqueue-summary': { icon: Queue01Icon, className: 'border-sky-300 text-sky-600 dark:border-sky-400/80 dark:text-sky-200' },
     'enqueue-report-dataset-for-account': { icon: Queue01Icon, className: 'border-sky-300 text-sky-600 dark:border-sky-400/80 dark:text-sky-200' },
     'enqueue-report-status': { icon: Queue01Icon, className: 'border-sky-300 text-sky-600 dark:border-sky-400/80 dark:text-sky-200' },
@@ -83,7 +85,7 @@ const formatTimestamp = (value: string) => {
     }
 
     return {
-        absolute: format(date, 'MMM d • HH:mm:ss'),
+        absolute: format(date, 'MMM d - HH:mm:ss'),
         relative: formatDistanceToNow(date, { addSuffix: true }),
         relativeShort,
     };
@@ -242,6 +244,37 @@ const renderActionContent = (action: JobAction) => {
                 </span>
             );
         }
+        case 'report-dataset-cleanup': {
+            const deletedCount = typeof action.deletedCount === 'number' ? action.deletedCount : 0;
+            const aggregation = typeof action.aggregation === 'string' ? action.aggregation : 'report';
+            const cutoff = typeof action.cutoff === 'string' ? action.cutoff : undefined;
+            return (
+                <span className="flex items-center gap-2">
+                    <span>Cleaned {aggregation} missing datasets</span>
+                    <Badge variant="secondary">{deletedCount} removed</Badge>
+                    {cutoff && <Badge variant="outline">older than {formatActionTimestamp(cutoff)}</Badge>}
+                </span>
+            );
+        }
+        case 'report-dataset-backfill': {
+            const insertedCount = typeof action.insertedCount === 'number' ? action.insertedCount : 0;
+            const totalPeriods = typeof action.totalPeriods === 'number' ? action.totalPeriods : 0;
+            const aggregation = typeof action.aggregation === 'string' ? action.aggregation : 'report';
+            const windowStart = typeof action.windowStart === 'string' ? action.windowStart : undefined;
+            const windowEnd = typeof action.windowEnd === 'string' ? action.windowEnd : undefined;
+            return (
+                <span className="flex flex-wrap items-center gap-2">
+                    <span>Backfilled {aggregation} datasets</span>
+                    <Badge variant="secondary">{insertedCount} added</Badge>
+                    <Badge variant="outline">{totalPeriods} checked</Badge>
+                    {windowStart && windowEnd && (
+                        <Badge variant="outline">
+                            {formatActionTimestamp(windowStart)} -> {formatActionTimestamp(windowEnd)}
+                        </Badge>
+                    )}
+                </span>
+            );
+        }
         case 'enqueue-report-dataset-for-account': {
             const input = typeof action.input === 'object' && action.input ? (action.input as Record<string, unknown>) : {};
             const accountId = typeof input.accountId === 'string' ? input.accountId : undefined;
@@ -276,7 +309,7 @@ const renderActionContent = (action: JobAction) => {
                     {bucketDate && <Badge variant="outline">{bucketDate}</Badge>}
                     {windowStart && windowEnd && (
                         <Badge variant="outline">
-                            {formatActionTimestamp(windowStart)} → {formatActionTimestamp(windowEnd)}
+                            {formatActionTimestamp(windowStart)} -> {formatActionTimestamp(windowEnd)}
                         </Badge>
                     )}
                 </span>
@@ -512,7 +545,7 @@ const SessionRow = ({ row, onSelect }: { row: TimelineRow; onSelect: (row: Timel
             </span>
             <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
                 {timestamp.absolute}
-                <span className="text-muted-foreground/40">•</span>
+                <span className="text-muted-foreground/40">-</span>
                 <span className="text-emerald-600 dark:text-emerald-300">{timestamp.relativeShort}</span>
             </span>
             <span className={cn('truncate', !isSession ? 'font-normal text-foreground' : '')}>
