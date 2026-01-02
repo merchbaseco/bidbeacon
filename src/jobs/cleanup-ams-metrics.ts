@@ -4,10 +4,10 @@
  */
 
 import { lt } from 'drizzle-orm';
-import { db } from '@/db/index.js';
-import { amsMetrics } from '@/db/schema.js';
-import { boss } from '@/jobs/boss.js';
-import { withJobSession } from '@/utils/job-events.js';
+import { db } from '@/db/index';
+import { amsMetrics } from '@/db/schema';
+import { boss } from '@/jobs/boss';
+import { withJobSession } from '@/utils/job-sessions';
 
 // ============================================================================
 // Job Definition
@@ -25,14 +25,14 @@ export const cleanupAmsMetricsJob = boss
                     {
                         jobName: 'cleanup-ams-metrics',
                         bossJobId: job.id,
+                        input: job.data,
                     },
                     async recorder => {
                         const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
                         await db.delete(amsMetrics).where(lt(amsMetrics.timestamp, cutoff));
-                        recorder.setFinalFields({
-                            metadata: {
-                                cutoff: cutoff.toISOString(),
-                            },
+                        await recorder.addAction({
+                            type: 'cleanup-ams-metrics',
+                            cutoff: cutoff.toISOString(),
                         });
                     }
                 )

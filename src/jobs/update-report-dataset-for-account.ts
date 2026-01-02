@@ -1,16 +1,15 @@
-import { format } from 'date-fns';
 import { and, desc, eq, isNotNull, isNull, lte } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/db/index.js';
-import { reportDatasetMetadata } from '@/db/schema.js';
-import { boss } from '@/jobs/boss.js';
+import { db } from '@/db/index';
+import { reportDatasetMetadata } from '@/db/schema';
+import { boss } from '@/jobs/boss';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
-import type { AggregationType, EntityType } from '@/types/reports.js';
-import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date.js';
-import { emitEvent } from '@/utils/events.js';
-import { getTimezoneForCountry } from '@/utils/timezones.js';
-import { updateReportStatusJob } from './update-report-status.js';
-import { withJobSession } from '@/utils/job-events.js';
+import type { AggregationType, EntityType } from '@/types/reports';
+import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedTopOfHour } from '@/utils/date';
+import { emitEvent } from '@/utils/events';
+import { getTimezoneForCountry } from '@/utils/timezones';
+import { updateReportStatusJob } from './update-report-status';
+import { withJobSession } from '@/utils/job-sessions';
 
 // Amazon Ads API data retention periods
 const HOURLY_RETENTION_DAYS = 14;
@@ -40,10 +39,7 @@ export const updateReportDatasetForAccountJob = boss
                     {
                         jobName: 'update-report-dataset-for-account',
                         bossJobId: job.id,
-                        context: {
-                            accountId: job.data.accountId,
-                            countryCode: job.data.countryCode,
-                        },
+                        input: job.data,
                     },
                     async recorder => {
                         const { accountId, countryCode } = job.data;
@@ -57,38 +53,23 @@ export const updateReportDatasetForAccountJob = boss
                         const dailyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
                         const hourlyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'hourly', 'target');
                         const totalDatasets = dailyResult.count + hourlyResult.count;
-                        const datasetLabels = [...dailyResult.labels, ...hourlyResult.labels].slice(0, 5);
+                        const enqueuedActions = [...dailyResult.actions, ...hourlyResult.actions];
 
                         emitEvent({
                             type: 'reports:refreshed',
                             accountId,
                         });
 
-                        recorder.setFinalFields({
-                            metadata: {
-                                accountId,
-                                countryCode,
-                                dailyEnqueuedCount: dailyResult.count,
-                                hourlyEnqueuedCount: hourlyResult.count,
-                            },
-                            recordsProcessed: totalDatasets,
+                        await recorder.addAction({
+                            type: 'report-dataset-scan',
+                            accountId,
+                            countryCode,
+                            dailyEnqueuedCount: dailyResult.count,
+                            hourlyEnqueuedCount: hourlyResult.count,
+                            totalEnqueuedCount: totalDatasets,
                         });
 
-                        await recorder.event({
-                            eventType: 'report-datasets',
-                            message:
-                                totalDatasets > 0
-                                    ? `Updated status on ${totalDatasets} datasets`
-                                    : 'Checked datasets (no work required)',
-                            detail:
-                                totalDatasets > 0 && datasetLabels.length > 0
-                                    ? datasetLabels.map(label => `(${label})`).join(' ')
-                                    : undefined,
-                            context: {
-                                accountId,
-                                countryCode,
-                            },
-                        });
+                        await Promise.all(enqueuedActions.map(action => recorder.addAction(action)));
                     }
                 )
             )
@@ -170,7 +151,15 @@ async function insertMetadata(args: {
  * processing), then by most recent period, then by nextRefreshAt. This ensures rows with report IDs always
  * get included before the limit is applied.
  */
-async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<{ count: number; labels: string[] }> {
+async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<{
+    count: number;
+    actions: Array<{
+        type: string;
+        jobName: string;
+        bossJobId: string;
+        input: Record<string, string>;
+    }>;
+}> {
     const MAX_CONCURRENT_REPORTS = 5;
 
     // Enqueue update-report-status jobs for records that already have a reportId and nextRefreshAt
@@ -211,7 +200,7 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
 
     const recordsNeedingWork = [...recordsWithActiveReport, ...recordsDueForNewReport];
     if (recordsNeedingWork.length === 0) {
-        return { count: 0, labels: [] };
+        return { count: 0, actions: [] };
     }
 
     const jobIds = await Promise.all(
@@ -226,17 +215,29 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
         )
     );
 
-    const labels = recordsNeedingWork.map(record => formatDatasetLabel(record.periodStart, aggregation)).slice(0, 5);
+    const actions = recordsNeedingWork.flatMap((record, index) => {
+        const bossJobId = jobIds[index];
+        if (!bossJobId) {
+            return [];
+        }
+        return [
+            {
+                type: 'enqueue-report-status',
+                jobName: 'update-report-status',
+                bossJobId,
+                input: {
+                    accountId: record.accountId,
+                    countryCode: record.countryCode,
+                    timestamp: record.periodStart.toISOString(),
+                    aggregation: record.aggregation,
+                    entityType: record.entityType,
+                },
+            },
+        ];
+    });
 
     return {
-        count: jobIds.length,
-        labels,
+        count: actions.length,
+        actions,
     };
-}
-
-function formatDatasetLabel(date: Date, aggregation: AggregationType) {
-    if (aggregation === 'daily') {
-        return format(date, 'MMM d');
-    }
-    return format(date, 'MMM d h:mmaaa');
 }

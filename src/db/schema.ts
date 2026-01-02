@@ -599,9 +599,7 @@ export const amsMetrics = pgTable(
         durationMs: integer('duration_ms').notNull(),
         error: text('error'), // Only populated on failure
     },
-    table => [
-        index('ams_metrics_timestamp_idx').on(table.timestamp),
-    ]
+    table => [index('ams_metrics_timestamp_idx').on(table.timestamp)]
 );
 
 /**
@@ -688,7 +686,7 @@ export const apiMetrics = pgTable(
  * ----------------------------------------------------------------------------
  *
  * Job sessions capture end-to-end metadata for each pg-boss job execution.
- * Job events capture the narrative timeline for each session.
+ * Job events capture specific actions taken during a job.
  */
 export const jobSessions = pgTable(
     'job_sessions',
@@ -699,57 +697,9 @@ export const jobSessions = pgTable(
         status: text('status').notNull().default('running'), // running, succeeded, failed
         startedAt: timestamp('started_at', { withTimezone: true, mode: 'date' }).notNull(),
         finishedAt: timestamp('finished_at', { withTimezone: true, mode: 'date' }),
-        durationMs: integer('duration_ms'),
-        errorCode: text('error_code'),
-        errorMessage: text('error_message'),
-        accountId: text('account_id'),
-        countryCode: text('country_code'),
-        datasetId: text('dataset_id'),
-        entityType: text('entity_type'),
-        aggregation: text('aggregation'),
-        bucketDate: date('bucket_date'),
-        bucketStart: timestamp('bucket_start', { withTimezone: true, mode: 'date' }),
-        recordsProcessed: integer('records_processed'),
-        recordsFailed: integer('records_failed'),
-        metadata: jsonb('metadata'),
+        error: text('error'),
+        input: jsonb('input'),
+        actions: jsonb('actions'),
     },
-    table => [
-        index('job_sessions_job_name_started_idx').on(table.jobName, table.startedAt),
-        index('job_sessions_account_started_idx').on(table.accountId, table.startedAt),
-    ]
-);
-
-export const jobEvents = pgTable(
-    'job_events',
-    {
-        id: uuid('id').primaryKey().defaultRandom(),
-        sessionId: uuid('session_id')
-            .notNull()
-            .references(() => jobSessions.id, { onDelete: 'cascade' }),
-        jobName: text('job_name').notNull(),
-        bossJobId: text('boss_job_id').notNull(),
-        occurredAt: timestamp('occurred_at', { withTimezone: true, mode: 'date' }).notNull(),
-        eventType: text('event_type').notNull(),
-        headline: text('headline').notNull(),
-        detail: text('detail'),
-        stage: text('stage'),
-        status: text('status'),
-        durationMs: integer('duration_ms'),
-        rowCount: integer('row_count'),
-        retryCount: integer('retry_count'),
-        apiName: text('api_name'),
-        accountId: text('account_id'),
-        countryCode: text('country_code'),
-        datasetId: text('dataset_id'),
-        entityType: text('entity_type'),
-        aggregation: text('aggregation'),
-        bucketDate: date('bucket_date'),
-        bucketStart: timestamp('bucket_start', { withTimezone: true, mode: 'date' }),
-        metadata: jsonb('metadata'),
-    },
-    table => [
-        index('job_events_session_occurred_idx').on(table.sessionId, table.occurredAt),
-        index('job_events_job_name_occurred_idx').on(table.jobName, table.occurredAt),
-        index('job_events_account_occurred_idx').on(table.accountId, table.occurredAt),
-    ]
+    table => [index('job_sessions_job_name_started_idx').on(table.jobName, table.startedAt)]
 );

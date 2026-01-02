@@ -5,11 +5,11 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { db } from '@/db/index.js';
-import { advertiserAccount } from '@/db/schema.js';
-import { boss } from '@/jobs/boss.js';
-import { updateReportDatasetForAccountJob } from './update-report-dataset-for-account.js';
-import { withJobSession } from '@/utils/job-events.js';
+import { db } from '@/db/index';
+import { advertiserAccount } from '@/db/schema';
+import { boss } from '@/jobs/boss';
+import { updateReportDatasetForAccountJob } from './update-report-dataset-for-account';
+import { withJobSession } from '@/utils/job-sessions';
 
 // ============================================================================
 // Job Definition
@@ -27,6 +27,7 @@ export const updateReportDatasetsJob = boss
                     {
                         jobName: 'update-report-datasets',
                         bossJobId: job.id,
+                        input: job.data,
                     },
                     async recorder => {
                         const enabledAccounts = await db
@@ -38,24 +39,28 @@ export const updateReportDatasetsJob = boss
                             .where(eq(advertiserAccount.enabled, true));
 
                         const accountJobPromises = enabledAccounts.map(async account => {
-                            await updateReportDatasetForAccountJob.emit({
+                            const bossJobId = await updateReportDatasetForAccountJob.emit({
                                 accountId: account.adsAccountId,
                                 countryCode: account.countryCode,
                             });
+                            if (bossJobId) {
+                                await recorder.addAction({
+                                    type: 'enqueue-report-dataset-for-account',
+                                    jobName: 'update-report-dataset-for-account',
+                                    bossJobId,
+                                    input: {
+                                        accountId: account.adsAccountId,
+                                        countryCode: account.countryCode,
+                                    },
+                                });
+                            }
                         });
 
                         await Promise.all(accountJobPromises);
 
-                        recorder.setFinalFields({
-                            recordsProcessed: enabledAccounts.length,
-                            metadata: {
-                                accountsEnqueued: enabledAccounts.length,
-                            },
-                        });
-
-                        await recorder.event({
-                            eventType: 'reports:enqueue',
-                            message: `Queued ${enabledAccounts.length} account datasets`,
+                        await recorder.addAction({
+                            type: 'report-dataset-enqueue-summary',
+                            accountsEnqueued: enabledAccounts.length,
                         });
                     }
                 )

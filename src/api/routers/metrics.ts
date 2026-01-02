@@ -2,7 +2,7 @@ import { and, desc, eq, gte, inArray, lt, lte, sql, isNotNull } from 'drizzle-or
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { amsMetrics, apiMetrics, jobEvents, jobSessions, performanceDaily, performanceHourly } from '@/db/schema';
+import { amsMetrics, apiMetrics, jobSessions, performanceDaily, performanceHourly } from '@/db/schema';
 import { publicProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
@@ -16,7 +16,7 @@ const SUPPORTED_JOBS = [
     'summarize-hourly-target-stream',
     'summarize-hourly-target-stream-for-account',
 ] as const;
-const VISIBLE_JOB_EVENTS = [
+const VISIBLE_JOB_SESSIONS = [
     'update-report-dataset-for-account',
     'update-report-status',
     'summarize-daily-target-stream-for-account',
@@ -154,7 +154,7 @@ export const metricsRouter = router({
                     interval: sql<string>`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`.as('interval'),
                     jobName: jobSessions.jobName,
                     count: sql<number>`count(*)`.as('count'),
-                    avgDuration: sql<number>`avg(${jobSessions.durationMs})`.as('avg_duration'),
+                    avgDuration: sql<number>`avg(extract(epoch from (${jobSessions.finishedAt} - ${jobSessions.startedAt})) * 1000)`.as('avg_duration'),
                     successCount: sql<number>`sum(case when ${jobSessions.status} = 'succeeded' then 1 else 0 end)`.as('success_count'),
                     errorCount: sql<number>`sum(case when ${jobSessions.status} = 'failed' then 1 else 0 end)`.as('error_count'),
                 })
@@ -192,7 +192,7 @@ export const metricsRouter = router({
                 to: to.toISOString(),
             };
         }),
-    jobEvents: publicProcedure
+    jobSessions: publicProcedure
         .input(
             z
                 .object({
@@ -207,75 +207,53 @@ export const metricsRouter = router({
         .query(async ({ input }) => {
             const limit = input?.limit ?? 50;
             const conditions = [];
-            const jobNamesFilter = input?.jobName ? [input.jobName] : [...VISIBLE_JOB_EVENTS];
+            const jobNamesFilter = input?.jobName ? [input.jobName] : [...VISIBLE_JOB_SESSIONS];
 
             if (jobNamesFilter.length > 0) {
-                conditions.push(inArray(jobEvents.jobName, jobNamesFilter));
+                conditions.push(inArray(jobSessions.jobName, jobNamesFilter));
             }
             if (input?.since) {
-                conditions.push(gte(jobEvents.occurredAt, new Date(input.since)));
+                conditions.push(gte(jobSessions.startedAt, new Date(input.since)));
             }
             if (input?.accountId) {
-                conditions.push(eq(jobEvents.accountId, input.accountId));
+                conditions.push(
+                    sql`(${jobSessions.input} ->> 'accountId' = ${input.accountId} OR exists (select 1 from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'accountId' = ${input.accountId} OR action->'input'->>'accountId' = ${input.accountId}))`
+                );
             }
             if (input?.countryCode) {
-                conditions.push(eq(jobEvents.countryCode, input.countryCode));
+                conditions.push(
+                    sql`(${jobSessions.input} ->> 'countryCode' = ${input.countryCode} OR exists (select 1 from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'countryCode' = ${input.countryCode} OR action->'input'->>'countryCode' = ${input.countryCode}))`
+                );
             }
 
             const baseQuery = db
                 .select({
-                    id: jobEvents.id,
-                    sessionId: jobEvents.sessionId,
-                    jobName: jobEvents.jobName,
-                    bossJobId: jobEvents.bossJobId,
-                    occurredAt: jobEvents.occurredAt,
-                    eventType: jobEvents.eventType,
-                    message: jobEvents.headline,
-                    detail: jobEvents.detail,
-                    stage: jobEvents.stage,
-                    status: jobEvents.status,
-                    durationMs: jobEvents.durationMs,
-                    rowCount: jobEvents.rowCount,
-                    retryCount: jobEvents.retryCount,
-                    apiName: jobEvents.apiName,
-                    accountId: jobEvents.accountId,
-                    countryCode: jobEvents.countryCode,
-                    datasetId: jobEvents.datasetId,
-                    entityType: jobEvents.entityType,
-                    aggregation: jobEvents.aggregation,
-                    bucketDate: jobEvents.bucketDate,
-                    bucketStart: jobEvents.bucketStart,
-                    metadata: jobEvents.metadata,
+                    id: jobSessions.id,
+                    jobName: jobSessions.jobName,
+                    bossJobId: jobSessions.bossJobId,
+                    status: jobSessions.status,
+                    startedAt: jobSessions.startedAt,
+                    finishedAt: jobSessions.finishedAt,
+                    error: jobSessions.error,
+                    input: jobSessions.input,
+                    actions: jobSessions.actions,
                 })
-                .from(jobEvents);
+                .from(jobSessions);
 
             const queryWithFilters = conditions.length > 0 ? baseQuery.where(and(...conditions)) : baseQuery;
 
-            const rows = await queryWithFilters.orderBy(desc(jobEvents.occurredAt)).limit(limit);
+            const rows = await queryWithFilters.orderBy(desc(jobSessions.startedAt)).limit(limit);
 
             return rows.map(row => ({
                 id: row.id,
-                sessionId: row.sessionId,
                 jobName: row.jobName,
                 bossJobId: row.bossJobId,
-                occurredAt: row.occurredAt.toISOString(),
-                eventType: row.eventType,
-                message: row.message,
-                detail: row.detail,
-                stage: row.stage,
                 status: row.status,
-                durationMs: row.durationMs,
-                rowCount: row.rowCount,
-                retryCount: row.retryCount,
-                apiName: row.apiName,
-                accountId: row.accountId,
-                countryCode: row.countryCode,
-                datasetId: row.datasetId,
-                entityType: row.entityType,
-                aggregation: row.aggregation,
-                bucketDate: row.bucketDate ? new Date(row.bucketDate).toISOString().slice(0, 10) : null,
-                bucketStart: row.bucketStart ? row.bucketStart.toISOString() : null,
-                metadata: (row.metadata ?? null) as Record<string, unknown> | null,
+                startedAt: row.startedAt.toISOString(),
+                finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
+                error: row.error ?? null,
+                input: (row.input ?? null) as Record<string, unknown> | null,
+                actions: (row.actions ?? []) as Array<Record<string, unknown>>,
             }));
         }),
     ams: publicProcedure
@@ -339,7 +317,7 @@ export const metricsRouter = router({
                 .select({
                     interval: sql<string>`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`.as('interval'),
                     jobCount: sql<number>`count(*)`.as('job_count'),
-                    totalRowsInserted: sql<number>`COALESCE(sum(cast(${jobSessions.metadata}->>'totalRowsInserted' as integer)), 0)`.as('total_rows_inserted'),
+                    totalRowsInserted: sql<number>`COALESCE(sum(COALESCE((select sum((action->>'rowsInserted')::int) from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'type' = 'ams-summary-complete'), 0)), 0)`.as('total_rows_inserted'),
                 })
                 .from(jobSessions)
                 .where(

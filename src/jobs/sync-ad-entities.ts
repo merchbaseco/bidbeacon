@@ -8,17 +8,17 @@ import { promisify } from 'node:util';
 import { gunzip } from 'node:zlib';
 import { and, eq, type InferInsertModel, inArray } from 'drizzle-orm';
 import { z } from 'zod';
-import { exportAdGroups } from '@/amazon-ads/export-ad-groups.js';
-import { exportAds } from '@/amazon-ads/export-ads.js';
-import { exportCampaigns } from '@/amazon-ads/export-campaigns.js';
-import { exportTargets } from '@/amazon-ads/export-targets.js';
-import { type ExportContentType, type ExportStatusResponse, getExportStatus } from '@/amazon-ads/get-export-status.js';
-import { db } from '@/db/index.js';
-import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, target } from '@/db/schema.js';
-import { boss } from '@/jobs/boss.js';
-import { utcNow } from '@/utils/date.js';
-import { emitEvent } from '@/utils/events.js';
-import { withJobSession } from '@/utils/job-events.js';
+import { exportAdGroups } from '@/amazon-ads/export-ad-groups';
+import { exportAds } from '@/amazon-ads/export-ads';
+import { exportCampaigns } from '@/amazon-ads/export-campaigns';
+import { exportTargets } from '@/amazon-ads/export-targets';
+import { type ExportContentType, type ExportStatusResponse, getExportStatus } from '@/amazon-ads/get-export-status';
+import { db } from '@/db/index';
+import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, target } from '@/db/schema';
+import { boss } from '@/jobs/boss';
+import { utcNow } from '@/utils/date';
+import { emitEvent } from '@/utils/events';
+import { withJobSession } from '@/utils/job-sessions';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -190,10 +190,7 @@ export const syncAdEntitiesJob = boss
                 {
                     jobName: 'sync-ad-entities',
                     bossJobId: job.id,
-                    context: {
-                        accountId,
-                        countryCode,
-                    },
+                    input: job.data,
                 },
                 async recorder => {
                     // Update metadata to indicate sync is starting
@@ -308,6 +305,16 @@ export const syncAdEntitiesJob = boss
                                         },
                                     ];
 
+                                    await recorder.addAction({
+                                        type: 'exports-created',
+                                        exports: {
+                                            campaigns: campaignsExport.exportId,
+                                            adGroups: adGroupsExport.exportId,
+                                            ads: adsExport.exportId,
+                                            targets: targetsExport.exportId,
+                                        },
+                                    });
+
                                     // Step 2: Poll for all exports to complete
                                     let pollCount = 0;
                                     while (pollCount < MAX_POLLS) {
@@ -340,11 +347,10 @@ export const syncAdEntitiesJob = boss
 
                                                 if (status.status === 'FAILED') {
                                                     exportState.error = status.error?.message ?? 'Unknown error';
-                                                    await recorder.event({
-                                                        eventType: 'entity-sync',
-                                                        message: `Export failed for ${exportState.entityType}`,
-                                                        detail: exportState.error ?? undefined,
-                                                        context: { accountId, countryCode },
+                                                    await recorder.addAction({
+                                                        type: 'export-failed',
+                                                        entityType: exportState.entityType,
+                                                        error: exportState.error,
                                                     });
                                                 }
 
@@ -679,16 +685,12 @@ export const syncAdEntitiesJob = boss
                                         };
                                         const totalRecords = syncTotals.campaigns + syncTotals.adGroups + syncTotals.ads + syncTotals.targets;
 
-                                        await recorder.event({
-                                            eventType: 'entity-sync',
-                                            message: `Imported ${syncTotals.campaigns} campaigns, ${syncTotals.adGroups} ad groups, ${syncTotals.ads} ads, ${syncTotals.targets} targets`,
-                                            detail: 'Account entity sync completed successfully',
-                                            context: { accountId, countryCode },
-                                        });
-
-                                        recorder.setFinalFields({
-                                            recordsProcessed: totalRecords,
-                                            metadata: syncTotals,
+                                        await recorder.addAction({
+                                            type: 'entities-synced',
+                                            accountId,
+                                            countryCode,
+                                            totals: syncTotals,
+                                            totalRecords,
                                         });
                 } catch (error) {
                     // Update metadata with error

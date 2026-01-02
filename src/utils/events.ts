@@ -8,7 +8,7 @@ export type EventType =
     | 'reports:refreshed'
     | 'api-metrics:updated'
     | 'job-metrics:updated'
-    | 'job-events:updated'
+    | 'job-sessions:updated'
     | 'account-dataset-metadata:updated'
     | 'report:refreshed'
     | 'report-dataset-metadata:error';
@@ -54,31 +54,19 @@ export interface JobMetricsUpdatedEvent extends BaseEvent {
     jobName: string;
 }
 
-export interface JobEventsUpdatedEvent extends BaseEvent {
-    type: 'job-events:updated';
+export interface JobSessionsUpdatedEvent extends BaseEvent {
+    type: 'job-sessions:updated';
     jobName: string;
-    event: {
+    session: {
         id: string;
-        sessionId: string;
         bossJobId: string;
-        occurredAt: string;
-        eventType: string;
-        message: string;
-        detail: string | null;
-        stage: string | null;
-        status: string | null;
-        durationMs: number | null;
-        rowCount: number | null;
-        retryCount: number | null;
-        apiName: string | null;
-        accountId: string | null;
-        countryCode: string | null;
-        datasetId: string | null;
-        entityType: string | null;
-        aggregation: string | null;
-        bucketDate: string | null;
-        bucketStart: string | null;
-        metadata: Record<string, unknown> | null;
+        jobName: string;
+        status: string;
+        startedAt: string;
+        finishedAt: string | null;
+        error: string | null;
+        input: Record<string, unknown> | null;
+        actions: Array<Record<string, unknown>>;
     };
 }
 
@@ -111,7 +99,7 @@ export type Event =
     | ReportsRefreshedEvent
     | ApiMetricsUpdatedEvent
     | JobMetricsUpdatedEvent
-    | JobEventsUpdatedEvent
+    | JobSessionsUpdatedEvent
     | AccountDatasetMetadataUpdatedEvent
     | ReportRefreshedEvent
     | ReportDatasetMetadataErrorEvent;
@@ -186,7 +174,7 @@ export function emitEvent(event: Omit<AccountUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<JobMetricsUpdatedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<JobEventsUpdatedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<JobSessionsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportDatasetMetadataErrorEvent, 'timestamp'>): void;

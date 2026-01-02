@@ -7,12 +7,12 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/db/index.js';
-import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceDaily } from '@/db/schema.js';
-import { boss } from '@/jobs/boss.js';
-import { zonedNow, zonedStartOfDay } from '@/utils/date.js';
-import { getTimezoneForCountry } from '@/utils/timezones.js';
-import { withJobSession, type JobSessionRecorder } from '@/utils/job-events.js';
+import { db } from '@/db/index';
+import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceDaily } from '@/db/schema';
+import { boss } from '@/jobs/boss';
+import { zonedNow, zonedStartOfDay } from '@/utils/date';
+import { getTimezoneForCountry } from '@/utils/timezones';
+import { withJobSession, type JobSessionRecorder } from '@/utils/job-sessions';
 
 const jobInputSchema = z.object({
     accountId: z.string(),
@@ -29,12 +29,7 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                     {
                         jobName: 'summarize-daily-target-stream-for-account',
                         bossJobId: job.id,
-                        context: {
-                            accountId: job.data.accountId,
-                            countryCode: job.data.countryCode,
-                            aggregation: 'daily',
-                            entityType: 'target',
-                        },
+                        input: job.data,
                     },
                     recorder => summarizeDailyForAccount(job.data.accountId, job.data.countryCode, recorder)
                 )
@@ -63,14 +58,13 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
 
     const entityId = accountRecord[0]?.entityId;
     if (!entityId) {
-        await recorder.event({
-            eventType: 'ams-summary',
-            message: `Skipped daily summary for ${accountId} (${countryCode})`,
-            detail: 'No advertiser entityId found.',
-            status: 'skipped',
-            context: { accountId, countryCode },
+        await recorder.addAction({
+            type: 'ams-summary-skipped',
+            cadence: 'daily',
+            accountId,
+            countryCode,
+            reason: 'missing-entity-id',
         });
-        recorder.setFinalFields({ metadata: { skipped: true } });
         return;
     }
 
@@ -78,12 +72,6 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
     const now = zonedNow(timezone);
     const todayStart = zonedStartOfDay(now, timezone);
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
-
-    recorder.updateSession({
-        context: {
-            bucketDate: todayStart,
-        },
-    });
 
     const bucketDateStr = formatInTimeZone(todayStart, timezone, 'yyyy-MM-dd');
 
@@ -184,29 +172,14 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
             });
     }
 
-    recorder.setFinalFields({
-        recordsProcessed: insertValues.length,
-        metadata: {
-            accountId,
-            countryCode,
-            bucketDate: bucketDateStr,
-            trafficAggregates: trafficAggregates.length,
-            conversionAggregates: conversionAggregates.length,
-            rowsInserted: insertValues.length,
-        },
-    });
-
-    await recorder.event({
-        eventType: 'ams-summary',
-        message: `Summarized daily AMS data for ${accountId}`,
-        detail: `Inserted ${insertValues.length} rows for ${bucketDateStr}`,
-        rowCount: insertValues.length,
-        context: {
-            accountId,
-            countryCode,
-            aggregation: 'daily',
-            entityType: 'target',
-            bucketDate: todayStart,
-        },
+    await recorder.addAction({
+        type: 'ams-summary-complete',
+        cadence: 'daily',
+        accountId,
+        countryCode,
+        bucketDate: bucketDateStr,
+        trafficAggregates: trafficAggregates.length,
+        conversionAggregates: conversionAggregates.length,
+        rowsInserted: insertValues.length,
     });
 }

@@ -6,7 +6,7 @@ import { AccountEnabledSwitch } from './components/account-selector/account-enab
 import { AmsMetricsCard } from './components/ams-metrics-card';
 import { DailyPerformanceMetrics } from './components/daily-performance-metrics';
 import { ReportsTable } from './components/reports-table/reports-table';
-import { JobEventsFeed } from './components/job-events-feed';
+import { JobSessionsFeed } from './components/job-sessions-feed';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
@@ -30,7 +30,7 @@ export function IndexRoute() {
             </div>
 
             <div className="max-w-background-frame-max mx-auto px-4 mt-4">
-                <JobEventsFeed />
+                <JobSessionsFeed />
             </div>
 
             <ReportsTable className="max-w-background-frame-max mx-auto px-4 mt-6" />

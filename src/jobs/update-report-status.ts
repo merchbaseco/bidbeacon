@@ -7,18 +7,18 @@
 import { toZonedTime } from 'date-fns-tz';
 import { and, eq, type InferSelectModel } from 'drizzle-orm';
 import { z } from 'zod';
-import { db } from '@/db/index.js';
-import { reportDatasetMetadata } from '@/db/schema.js';
-import { createReportForDataset } from '@/lib/create-report/index.js';
+import { db } from '@/db/index';
+import { reportDatasetMetadata } from '@/db/schema';
+import { createReportForDataset } from '@/lib/create-report/index';
 import { parseReport } from '@/lib/parse-report/index';
 import { getNextAction } from '@/lib/report-status-state-machine';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
-import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports.js';
-import { utcNow } from '@/utils/date.js';
-import { emitEvent } from '@/utils/events.js';
-import { withJobSession } from '@/utils/job-events.js';
-import { getTimezoneForCountry } from '@/utils/timezones.js';
-import { boss } from './boss.js';
+import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports';
+import { utcNow } from '@/utils/date';
+import { emitEvent } from '@/utils/events';
+import { withJobSession } from '@/utils/job-sessions';
+import { getTimezoneForCountry } from '@/utils/timezones';
+import { boss } from './boss';
 
 // ============================================================================
 // Job Definition
@@ -51,13 +51,7 @@ export const updateReportStatusJob = boss
                     {
                         jobName: 'update-report-status',
                         bossJobId: job.id,
-                        context: {
-                            accountId,
-                            countryCode,
-                            aggregation,
-                            entityType,
-                            bucketDate: date,
-                        },
+                        input: job.data,
                     },
                     async recorder => {
                         let action: string | undefined;
@@ -95,17 +89,13 @@ export const updateReportStatusJob = boss
                             case 'none': {
                                 await setNextRefreshAt(reportDatum, getNextRefreshTime(reportDatum));
                                 await setRefreshing(reportDatum, false);
-                                await recorder.event({
-                                    eventType: 'report-status',
-                                    message: formatReportHeadline('checked', aggregation, entityType, date, accountId, countryCode),
-                                    detail: 'Report state machine checked, no action required.',
-                                    context: {
-                                        accountId,
-                                        countryCode,
-                                        aggregation,
-                                        entityType,
-                                        bucketDate: date,
-                                    },
+                                await recorder.addAction({
+                                    type: 'report-status-checked',
+                                    accountId,
+                                    countryCode,
+                                    aggregation,
+                                    entityType,
+                                    timestamp,
                                 });
                                 break;
                             }
@@ -116,17 +106,14 @@ export const updateReportStatusJob = boss
                                 await setNextRefreshAt(updatedRow, getNextRefreshTime(updatedRow));
                                 await setStatus(updatedRow, 'fetching');
                                 await setRefreshing(updatedRow, false);
-                                await recorder.event({
-                                    eventType: 'report-status',
-                                    message: formatReportHeadline('queued', aggregation, entityType, date, accountId, countryCode),
-                                    detail: `Requested Amazon report ${reportId}`,
-                                    context: {
-                                        accountId,
-                                        countryCode,
-                                        aggregation,
-                                        entityType,
-                                        bucketDate: date,
-                                    },
+                                await recorder.addAction({
+                                    type: 'report-status-queued',
+                                    accountId,
+                                    countryCode,
+                                    aggregation,
+                                    entityType,
+                                    timestamp,
+                                    reportId,
                                 });
                                 break;
                             }
@@ -140,17 +127,14 @@ export const updateReportStatusJob = boss
                                 const processedRow = await markReportProcessed(reportDatum, reportDatum.reportId);
                                 await setNextRefreshAt(processedRow, getNextRefreshTime(processedRow));
                                 await setRefreshing(processedRow, false);
-                                await recorder.event({
-                                    eventType: 'report-status',
-                                    message: formatReportHeadline('processed', aggregation, entityType, date, accountId, countryCode),
-                                    detail: reportDatum.reportId ? `Processed report ${reportDatum.reportId}` : undefined,
-                                    context: {
-                                        accountId,
-                                        countryCode,
-                                        aggregation,
-                                        entityType,
-                                        bucketDate: date,
-                                    },
+                                await recorder.addAction({
+                                    type: 'report-status-processed',
+                                    accountId,
+                                    countryCode,
+                                    aggregation,
+                                    entityType,
+                                    timestamp,
+                                    reportId: reportDatum.reportId ?? null,
                                 });
                                 break;
                             }
@@ -376,26 +360,4 @@ async function clearError(row: InferSelectModel<typeof reportDatasetMetadata>): 
             row: updatedRow,
         });
     }
-}
-
-function formatReportHeadline(action: 'checked' | 'queued' | 'processed', aggregation: string, entityType: string, date: Date, accountId: string, countryCode: string) {
-    const prefix = action === 'queued' ? 'Queued' : action === 'processed' ? 'Processed' : 'Checked';
-    const agg = capitalize(aggregation);
-    const entity = capitalize(entityType);
-    const accountTag = formatAccountTag(accountId, countryCode);
-    return `${prefix} ${agg} ${entity} report · ${formatDateLabel(date)} ${accountTag}`;
-}
-
-function formatAccountTag(accountId: string, countryCode: string) {
-    const segments = accountId.split('.');
-    const shortId = (segments[segments.length - 1] ?? accountId).slice(-6).toUpperCase();
-    return `(${shortId}/${countryCode})`;
-}
-
-function formatDateLabel(date: Date) {
-    return new Intl.DateTimeFormat('en-US', { month: 'long', day: 'numeric', year: 'numeric' }).format(date);
-}
-
-function capitalize(value: string) {
-    return value.charAt(0).toUpperCase() + value.slice(1);
 }

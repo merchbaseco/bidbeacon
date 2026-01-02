@@ -26,30 +26,18 @@ type Event =
       }
     | { type: 'job-metrics:updated'; jobName: string; timestamp: string }
     | {
-          type: 'job-events:updated';
+          type: 'job-sessions:updated';
           jobName: string;
-          event: {
+          session: {
               id: string;
-              sessionId: string;
               bossJobId: string;
-              occurredAt: string;
-              eventType: string;
-              message: string;
-              detail: string | null;
-              stage: string | null;
-              status: string | null;
-              durationMs: number | null;
-              rowCount: number | null;
-              retryCount: number | null;
-              apiName: string | null;
-              accountId: string | null;
-              countryCode: string | null;
-              datasetId: string | null;
-              entityType: string | null;
-              aggregation: string | null;
-              bucketDate: string | null;
-              bucketStart: string | null;
-              metadata: Record<string, unknown> | null;
+              jobName: string;
+              status: string;
+              startedAt: string;
+              finishedAt: string | null;
+              error: string | null;
+              input: Record<string, unknown> | null;
+              actions: Array<Record<string, unknown>>;
           };
           timestamp: string;
       }
@@ -123,8 +111,8 @@ export const useWebSocket = () => {
                         // Invalidate job metrics queries to refresh the chart
                         utils.metrics.job.invalidate();
                         break;
-                    case 'job-events:updated':
-                        utils.metrics.jobEvents.invalidate();
+                    case 'job-sessions:updated':
+                        utils.metrics.jobSessions.invalidate();
                         break;
                     case 'account-dataset-metadata:updated':
                         // Invalidate account dataset metadata query to refresh the sync status

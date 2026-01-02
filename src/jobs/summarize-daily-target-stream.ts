@@ -5,11 +5,11 @@
  */
 
 import { eq } from 'drizzle-orm';
-import { db } from '@/db/index.js';
-import { advertiserAccount } from '@/db/schema.js';
-import { boss } from '@/jobs/boss.js';
-import { summarizeDailyTargetStreamForAccountJob } from './summarize-daily-target-stream-for-account.js';
-import { withJobSession } from '@/utils/job-events.js';
+import { db } from '@/db/index';
+import { advertiserAccount } from '@/db/schema';
+import { boss } from '@/jobs/boss';
+import { summarizeDailyTargetStreamForAccountJob } from './summarize-daily-target-stream-for-account';
+import { withJobSession } from '@/utils/job-sessions';
 
 // ============================================================================
 // Job Definition
@@ -27,6 +27,7 @@ export const summarizeDailyTargetStreamJob = boss
                     {
                         jobName: 'summarize-daily-target-stream',
                         bossJobId: job.id,
+                        input: job.data,
                     },
                     async recorder => {
                         const enabledAccounts = await db
@@ -46,17 +47,10 @@ export const summarizeDailyTargetStreamJob = boss
                             )
                         );
 
-                        recorder.setFinalFields({
-                            recordsProcessed: enabledAccounts.length,
-                            metadata: {
-                                accountsEnqueued: enabledAccounts.length,
-                            },
-                        });
-
-                        await recorder.event({
-                            eventType: 'ams-summary',
-                            message: `Queued daily AMS summarization for ${enabledAccounts.length} accounts`,
-                            detail: 'Summaries run every 15 minutes',
+                        await recorder.addAction({
+                            type: 'ams-summary-enqueue',
+                            cadence: 'daily',
+                            accountsEnqueued: enabledAccounts.length,
                         });
                     }
                 )
