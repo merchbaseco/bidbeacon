@@ -250,7 +250,7 @@ const renderActionContent = (action: JobAction) => {
             const cutoff = typeof action.cutoff === 'string' ? action.cutoff : undefined;
             return (
                 <span className="flex items-center gap-2">
-                    <span>Cleaned {aggregation} missing datasets</span>
+                    <span>Cleaned {aggregation} incomplete datasets</span>
                     <Badge variant="secondary">{deletedCount} removed</Badge>
                     {cutoff && <Badge variant="outline">older than {formatActionTimestamp(cutoff)}</Badge>}
                 </span>
@@ -269,7 +269,7 @@ const renderActionContent = (action: JobAction) => {
                     <Badge variant="outline">{totalPeriods} checked</Badge>
                     {windowStart && windowEnd && (
                         <Badge variant="outline">
-                            {formatActionTimestamp(windowStart)} -> {formatActionTimestamp(windowEnd)}
+                            {formatActionTimestamp(windowStart)} to {formatActionTimestamp(windowEnd)}
                         </Badge>
                     )}
                 </span>
@@ -309,7 +309,7 @@ const renderActionContent = (action: JobAction) => {
                     {bucketDate && <Badge variant="outline">{bucketDate}</Badge>}
                     {windowStart && windowEnd && (
                         <Badge variant="outline">
-                            {formatActionTimestamp(windowStart)} -> {formatActionTimestamp(windowEnd)}
+                            {formatActionTimestamp(windowStart)} to {formatActionTimestamp(windowEnd)}
                         </Badge>
                     )}
                 </span>

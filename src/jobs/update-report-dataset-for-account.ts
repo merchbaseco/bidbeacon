@@ -1,4 +1,4 @@
-import { and, desc, eq, isNotNull, isNull, lt, lte } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, lt, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { reportDatasetMetadata } from '@/db/schema';
@@ -199,7 +199,7 @@ async function cleanupOutOfBoundsMetadataRecords(
                 eq(reportDatasetMetadata.countryCode, countryCode),
                 eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType),
-                eq(reportDatasetMetadata.status, 'missing'),
+                sql`${reportDatasetMetadata.status} <> 'completed'`,
                 lt(reportDatasetMetadata.periodStart, cutoff)
             )
         )
