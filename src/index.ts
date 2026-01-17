@@ -100,7 +100,7 @@ async function registerPlugins(fastify: FastifyInstance) {
     await fastify.register(websocket);
     await fastify.register(cors, {
         origin: (origin, callback) => {
-            const allowedOrigins = ['https://merchbase.co', 'https://admin.bidbeacon.merchbase.co', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'http://localhost:4174'];
+            const allowedOrigins = ['https://merchbase.co', 'https://bidbeacon.merchbase.co', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'http://localhost:4174'];
 
             // Allow requests with no origin (e.g., mobile apps, server-to-server)
             if (!origin) return callback(null, true);

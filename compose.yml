@@ -22,6 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      target: runtime
       args:
         - MERCHBASE_NPM_TOKEN=${MERCHBASE_NPM_TOKEN}
     image: bidbeacon-server:local
@@ -86,7 +87,13 @@ services:
       start_period: 10s
 
   caddy:
-    image: caddy:alpine
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: caddy
+      args:
+        - MERCHBASE_NPM_TOKEN=${MERCHBASE_NPM_TOKEN}
+    image: bidbeacon-caddy:local
     container_name: bidbeacon-caddy
     restart: unless-stopped
     ports:

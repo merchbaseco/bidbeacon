@@ -1,3 +1,13 @@
 :80 {
-    reverse_proxy server:8080
+    # API requests go to the server
+    handle /api/* {
+        reverse_proxy server:8080
+    }
+
+    # Everything else serves the dashboard
+    handle {
+        root * /srv
+        try_files {path} /index.html
+        file_server
+    }
 }

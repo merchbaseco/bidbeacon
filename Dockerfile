@@ -20,6 +20,7 @@ RUN if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
       printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" > .env; \
     fi && \
     yarn build && \
+    yarn build:dashboard && \
     rm -f .env
 
 # Production dependencies only - prune dev deps from node_modules
@@ -47,4 +48,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
 
 ENTRYPOINT ["dumb-init", "--"]
 CMD ["node", "dist/index.js"]
+
+# Caddy with dashboard static files
+FROM caddy:alpine AS caddy
+COPY --from=build /app/dist/dashboard /srv
+EXPOSE 80
 
