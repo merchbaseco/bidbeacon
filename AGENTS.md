@@ -150,6 +150,6 @@ Use coss ui (Base UI + Tailwind). Copy-paste components, accessible by default.
 - **Distinguish jobs**: `summarize-hourly-*` → `performance_hourly`, `summarize-daily-*` → `performance_daily`
 - **Metadata differences**: Daily jobs include `bucketDate`, hourly jobs include `window: "trailing 24h"`.
 
-### SSH Access
+### Database Queries
 
-Ask the user for the SSH key path to access the production server at `merchbase.co`.
+See `docs/database-queries.md` for patterns on querying the production database.
