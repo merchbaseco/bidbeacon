@@ -232,9 +232,11 @@ export const metricsRouter = router({
             }
 
             // Filter by accessible accounts - job must be for an account the user can access
+            // Build PostgreSQL array literal for use with ANY()
             const accountIds = ctx.accessibleAccountIds;
+            const accountIdsArray = sql.raw(`ARRAY[${accountIds.map(id => `'${id}'`).join(',')}]::text[]`);
             conditions.push(
-                sql`(${jobSessions.input} ->> 'accountId' = ANY(${accountIds}) OR exists (select 1 from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'accountId' = ANY(${accountIds}) OR action->'input'->>'accountId' = ANY(${accountIds})))`
+                sql`(${jobSessions.input} ->> 'accountId' = ANY(${accountIdsArray}) OR exists (select 1 from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'accountId' = ANY(${accountIdsArray}) OR action->'input'->>'accountId' = ANY(${accountIdsArray})))`
             );
 
             // Additional filter if specific accountId requested (must be in accessible accounts)
