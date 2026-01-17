@@ -29,6 +29,7 @@ export function AccountSelector() {
     const selectedRow = accounts.find(a => a.adsAccountId === accountId && a.profileId === profileId);
     const selectedValue = accountId && profileId ? `${accountId}:${profileId}` : '';
 
+    // Auto-select first account when accounts load and none is selected
     useEffect(() => {
         if (accounts.length > 0 && !accountId) {
             const firstAccount = accounts.find(a => a.profileId !== null);
