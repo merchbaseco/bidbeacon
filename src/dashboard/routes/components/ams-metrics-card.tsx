@@ -217,8 +217,24 @@ export const AmsMetricsCard = () => {
     if (isLoading) {
         return (
             <Card className="p-3 pb-1 space-y-0 gap-0">
-                <div className="flex items-center justify-center h-32">
-                    <Spinner />
+                <div className="flex items-start justify-between pl-1 pb-3">
+                    <div className="text-sm font-medium">AMS Metric Ingestion (60m)</div>
+                </div>
+                <div className="flex items-center justify-center h-[144px]">
+                    <Spinner className="size-5 text-muted-foreground" />
+                </div>
+            </Card>
+        );
+    }
+
+    if (metrics.length === 0) {
+        return (
+            <Card className="p-3 pb-1 space-y-0 gap-0">
+                <div className="flex items-start justify-between pl-1 pb-3">
+                    <div className="text-sm font-medium">AMS Metric Ingestion (60m)</div>
+                </div>
+                <div className="flex items-center justify-center h-[144px]">
+                    <p className="text-sm text-muted-foreground">No ingestion data available</p>
                 </div>
             </Card>
         );
@@ -227,9 +243,7 @@ export const AmsMetricsCard = () => {
     return (
         <Card className="p-3 pb-1 space-y-0 gap-0">
             <div className="flex items-start justify-between pl-1 pb-3">
-                <div>
-                    <div className="text-sm font-medium">AMS Metric Ingestion (60m)</div>
-                </div>
+                <div className="text-sm font-medium">AMS Metric Ingestion (60m)</div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 px-1">
                 <div className="divide-y">

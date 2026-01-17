@@ -441,20 +441,24 @@ export function JobSessionsFeed() {
                     </div>
                 </div>
                 {!hasSelection ? (
-                    <div className="rounded-lg border border-dashed border-muted px-4 py-6 text-center font-mono text-xs text-muted-foreground">
-                        Select an account to view job actions.
+                    <div className="flex items-center justify-center py-12">
+                        <p className="text-sm text-muted-foreground">Select an account to view events</p>
                     </div>
                 ) : isLoading || isFetching ? (
                     <div className="flex items-center justify-center py-12">
-                        <Spinner className="size-6 text-muted-foreground" />
+                        <Spinner className="size-5 text-muted-foreground" />
                     </div>
                 ) : error ? (
-                    <div className="flex items-center gap-3 rounded-lg border border-red-400/40 bg-red-100/60 px-4 py-3 font-mono text-sm text-red-700 dark:border-red-400/30 dark:bg-red-400/10 dark:text-red-100">
-                        <HugeiconsIcon icon={AlertCircleIcon} size={16} color="currentColor" />
-                        <span>Failed to load job actions. {error instanceof Error ? error.message : 'Unknown error'}.</span>
+                    <div className="flex items-center justify-center py-12">
+                        <div className="text-center">
+                            <p className="text-sm text-muted-foreground">Unable to load events</p>
+                            <p className="text-xs text-muted-foreground/60 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
+                        </div>
                     </div>
                 ) : timelineRows.length === 0 ? (
-                    <div className="rounded-lg border border-dashed border-muted px-4 py-6 text-center font-mono text-xs text-muted-foreground">No job actions recorded yet.</div>
+                    <div className="flex items-center justify-center py-12">
+                        <p className="text-sm text-muted-foreground">No events recorded yet</p>
+                    </div>
                 ) : (
                     <div className="relative">
                         <span className="pointer-events-none absolute left-6 top-0 h-full w-px bg-muted-foreground/30" aria-hidden />

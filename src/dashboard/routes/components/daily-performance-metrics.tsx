@@ -168,9 +168,14 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
 
     if (isLoading) {
         return (
-            <div className="w-full">
-                <div className="flex items-center justify-center h-[340px]">
-                    <Spinner />
+            <div className={cn('w-full', className)}>
+                <div className="flex items-start justify-start gap-6 md:gap-12 mb-4 px-4 max-w-background-frame-max mx-auto">
+                    {METRICS.map(metric => (
+                        <MetricLabel key={metric.key} metric={metric} value={0} change={0} />
+                    ))}
+                </div>
+                <div className="flex items-center justify-center h-[360px]">
+                    <Spinner className="size-6 text-muted-foreground" />
                 </div>
             </div>
         );
@@ -178,8 +183,18 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
 
     if (error) {
         return (
-            <div className="w-full">
-                <div className="flex items-center justify-center h-[340px] text-destructive text-sm">Error loading metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>
+            <div className={cn('w-full', className)}>
+                <div className="flex items-start justify-start gap-6 md:gap-12 mb-4 px-4 max-w-background-frame-max mx-auto">
+                    {METRICS.map(metric => (
+                        <MetricLabel key={metric.key} metric={metric} value={0} change={0} />
+                    ))}
+                </div>
+                <div className="flex items-center justify-center h-[360px]">
+                    <div className="text-center">
+                        <p className="text-sm text-muted-foreground">Unable to load performance data</p>
+                        <p className="text-xs text-muted-foreground/60 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
+                    </div>
+                </div>
             </div>
         );
     }

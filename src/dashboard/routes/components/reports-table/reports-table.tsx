@@ -1,6 +1,7 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useMemo } from 'react';
 import { Frame, FrameFooter } from '../../../components/ui/frame.js';
+import { Spinner } from '../../../components/ui/spinner.js';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table.js';
 import { useReports } from '../../hooks/use-reports.js';
 import { limitAtom, offsetAtom } from './atoms.js';
@@ -48,10 +49,18 @@ export const ReportsTable = ({ className }: { className?: string }) => {
                         </TableRow>
                     </TableHeader>
                     <TableBody className={cn(isFetching && !isLoading && 'opacity-50 transition-opacity')}>
-                        {rows.length === 0 && !isLoading ? (
+                        {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
-                                    No records found in this window.
+                                <TableCell colSpan={7} className="py-12">
+                                    <div className="flex items-center justify-center">
+                                        <Spinner className="size-5 text-muted-foreground" />
+                                    </div>
+                                </TableCell>
+                            </TableRow>
+                        ) : rows.length === 0 ? (
+                            <TableRow>
+                                <TableCell colSpan={7} className="py-12">
+                                    <p className="text-sm text-muted-foreground text-center">No datasets found for this time window</p>
                                 </TableCell>
                             </TableRow>
                         ) : (

@@ -20,22 +20,32 @@ export const AccountDataCard = () => {
         sync({ accountId, countryCode });
     };
 
+    const hasNoData = !isLoading && !metadata;
+
     return (
         <Card className="p-3 pb-1 space-y-0 gap-0">
             <div className="flex items-start justify-between pl-1 pb-1">
-                <div>
-                    <div className="text-sm font-medium">Account Data</div>
-                </div>
+                <div className="text-sm font-medium">Account Data</div>
                 <Button onClick={handleSync} disabled={isLoading || isSyncing} variant="outline" size="sm">
-                    {isLoading || isSyncing ? <Spinner /> : <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} color="currentColor" />}
+                    {isLoading || isSyncing ? <Spinner className="size-3.5" /> : <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={14} color="currentColor" />}
                 </Button>
             </div>
-            <div className="divide-y px-1">
-                <EntityRow label="Campaigns" count={metadata?.campaignsCount ?? null} isFetching={metadata?.fetchingCampaigns === true} />
-                <EntityRow label="Ad Groups" count={metadata?.adGroupsCount ?? null} isFetching={metadata?.fetchingAdGroups === true} />
-                <EntityRow label="Ads" count={metadata?.adsCount ?? null} isFetching={metadata?.fetchingAds === true} />
-                <EntityRow label="Targets" count={metadata?.targetsCount ?? null} isFetching={metadata?.fetchingTargets === true} />
-            </div>
+            {isLoading ? (
+                <div className="flex items-center justify-center h-[144px]">
+                    <Spinner className="size-5 text-muted-foreground" />
+                </div>
+            ) : hasNoData ? (
+                <div className="flex items-center justify-center h-[144px]">
+                    <p className="text-sm text-muted-foreground">No account data synced yet</p>
+                </div>
+            ) : (
+                <div className="divide-y px-1">
+                    <EntityRow label="Campaigns" count={metadata?.campaignsCount ?? null} isFetching={metadata?.fetchingCampaigns === true} />
+                    <EntityRow label="Ad Groups" count={metadata?.adGroupsCount ?? null} isFetching={metadata?.fetchingAdGroups === true} />
+                    <EntityRow label="Ads" count={metadata?.adsCount ?? null} isFetching={metadata?.fetchingAds === true} />
+                    <EntityRow label="Targets" count={metadata?.targetsCount ?? null} isFetching={metadata?.fetchingTargets === true} />
+                </div>
+            )}
         </Card>
     );
 };
