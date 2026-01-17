@@ -2,7 +2,8 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import CircleIcon from '@merchbaseco/icons/core-solid-rounded/CircleIcon';
 import CircleIconStroke from '@merchbaseco/icons/core-stroke-rounded/CircleIcon';
 import { useAtom } from 'jotai';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
+import { api } from '../../../lib/trpc';
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { useAdvertisingAccounts } from '../../hooks/use-advertising-accounts';
 import { selectedAccountIdAtom, selectedCountryCodeAtom, selectedProfileIdAtom } from './atoms';
@@ -12,6 +13,17 @@ export function AccountSelector() {
     const [accountId, setAccountId] = useAtom(selectedAccountIdAtom);
     const [profileId, setProfileId] = useAtom(selectedProfileIdAtom);
     const [, setCountryCode] = useAtom(selectedCountryCodeAtom);
+
+    // Track if we've initialized from saved preference
+    const initializedRef = useRef(false);
+
+    // Get saved account preference
+    const { data: savedAccount } = api.users.getSelectedAccount.useQuery(undefined, {
+        staleTime: Infinity, // Only fetch once per session
+    });
+
+    // Mutation to save account preference
+    const setSelectedAccountMutation = api.users.setSelectedAccount.useMutation();
 
     const selectOptions = useMemo(() => {
         return accounts
@@ -29,17 +41,43 @@ export function AccountSelector() {
     const selectedRow = accounts.find(a => a.adsAccountId === accountId && a.profileId === profileId);
     const selectedValue = accountId && profileId ? `${accountId}:${profileId}` : '';
 
-    // Auto-select first account when accounts load and none is selected
+    // Initialize from saved preference or auto-select first account
     useEffect(() => {
-        if (accounts.length > 0 && !accountId) {
-            const firstAccount = accounts.find(a => a.profileId !== null);
-            if (firstAccount?.profileId) {
-                setAccountId(firstAccount.adsAccountId);
-                setProfileId(firstAccount.profileId);
-                setCountryCode(firstAccount.countryCode);
+        if (initializedRef.current || accounts.length === 0 || accountId) return;
+
+        // Try to restore saved preference
+        if (savedAccount?.adsAccountId && savedAccount?.profileId) {
+            const savedExists = accounts.some(
+                a => a.adsAccountId === savedAccount.adsAccountId && a.profileId === savedAccount.profileId
+            );
+            if (savedExists) {
+                const account = accounts.find(
+                    a => a.adsAccountId === savedAccount.adsAccountId && a.profileId === savedAccount.profileId
+                );
+                if (account) {
+                    setAccountId(savedAccount.adsAccountId);
+                    setProfileId(savedAccount.profileId);
+                    setCountryCode(account.countryCode);
+                    initializedRef.current = true;
+                    return;
+                }
             }
         }
-    }, [accounts, accountId, setAccountId, setProfileId, setCountryCode]);
+
+        // Fall back to first account
+        const firstAccount = accounts.find(a => a.profileId !== null);
+        if (firstAccount?.profileId) {
+            setAccountId(firstAccount.adsAccountId);
+            setProfileId(firstAccount.profileId);
+            setCountryCode(firstAccount.countryCode);
+            // Save as the new preference
+            setSelectedAccountMutation.mutate({
+                adsAccountId: firstAccount.adsAccountId,
+                profileId: firstAccount.profileId,
+            });
+        }
+        initializedRef.current = true;
+    }, [accounts, accountId, savedAccount, setAccountId, setProfileId, setCountryCode, setSelectedAccountMutation]);
 
     useEffect(() => {
         if (accountId && profileId && accounts.length > 0) {
@@ -52,14 +90,19 @@ export function AccountSelector() {
 
     const handleValueChange = (value: string | null) => {
         if (!value) return;
-        const [adsAccountId, profileId] = value.split(':');
-        if (adsAccountId && profileId) {
-            const selectedAccount = accounts.find(a => a.adsAccountId === adsAccountId && a.profileId === profileId);
+        const [adsAccountId, newProfileId] = value.split(':');
+        if (adsAccountId && newProfileId) {
+            const selectedAccount = accounts.find(a => a.adsAccountId === adsAccountId && a.profileId === newProfileId);
             setAccountId(adsAccountId);
-            setProfileId(profileId);
+            setProfileId(newProfileId);
             if (selectedAccount) {
                 setCountryCode(selectedAccount.countryCode);
             }
+            // Persist the selection
+            setSelectedAccountMutation.mutate({
+                adsAccountId,
+                profileId: newProfileId,
+            });
         }
     };
 

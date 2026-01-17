@@ -725,3 +725,18 @@ export const userAccountAccess = pgTable(
         index('user_account_access_user_idx').on(table.clerkUserId),
     ]
 );
+
+/**
+ * ----------------------------------------------------------------------------
+ * User Preferences
+ * ----------------------------------------------------------------------------
+ *
+ * Stores per-user preferences like last selected account/profile.
+ * One row per Clerk user.
+ */
+export const userPreferences = pgTable('user_preferences', {
+    clerkUserId: text('clerk_user_id').primaryKey(),
+    selectedAdsAccountId: text('selected_ads_account_id'),
+    selectedProfileId: text('selected_profile_id'),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+});

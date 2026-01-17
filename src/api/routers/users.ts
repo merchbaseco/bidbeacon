@@ -1,7 +1,7 @@
 import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { advertiserAccount, userAccountAccess } from '@/db/schema';
+import { advertiserAccount, userAccountAccess, userPreferences } from '@/db/schema';
 import { protectedProcedure, router } from '../trpc';
 
 export const usersRouter = router({
@@ -44,6 +44,57 @@ export const usersRouter = router({
                     eq(userAccountAccess.adsAccountId, input.adsAccountId)
                 )
             );
+
+            return true;
+        }),
+
+    getSelectedAccount: protectedProcedure.query(async ({ ctx }) => {
+        const prefs = await db.query.userPreferences.findFirst({
+            where: eq(userPreferences.clerkUserId, ctx.user.sub),
+        });
+
+        if (!prefs?.selectedAdsAccountId) {
+            return null;
+        }
+
+        // Verify user still has access to this account
+        if (!ctx.accessibleAccountIds.includes(prefs.selectedAdsAccountId)) {
+            return null;
+        }
+
+        return {
+            adsAccountId: prefs.selectedAdsAccountId,
+            profileId: prefs.selectedProfileId,
+        };
+    }),
+
+    setSelectedAccount: protectedProcedure
+        .input(
+            z.object({
+                adsAccountId: z.string(),
+                profileId: z.string(),
+            })
+        )
+        .mutation(async ({ ctx, input }) => {
+            // Verify user has access to this account
+            ctx.assertAccountAccess(input.adsAccountId);
+
+            await db
+                .insert(userPreferences)
+                .values({
+                    clerkUserId: ctx.user.sub,
+                    selectedAdsAccountId: input.adsAccountId,
+                    selectedProfileId: input.profileId,
+                    updatedAt: new Date(),
+                })
+                .onConflictDoUpdate({
+                    target: userPreferences.clerkUserId,
+                    set: {
+                        selectedAdsAccountId: input.adsAccountId,
+                        selectedProfileId: input.profileId,
+                        updatedAt: new Date(),
+                    },
+                });
 
             return true;
         }),
