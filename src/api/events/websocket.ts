@@ -1,37 +1,13 @@
+import { verifyToken } from '@clerk/backend';
+import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
+import { db } from '@/db/index';
+import { userAccountAccess } from '@/db/schema';
 import { registerWebSocketConnection } from '@/utils/events.js';
 
 export function registerWebSocketRoute(fastify: FastifyInstance) {
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/bfc1d6a1-5da9-445e-ba28-3faa087b1b0f', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            location: 'websocket.ts:registerWebSocketRoute',
-            message: 'Registering WebSocket route at /api/events',
-            data: {},
-            timestamp: Date.now(),
-            sessionId: 'debug-session',
-            hypothesisId: 'H1',
-        }),
-    }).catch(() => {});
-    // #endregion
-    fastify.get('/api/events', { websocket: true }, (socket: WebSocket, _req) => {
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/bfc1d6a1-5da9-445e-ba28-3faa087b1b0f', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                location: 'websocket.ts:connection',
-                message: 'WebSocket connection received',
-                data: { readyState: socket.readyState },
-                timestamp: Date.now(),
-                sessionId: 'debug-session',
-                hypothesisId: 'H1',
-            }),
-        }).catch(() => {});
-        // #endregion
+    fastify.get('/api/events', { websocket: true }, async (socket: WebSocket, req) => {
         socket.on('error', error => {
             console.error('WebSocket connection error', error);
         });
@@ -40,7 +16,39 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
             return;
         }
 
-        registerWebSocketConnection(socket);
+        // Extract token from query string
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const token = url.searchParams.get('token');
+
+        if (!token) {
+            socket.close(4001, 'Authentication required');
+            return;
+        }
+
+        // Verify token and load accessible accounts
+        try {
+            const secretKey = process.env.CLERK_SECRET_KEY;
+            if (!secretKey) {
+                socket.close(4002, 'Server configuration error');
+                return;
+            }
+
+            const payload = await verifyToken(token, { secretKey });
+
+            // Load accessible account IDs for this user
+            const accessibleAccounts = await db
+                .select({ adsAccountId: userAccountAccess.adsAccountId })
+                .from(userAccountAccess)
+                .where(eq(userAccountAccess.clerkUserId, payload.sub));
+
+            const accessibleAccountIds = accessibleAccounts.map(a => a.adsAccountId);
+
+            registerWebSocketConnection(socket, accessibleAccountIds);
+        } catch (error) {
+            console.error('WebSocket authentication failed', error);
+            socket.close(4003, 'Authentication failed');
+            return;
+        }
 
         socket.on('message', (message: Buffer | ArrayBuffer | Buffer[]) => {
             try {

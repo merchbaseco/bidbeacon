@@ -2,6 +2,11 @@ import type { InferSelectModel } from 'drizzle-orm';
 import type { WebSocket } from 'ws';
 import type { reportDatasetMetadata } from '@/db/schema';
 
+interface AuthenticatedConnection {
+    socket: WebSocket;
+    accessibleAccountIds: string[];
+}
+
 export type EventType =
     | 'error'
     | 'account:updated'
@@ -105,15 +110,25 @@ export type Event =
     | ReportDatasetMetadataErrorEvent;
 
 /**
+ * Extract accountId from an event if it has one
+ */
+const getEventAccountId = (event: Event): string | null => {
+    if ('accountId' in event) return event.accountId;
+    if ('row' in event && event.row && 'accountId' in event.row) return event.row.accountId;
+    if ('data' in event && event.data && 'accountId' in event.data) return (event.data as { accountId?: string }).accountId ?? null;
+    return null;
+};
+
+/**
  * Singleton event emitter for WebSocket connections
  */
 class EventEmitter {
-    private connections: Set<WebSocket> = new Set();
+    private connections: Map<WebSocket, AuthenticatedConnection> = new Map();
 
     constructor() {
         // Clean up dead connections every 30 seconds
         setInterval(() => {
-            for (const socket of this.connections) {
+            for (const [socket] of this.connections) {
                 if (socket.readyState !== 1) {
                     this.connections.delete(socket);
                 }
@@ -122,9 +137,9 @@ class EventEmitter {
     }
 
     /**
-     * Add a WebSocket connection to the emitter
+     * Add an authenticated WebSocket connection to the emitter
      */
-    addConnection(socket: WebSocket) {
+    addConnection(socket: WebSocket, accessibleAccountIds: string[]) {
         socket.on('close', () => {
             this.connections.delete(socket);
         });
@@ -135,25 +150,30 @@ class EventEmitter {
         });
 
         if (socket.readyState === 1) {
-            this.connections.add(socket);
+            this.connections.set(socket, { socket, accessibleAccountIds });
         }
     }
 
     /**
-     * Emit an event to all connected clients
+     * Emit an event to connected clients that have access to the event's account
      */
     emitEvent(event: Event) {
         const message = JSON.stringify(event);
+        const eventAccountId = getEventAccountId(event);
 
-        let _sentCount = 0;
-        for (const socket of this.connections) {
+        for (const [socket, connection] of this.connections) {
             try {
-                if (socket.readyState === 1) {
-                    socket.send(message);
-                    _sentCount++;
-                } else {
+                if (socket.readyState !== 1) {
                     this.connections.delete(socket);
+                    continue;
                 }
+
+                // If event has an accountId, only send to connections with access
+                if (eventAccountId && !connection.accessibleAccountIds.includes(eventAccountId)) {
+                    continue;
+                }
+
+                socket.send(message);
             } catch (error) {
                 console.error(`Failed to send websocket message for event ${event.type}`, error);
                 this.connections.delete(socket);
@@ -188,8 +208,8 @@ export function emitEvent(event: Omit<Event, 'timestamp'>): void {
 }
 
 /**
- * Register a WebSocket connection with the event emitter
+ * Register an authenticated WebSocket connection with the event emitter
  */
-export function registerWebSocketConnection(socket: WebSocket) {
-    eventEmitter.addConnection(socket);
+export function registerWebSocketConnection(socket: WebSocket, accessibleAccountIds: string[]) {
+    eventEmitter.addConnection(socket, accessibleAccountIds);
 }

@@ -34,7 +34,12 @@ export const metricsRouter = router({
                 apiName: z.string().optional(),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            // Only show operational metrics to users with account access
+            if (ctx.accessibleAccountIds.length === 0) {
+                return { data: [], apiNames: [...SUPPORTED_APIS] };
+            }
+
             const from = new Date(input.from);
             const to = new Date(input.to);
 
@@ -139,7 +144,12 @@ export const metricsRouter = router({
                 jobName: z.string().optional(),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            // Only show operational metrics to users with account access
+            if (ctx.accessibleAccountIds.length === 0) {
+                return { data: {}, jobNames: [...SUPPORTED_JOBS], from: input.from, to: input.to };
+            }
+
             const from = new Date(input.from);
             const to = new Date(input.to);
 
@@ -204,7 +214,12 @@ export const metricsRouter = router({
                 })
                 .optional()
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            // Only show job sessions for accounts user has access to
+            if (ctx.accessibleAccountIds.length === 0) {
+                return [];
+            }
+
             const limit = input?.limit ?? 50;
             const conditions = [];
             const jobNamesFilter = input?.jobName ? [input.jobName] : [...VISIBLE_JOB_SESSIONS];
@@ -215,7 +230,16 @@ export const metricsRouter = router({
             if (input?.since) {
                 conditions.push(gte(jobSessions.startedAt, new Date(input.since)));
             }
+
+            // Filter by accessible accounts - job must be for an account the user can access
+            const accountIds = ctx.accessibleAccountIds;
+            conditions.push(
+                sql`(${jobSessions.input} ->> 'accountId' = ANY(${accountIds}) OR exists (select 1 from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'accountId' = ANY(${accountIds}) OR action->'input'->>'accountId' = ANY(${accountIds})))`
+            );
+
+            // Additional filter if specific accountId requested (must be in accessible accounts)
             if (input?.accountId) {
+                ctx.assertAccountAccess(input.accountId);
                 conditions.push(
                     sql`(${jobSessions.input} ->> 'accountId' = ${input.accountId} OR exists (select 1 from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'accountId' = ${input.accountId} OR action->'input'->>'accountId' = ${input.accountId}))`
                 );
@@ -263,7 +287,12 @@ export const metricsRouter = router({
                 to: z.string().datetime(),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            // Only show operational metrics to users with account access
+            if (ctx.accessibleAccountIds.length === 0) {
+                return { data: {}, entityTypes: [] };
+            }
+
             const from = new Date(input.from);
             const to = new Date(input.to);
 
@@ -309,7 +338,12 @@ export const metricsRouter = router({
                 to: z.string().datetime(),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            // Only show operational metrics to users with account access
+            if (ctx.accessibleAccountIds.length === 0) {
+                return { data: [] };
+            }
+
             const from = new Date(input.from);
             const to = new Date(input.to);
 
@@ -348,7 +382,12 @@ export const metricsRouter = router({
                 to: z.string().datetime(),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            // Only show operational metrics to users with account access
+            if (ctx.accessibleAccountIds.length === 0) {
+                return { data: {}, entityTypes: [] };
+            }
+
             const from = new Date(input.from);
             const to = new Date(input.to);
 
@@ -388,7 +427,12 @@ export const metricsRouter = router({
             };
         }),
     // Real-time AMS metrics with 5-minute granularity for the last 60 minutes
-    amsRecent: protectedProcedure.query(async () => {
+    amsRecent: protectedProcedure.query(async ({ ctx }) => {
+        // Only show operational metrics to users with account access
+        if (ctx.accessibleAccountIds.length === 0) {
+            return { data: {}, entityTypes: [], lastActivity: {} };
+        }
+
         const now = new Date();
         const from = new Date(now.getTime() - 60 * 60 * 1000); // 60 minutes ago
 
@@ -747,7 +791,12 @@ export const metricsRouter = router({
                 },
             };
         }),
-    messageThroughput: protectedProcedure.query(async () => {
+    messageThroughput: protectedProcedure.query(async ({ ctx }) => {
+        // Only show operational metrics to users with account access
+        if (ctx.accessibleAccountIds.length === 0) {
+            return { currentHourTotal: 0, previousHourTotal: 0, percentChange: 0, sparkline: [] };
+        }
+
         const now = new Date();
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
         const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
@@ -811,7 +860,12 @@ export const metricsRouter = router({
             sparkline,
         };
     }),
-    apiHealth: protectedProcedure.query(async () => {
+    apiHealth: protectedProcedure.query(async ({ ctx }) => {
+        // Only show operational metrics to users with account access
+        if (ctx.accessibleAccountIds.length === 0) {
+            return { successRate: 100, total: 0, successCount: 0, errorCount: 0, rateLimitCount: 0 };
+        }
+
         const now = new Date();
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 

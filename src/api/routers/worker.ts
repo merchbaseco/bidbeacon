@@ -3,10 +3,15 @@ import { z } from 'zod';
 import { db } from '@/db/index';
 import { workerControl } from '@/db/schema';
 import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqsClient';
-import { publicProcedure, router } from '../trpc';
+import { protectedProcedure, router } from '../trpc';
 
 export const workerRouter = router({
-    status: publicProcedure.query(async () => {
+    status: protectedProcedure.query(async ({ ctx }) => {
+        // Only show worker status to users with account access
+        if (ctx.accessibleAccountIds.length === 0) {
+            return { enabled: false, messagesPerSecond: 0 };
+        }
+
         const control = await db.select().from(workerControl).where(eq(workerControl.id, 'main')).limit(1);
 
         if (control.length === 0) {
@@ -28,7 +33,12 @@ export const workerRouter = router({
         };
     }),
 
-    start: publicProcedure.mutation(async () => {
+    start: protectedProcedure.mutation(async ({ ctx }) => {
+        // Only allow users with account access to control worker
+        if (ctx.accessibleAccountIds.length === 0) {
+            return { enabled: false, messagesPerSecond: 0 };
+        }
+
         const result = await db
             .insert(workerControl)
             .values({ id: 'main', enabled: true, messagesPerSecond: 0 })
@@ -48,7 +58,12 @@ export const workerRouter = router({
         };
     }),
 
-    stop: publicProcedure.mutation(async () => {
+    stop: protectedProcedure.mutation(async ({ ctx }) => {
+        // Only allow users with account access to control worker
+        if (ctx.accessibleAccountIds.length === 0) {
+            return { enabled: false, messagesPerSecond: 0 };
+        }
+
         const result = await db
             .insert(workerControl)
             .values({ id: 'main', enabled: false, messagesPerSecond: 0 })
@@ -68,13 +83,18 @@ export const workerRouter = router({
         };
     }),
 
-    speed: publicProcedure
+    speed: protectedProcedure
         .input(
             z.object({
                 messagesPerSecond: z.number().min(0),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
+            // Only allow users with account access to control worker
+            if (ctx.accessibleAccountIds.length === 0) {
+                return { enabled: false, messagesPerSecond: 0 };
+            }
+
             const result = await db
                 .insert(workerControl)
                 .values({ id: 'main', messagesPerSecond: input.messagesPerSecond })
@@ -94,7 +114,31 @@ export const workerRouter = router({
             };
         }),
 
-    metrics: publicProcedure.query(async () => {
+    metrics: protectedProcedure.query(async ({ ctx }) => {
+        // Only show worker metrics to users with account access
+        if (ctx.accessibleAccountIds.length === 0) {
+            const emptyMetrics = {
+                sparkline: new Array(60).fill(0),
+                sparklineSent: new Array(60).fill(0),
+                sparklineReceived: new Array(60).fill(0),
+                sparklineDeleted: new Array(60).fill(0),
+                messagesLastHour: 0,
+                messagesLast24h: 0,
+                approximateVisible: 0,
+                oldestMessageAge: 0,
+                messagesSentLastHour: 0,
+                messagesSentLast24h: 0,
+                messagesReceivedLastHour: 0,
+                messagesReceivedLast24h: 0,
+                messagesDeletedLastHour: 0,
+                messagesDeletedLast24h: 0,
+                messagesSentLast60s: 0,
+                messagesReceivedLast60s: 0,
+                messagesDeletedLast60s: 0,
+            };
+            return { mainQueue: emptyMetrics, dlq: emptyMetrics };
+        }
+
         const mainQueueUrl = process.env.AMS_QUEUE_URL;
 
         if (!mainQueueUrl) {

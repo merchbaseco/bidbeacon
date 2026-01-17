@@ -1,3 +1,4 @@
+import { ClerkProvider, SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { StrictMode } from 'react';
@@ -15,10 +16,15 @@ import LighthouseIcon from '@merchbaseco/icons/core-solid-rounded/LighthouseIcon
 import { Outlet } from 'react-router';
 import { MoreMenu } from './components/more-menu';
 import { Toaster } from './components/ui/toast';
-import { api } from './lib/trpc';
-import { createTRPCClient } from './lib/trpc-client';
+import { TRPCProvider } from './lib/trpc-provider';
 import { AccountSelector } from './routes/components/account-selector/account-selector';
 import { useWebSocket } from './routes/hooks/use-websocket';
+
+const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+
+if (!CLERK_PUBLISHABLE_KEY) {
+    throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY environment variable');
+}
 
 export function RootRoute() {
     // Initialize WebSocket connection for real-time events
@@ -44,6 +50,7 @@ export function RootRoute() {
                                     <AccountSelector />
                                 </div>
                                 <MoreMenu />
+                                <UserButton />
                             </div>
                         </div>
                     </div>
@@ -59,8 +66,11 @@ export function RootRoute() {
     );
 }
 
-const queryClient = new QueryClient();
-const apiClient = api.createClient(createTRPCClient());
+const SignInPage = () => (
+    <div className="min-h-screen flex items-center justify-center bg-background">
+        <SignIn />
+    </div>
+);
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -69,13 +79,18 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
     <StrictMode>
-        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-            <api.Provider client={apiClient} queryClient={queryClient}>
-                <QueryClientProvider client={queryClient}>
-                    <RouterProvider router={router} />
-                    <Toaster position="bottom-right" />
-                </QueryClientProvider>
-            </api.Provider>
-        </ThemeProvider>
+        <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+            <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+                <SignedIn>
+                    <TRPCProvider>
+                        <RouterProvider router={router} />
+                        <Toaster position="bottom-right" />
+                    </TRPCProvider>
+                </SignedIn>
+                <SignedOut>
+                    <SignInPage />
+                </SignedOut>
+            </ThemeProvider>
+        </ClerkProvider>
     </StrictMode>
 );

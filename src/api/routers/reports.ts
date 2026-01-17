@@ -71,7 +71,7 @@ export const reportsRouter = router({
                 uid: z.string().uuid(),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
             const report = await db.query.reportDatasetMetadata.findFirst({
                 where: eq(reportDatasetMetadata.uid, input.uid),
             });
@@ -79,6 +79,9 @@ export const reportsRouter = router({
             if (!report) {
                 throw new Error('Report not found');
             }
+
+            // Validate user has access to this report's account
+            ctx.assertAccountAccess(report.accountId);
 
             return report;
         }),

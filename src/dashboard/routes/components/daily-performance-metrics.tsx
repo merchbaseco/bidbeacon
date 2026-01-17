@@ -122,12 +122,29 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
     const { data, isLoading, error } = api.metrics.hourlyPerformance.useQuery(
-        { accountId, timezone },
+        { accountId: accountId!, timezone },
         {
+            enabled: !!accountId,
             refetchInterval: 60000, // 1 minute for hourly data
             staleTime: 30000,
         }
     );
+
+    // Show empty state when no account is selected
+    if (!accountId) {
+        return (
+            <div className={cn('w-full', className)}>
+                <div className="flex items-start justify-start gap-6 md:gap-12 mb-4 px-4 max-w-background-frame-max mx-auto">
+                    {METRICS.map(metric => (
+                        <MetricLabel key={metric.key} metric={metric} value={0} change={0} />
+                    ))}
+                </div>
+                <div className="flex items-center justify-center h-[360px] text-muted-foreground text-sm">
+                    Select an account to view performance metrics
+                </div>
+            </div>
+        );
+    }
 
     const chartData = useMemo(() => {
         const hourlyData = data?.hourlyData ?? [];

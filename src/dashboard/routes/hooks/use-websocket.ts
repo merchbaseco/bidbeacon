@@ -1,5 +1,6 @@
+import { useAuth } from '@clerk/clerk-react';
 import { useSetAtom } from 'jotai';
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import useWebSocketLib, { ReadyState } from 'react-use-websocket';
 import { toast } from 'sonner';
 import { api } from '../../lib/trpc';
@@ -75,11 +76,27 @@ type Event =
       }
     | { type: 'pong' };
 
-const WS_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
+const WS_BASE_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
 
 export const useWebSocket = () => {
+    const { getToken } = useAuth();
     const utils = api.useUtils();
     const setConnectionStatus = useSetAtom(connectionStatusAtom);
+    const [wsUrl, setWsUrl] = useState<string | null>(null);
+
+    // Get token and build WebSocket URL with auth
+    useEffect(() => {
+        const updateToken = async () => {
+            const token = await getToken();
+            if (token) {
+                setWsUrl(`${WS_BASE_URL}?token=${encodeURIComponent(token)}`);
+            }
+        };
+        updateToken();
+        // Refresh token periodically (Clerk tokens expire)
+        const interval = setInterval(updateToken, 50000);
+        return () => clearInterval(interval);
+    }, [getToken]);
 
     const handleMessage = useCallback(
         (event: MessageEvent) => {
@@ -134,7 +151,7 @@ export const useWebSocket = () => {
         [utils]
     );
 
-    const { readyState } = useWebSocketLib(WS_URL, {
+    const { readyState } = useWebSocketLib(wsUrl, {
         onMessage: handleMessage,
         shouldReconnect: () => true,
         reconnectAttempts: 5,

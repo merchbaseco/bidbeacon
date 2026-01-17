@@ -15,10 +15,12 @@ RUN if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
 
 FROM deps AS build
 ARG MERCHBASE_NPM_TOKEN
+ARG VITE_CLERK_PUBLISHABLE_KEY
 COPY . .
-RUN if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
-      printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" > .env; \
-    fi && \
+RUN { \
+      [ -n "$MERCHBASE_NPM_TOKEN" ] && printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN"; \
+      [ -n "$VITE_CLERK_PUBLISHABLE_KEY" ] && printf "VITE_CLERK_PUBLISHABLE_KEY=%s\n" "$VITE_CLERK_PUBLISHABLE_KEY"; \
+    } > .env && \
     yarn build && \
     yarn build:dashboard && \
     rm -f .env

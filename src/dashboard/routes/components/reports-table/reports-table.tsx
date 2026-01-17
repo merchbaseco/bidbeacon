@@ -50,7 +50,7 @@ export const ReportsTable = ({ className }: { className?: string }) => {
                     <TableBody className={cn(isFetching && !isLoading && 'opacity-50 transition-opacity')}>
                         {rows.length === 0 && !isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center text-muted-foreground">
+                                <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
                                     No records found in this window.
                                 </TableCell>
                             </TableRow>

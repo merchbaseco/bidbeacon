@@ -35,7 +35,7 @@ export const useReports = () => {
 
     const { data, isLoading, isFetching, ...rest } = api.reports.summary.useQuery(
         {
-            accountId,
+            accountId: accountId!,
             countryCode,
             aggregation,
             entityType,
@@ -46,7 +46,7 @@ export const useReports = () => {
             offset,
         },
         {
-            enabled: !!countryCode,
+            enabled: !!accountId && !!countryCode,
             staleTime: Infinity, // Never refetch due to staleness - rely on WebSocket events for invalidation
             placeholderData: keepPreviousData, // Keep previous page visible while fetching new page
         }
