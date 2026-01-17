@@ -1,30 +1,26 @@
-# syntax=docker/dockerfile:1.6
-
 FROM node:20-alpine AS base
 WORKDIR /app
 ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
 RUN apk add --no-cache libc6-compat && corepack enable
 
 FROM base AS deps
+ARG MERCHBASE_NPM_TOKEN
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY .yarn ./.yarn
-RUN --mount=type=secret,id=merchbase_npm_token \
-  set -eux; \
-  if [ -f /run/secrets/merchbase_npm_token ]; then \
-    printf "MERCHBASE_NPM_TOKEN=%s\n" "$(cat /run/secrets/merchbase_npm_token)" > .env; \
-  fi; \
-  yarn install --immutable; \
-  rm -f .env
+RUN if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
+      printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" > .env; \
+    fi && \
+    yarn install --immutable && \
+    rm -f .env
 
 FROM deps AS build
+ARG MERCHBASE_NPM_TOKEN
 COPY . .
-RUN --mount=type=secret,id=merchbase_npm_token \
-  set -eux; \
-  if [ -f /run/secrets/merchbase_npm_token ]; then \
-    printf "MERCHBASE_NPM_TOKEN=%s\n" "$(cat /run/secrets/merchbase_npm_token)" > .env; \
-  fi; \
-  yarn build; \
-  rm -f .env
+RUN if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
+      printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" > .env; \
+    fi && \
+    yarn build && \
+    rm -f .env
 
 # Production dependencies only - prune dev deps from node_modules
 FROM deps AS prod-deps

@@ -1,59 +1,51 @@
 # BidBeacon Server
 
-Fastify-based API for BidBeacon. The service is distributed as a Docker container via GitHub Container Registry (GHCR) and fronts the `/api/*` routes behind the public Caddy proxy.
+Fastify-based API for BidBeacon's Amazon Ads integration.
 
-## Requirements
+## Hosting
 
-- Node.js 18+
-- Yarn 4 (Corepack enabled)
-- Docker (optional, for container builds)
+Deployed on Mac Mini via self-hosted GitHub Actions runner.
 
-## Setup
+- **URL:** https://bidbeacon.merchbase.co
+- **DB Viewer:** http://localhost:4984 (pgweb, local only)
+- **Local port:** 8091
 
+## Deployment
+
+Push to `main` triggers automatic build and deploy via self-hosted runner.
+
+Manual deploy:
 ```bash
-yarn install
-cp .env.example .env
-# fill .env with any required configuration
+cd /Users/zknicker/srv/bidbeacon
+git pull
+docker compose build
+docker compose up -d
 ```
 
 ## Local Development
 
 ```bash
+yarn install
+cp .env.example .env
+# Fill in .env with your credentials
 docker compose up --build
 ```
 
-Runs both API server (port 8080) and worker. Worker needs `AMS_QUEUE_URL` and AWS credentials in `.env`.
-
-To build and run the service manually:
-
-```bash
-yarn build
-NODE_ENV=production yarn start
-```
+The API will be available at `http://localhost:8091/api/health`.
 
 ## Scripts
 
 - `yarn build` – bundle server and worker
 - `yarn start` – run compiled server
-- `yarn worker` – run worker in dev mode (`tsx`)
-- `yarn start:worker` – run compiled worker
+- `yarn worker` – run worker in dev mode
+- `./test-api.sh` – smoke test the health endpoint
 
-## Docker
+## Docker Services
 
-- Dockerfile: `./Dockerfile`
-- Compose files for local testing: `docker-compose.yml`
-- Health endpoint: `GET /api/health`
-- Test endpoint: `GET /api/test`
+- `bidbeacon-postgres` – PostgreSQL 16 database
+- `bidbeacon-server` – Node.js API server
+- `bidbeacon-worker` – SQS consumer for Amazon Marketing Stream
+- `bidbeacon-caddy` – Reverse proxy (port 8091)
+- `bidbeacon-pgweb` – DB viewer (port 4984)
 
-GitHub Actions builds and deploys via `merchbase-infra`. Two services: API server and SQS worker. See [AGENTS.md](./AGENTS.md) for context.
-
-## Testing
-
-Manual smoke tests:
-
-```bash
-./test-api.sh
-```
-
-This script hits the health and test endpoints. Add new automated tests when extending the API surface.
-
+Health endpoint: `GET /api/health`
