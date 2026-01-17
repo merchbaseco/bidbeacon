@@ -8,15 +8,13 @@ import { updateReportStatusJob } from '@/jobs/update-report-status';
 import { createReportForDataset } from '@/lib/create-report/index';
 import { parseReport } from '@/lib/parse-report/index';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports';
-import { publicProcedure, router } from '../trpc';
-
-const DEFAULT_ACCOUNT_ID = 'amzn1.ads-account.g.akzidxc3kemvnyklo33ht2mjm';
+import { protectedProcedure, router } from '../trpc';
 
 export const reportsRouter = router({
-    summary: publicProcedure
+    summary: protectedProcedure
         .input(
             z.object({
-                accountId: z.string().default(DEFAULT_ACCOUNT_ID),
+                accountId: z.string(),
                 countryCode: z.string().optional(),
                 aggregation: z.enum(['hourly', 'daily']).default('daily'),
                 entityType: z.enum(['target', 'product']).optional(),
@@ -27,7 +25,8 @@ export const reportsRouter = router({
                 offset: z.number().min(0).default(0),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
             const to = input.to ? new Date(input.to) : new Date();
             const from = input.from ? new Date(input.from) : new Date(to.getTime() - 30 * 24 * 60 * 60 * 1000);
 
@@ -66,7 +65,7 @@ export const reportsRouter = router({
             };
         }),
 
-    get: publicProcedure
+    get: protectedProcedure
         .input(
             z.object({
                 uid: z.string().uuid(),
@@ -84,14 +83,15 @@ export const reportsRouter = router({
             return report;
         }),
 
-    triggerUpdate: publicProcedure
+    triggerUpdate: protectedProcedure
         .input(
             z.object({
                 accountId: z.string(),
                 countryCode: z.string(),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
             await updateReportDatasetForAccountJob.emit({
                 accountId: input.accountId,
                 countryCode: input.countryCode,
@@ -99,7 +99,7 @@ export const reportsRouter = router({
             return true;
         }),
 
-    create: publicProcedure
+    create: protectedProcedure
         .input(
             z.object({
                 accountId: z.string(),
@@ -109,12 +109,13 @@ export const reportsRouter = router({
                 entityType: z.enum(ENTITY_TYPES),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
             const reportId = await createReportForDataset(input);
             return { reportId };
         }),
 
-    retrieve: publicProcedure
+    retrieve: protectedProcedure
         .input(
             z.object({
                 accountId: z.string(),
@@ -123,7 +124,8 @@ export const reportsRouter = router({
                 entityType: z.enum(['target', 'product']),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
             const metadata = await db.query.reportDatasetMetadata.findFirst({
                 where: and(
                     eq(reportDatasetMetadata.accountId, input.accountId),
@@ -150,7 +152,7 @@ export const reportsRouter = router({
             return response;
         }),
 
-    parse: publicProcedure
+    parse: protectedProcedure
         .input(
             z.object({
                 accountId: z.string(),
@@ -160,7 +162,8 @@ export const reportsRouter = router({
                 entityType: z.enum(ENTITY_TYPES),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
             const periodStart = new Date(input.timestamp);
             const metadata = await db.query.reportDatasetMetadata.findFirst({
                 where: and(
@@ -180,7 +183,7 @@ export const reportsRouter = router({
             return { rowsProcessed: result.rowsProcessed };
         }),
 
-    refresh: publicProcedure
+    refresh: protectedProcedure
         .input(
             z.object({
                 accountId: z.string(),
@@ -190,7 +193,8 @@ export const reportsRouter = router({
                 entityType: z.enum(ENTITY_TYPES),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
             // Queue the update status job
             const jobId = await updateReportStatusJob.emit({
                 accountId: input.accountId,

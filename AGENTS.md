@@ -1,5 +1,7 @@
 # BidBeacon Agent Context
 
+> **Note:** `CLAUDE.md` is a symlink to this file.
+
 ## Architecture
 
 Two services, same Docker image, separate containers:
@@ -7,6 +9,33 @@ Two services, same Docker image, separate containers:
 - **Worker**: SQS processor for Amazon Marketing Stream
 
 Both share the same PostgreSQL database.
+
+### Authentication & Multi-Tenancy
+
+Uses **Clerk** for authentication with a custom multi-tenancy layer:
+
+```
+Clerk User (clerk_user_id)
+    └── user_account_access (M:N join table)
+            └── Advertiser Account (ads_account_id)
+                    └── All data (campaigns, reports, metrics, etc.)
+```
+
+**Key files:**
+- `src/api/context.ts` - Verifies Clerk token, loads `accessibleAccountIds` into context
+- `src/api/trpc.ts` - `protectedProcedure` provides `assertAccountAccess(accountId)` helper
+- `src/db/schema.ts` - `userAccountAccess` table links users to accounts
+
+**Access control pattern:**
+```typescript
+// In any router that takes accountId
+.query(async ({ ctx, input }) => {
+    ctx.assertAccountAccess(input.accountId);  // Throws FORBIDDEN if no access
+    // ... rest of query
+})
+```
+
+**New accounts:** When `accounts.sync` discovers new accounts from Amazon Ads API, they're automatically linked to the current user.
 
 ---
 
@@ -153,3 +182,103 @@ Use coss ui (Base UI + Tailwind). Copy-paste components, accessible by default.
 ### Database Queries
 
 See `docs/database-queries.md` for patterns on querying the production database.
+
+---
+
+## Database Migrations
+
+Uses **Drizzle ORM** with migration files in `drizzle/`.
+
+### Development Workflow
+
+1. **Modify schema** in `src/db/schema.ts`
+2. **Generate migration**: `yarn db:generate`
+3. **Review** the generated SQL in `drizzle/XXXX_*.sql`
+4. **Apply locally** (if running local postgres): `yarn db:push`
+
+### Production Deployment
+
+Migrations run automatically on server startup via `src/db/migrate.ts`. The server reads from `drizzle/` folder and tracks applied migrations in `__drizzle_migrations` table.
+
+**If you need to run SQL manually against production:**
+```bash
+docker exec bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "YOUR SQL HERE"
+```
+
+**Common operations:**
+```bash
+# List tables
+docker exec bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "\dt"
+
+# Describe table
+docker exec bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "\d table_name"
+
+# Run a query
+docker exec bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "SELECT * FROM table LIMIT 5;"
+```
+
+### Migration Gotchas
+
+1. **Foreign keys on non-unique columns fail** - The `advertiser_account.ads_account_id` is NOT unique (same account has multiple profiles/countries). Don't create FKs referencing it.
+
+2. **Drizzle tracks migrations by hash** - If you manually apply a migration, you must also insert into `__drizzle_migrations`:
+   ```sql
+   INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('migration_tag', epoch_ms);
+   ```
+
+3. **Never delete migration files** without also removing them from `drizzle/meta/_journal.json` and the corresponding snapshot file.
+
+---
+
+## Deployment
+
+### Build & Deploy
+
+```bash
+# Full rebuild and deploy
+docker compose up -d --build
+
+# Rebuild specific service
+docker compose build --no-cache server
+docker compose up -d server worker
+
+# Just restart (no rebuild)
+docker compose up -d
+```
+
+### Service Names
+
+Docker Compose services vs container names:
+- `server` → `bidbeacon-server`
+- `worker` → `bidbeacon-worker`
+- `caddy` → `bidbeacon-caddy`
+- `postgres` → `bidbeacon-postgres`
+
+### Checking Health
+
+```bash
+# Container status
+docker ps --format "table {{.Names}}\t{{.Status}}" | grep bidbeacon
+
+# Server logs
+docker logs bidbeacon-server --tail 50
+
+# Worker logs
+docker logs bidbeacon-worker --tail 50
+```
+
+### Common Issues
+
+1. **Server unhealthy after deploy** - Check logs for migration errors:
+   ```bash
+   docker logs bidbeacon-server 2>&1 | tail -30
+   ```
+
+2. **"relation already exists"** - Migration trying to create existing table. Either:
+   - Drop the table and let migration recreate it
+   - Mark migration as applied in `__drizzle_migrations`
+
+3. **Cached Docker layers** - If code changes aren't reflected:
+   ```bash
+   docker compose build --no-cache server
+   ```

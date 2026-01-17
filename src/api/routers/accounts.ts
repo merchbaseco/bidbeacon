@@ -1,16 +1,23 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { advertiserAccount } from '@/db/schema';
+import { advertiserAccount, userAccountAccess } from '@/db/schema';
 import { syncAdEntitiesJob } from '@/jobs/sync-ad-entities';
-import { publicProcedure, router } from '../trpc';
+import { protectedProcedure, router } from '../trpc';
 
 export const accountsRouter = router({
-    list: publicProcedure.query(async () => {
-        return db.select().from(advertiserAccount);
+    list: protectedProcedure.query(async ({ ctx }) => {
+        // Filter to only return accounts the user has access to
+        if (ctx.accessibleAccountIds.length === 0) {
+            return [];
+        }
+        return db
+            .select()
+            .from(advertiserAccount)
+            .where(inArray(advertiserAccount.adsAccountId, ctx.accessibleAccountIds));
     }),
 
-    toggle: publicProcedure
+    toggle: protectedProcedure
         .input(
             z.object({
                 adsAccountId: z.string(),
@@ -18,7 +25,9 @@ export const accountsRouter = router({
                 enabled: z.boolean(),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.adsAccountId);
+
             await db
                 .update(advertiserAccount)
                 .set({ enabled: input.enabled })
@@ -34,7 +43,7 @@ export const accountsRouter = router({
             return true;
         }),
 
-    sync: publicProcedure.mutation(async () => {
+    sync: protectedProcedure.mutation(async ({ ctx }) => {
         const { listAdvertiserAccounts } = await import('@/amazon-ads/list-advertiser-accounts');
 
         const result = await listAdvertiserAccounts(undefined, 'na');
@@ -66,20 +75,31 @@ export const accountsRouter = router({
                     profileId: profileId.toString(),
                     entityId: entityId,
                 });
+
+                // Auto-link the new account to the current user
+                await db
+                    .insert(userAccountAccess)
+                    .values({
+                        clerkUserId: ctx.user.sub,
+                        adsAccountId: account.adsAccountId,
+                    })
+                    .onConflictDoNothing();
             }
         }
 
         return true;
     }),
 
-    datasetMetadata: publicProcedure
+    datasetMetadata: protectedProcedure
         .input(
             z.object({
                 accountId: z.string(),
                 countryCode: z.string(),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
+
             const data = await db.query.accountDatasetMetadata.findFirst({
                 where: (metadata, { and, eq }) => and(eq(metadata.accountId, input.accountId), eq(metadata.countryCode, input.countryCode)),
             });
@@ -87,14 +107,16 @@ export const accountsRouter = router({
             return data;
         }),
 
-    syncAdEntities: publicProcedure
+    syncAdEntities: protectedProcedure
         .input(
             z.object({
                 accountId: z.string(),
                 countryCode: z.string(),
             })
         )
-        .mutation(async ({ input }) => {
+        .mutation(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
+
             await syncAdEntitiesJob.emit({
                 accountId: input.accountId,
                 countryCode: input.countryCode,

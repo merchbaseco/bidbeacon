@@ -3,7 +3,7 @@ import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { amsMetrics, apiMetrics, jobSessions, performanceDaily, performanceHourly } from '@/db/schema';
-import { publicProcedure, router } from '../trpc';
+import { protectedProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
 const SUPPORTED_JOBS = [
@@ -26,7 +26,7 @@ const VISIBLE_JOB_SESSIONS = [
 ] as const;
 
 export const metricsRouter = router({
-    adsApi: publicProcedure
+    adsApi: protectedProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -131,7 +131,7 @@ export const metricsRouter = router({
                 apiNames: [...SUPPORTED_APIS],
             };
         }),
-    job: publicProcedure
+    job: protectedProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -192,7 +192,7 @@ export const metricsRouter = router({
                 to: to.toISOString(),
             };
         }),
-    jobSessions: publicProcedure
+    jobSessions: protectedProcedure
         .input(
             z
                 .object({
@@ -256,7 +256,7 @@ export const metricsRouter = router({
                 actions: (row.actions ?? []) as Array<Record<string, unknown>>,
             }));
         }),
-    ams: publicProcedure
+    ams: protectedProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -302,7 +302,7 @@ export const metricsRouter = router({
                 entityTypes: [...entityTypes],
             };
         }),
-    aggregation: publicProcedure
+    aggregation: protectedProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -341,7 +341,7 @@ export const metricsRouter = router({
                 data: chartData,
             };
         }),
-    amsHourly: publicProcedure
+    amsHourly: protectedProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -388,7 +388,7 @@ export const metricsRouter = router({
             };
         }),
     // Real-time AMS metrics with 5-minute granularity for the last 60 minutes
-    amsRecent: publicProcedure.query(async () => {
+    amsRecent: protectedProcedure.query(async () => {
         const now = new Date();
         const from = new Date(now.getTime() - 60 * 60 * 1000); // 60 minutes ago
 
@@ -450,14 +450,15 @@ export const metricsRouter = router({
             lastActivity: lastActivityMap,
         };
     }),
-    dailyPerformance: publicProcedure
+    dailyPerformance: protectedProcedure
         .input(
             z.object({
                 accountId: z.string(),
                 days: z.number().min(1).max(30).default(14),
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
             // Calculate date range - last N days
             const today = new Date();
             today.setHours(0, 0, 0, 0);
@@ -539,14 +540,15 @@ export const metricsRouter = router({
                 data: chartData,
             };
         }),
-    hourlyPerformance: publicProcedure
+    hourlyPerformance: protectedProcedure
         .input(
             z.object({
                 accountId: z.string(),
                 timezone: z.string(), // Browser timezone - used for display
             })
         )
-        .query(async ({ input }) => {
+        .query(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
             const browserTimezone = input.timezone;
             const now = new Date();
 
@@ -745,7 +747,7 @@ export const metricsRouter = router({
                 },
             };
         }),
-    messageThroughput: publicProcedure.query(async () => {
+    messageThroughput: protectedProcedure.query(async () => {
         const now = new Date();
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
         const twoHoursAgo = new Date(now.getTime() - 2 * 60 * 60 * 1000);
@@ -809,7 +811,7 @@ export const metricsRouter = router({
             sparkline,
         };
     }),
-    apiHealth: publicProcedure.query(async () => {
+    apiHealth: protectedProcedure.query(async () => {
         const now = new Date();
         const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
 

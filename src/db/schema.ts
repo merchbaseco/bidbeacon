@@ -703,3 +703,25 @@ export const jobSessions = pgTable(
     },
     table => [index('job_sessions_job_name_started_idx').on(table.jobName, table.startedAt)]
 );
+
+/**
+ * ----------------------------------------------------------------------------
+ * User Account Access
+ * ----------------------------------------------------------------------------
+ *
+ * Links Clerk users to advertiser accounts they can access.
+ * A user can access multiple accounts, and an account can be accessed by multiple users.
+ */
+export const userAccountAccess = pgTable(
+    'user_account_access',
+    {
+        id: uuid('id').defaultRandom().primaryKey(),
+        clerkUserId: text('clerk_user_id').notNull(),
+        adsAccountId: text('ads_account_id').notNull(),
+        createdAt: timestamp('created_at').notNull().defaultNow(),
+    },
+    table => [
+        uniqueIndex('user_account_access_user_account_idx').on(table.clerkUserId, table.adsAccountId),
+        index('user_account_access_user_idx').on(table.clerkUserId),
+    ]
+);
