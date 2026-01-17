@@ -1,5 +1,8 @@
+import { HugeiconsIcon } from '@hugeicons/react';
+import ChartBarLineIcon from '@merchbaseco/icons/core-stroke-rounded/ChartBarLineIcon';
 import { useAtomValue } from 'jotai';
 import { ConnectionStatusBadge } from '../components/connection-status-badge';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../components/ui/empty';
 import { connectionStatusAtom } from './atoms';
 import { AccountDataCard } from './components/account-data-card';
 import { AccountEnabledSwitch } from './components/account-selector/account-enabled-switch';
@@ -7,9 +10,30 @@ import { AmsMetricsCard } from './components/ams-metrics-card';
 import { DailyPerformanceMetrics } from './components/daily-performance-metrics';
 import { ReportsTable } from './components/reports-table/reports-table';
 import { JobSessionsFeed } from './components/job-sessions-feed';
+import { useSelectedAccountId } from './hooks/use-selected-accountid';
 
 export function IndexRoute() {
     const connectionStatus = useAtomValue(connectionStatusAtom);
+    const accountId = useSelectedAccountId();
+
+    // Show empty state when no account is selected
+    if (!accountId) {
+        return (
+            <div className="flex items-center justify-center min-h-[calc(100vh-120px)] px-4">
+                <Empty className="border border-border bg-card/50 max-w-lg">
+                    <EmptyHeader>
+                        <EmptyMedia variant="icon">
+                            <HugeiconsIcon icon={ChartBarLineIcon} size={20} />
+                        </EmptyMedia>
+                        <EmptyTitle>No account selected</EmptyTitle>
+                        <EmptyDescription>
+                            Select an advertising account from the dropdown above to view your performance metrics, reports, and campaign data.
+                        </EmptyDescription>
+                    </EmptyHeader>
+                </Empty>
+            </div>
+        );
+    }
 
     return (
         <div>

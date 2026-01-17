@@ -156,22 +156,6 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
 
     const currentHour = data?.currentHour ?? new Date().getHours();
 
-    // Show empty state when no account is selected
-    if (!accountId) {
-        return (
-            <div className={cn('w-full', className)}>
-                <div className="flex items-start justify-start gap-6 md:gap-12 mb-4 px-4 max-w-background-frame-max mx-auto">
-                    {METRICS.map(metric => (
-                        <MetricLabel key={metric.key} metric={metric} value={0} change={0} />
-                    ))}
-                </div>
-                <div className="flex items-center justify-center h-[360px] text-muted-foreground text-sm">
-                    Select an account to view performance metrics
-                </div>
-            </div>
-        );
-    }
-
     // Custom tick formatter for X axis - only show 00:00, current hour, and 23:00
     // Note: index 0 is the leading hour (yesterday's last hour), so actual hours start at index 1
     const formatXAxisTick = (value: string, index: number) => {
