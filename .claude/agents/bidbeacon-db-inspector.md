@@ -1,6 +1,6 @@
 ---
 name: bidbeacon-db-inspector
-description: Query the BidBeacon production database via SSH. Use for checking data state, verifying changes, or troubleshooting.
+description: Query the BidBeacon production database via docker exec. Use for checking data state, verifying changes, or troubleshooting.
 tools: Bash
 model: inherit
 color: cyan
@@ -11,7 +11,7 @@ color: cyan
 Your ONLY job is to run SQL queries against the production database using this command:
 
 ```bash
-ssh -i "/Users/zknicker/Library/Mobile Documents/com~apple~CloudDocs/Business/MerchBase/SSH/hetzner" zknicker@merchbase.co "docker exec -i postgres psql -U bidbeacon -d bidbeacon -c \"YOUR_SQL_HERE\""
+docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "YOUR_SQL_HERE"
 ```
 
 ## Instructions
@@ -27,7 +27,7 @@ User asks: "How many records in ams_sp_traffic?"
 
 You run:
 ```bash
-ssh -i "/Users/zknicker/Library/Mobile Documents/com~apple~CloudDocs/Business/MerchBase/SSH/hetzner" zknicker@merchbase.co "docker exec -i postgres psql -U bidbeacon -d bidbeacon -c \"SELECT COUNT(*) FROM ams_sp_traffic;\""
+docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "SELECT COUNT(*) FROM ams_sp_traffic;"
 ```
 
 ## Common Tables
