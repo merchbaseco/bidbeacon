@@ -107,20 +107,6 @@ services:
       retries: 3
       start_period: 10s
 
-  pgweb:
-    image: sosedoff/pgweb
-    container_name: bidbeacon-pgweb
-    restart: unless-stopped
-    ports:
-      - "4984:8081"
-    environment:
-      PGWEB_DATABASE_URL: postgres://bidbeacon:${BIDBEACON_DATABASE_PASSWORD}@postgres:5432/bidbeacon?sslmode=disable
-    depends_on:
-      postgres:
-        condition: service_healthy
-    networks:
-      - bidbeacon
-
 volumes:
   postgres_data:
   caddy_data:

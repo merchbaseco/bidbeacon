@@ -14,18 +14,13 @@ Task({
   prompt: `Query the BidBeacon production database to answer: [YOUR QUESTION HERE]
 
   Database access instructions:
-  1. SSH into production server:
-     ssh -i "/Users/zknicker/Library/Mobile Documents/com~apple~CloudDocs/Business/MerchBase/SSH/hetzner" zknicker@merchbase.co
+  1. Use docker exec to run queries inside the postgres container:
+     docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "SELECT ..."
 
-  2. On the server, use docker exec to run queries inside the postgres container:
-     docker exec -it postgres psql -U bidbeacon -d bidbeacon -c "SELECT ..."
+  2. For multi-line output or complex queries, you can enter interactive psql:
+     docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon
 
-  3. For multi-line output or complex queries, you can enter interactive psql:
-     docker exec -it postgres psql -U bidbeacon -d bidbeacon
-
-  4. Exit SSH when done
-
-  5. Return concise summary of findings
+  3. Return concise summary of findings
 
   Schema reference: src/db/schema.ts
   Common tables: advertiser_account, report_dataset_metadata, performance_hourly, performance_daily`
@@ -86,35 +81,24 @@ Key tables (see `src/db/schema.ts` for complete schema):
 ### Ad Entities
 - `campaign` / `ad_group` / `ad` / `target` - Synced Amazon Ads entities
 
-## Important Notes
+## Query Execution
 
-### SSH Connection Details
-- **Server**: merchbase.co (production server)
-- **SSH User**: zknicker
-- **SSH Key**: `/Users/zknicker/Library/Mobile Documents/com~apple~CloudDocs/Business/MerchBase/SSH/hetzner`
-- **Postgres Container**: postgres (Docker container running on the server)
-- **Database User**: bidbeacon
-- **Database Name**: bidbeacon
-- **No password needed**: Docker exec connects directly to container
-
-### Query Execution Method
-**Use docker exec on the server** - This is simpler and more reliable than SSH tunnels:
 ```bash
 # One-line query
-docker exec -it postgres psql -U bidbeacon -d bidbeacon -c "SELECT COUNT(*) FROM advertiser_account;"
+docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "SELECT COUNT(*) FROM advertiser_account;"
 
 # Interactive psql session
-docker exec -it postgres psql -U bidbeacon -d bidbeacon
+docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon
 # Then run queries interactively
 # \dt to list tables
 # \d table_name to describe a table
 # \q to quit
 ```
 
-### Timezone Handling
+## Timezone Handling
 - `performance_hourly.bucket_start` is in UTC (canonical timestamp)
 - `performance_hourly.bucket_date` and `bucket_hour` are in account's local timezone
 - Query by bucket_start for UTC ranges, bucket_date for local time
 
-### Read-Only Convention
-Database queries should be SELECT-only to avoid accidentally modifying production data. The sub-agent has full access, so use caution.
+## Read-Only Convention
+Database queries should be SELECT-only to avoid accidentally modifying production data.
