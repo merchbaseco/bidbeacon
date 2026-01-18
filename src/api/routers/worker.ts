@@ -5,6 +5,11 @@ import { workerControl } from '@/db/schema';
 import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqsClient';
 import { protectedProcedure, router } from '../trpc';
 
+// Cache for worker metrics - CloudWatch API calls are slow and data is delayed anyway
+type WorkerMetricsResult = Awaited<ReturnType<typeof getQueueMetrics>>;
+let metricsCache: { data: { mainQueue: WorkerMetricsResult; dlq: WorkerMetricsResult }; expiresAt: number } | null = null;
+const METRICS_CACHE_TTL_MS = 30_000; // 30 seconds
+
 export const workerRouter = router({
     status: protectedProcedure.query(async ({ ctx }) => {
         // Only show worker status to users with account access
@@ -115,28 +120,34 @@ export const workerRouter = router({
         }),
 
     metrics: protectedProcedure.query(async ({ ctx }) => {
+        const emptyMetrics = {
+            sparkline: new Array(60).fill(0),
+            sparklineSent: new Array(60).fill(0),
+            sparklineReceived: new Array(60).fill(0),
+            sparklineDeleted: new Array(60).fill(0),
+            messagesLastHour: 0,
+            messagesLast24h: 0,
+            approximateVisible: 0,
+            oldestMessageAge: 0,
+            messagesSentLastHour: 0,
+            messagesSentLast24h: 0,
+            messagesReceivedLastHour: 0,
+            messagesReceivedLast24h: 0,
+            messagesDeletedLastHour: 0,
+            messagesDeletedLast24h: 0,
+            messagesSentLast60s: 0,
+            messagesReceivedLast60s: 0,
+            messagesDeletedLast60s: 0,
+        };
+
         // Only show worker metrics to users with account access
         if (ctx.accessibleAccountIds.length === 0) {
-            const emptyMetrics = {
-                sparkline: new Array(60).fill(0),
-                sparklineSent: new Array(60).fill(0),
-                sparklineReceived: new Array(60).fill(0),
-                sparklineDeleted: new Array(60).fill(0),
-                messagesLastHour: 0,
-                messagesLast24h: 0,
-                approximateVisible: 0,
-                oldestMessageAge: 0,
-                messagesSentLastHour: 0,
-                messagesSentLast24h: 0,
-                messagesReceivedLastHour: 0,
-                messagesReceivedLast24h: 0,
-                messagesDeletedLastHour: 0,
-                messagesDeletedLast24h: 0,
-                messagesSentLast60s: 0,
-                messagesReceivedLast60s: 0,
-                messagesDeletedLast60s: 0,
-            };
             return { mainQueue: emptyMetrics, dlq: emptyMetrics };
+        }
+
+        // Return cached result if still valid
+        if (metricsCache && Date.now() < metricsCache.expiresAt) {
+            return metricsCache.data;
         }
 
         const mainQueueUrl = process.env.AMS_QUEUE_URL;
@@ -148,7 +159,7 @@ export const workerRouter = router({
         const mainQueueMetrics = await getQueueMetrics(mainQueueUrl);
         const dlqUrlFromPolicy = await getDlqUrlFromMainQueue(mainQueueUrl);
 
-        let dlqMetrics = null;
+        let dlqMetrics: WorkerMetricsResult;
         if (dlqUrlFromPolicy) {
             try {
                 dlqMetrics = await getQueueMetrics(dlqUrlFromPolicy);
@@ -160,51 +171,20 @@ export const workerRouter = router({
                     console.error('Error getting DLQ metrics', error);
                 }
 
-                dlqMetrics = {
-                    sparkline: new Array(60).fill(0),
-                    sparklineSent: new Array(60).fill(0),
-                    sparklineReceived: new Array(60).fill(0),
-                    sparklineDeleted: new Array(60).fill(0),
-                    messagesLastHour: 0,
-                    messagesLast24h: 0,
-                    approximateVisible: 0,
-                    oldestMessageAge: 0,
-                    messagesSentLastHour: 0,
-                    messagesSentLast24h: 0,
-                    messagesReceivedLastHour: 0,
-                    messagesReceivedLast24h: 0,
-                    messagesDeletedLastHour: 0,
-                    messagesDeletedLast24h: 0,
-                    messagesSentLast60s: 0,
-                    messagesReceivedLast60s: 0,
-                    messagesDeletedLast60s: 0,
-                };
+                dlqMetrics = emptyMetrics;
             }
         } else {
-            dlqMetrics = {
-                sparkline: new Array(60).fill(0),
-                sparklineSent: new Array(60).fill(0),
-                sparklineReceived: new Array(60).fill(0),
-                sparklineDeleted: new Array(60).fill(0),
-                messagesLastHour: 0,
-                messagesLast24h: 0,
-                approximateVisible: 0,
-                oldestMessageAge: 0,
-                messagesSentLastHour: 0,
-                messagesSentLast24h: 0,
-                messagesReceivedLastHour: 0,
-                messagesReceivedLast24h: 0,
-                messagesDeletedLastHour: 0,
-                messagesDeletedLast24h: 0,
-                messagesSentLast60s: 0,
-                messagesReceivedLast60s: 0,
-                messagesDeletedLast60s: 0,
-            };
+            dlqMetrics = emptyMetrics;
         }
 
-        return {
+        const result = {
             mainQueue: mainQueueMetrics,
             dlq: dlqMetrics,
         };
+
+        // Cache the result
+        metricsCache = { data: result, expiresAt: Date.now() + METRICS_CACHE_TTL_MS };
+
+        return result;
     }),
 });
