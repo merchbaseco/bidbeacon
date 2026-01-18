@@ -21,6 +21,7 @@ import { AccountSelector } from './routes/components/account-selector/account-se
 import { useWebSocket } from './routes/hooks/use-websocket';
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const DEV_AUTH_ENABLED = import.meta.env.VITE_DEV_AUTH === 'true' || import.meta.env.VITE_DEV_AUTH === '1';
 
 if (!CLERK_PUBLISHABLE_KEY) {
     throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY environment variable');
@@ -50,7 +51,7 @@ export function RootRoute() {
                                     <AccountSelector />
                                 </div>
                                 <MoreMenu />
-                                <UserButton />
+                                {!DEV_AUTH_ENABLED && <UserButton />}
                             </div>
                         </div>
                     </div>

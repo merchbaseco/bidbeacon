@@ -14,6 +14,12 @@ interface ClerkUser {
  * This is where you can add request-specific data like user info, database connections, etc.
  */
 export async function createContext({ req }: CreateFastifyContextOptions) {
+    const devUserId = getDevUserId();
+    if (devUserId) {
+        const accessibleAccountIds = await fetchAccessibleAccountIds(devUserId);
+        return { user: { sub: devUserId }, accessibleAccountIds, request: req };
+    }
+
     const authHeader = req.headers.authorization;
     const token = authHeader?.replace('Bearer ', '');
 
@@ -34,13 +40,7 @@ export async function createContext({ req }: CreateFastifyContextOptions) {
             email: payload.email as string | undefined,
         };
 
-        // Load accessible account IDs for this user
-        const accessibleAccounts = await db
-            .select({ adsAccountId: userAccountAccess.adsAccountId })
-            .from(userAccountAccess)
-            .where(eq(userAccountAccess.clerkUserId, payload.sub));
-
-        const accessibleAccountIds = accessibleAccounts.map(a => a.adsAccountId);
+        const accessibleAccountIds = await fetchAccessibleAccountIds(payload.sub);
 
         return { user, accessibleAccountIds, request: req };
     } catch {
@@ -49,3 +49,21 @@ export async function createContext({ req }: CreateFastifyContextOptions) {
 }
 
 export type Context = Awaited<ReturnType<typeof createContext>>;
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+const getDevUserId = () => {
+    const devUserId = process.env.BIDBEACON_DEV_USER_ID?.trim();
+    return devUserId ? devUserId : null;
+};
+
+const fetchAccessibleAccountIds = async (clerkUserId: string) => {
+    const accessibleAccounts = await db
+        .select({ adsAccountId: userAccountAccess.adsAccountId })
+        .from(userAccountAccess)
+        .where(eq(userAccountAccess.clerkUserId, clerkUserId));
+
+    return accessibleAccounts.map(account => account.adsAccountId);
+};

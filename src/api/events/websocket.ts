@@ -16,6 +16,13 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
             return;
         }
 
+        const devUserId = getDevUserId();
+        if (devUserId) {
+            const accessibleAccountIds = await fetchAccessibleAccountIds(devUserId);
+            registerWebSocketConnection(socket, accessibleAccountIds);
+            return;
+        }
+
         // Extract token from query string
         const url = new URL(req.url, `http://${req.headers.host}`);
         const token = url.searchParams.get('token');
@@ -36,12 +43,7 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
             const payload = await verifyToken(token, { secretKey });
 
             // Load accessible account IDs for this user
-            const accessibleAccounts = await db
-                .select({ adsAccountId: userAccountAccess.adsAccountId })
-                .from(userAccountAccess)
-                .where(eq(userAccountAccess.clerkUserId, payload.sub));
-
-            const accessibleAccountIds = accessibleAccounts.map(a => a.adsAccountId);
+            const accessibleAccountIds = await fetchAccessibleAccountIds(payload.sub);
 
             registerWebSocketConnection(socket, accessibleAccountIds);
         } catch (error) {
@@ -62,3 +64,21 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
         });
     });
 }
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+const getDevUserId = () => {
+    const devUserId = process.env.BIDBEACON_DEV_USER_ID?.trim();
+    return devUserId ? devUserId : null;
+};
+
+const fetchAccessibleAccountIds = async (clerkUserId: string) => {
+    const accessibleAccounts = await db
+        .select({ adsAccountId: userAccountAccess.adsAccountId })
+        .from(userAccountAccess)
+        .where(eq(userAccountAccess.clerkUserId, clerkUserId));
+
+    return accessibleAccounts.map(account => account.adsAccountId);
+};
