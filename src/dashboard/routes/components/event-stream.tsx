@@ -10,7 +10,6 @@ import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, Dia
 import { Spinner } from '../../components/ui/spinner';
 import { cn } from '../../lib/utils';
 import { useEvents } from '../hooks/use-events';
-import { roundUpToNearestMinute } from '../utils';
 import { selectedAccountIdAtom, selectedCountryCodeAtom } from './account-selector/atoms';
 
 type EventRow = RouterOutputs['metrics']['events']['events'][number];
@@ -42,7 +41,7 @@ export const EventStream = () => {
     const [isLive, setIsLive] = useState(true);
 
     const baseRange = useMemo(() => {
-        const to = roundUpToNearestMinute(new Date());
+        const to = roundUpToNearestFiveMinutes(new Date());
         const from = new Date(to.getTime() - 60 * 60 * 1000);
         return { from, to };
     }, []);
@@ -52,7 +51,7 @@ export const EventStream = () => {
             return null;
         }
         const start = new Date(selectedBucket);
-        const end = new Date(start.getTime() + 60 * 1000);
+        const end = new Date(start.getTime() + 5 * 60 * 1000);
         return { from: start, to: end };
     }, [selectedBucket]);
 
@@ -289,4 +288,8 @@ const renderMessage = (message?: string | null, badges?: string[] | null): React
 
 const formatJobName = (jobName: string) => {
     return jobName.replace(/-/g, ' ');
+};
+
+const roundUpToNearestFiveMinutes = (date: Date): Date => {
+    return new Date(Math.ceil(date.getTime() / (5 * 60 * 1000)) * (5 * 60 * 1000));
 };

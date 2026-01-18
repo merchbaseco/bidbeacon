@@ -247,18 +247,22 @@ export const metricsRouter = router({
 
             const bucketRows = await db
                 .select({
-                    interval: sql<string>`date_trunc('minute', ${events.createdAt})`.as('interval'),
+                    interval: sql<string>`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`.as(
+                        'interval'
+                    ),
                     count: sql<number>`count(*)`.as('count'),
                 })
                 .from(events)
                 .where(and(...histogramConditions))
-                .groupBy(sql`date_trunc('minute', ${events.createdAt})`)
-                .orderBy(sql`date_trunc('minute', ${events.createdAt})`);
+                .groupBy(sql`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`)
+                .orderBy(sql`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`);
 
             const roundedFrom = new Date(from);
             roundedFrom.setSeconds(0, 0);
+            roundedFrom.setMinutes(Math.floor(roundedFrom.getMinutes() / 5) * 5);
             const roundedTo = new Date(to);
             roundedTo.setSeconds(0, 0);
+            roundedTo.setMinutes(Math.ceil(roundedTo.getMinutes() / 5) * 5);
 
             const bucketMap = new Map<string, number>();
             for (const row of bucketRows) {
@@ -267,7 +271,7 @@ export const metricsRouter = router({
             }
 
             const histogram: Array<{ interval: string; count: number }> = [];
-            for (let ts = roundedFrom.getTime(); ts <= roundedTo.getTime(); ts += 60 * 1000) {
+            for (let ts = roundedFrom.getTime(); ts <= roundedTo.getTime(); ts += 5 * 60 * 1000) {
                 const date = new Date(ts);
                 const interval = date.toISOString();
                 histogram.push({
