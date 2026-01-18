@@ -89,9 +89,7 @@ export const EventStream = () => {
         return histogram.reduce((sum, bucket) => sum + bucket.count, 0);
     }, [histogram]);
 
-    const selectedLabel = selectedBucket
-        ? formatInTimeZone(new Date(selectedBucket), timezone, 'MMM dd HH:mm')
-        : null;
+    const selectedLabel = selectedBucket ? formatInTimeZone(new Date(selectedBucket), timezone, 'MMM dd HH:mm') : null;
 
     const handleBucketClick = (bucket: EventBucket) => {
         setSelectedBucket(current => (current === bucket.interval ? null : bucket.interval));
@@ -99,7 +97,7 @@ export const EventStream = () => {
 
     return (
         <>
-            <Card className="font-mono">
+            <Card className="font-mono pb-0 gap-0 overflow-hidden">
                 <div className="flex items-center gap-2 mb-4 px-4">
                     <Button
                         variant="outline"
@@ -112,21 +110,13 @@ export const EventStream = () => {
                         <Filter className="h-5 w-5" />
                     </Button>
 
-                    <div className="flex-1 flex items-center gap-3 h-11 px-4 border border-input rounded-md text-sm text-muted-foreground bg-background">
+                    <div className="flex-1 flex items-center gap-3 h-[32px] px-2 border border-input rounded-lg text-sm text-muted-foreground bg-background">
                         <Search className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-muted-foreground">
-                            {selectedLabel
-                                ? `Filtered to ${selectedLabel}`
-                                : `${totalCount.toLocaleString()} events (last 1h)`}
-                        </span>
+                        <span className="text-muted-foreground">{selectedLabel ? `Filtered to ${selectedLabel}` : `${totalCount.toLocaleString()} events (last 1h)`}</span>
                         <ChevronDown className="h-5 w-5 text-muted-foreground ml-auto" />
                     </div>
 
-                    <Button
-                        variant="outline"
-                        className={cn('h-11 px-4 gap-2', isLive ? 'text-foreground' : 'text-muted-foreground')}
-                        onClick={() => setIsLive(current => !current)}
-                    >
+                    <Button variant="outline" className={cn('h-11 px-4 gap-2', isLive ? 'text-foreground' : 'text-muted-foreground')} onClick={() => setIsLive(current => !current)}>
                         <Play className="h-4 w-4 fill-current" />
                         Live
                     </Button>
@@ -160,14 +150,12 @@ export const EventStream = () => {
                     <div className="flex items-center justify-center py-10">
                         <div className="text-center">
                             <p className="text-sm text-muted-foreground">Unable to load events</p>
-                            <p className="text-xs text-muted-foreground/70 mt-1">
-                                {error instanceof Error ? error.message : 'Please try again later'}
-                            </p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
                         </div>
                     </div>
                 ) : (
                     <>
-                        <div className="h-16 flex items-end gap-px mb-4 px-4">
+                        <div className="h-20 flex items-end gap-px mb-4">
                             {histogram.map(bucket => {
                                 const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * 48)) : 2;
                                 const isSelected = selectedBucket === bucket.interval;
@@ -177,11 +165,7 @@ export const EventStream = () => {
                                     <button
                                         key={bucket.interval}
                                         type="button"
-                                        className={cn(
-                                            'flex-1 min-w-[2px] transition-colors',
-                                            bucket.count > 0 ? 'bg-muted-foreground/50' : 'bg-muted/70',
-                                            isSelected && 'bg-foreground'
-                                        )}
+                                        className={cn('flex-1 min-w-[2px] transition-colors', bucket.count > 0 ? 'bg-muted-foreground/50' : 'bg-muted/70', isSelected && 'bg-foreground')}
                                         style={{ height }}
                                         title={`${formattedBucket} · ${bucket.count} events`}
                                         onClick={() => handleBucketClick(bucket)}
@@ -207,10 +191,7 @@ export const EventStream = () => {
                                     return (
                                         <div
                                             key={row.event.id}
-                                            className={cn(
-                                                'grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-sm hover:bg-muted/50 transition-colors cursor-pointer min-w-0',
-                                                isError && 'bg-destructive/10'
-                                            )}
+                                            className={cn('grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-sm hover:bg-muted/50 cursor-pointer min-w-0', isError && 'bg-destructive/10')}
                                             onClick={() => setSelectedEvent(row.event)}
                                         >
                                             <div className="flex items-center gap-2">
@@ -225,9 +206,7 @@ export const EventStream = () => {
                                             <div className={cn('font-mono text-xs', isError ? 'text-destructive-foreground' : 'text-success-foreground')}>
                                                 {OUTCOME_COPY[row.event.outcome]?.label ?? row.event.outcome}
                                             </div>
-                                            <div className="text-muted-foreground truncate whitespace-nowrap min-w-0">
-                                                {renderMessage(row.event.message, row.event.badges)}
-                                            </div>
+                                            <div className="text-muted-foreground truncate whitespace-nowrap min-w-0">{renderMessage(row.event.message, row.event.badges)}</div>
                                         </div>
                                     );
                                 })}
@@ -247,9 +226,7 @@ export const EventStream = () => {
                         <DialogPanel className="space-y-4">
                             <div className="flex items-center justify-between text-sm">
                                 <span className="font-mono text-muted-foreground">{selectedEvent.jobName}</span>
-                                <span className="text-muted-foreground">
-                                    {formatInTimeZone(new Date(selectedEvent.createdAt), timezone, 'MMM dd HH:mm:ss.SSS')}
-                                </span>
+                                <span className="text-muted-foreground">{formatInTimeZone(new Date(selectedEvent.createdAt), timezone, 'MMM dd HH:mm:ss.SSS')}</span>
                             </div>
                             <div className="flex flex-wrap gap-2">
                                 <OutcomeBadge outcome={selectedEvent.outcome} />
