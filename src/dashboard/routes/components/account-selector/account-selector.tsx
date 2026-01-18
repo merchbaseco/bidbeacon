@@ -18,7 +18,7 @@ export function AccountSelector() {
     const initializedRef = useRef(false);
 
     // Get saved account preference
-    const { data: savedAccount } = api.users.getSelectedAccount.useQuery(undefined, {
+    const { data: savedAccount, isFetched: isSavedAccountFetched } = api.users.getSelectedAccount.useQuery(undefined, {
         staleTime: Infinity, // Only fetch once per session
     });
 
@@ -43,7 +43,7 @@ export function AccountSelector() {
 
     // Initialize from saved preference or auto-select first account
     useEffect(() => {
-        if (initializedRef.current || accounts.length === 0 || accountId) return;
+        if (initializedRef.current || accounts.length === 0 || accountId || !isSavedAccountFetched) return;
 
         // Try to restore saved preference
         if (savedAccount?.adsAccountId && savedAccount?.profileId) {
@@ -64,20 +64,33 @@ export function AccountSelector() {
             }
         }
 
-        // Fall back to first account
+        // Fall back to first account once we know there is no saved preference.
         const firstAccount = accounts.find(a => a.profileId !== null);
         if (firstAccount?.profileId) {
             setAccountId(firstAccount.adsAccountId);
             setProfileId(firstAccount.profileId);
             setCountryCode(firstAccount.countryCode);
-            // Save as the new preference
-            setSelectedAccountMutation.mutate({
-                adsAccountId: firstAccount.adsAccountId,
-                profileId: firstAccount.profileId,
-            });
+            const shouldPersistFallback =
+                savedAccount === null || Boolean(savedAccount?.adsAccountId && savedAccount?.profileId);
+            if (shouldPersistFallback) {
+                // Save as the new preference when none exists or the saved preference is invalid.
+                setSelectedAccountMutation.mutate({
+                    adsAccountId: firstAccount.adsAccountId,
+                    profileId: firstAccount.profileId,
+                });
+            }
         }
         initializedRef.current = true;
-    }, [accounts, accountId, savedAccount, setAccountId, setProfileId, setCountryCode, setSelectedAccountMutation]);
+    }, [
+        accounts,
+        accountId,
+        savedAccount,
+        isSavedAccountFetched,
+        setAccountId,
+        setProfileId,
+        setCountryCode,
+        setSelectedAccountMutation,
+    ]);
 
     useEffect(() => {
         if (accountId && profileId && accounts.length > 0) {
