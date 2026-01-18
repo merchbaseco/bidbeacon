@@ -62,6 +62,7 @@ Clerk User (clerk_user_id)
 3. **Simple local state for immediate feedback** - Use `useState` for optimistic UI, not complex cache manipulation. Trust the server.
 4. **Derive state inline** - Calculate derived values in the hook body, not separate functions.
 5. **Memoize dates** - Always memoize `Date` objects used as query keys to prevent infinite refetch loops.
+6. **Encapsulate data wiring** - If a component needs a query + related `useEffect` logic, extract it into a hook in `src/dashboard/routes/hooks/` and keep the component mostly presentational.
 
 ### Data Fetching
 
