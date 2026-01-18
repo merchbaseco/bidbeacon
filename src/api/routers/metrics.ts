@@ -1,8 +1,9 @@
-import { and, desc, eq, gte, inArray, lt, lte, sql, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, gte, lt, lte, sql, isNotNull } from 'drizzle-orm';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { amsMetrics, apiMetrics, jobSessions, performanceDaily, performanceHourly } from '@/db/schema';
+import { amsMetrics, apiMetrics, events, jobMetrics, performanceDaily, performanceHourly } from '@/db/schema';
+import { getTimezoneForCountry } from '@/utils/timezones';
 import { protectedProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
@@ -15,14 +16,6 @@ const SUPPORTED_JOBS = [
     'summarize-daily-target-stream-for-account',
     'summarize-hourly-target-stream',
     'summarize-hourly-target-stream-for-account',
-] as const;
-const VISIBLE_JOB_SESSIONS = [
-    'update-report-dataset-for-account',
-    'update-report-status',
-    'summarize-daily-target-stream-for-account',
-    'summarize-hourly-target-stream-for-account',
-    'sync-ad-entities',
-    'cleanup-ams-metrics',
 ] as const;
 
 export const metricsRouter = router({
@@ -153,25 +146,25 @@ export const metricsRouter = router({
             const from = new Date(input.from);
             const to = new Date(input.to);
 
-            const conditions = [isNotNull(jobSessions.finishedAt), gte(jobSessions.finishedAt, from), lte(jobSessions.finishedAt, to)];
+            const conditions = [isNotNull(jobMetrics.finishedAt), gte(jobMetrics.finishedAt, from), lte(jobMetrics.finishedAt, to)];
 
             if (input.jobName) {
-                conditions.push(eq(jobSessions.jobName, input.jobName));
+                conditions.push(eq(jobMetrics.jobName, input.jobName));
             }
 
             const data = await db
                 .select({
-                    interval: sql<string>`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`.as('interval'),
-                    jobName: jobSessions.jobName,
+                    interval: sql<string>`date_trunc('hour', ${jobMetrics.finishedAt}) + floor(extract(minute from ${jobMetrics.finishedAt}) / 5) * interval '5 minutes'`.as('interval'),
+                    jobName: jobMetrics.jobName,
                     count: sql<number>`count(*)`.as('count'),
-                    avgDuration: sql<number>`avg(extract(epoch from (${jobSessions.finishedAt} - ${jobSessions.startedAt})) * 1000)`.as('avg_duration'),
-                    successCount: sql<number>`sum(case when ${jobSessions.status} = 'succeeded' then 1 else 0 end)`.as('success_count'),
-                    errorCount: sql<number>`sum(case when ${jobSessions.status} = 'failed' then 1 else 0 end)`.as('error_count'),
+                    avgDuration: sql<number>`avg(extract(epoch from (${jobMetrics.finishedAt} - ${jobMetrics.startedAt})) * 1000)`.as('avg_duration'),
+                    successCount: sql<number>`sum(case when ${jobMetrics.status} = 'succeeded' then 1 else 0 end)`.as('success_count'),
+                    errorCount: sql<number>`sum(case when ${jobMetrics.status} = 'failed' then 1 else 0 end)`.as('error_count'),
                 })
-                .from(jobSessions)
+                .from(jobMetrics)
                 .where(and(...conditions))
-                .groupBy(sql`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`, jobSessions.jobName)
-                .orderBy(sql`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`, sql`${jobSessions.jobName}`);
+                .groupBy(sql`date_trunc('hour', ${jobMetrics.finishedAt}) + floor(extract(minute from ${jobMetrics.finishedAt}) / 5) * interval '5 minutes'`, jobMetrics.jobName)
+                .orderBy(sql`date_trunc('hour', ${jobMetrics.finishedAt}) + floor(extract(minute from ${jobMetrics.finishedAt}) / 5) * interval '5 minutes'`, sql`${jobMetrics.jobName}`);
 
             const chartData: Record<string, Array<{ interval: string; count: number; avgDuration: number; successCount: number; errorCount: number }>> = {};
 
@@ -202,85 +195,102 @@ export const metricsRouter = router({
                 to: to.toISOString(),
             };
         }),
-    jobSessions: protectedProcedure
+    events: protectedProcedure
         .input(
-            z
-                .object({
-                    limit: z.number().min(1).max(200).default(50),
-                    jobName: z.string().optional(),
-                    since: z.string().datetime().optional(),
-                    accountId: z.string().optional(),
-                    countryCode: z.string().optional(),
-                })
-                .optional()
+            z.object({
+                accountId: z.string(),
+                countryCode: z.string(),
+                from: z.string().datetime(),
+                to: z.string().datetime(),
+                filterFrom: z.string().datetime().optional(),
+                filterTo: z.string().datetime().optional(),
+                limit: z.number().min(1).max(200).default(100),
+                jobName: z.string().optional(),
+            })
         )
         .query(async ({ ctx, input }) => {
-            // Only show job sessions for accounts user has access to
+            ctx.assertAccountAccess(input.accountId);
+
             if (ctx.accessibleAccountIds.length === 0) {
-                return [];
+                return { events: [], histogram: [], timezone: getTimezoneForCountry(input.countryCode), from: input.from, to: input.to };
             }
 
-            const limit = input?.limit ?? 50;
-            const conditions = [];
-            const jobNamesFilter = input?.jobName ? [input.jobName] : [...VISIBLE_JOB_SESSIONS];
+            const limit = input.limit ?? 100;
+            const from = new Date(input.from);
+            const to = new Date(input.to);
+            const listFrom = input.filterFrom ? new Date(input.filterFrom) : from;
+            const listTo = input.filterTo ? new Date(input.filterTo) : to;
 
-            if (jobNamesFilter.length > 0) {
-                conditions.push(inArray(jobSessions.jobName, jobNamesFilter));
-            }
-            if (input?.since) {
-                conditions.push(gte(jobSessions.startedAt, new Date(input.since)));
-            }
+            const baseConditions = [eq(events.accountId, input.accountId), eq(events.countryCode, input.countryCode)];
 
-            // Filter by accessible accounts - job must be for an account the user can access
-            // Build PostgreSQL array literal for use with ANY()
-            const accountIds = ctx.accessibleAccountIds;
-            const accountIdsArray = sql.raw(`ARRAY[${accountIds.map(id => `'${id}'`).join(',')}]::text[]`);
-            conditions.push(
-                sql`(${jobSessions.input} ->> 'accountId' = ANY(${accountIdsArray}) OR exists (select 1 from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'accountId' = ANY(${accountIdsArray}) OR action->'input'->>'accountId' = ANY(${accountIdsArray})))`
-            );
-
-            // Additional filter if specific accountId requested (must be in accessible accounts)
-            if (input?.accountId) {
-                ctx.assertAccountAccess(input.accountId);
-                conditions.push(
-                    sql`(${jobSessions.input} ->> 'accountId' = ${input.accountId} OR exists (select 1 from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'accountId' = ${input.accountId} OR action->'input'->>'accountId' = ${input.accountId}))`
-                );
-            }
-            if (input?.countryCode) {
-                conditions.push(
-                    sql`(${jobSessions.input} ->> 'countryCode' = ${input.countryCode} OR exists (select 1 from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'countryCode' = ${input.countryCode} OR action->'input'->>'countryCode' = ${input.countryCode}))`
-                );
+            if (input.jobName) {
+                baseConditions.push(eq(events.jobName, input.jobName));
             }
 
-            const baseQuery = db
+            const listConditions = [...baseConditions, gte(events.createdAt, listFrom), lte(events.createdAt, listTo)];
+            const histogramConditions = [...baseConditions, gte(events.createdAt, from), lte(events.createdAt, to)];
+
+            const rows = await db
                 .select({
-                    id: jobSessions.id,
-                    jobName: jobSessions.jobName,
-                    bossJobId: jobSessions.bossJobId,
-                    status: jobSessions.status,
-                    startedAt: jobSessions.startedAt,
-                    finishedAt: jobSessions.finishedAt,
-                    error: jobSessions.error,
-                    input: jobSessions.input,
-                    actions: jobSessions.actions,
+                    id: events.id,
+                    jobName: events.jobName,
+                    outcome: events.outcome,
+                    message: events.message,
+                    badges: events.badges,
+                    payload: events.payload,
+                    createdAt: events.createdAt,
                 })
-                .from(jobSessions);
+                .from(events)
+                .where(and(...listConditions))
+                .orderBy(desc(events.createdAt))
+                .limit(limit);
 
-            const queryWithFilters = conditions.length > 0 ? baseQuery.where(and(...conditions)) : baseQuery;
+            const bucketRows = await db
+                .select({
+                    interval: sql<string>`date_trunc('minute', ${events.createdAt})`.as('interval'),
+                    count: sql<number>`count(*)`.as('count'),
+                })
+                .from(events)
+                .where(and(...histogramConditions))
+                .groupBy(sql`date_trunc('minute', ${events.createdAt})`)
+                .orderBy(sql`date_trunc('minute', ${events.createdAt})`);
 
-            const rows = await queryWithFilters.orderBy(desc(jobSessions.startedAt)).limit(limit);
+            const roundedFrom = new Date(from);
+            roundedFrom.setSeconds(0, 0);
+            const roundedTo = new Date(to);
+            roundedTo.setSeconds(0, 0);
 
-            return rows.map(row => ({
-                id: row.id,
-                jobName: row.jobName,
-                bossJobId: row.bossJobId,
-                status: row.status,
-                startedAt: row.startedAt.toISOString(),
-                finishedAt: row.finishedAt ? row.finishedAt.toISOString() : null,
-                error: row.error ?? null,
-                input: (row.input ?? null) as Record<string, unknown> | null,
-                actions: (row.actions ?? []) as Array<Record<string, unknown>>,
-            }));
+            const bucketMap = new Map<string, number>();
+            for (const row of bucketRows) {
+                const interval = new Date(row.interval).toISOString();
+                bucketMap.set(interval, Number(row.count));
+            }
+
+            const histogram: Array<{ interval: string; count: number }> = [];
+            for (let ts = roundedFrom.getTime(); ts <= roundedTo.getTime(); ts += 60 * 1000) {
+                const date = new Date(ts);
+                const interval = date.toISOString();
+                histogram.push({
+                    interval,
+                    count: bucketMap.get(interval) ?? 0,
+                });
+            }
+
+            return {
+                events: rows.map(row => ({
+                    id: row.id,
+                    jobName: row.jobName,
+                    outcome: row.outcome,
+                    message: row.message ?? null,
+                    badges: (row.badges ?? null) as string[] | null,
+                    payload: (row.payload ?? null) as Record<string, unknown> | null,
+                    createdAt: row.createdAt.toISOString(),
+                })),
+                histogram,
+                timezone: getTimezoneForCountry(input.countryCode),
+                from: roundedFrom.toISOString(),
+                to: roundedTo.toISOString(),
+            };
         }),
     ams: protectedProcedure
         .input(
@@ -351,21 +361,21 @@ export const metricsRouter = router({
 
             const data = await db
                 .select({
-                    interval: sql<string>`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`.as('interval'),
+                    interval: sql<string>`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`.as('interval'),
                     jobCount: sql<number>`count(*)`.as('job_count'),
-                    totalRowsInserted: sql<number>`COALESCE(sum(COALESCE((select sum((action->>'rowsInserted')::int) from jsonb_array_elements(coalesce(${jobSessions.actions}, '[]'::jsonb)) as action where action->>'type' = 'ams-summary-complete'), 0)), 0)`.as('total_rows_inserted'),
+                    totalRowsInserted: sql<number>`COALESCE(sum(COALESCE((${events.payload} ->> 'rowsInserted')::int, 0)), 0)`.as('total_rows_inserted'),
                 })
-                .from(jobSessions)
+                .from(events)
                 .where(
                     and(
-                        eq(jobSessions.jobName, 'summarize-daily-target-stream-for-account'),
-                        isNotNull(jobSessions.finishedAt),
-                        gte(jobSessions.finishedAt, from),
-                        lte(jobSessions.finishedAt, to)
+                        eq(events.jobName, 'summarize-daily-target-stream-for-account'),
+                        eq(events.outcome, 'ok'),
+                        gte(events.createdAt, from),
+                        lte(events.createdAt, to)
                     )
                 )
-                .groupBy(sql`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`)
-                .orderBy(sql`date_trunc('hour', ${jobSessions.finishedAt}) + floor(extract(minute from ${jobSessions.finishedAt}) / 5) * interval '5 minutes'`);
+                .groupBy(sql`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`)
+                .orderBy(sql`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`);
 
             const chartData = data.map(row => ({
                 interval: new Date(row.interval).toISOString(),

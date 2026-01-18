@@ -1,0 +1,266 @@
+import { formatInTimeZone } from 'date-fns-tz';
+import { useMemo, useState, type ReactNode } from 'react';
+import { useAtomValue } from 'jotai';
+import type { RouterOutputs } from '@/dashboard/lib/trpc';
+import { Badge } from '../../components/ui/badge';
+import { Button } from '../../components/ui/button';
+import { Card } from '../../components/ui/card';
+import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
+import { Spinner } from '../../components/ui/spinner';
+import { cn } from '../../lib/utils';
+import { useEvents } from '../hooks/use-events';
+import { roundUpToNearestMinute } from '../utils';
+import { selectedAccountIdAtom, selectedCountryCodeAtom } from './account-selector/atoms';
+
+type EventRow = RouterOutputs['metrics']['events']['events'][number];
+
+type EventBucket = {
+    interval: string;
+    count: number;
+};
+
+type EventRowWithMeta = {
+    event: EventRow;
+    formattedTime: string;
+};
+
+const OUTCOME_COPY: Record<string, { label: string; variant: 'success' | 'error' }> = {
+    ok: { label: 'ok', variant: 'success' },
+    error: { label: 'error', variant: 'error' },
+};
+
+const HEADER_COLUMNS = ['Time', 'Job', 'Outcome', 'Message'];
+
+export const EventStream = () => {
+    const accountId = useAtomValue(selectedAccountIdAtom);
+    const countryCode = useAtomValue(selectedCountryCodeAtom);
+    const hasSelection = Boolean(accountId && countryCode);
+
+    const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
+    const [selectedEvent, setSelectedEvent] = useState<EventRow | null>(null);
+
+    const baseRange = useMemo(() => {
+        const to = roundUpToNearestMinute(new Date());
+        const from = new Date(to.getTime() - 60 * 60 * 1000);
+        return { from, to };
+    }, []);
+
+    const filterRange = useMemo(() => {
+        if (!selectedBucket) {
+            return null;
+        }
+        const start = new Date(selectedBucket);
+        const end = new Date(start.getTime() + 60 * 1000);
+        return { from: start, to: end };
+    }, [selectedBucket]);
+
+    const { data, isLoading, isFetching, error } = useEvents({
+        accountId: accountId ?? '',
+        countryCode: countryCode ?? '',
+        from: baseRange.from.toISOString(),
+        to: baseRange.to.toISOString(),
+        filterFrom: filterRange?.from.toISOString(),
+        filterTo: filterRange?.to.toISOString(),
+        limit: 200,
+        enabled: hasSelection,
+    });
+
+    const timezone = data?.timezone ?? 'UTC';
+    const histogram = (data?.histogram ?? []) as EventBucket[];
+
+    const events = useMemo<EventRowWithMeta[]>(() => {
+        if (!data?.events) {
+            return [];
+        }
+        return data.events.map(event => ({
+            event,
+            formattedTime: formatInTimeZone(new Date(event.createdAt), timezone, 'MMM dd HH:mm:ss.SSS'),
+        }));
+    }, [data?.events, timezone]);
+
+    const maxCount = useMemo(() => {
+        return histogram.reduce((max, bucket) => Math.max(max, bucket.count), 0);
+    }, [histogram]);
+
+    const selectedLabel = selectedBucket
+        ? formatInTimeZone(new Date(selectedBucket), timezone, 'MMM dd HH:mm')
+        : null;
+
+    const handleBucketClick = (bucket: EventBucket) => {
+        setSelectedBucket(current => (current === bucket.interval ? null : bucket.interval));
+    };
+
+    return (
+        <>
+            <Card className="p-3 space-y-3">
+                <div className="flex items-center justify-between px-1">
+                    <div>
+                        <h3 className="text-sm font-medium">Event Stream</h3>
+                        {selectedLabel && (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                                Filtered to {selectedLabel}
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="ml-2 h-auto px-2 py-0 text-xs"
+                                    onClick={() => setSelectedBucket(null)}
+                                >
+                                    Clear
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {!hasSelection ? (
+                    <div className="flex items-center justify-center py-10">
+                        <p className="text-sm text-muted-foreground">Select an account to view events</p>
+                    </div>
+                ) : isLoading || isFetching ? (
+                    <div className="flex items-center justify-center py-10">
+                        <Spinner className="size-5 text-muted-foreground" />
+                    </div>
+                ) : error ? (
+                    <div className="flex items-center justify-center py-10">
+                        <div className="text-center">
+                            <p className="text-sm text-muted-foreground">Unable to load events</p>
+                            <p className="text-xs text-muted-foreground/60 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
+                        </div>
+                    </div>
+                ) : (
+                    <>
+                        <div className="rounded-md border bg-muted/20 px-2 py-1">
+                            <div className="flex items-end gap-0.5 h-7">
+                                {histogram.map(bucket => {
+                                    const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * 24)) : 2;
+                                    const isSelected = selectedBucket === bucket.interval;
+                                    const formattedBucket = formatInTimeZone(new Date(bucket.interval), timezone, 'MMM dd HH:mm');
+
+                                    return (
+                                        <button
+                                            key={bucket.interval}
+                                            type="button"
+                                            className={cn(
+                                                'flex-1 rounded-[2px] transition-colors',
+                                                bucket.count > 0 ? 'bg-foreground/70' : 'bg-muted-foreground/20',
+                                                isSelected && 'bg-primary'
+                                            )}
+                                            style={{ height }}
+                                            title={`${formattedBucket} · ${bucket.count} events`}
+                                            onClick={() => handleBucketClick(bucket)}
+                                        />
+                                    );
+                                })}
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-[160px_160px_90px_1fr] gap-3 px-3 pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                            {HEADER_COLUMNS.map(column => (
+                                <span key={column}>{column}</span>
+                            ))}
+                        </div>
+
+                        {events.length === 0 ? (
+                            <div className="flex items-center justify-center py-8">
+                                <p className="text-sm text-muted-foreground">No events recorded yet</p>
+                            </div>
+                        ) : (
+                            <ul className="space-y-1">
+                                {events.map(row => (
+                                    <li
+                                        key={row.event.id}
+                                        className="grid grid-cols-[160px_160px_90px_1fr] items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-muted/50 cursor-pointer min-w-0"
+                                        onClick={() => setSelectedEvent(row.event)}
+                                    >
+                                        <span className="font-mono text-xs text-muted-foreground">{row.formattedTime}</span>
+                                        <span className="text-sm text-foreground truncate" title={row.event.jobName}>
+                                            {formatJobName(row.event.jobName)}
+                                        </span>
+                                        <OutcomeBadge outcome={row.event.outcome} />
+                                        <div className="text-sm text-foreground/80">
+                                            {renderMessage(row.event.message, row.event.badges)}
+                                        </div>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </>
+                )}
+            </Card>
+
+            <Dialog open={Boolean(selectedEvent)} onOpenChange={(open: boolean) => !open && setSelectedEvent(null)}>
+                <DialogPopup className="sm:max-w-2xl">
+                    <DialogHeader>
+                        <DialogTitle>Event details</DialogTitle>
+                        <DialogDescription>Event payload</DialogDescription>
+                    </DialogHeader>
+                    {selectedEvent && (
+                        <DialogPanel className="space-y-4">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="font-mono text-muted-foreground">{selectedEvent.jobName}</span>
+                                <span className="text-muted-foreground">
+                                    {formatInTimeZone(new Date(selectedEvent.createdAt), timezone, 'MMM dd HH:mm:ss.SSS')}
+                                </span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                                <OutcomeBadge outcome={selectedEvent.outcome} />
+                                {selectedEvent.badges?.map(badge => (
+                                    <Badge key={badge} variant="outline" className="text-[11px]">
+                                        {badge}
+                                    </Badge>
+                                ))}
+                            </div>
+                            <div className="rounded-lg border bg-muted/30 p-3">
+                                <pre className="max-h-[50vh] overflow-auto text-xs font-mono text-muted-foreground">
+                                    <code>{JSON.stringify(selectedEvent, null, 2)}</code>
+                                </pre>
+                            </div>
+                        </DialogPanel>
+                    )}
+                    <DialogFooter>
+                        <DialogClose>
+                            <Button variant="outline">Close</Button>
+                        </DialogClose>
+                    </DialogFooter>
+                </DialogPopup>
+            </Dialog>
+        </>
+    );
+};
+
+const OutcomeBadge = ({ outcome }: { outcome: string }) => {
+    const config = OUTCOME_COPY[outcome] ?? { label: outcome, variant: 'secondary' as const };
+    return (
+        <Badge variant={config.variant} className="text-[11px]">
+            {config.label}
+        </Badge>
+    );
+};
+
+const renderMessage = (message?: string | null, badges?: string[] | null): ReactNode => {
+    if (!message) {
+        return null;
+    }
+
+    if (!message.includes('{{badges}}')) {
+        return message;
+    }
+
+    const [before, after] = message.split('{{badges}}');
+
+    return (
+        <span className="inline-flex flex-wrap items-center gap-1">
+            {before?.trim() && <span>{before.trimEnd()}</span>}
+            {badges?.map(badge => (
+                <Badge key={badge} variant="outline" className="text-[11px]">
+                    {badge}
+                </Badge>
+            ))}
+            {after?.trim() && <span>{after.trimStart()}</span>}
+        </span>
+    );
+};
+
+const formatJobName = (jobName: string) => {
+    return jobName.replace(/-/g, ' ');
+};

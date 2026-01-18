@@ -18,7 +18,7 @@ import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, targe
 import { boss } from '@/jobs/boss';
 import { utcNow } from '@/utils/date';
 import { emitEvent } from '@/utils/events';
-import { withJobSession } from '@/utils/job-sessions';
+import { withJobMetrics } from '@/utils/job-metrics';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -186,11 +186,13 @@ export const syncAdEntitiesJob = boss
         for (const job of jobs) {
             const { accountId, countryCode } = job.data;
 
-            await withJobSession(
+            await withJobMetrics(
                 {
                     jobName: 'sync-ad-entities',
                     bossJobId: job.id,
                     input: job.data,
+                    accountId: job.data.accountId,
+                    countryCode: job.data.countryCode,
                 },
                 async recorder => {
                     // Update metadata to indicate sync is starting
@@ -305,16 +307,6 @@ export const syncAdEntitiesJob = boss
                                         },
                                     ];
 
-                                    await recorder.addAction({
-                                        type: 'exports-created',
-                                        exports: {
-                                            campaigns: campaignsExport.exportId,
-                                            adGroups: adGroupsExport.exportId,
-                                            ads: adsExport.exportId,
-                                            targets: targetsExport.exportId,
-                                        },
-                                    });
-
                                     // Step 2: Poll for all exports to complete
                                     let pollCount = 0;
                                     while (pollCount < MAX_POLLS) {
@@ -347,11 +339,6 @@ export const syncAdEntitiesJob = boss
 
                                                 if (status.status === 'FAILED') {
                                                     exportState.error = status.error?.message ?? 'Unknown error';
-                                                    await recorder.addAction({
-                                                        type: 'export-failed',
-                                                        entityType: exportState.entityType,
-                                                        error: exportState.error,
-                                                    });
                                                 }
 
                                                 // Track if this export just completed
@@ -683,14 +670,37 @@ export const syncAdEntitiesJob = boss
                                             ads: adsData.length,
                                             targets: targetsData.length,
                                         };
-                                        const totalRecords = syncTotals.campaigns + syncTotals.adGroups + syncTotals.ads + syncTotals.targets;
 
-                                        await recorder.addAction({
-                                            type: 'entities-synced',
-                                            accountId,
-                                            countryCode,
-                                            totals: syncTotals,
-                                            totalRecords,
+                                        recorder.addEvent({
+                                            message: `Sync'd ${syncTotals.campaigns} campaign records.`,
+                                            payload: {
+                                                entityType: 'campaigns',
+                                                count: syncTotals.campaigns,
+                                            },
+                                        });
+
+                                        recorder.addEvent({
+                                            message: `Sync'd ${syncTotals.adGroups} ad group records.`,
+                                            payload: {
+                                                entityType: 'adGroups',
+                                                count: syncTotals.adGroups,
+                                            },
+                                        });
+
+                                        recorder.addEvent({
+                                            message: `Sync'd ${syncTotals.ads} ad records.`,
+                                            payload: {
+                                                entityType: 'ads',
+                                                count: syncTotals.ads,
+                                            },
+                                        });
+
+                                        recorder.addEvent({
+                                            message: `Sync'd ${syncTotals.targets} target records.`,
+                                            payload: {
+                                                entityType: 'targets',
+                                                count: syncTotals.targets,
+                                            },
                                         });
                 } catch (error) {
                     // Update metadata with error

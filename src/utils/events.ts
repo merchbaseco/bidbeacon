@@ -13,7 +13,7 @@ export type EventType =
     | 'reports:refreshed'
     | 'api-metrics:updated'
     | 'job-metrics:updated'
-    | 'job-sessions:updated'
+    | 'events:updated'
     | 'account-dataset-metadata:updated'
     | 'report:refreshed'
     | 'report-dataset-metadata:error';
@@ -59,20 +59,9 @@ export interface JobMetricsUpdatedEvent extends BaseEvent {
     jobName: string;
 }
 
-export interface JobSessionsUpdatedEvent extends BaseEvent {
-    type: 'job-sessions:updated';
-    jobName: string;
-    session: {
-        id: string;
-        bossJobId: string;
-        jobName: string;
-        status: string;
-        startedAt: string;
-        finishedAt: string | null;
-        error: string | null;
-        input: Record<string, unknown> | null;
-        actions: Array<Record<string, unknown>>;
-    };
+export interface EventsUpdatedEvent extends BaseEvent {
+    type: 'events:updated';
+    accountId: string | null;
 }
 
 export interface AccountDatasetMetadataUpdatedEvent extends BaseEvent {
@@ -104,7 +93,7 @@ export type Event =
     | ReportsRefreshedEvent
     | ApiMetricsUpdatedEvent
     | JobMetricsUpdatedEvent
-    | JobSessionsUpdatedEvent
+    | EventsUpdatedEvent
     | AccountDatasetMetadataUpdatedEvent
     | ReportRefreshedEvent
     | ReportDatasetMetadataErrorEvent;
@@ -194,7 +183,7 @@ export function emitEvent(event: Omit<AccountUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<JobMetricsUpdatedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<JobSessionsUpdatedEvent, 'timestamp'>): void;
+export function emitEvent(event: Omit<EventsUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportRefreshedEvent, 'timestamp'>): void;
 export function emitEvent(event: Omit<ReportDatasetMetadataErrorEvent, 'timestamp'>): void;

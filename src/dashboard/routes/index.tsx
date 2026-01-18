@@ -9,7 +9,7 @@ import { AccountEnabledSwitch } from './components/account-selector/account-enab
 import { AmsMetricsCard } from './components/ams-metrics-card';
 import { DailyPerformanceMetrics } from './components/daily-performance-metrics';
 import { ReportsTable } from './components/reports-table/reports-table';
-import { JobSessionsFeed } from './components/job-sessions-feed';
+import { EventStream } from './components/event-stream';
 import { useSelectedAccountId } from './hooks/use-selected-accountid';
 
 export function IndexRoute() {
@@ -54,7 +54,7 @@ export function IndexRoute() {
             </div>
 
             <div className="max-w-background-frame-max mx-auto px-4 mt-4">
-                <JobSessionsFeed />
+                <EventStream />
             </div>
 
             <ReportsTable className="max-w-background-frame-max mx-auto px-4 mt-6" />

@@ -9,7 +9,7 @@ import { db } from '@/db/index';
 import { advertiserAccount } from '@/db/schema';
 import { boss } from '@/jobs/boss';
 import { updateReportDatasetForAccountJob } from './update-report-dataset-for-account';
-import { withJobSession } from '@/utils/job-sessions';
+import { withJobMetrics } from '@/utils/job-metrics';
 
 // ============================================================================
 // Job Definition
@@ -23,13 +23,13 @@ export const updateReportDatasetsJob = boss
     .work(async jobs => {
         await Promise.all(
             jobs.map(job =>
-                withJobSession(
+                withJobMetrics(
                     {
                         jobName: 'update-report-datasets',
                         bossJobId: job.id,
                         input: job.data,
                     },
-                    async recorder => {
+                    async () => {
                         const enabledAccounts = await db
                             .select({
                                 adsAccountId: advertiserAccount.adsAccountId,
@@ -38,30 +38,14 @@ export const updateReportDatasetsJob = boss
                             .from(advertiserAccount)
                             .where(eq(advertiserAccount.enabled, true));
 
-                        const accountJobPromises = enabledAccounts.map(async account => {
-                            const bossJobId = await updateReportDatasetForAccountJob.emit({
-                                accountId: account.adsAccountId,
-                                countryCode: account.countryCode,
-                            });
-                            if (bossJobId) {
-                                await recorder.addAction({
-                                    type: 'enqueue-report-dataset-for-account',
-                                    jobName: 'update-report-dataset-for-account',
-                                    bossJobId,
-                                    input: {
-                                        accountId: account.adsAccountId,
-                                        countryCode: account.countryCode,
-                                    },
-                                });
-                            }
-                        });
-
-                        await Promise.all(accountJobPromises);
-
-                        await recorder.addAction({
-                            type: 'report-dataset-enqueue-summary',
-                            accountsEnqueued: enabledAccounts.length,
-                        });
+                        await Promise.all(
+                            enabledAccounts.map(account =>
+                                updateReportDatasetForAccountJob.emit({
+                                    accountId: account.adsAccountId,
+                                    countryCode: account.countryCode,
+                                })
+                            )
+                        );
                     }
                 )
             )

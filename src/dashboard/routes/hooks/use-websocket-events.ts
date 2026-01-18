@@ -13,19 +13,8 @@ type Event =
       }
     | { type: 'job-metrics:updated'; jobName: string; timestamp: string }
     | {
-          type: 'job-sessions:updated';
-          jobName: string;
-          session: {
-              id: string;
-              bossJobId: string;
-              jobName: string;
-              status: string;
-              startedAt: string;
-              finishedAt: string | null;
-              error: string | null;
-              input: Record<string, unknown> | null;
-              actions: Array<Record<string, unknown>>;
-          };
+          type: 'events:updated';
+          accountId: string | null;
           timestamp: string;
       }
     | {

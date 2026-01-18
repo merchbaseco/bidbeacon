@@ -12,7 +12,7 @@ import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceDaily } fr
 import { boss } from '@/jobs/boss';
 import { zonedNow, zonedStartOfDay } from '@/utils/date';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import { withJobSession, type JobSessionRecorder } from '@/utils/job-sessions';
+import { withJobMetrics, type JobMetricsRecorder } from '@/utils/job-metrics';
 
 const jobInputSchema = z.object({
     accountId: z.string(),
@@ -25,11 +25,13 @@ export const summarizeDailyTargetStreamForAccountJob = boss
     .work(async jobs => {
         await Promise.all(
             jobs.map(job =>
-                withJobSession(
+                withJobMetrics(
                     {
                         jobName: 'summarize-daily-target-stream-for-account',
                         bossJobId: job.id,
                         input: job.data,
+                        accountId: job.data.accountId,
+                        countryCode: job.data.countryCode,
                     },
                     recorder => summarizeDailyForAccount(job.data.accountId, job.data.countryCode, recorder)
                 )
@@ -49,7 +51,7 @@ type AggregatedRow = {
     orders: number;
 };
 
-async function summarizeDailyForAccount(accountId: string, countryCode: string, recorder: JobSessionRecorder) {
+async function summarizeDailyForAccount(accountId: string, countryCode: string, recorder: JobMetricsRecorder) {
     const accountRecord = await db
         .select({ entityId: advertiserAccount.entityId })
         .from(advertiserAccount)
@@ -57,23 +59,28 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
         .limit(1);
 
     const entityId = accountRecord[0]?.entityId;
-    if (!entityId) {
-        await recorder.addAction({
-            type: 'ams-summary-skipped',
-            cadence: 'daily',
-            accountId,
-            countryCode,
-            reason: 'missing-entity-id',
-        });
-        return;
-    }
-
     const timezone = getTimezoneForCountry(countryCode);
     const now = zonedNow(timezone);
     const todayStart = zonedStartOfDay(now, timezone);
     const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
 
     const bucketDateStr = formatInTimeZone(todayStart, timezone, 'yyyy-MM-dd');
+    const datasetBadge = `daily target · ${formatInTimeZone(todayStart, timezone, 'MMM d')}`;
+
+    if (!entityId) {
+        recorder.addEvent({
+            message: `Skipped {{badges}} summary (missing entity id).`,
+            badges: [datasetBadge],
+            payload: {
+                cadence: 'daily',
+                accountId,
+                countryCode,
+                bucketDate: bucketDateStr,
+                reason: 'missing-entity-id',
+            },
+        });
+        return;
+    }
 
     const trafficAggregates = await db
         .select({
@@ -172,14 +179,17 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
             });
     }
 
-    await recorder.addAction({
-        type: 'ams-summary-complete',
-        cadence: 'daily',
-        accountId,
-        countryCode,
-        bucketDate: bucketDateStr,
-        trafficAggregates: trafficAggregates.length,
-        conversionAggregates: conversionAggregates.length,
-        rowsInserted: insertValues.length,
+    recorder.addEvent({
+        message: `Updated {{badges}} with latest stream data. ${insertValues.length} rows.`,
+        badges: [datasetBadge],
+        payload: {
+            cadence: 'daily',
+            accountId,
+            countryCode,
+            bucketDate: bucketDateStr,
+            trafficAggregates: trafficAggregates.length,
+            conversionAggregates: conversionAggregates.length,
+            rowsInserted: insertValues.length,
+        },
     });
 }

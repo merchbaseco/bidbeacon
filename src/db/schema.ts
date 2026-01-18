@@ -682,14 +682,14 @@ export const apiMetrics = pgTable(
 
 /**
  * ----------------------------------------------------------------------------
- * Job Session Timeline
+ * Job Metrics + Events
  * ----------------------------------------------------------------------------
  *
- * Job sessions capture end-to-end metadata for each pg-boss job execution.
- * Job events capture specific actions taken during a job.
+ * Job metrics capture end-to-end metadata for each pg-boss job execution.
+ * Events capture user-visible milestones tied to those runs.
  */
-export const jobSessions = pgTable(
-    'job_sessions',
+export const jobMetrics = pgTable(
+    'job_metrics',
     {
         id: uuid('id').primaryKey().defaultRandom(),
         jobName: text('job_name').notNull(),
@@ -699,9 +699,31 @@ export const jobSessions = pgTable(
         finishedAt: timestamp('finished_at', { withTimezone: true, mode: 'date' }),
         error: text('error'),
         input: jsonb('input'),
-        actions: jsonb('actions'),
     },
-    table => [index('job_sessions_job_name_started_idx').on(table.jobName, table.startedAt)]
+    table => [index('job_metrics_job_name_started_idx').on(table.jobName, table.startedAt)]
+);
+
+export const events = pgTable(
+    'events',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        jobMetricId: uuid('job_metric_id')
+            .notNull()
+            .references(() => jobMetrics.id),
+        jobName: text('job_name').notNull(),
+        accountId: text('account_id'),
+        countryCode: text('country_code'),
+        outcome: text('outcome').notNull(), // ok, error
+        message: text('message'),
+        badges: jsonb('badges'),
+        payload: jsonb('payload'),
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    },
+    table => [
+        index('events_account_created_idx').on(table.accountId, table.createdAt),
+        index('events_job_name_created_idx').on(table.jobName, table.createdAt),
+        index('events_created_at_idx').on(table.createdAt),
+    ]
 );
 
 /**

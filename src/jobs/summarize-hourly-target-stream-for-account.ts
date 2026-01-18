@@ -11,7 +11,7 @@ import { db } from '@/db/index';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceHourly } from '@/db/schema';
 import { boss } from '@/jobs/boss';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import { withJobSession, type JobSessionRecorder } from '@/utils/job-sessions';
+import { withJobMetrics, type JobMetricsRecorder } from '@/utils/job-metrics';
 
 const jobInputSchema = z.object({
     accountId: z.string(),
@@ -24,11 +24,13 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
     .work(async jobs => {
         await Promise.all(
             jobs.map(job =>
-                withJobSession(
+                withJobMetrics(
                     {
                         jobName: 'summarize-hourly-target-stream-for-account',
                         bossJobId: job.id,
                         input: job.data,
+                        accountId: job.data.accountId,
+                        countryCode: job.data.countryCode,
                     },
                     recorder => summarizeHourlyForAccount(job.data.accountId, job.data.countryCode, recorder)
                 )
@@ -49,7 +51,7 @@ type HourlyRow = {
     orders: number;
 };
 
-async function summarizeHourlyForAccount(accountId: string, countryCode: string, recorder: JobSessionRecorder) {
+async function summarizeHourlyForAccount(accountId: string, countryCode: string, recorder: JobMetricsRecorder) {
     const accountRecord = await db
         .select({ entityId: advertiserAccount.entityId })
         .from(advertiserAccount)
@@ -57,20 +59,26 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
         .limit(1);
 
     const entityId = accountRecord[0]?.entityId;
-    if (!entityId) {
-        await recorder.addAction({
-            type: 'ams-summary-skipped',
-            cadence: 'hourly',
-            accountId,
-            countryCode,
-            reason: 'missing-entity-id',
-        });
-        return;
-    }
-
     const windowEnd = new Date();
     const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1000);
     const timezone = getTimezoneForCountry(countryCode);
+    const datasetBadge = `hourly target · ${formatInTimeZone(windowEnd, timezone, 'MMM d HH:mm')}`;
+
+    if (!entityId) {
+        recorder.addEvent({
+            message: `Skipped {{badges}} summary (missing entity id).`,
+            badges: [datasetBadge],
+            payload: {
+                cadence: 'hourly',
+                accountId,
+                countryCode,
+                windowStart: windowStart.toISOString(),
+                windowEnd: windowEnd.toISOString(),
+                reason: 'missing-entity-id',
+            },
+        });
+        return;
+    }
 
     const trafficAggregates = await db
         .select({
@@ -180,15 +188,18 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
             });
     }
 
-    await recorder.addAction({
-        type: 'ams-summary-complete',
-        cadence: 'hourly',
-        accountId,
-        countryCode,
-        windowStart: windowStart.toISOString(),
-        windowEnd: windowEnd.toISOString(),
-        trafficAggregates: trafficAggregates.length,
-        conversionAggregates: conversionAggregates.length,
-        rowsInserted: insertValues.length,
+    recorder.addEvent({
+        message: `Updated {{badges}} with latest stream data. ${insertValues.length} rows.`,
+        badges: [datasetBadge],
+        payload: {
+            cadence: 'hourly',
+            accountId,
+            countryCode,
+            windowStart: windowStart.toISOString(),
+            windowEnd: windowEnd.toISOString(),
+            trafficAggregates: trafficAggregates.length,
+            conversionAggregates: conversionAggregates.length,
+            rowsInserted: insertValues.length,
+        },
     });
 }

@@ -9,7 +9,7 @@ import { db } from '@/db/index';
 import { advertiserAccount } from '@/db/schema';
 import { boss } from '@/jobs/boss';
 import { summarizeDailyTargetStreamForAccountJob } from './summarize-daily-target-stream-for-account';
-import { withJobSession } from '@/utils/job-sessions';
+import { withJobMetrics } from '@/utils/job-metrics';
 
 // ============================================================================
 // Job Definition
@@ -23,13 +23,13 @@ export const summarizeDailyTargetStreamJob = boss
     .work(async jobs => {
         await Promise.all(
             jobs.map(job =>
-                withJobSession(
+                withJobMetrics(
                     {
                         jobName: 'summarize-daily-target-stream',
                         bossJobId: job.id,
                         input: job.data,
                     },
-                    async recorder => {
+                    async () => {
                         const enabledAccounts = await db
                             .select({
                                 adsAccountId: advertiserAccount.adsAccountId,
@@ -46,12 +46,6 @@ export const summarizeDailyTargetStreamJob = boss
                                 })
                             )
                         );
-
-                        await recorder.addAction({
-                            type: 'ams-summary-enqueue',
-                            cadence: 'daily',
-                            accountsEnqueued: enabledAccounts.length,
-                        });
                     }
                 )
             )

@@ -160,7 +160,7 @@ Use coss ui (Base UI + Tailwind). Copy-paste components, accessible by default.
 ### Common Pitfalls
 
 - Browser timezone ≠ account timezone. A US account (PST) viewed from EST shows different "today".
-- Job metadata now lives in `job_sessions` and `job_events`. Filter by `job_name` and account details instead of scraping container logs.
+- Job metadata now lives in `job_metrics` and `events`. Filter by `job_name` and account details instead of scraping container logs.
 
 ---
 
@@ -174,8 +174,8 @@ Use coss ui (Base UI + Tailwind). Copy-paste components, accessible by default.
 
 ### Job Inspection
 
-- **Recent runs**: `SELECT * FROM job_sessions WHERE job_name = '...' ORDER BY started_at DESC LIMIT 5`
-- **Timeline**: Join or filter `job_events` by `session_id` to see each stage/message for that run.
+- **Recent runs**: `SELECT * FROM job_metrics WHERE job_name = '...' ORDER BY started_at DESC LIMIT 5`
+- **Timeline**: Join or filter `events` by `job_metric_id` to see each stage/message for that run.
 - **Distinguish jobs**: `summarize-hourly-*` → `performance_hourly`, `summarize-daily-*` → `performance_daily`
 - **Metadata differences**: Daily jobs include `bucketDate`, hourly jobs include `window: "trailing 24h"`.
 
@@ -194,11 +194,11 @@ Uses **Drizzle ORM** with migration files in `drizzle/`.
 1. **Modify schema** in `src/db/schema.ts`
 2. **Generate migration**: `yarn db:generate`
 3. **Review** the generated SQL in `drizzle/XXXX_*.sql`
-4. **Apply locally** (if running local postgres): `yarn db:push`
+4. **Rebuild and restart** the Docker services so the server applies migrations on startup
 
 ### Production Deployment
 
-Migrations run automatically on server startup via `src/db/migrate.ts`. The server reads from `drizzle/` folder and tracks applied migrations in `__drizzle_migrations` table.
+Migrations run automatically on server startup via `src/db/migrate.ts`. The server reads from `drizzle/` folder and tracks applied migrations in `__drizzle_migrations` table. There are no `db:migrate` or `db:push` scripts; always rebuild/restart the container after `yarn db:generate`.
 
 **If you need to run SQL manually against production:**
 ```bash
@@ -221,10 +221,11 @@ docker exec bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "SELECT * FROM 
 
 1. **Foreign keys on non-unique columns fail** - The `advertiser_account.ads_account_id` is NOT unique (same account has multiple profiles/countries). Don't create FKs referencing it.
 
-2. **Drizzle tracks migrations by hash** - If you manually apply a migration, you must also insert into `__drizzle_migrations`:
+2. **Drizzle tracks migrations by hash in the `drizzle` schema** - The auto-migrator writes to `drizzle.__drizzle_migrations` and compares against migration file hashes, not tags. If you manually apply a migration, also insert the SHA256 hash into `drizzle.__drizzle_migrations`:
    ```sql
-   INSERT INTO __drizzle_migrations (hash, created_at) VALUES ('migration_tag', epoch_ms);
+   INSERT INTO drizzle.__drizzle_migrations (hash, created_at) VALUES ('sha256_hash', epoch_ms);
    ```
+   The `public.__drizzle_migrations` table may exist from older tools; it is not used by the runtime migrator.
 
 3. **Never delete migration files** without also removing them from `drizzle/meta/_journal.json` and the corresponding snapshot file.
 

@@ -9,7 +9,7 @@ import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zoned
 import { emitEvent } from '@/utils/events';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { updateReportStatusJob } from './update-report-status';
-import { withJobSession } from '@/utils/job-sessions';
+import { withJobMetrics } from '@/utils/job-metrics';
 
 // Amazon Ads API data retention periods
 const HOURLY_RETENTION_DAYS = 14;
@@ -34,11 +34,13 @@ export const updateReportDatasetForAccountJob = boss
     .work(async jobs => {
         await Promise.all(
             jobs.map(job =>
-                withJobSession(
+                withJobMetrics(
                     {
                         jobName: 'update-report-dataset-for-account',
                         bossJobId: job.id,
                         input: job.data,
+                        accountId: job.data.accountId,
+                        countryCode: job.data.countryCode,
                     },
                     async recorder => {
                         const { accountId, countryCode } = job.data;
@@ -49,73 +51,54 @@ export const updateReportDatasetForAccountJob = boss
                         const dailyCleanup = await cleanupOutOfBoundsMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
                         const hourlyCleanup = await cleanupOutOfBoundsMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
 
-                        await recorder.addAction({
-                            type: 'report-dataset-cleanup',
-                            accountId,
-                            countryCode,
-                            aggregation: 'daily',
-                            entityType: 'target',
-                            cutoff: dailyCleanup.cutoff.toISOString(),
-                            deletedCount: dailyCleanup.deletedCount,
-                        });
-
-                        await recorder.addAction({
-                            type: 'report-dataset-cleanup',
-                            accountId,
-                            countryCode,
-                            aggregation: 'hourly',
-                            entityType: 'target',
-                            cutoff: hourlyCleanup.cutoff.toISOString(),
-                            deletedCount: hourlyCleanup.deletedCount,
-                        });
-
                         const dailyInsert = await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
                         const hourlyInsert = await insertMissingMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
-
-                        await recorder.addAction({
-                            type: 'report-dataset-backfill',
-                            accountId,
-                            countryCode,
-                            aggregation: 'daily',
-                            entityType: 'target',
-                            insertedCount: dailyInsert.insertedCount,
-                            totalPeriods: dailyInsert.totalPeriods,
-                            windowStart: dailyInsert.earliestPeriodStart.toISOString(),
-                            windowEnd: dailyInsert.latestPeriodStart.toISOString(),
-                        });
-
-                        await recorder.addAction({
-                            type: 'report-dataset-backfill',
-                            accountId,
-                            countryCode,
-                            aggregation: 'hourly',
-                            entityType: 'target',
-                            insertedCount: hourlyInsert.insertedCount,
-                            totalPeriods: hourlyInsert.totalPeriods,
-                            windowStart: hourlyInsert.earliestPeriodStart.toISOString(),
-                            windowEnd: hourlyInsert.latestPeriodStart.toISOString(),
-                        });
 
                         const dailyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
                         const hourlyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'hourly', 'target');
                         const totalDatasets = dailyResult.count + hourlyResult.count;
-                        const enqueuedActions = [...dailyResult.actions, ...hourlyResult.actions];
 
                         emitEvent({
                             type: 'reports:refreshed',
                             accountId,
                         });
 
-                        await recorder.addAction({
-                            type: 'report-dataset-scan',
-                            accountId,
-                            countryCode,
-                            dailyEnqueuedCount: dailyResult.count,
-                            hourlyEnqueuedCount: hourlyResult.count,
-                            totalEnqueuedCount: totalDatasets,
+                        recorder.addEvent({
+                            message: null,
+                            payload: {
+                                accountId,
+                                countryCode,
+                                cleanup: {
+                                    daily: {
+                                        deletedCount: dailyCleanup.deletedCount,
+                                        cutoff: dailyCleanup.cutoff.toISOString(),
+                                    },
+                                    hourly: {
+                                        deletedCount: hourlyCleanup.deletedCount,
+                                        cutoff: hourlyCleanup.cutoff.toISOString(),
+                                    },
+                                },
+                                backfill: {
+                                    daily: {
+                                        insertedCount: dailyInsert.insertedCount,
+                                        totalPeriods: dailyInsert.totalPeriods,
+                                        windowStart: dailyInsert.earliestPeriodStart.toISOString(),
+                                        windowEnd: dailyInsert.latestPeriodStart.toISOString(),
+                                    },
+                                    hourly: {
+                                        insertedCount: hourlyInsert.insertedCount,
+                                        totalPeriods: hourlyInsert.totalPeriods,
+                                        windowStart: hourlyInsert.earliestPeriodStart.toISOString(),
+                                        windowEnd: hourlyInsert.latestPeriodStart.toISOString(),
+                                    },
+                                },
+                                enqueued: {
+                                    daily: dailyResult.count,
+                                    hourly: hourlyResult.count,
+                                    total: totalDatasets,
+                                },
+                            },
                         });
-
-                        await Promise.all(enqueuedActions.map(action => recorder.addAction(action)));
                     }
                 )
             )
@@ -255,12 +238,6 @@ async function insertMetadata(args: {
  */
 async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<{
     count: number;
-    actions: Array<{
-        type: string;
-        jobName: string;
-        bossJobId: string;
-        input: Record<string, string>;
-    }>;
 }> {
     const MAX_CONCURRENT_REPORTS = 5;
 
@@ -317,29 +294,9 @@ async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: str
         )
     );
 
-    const actions = recordsNeedingWork.flatMap((record, index) => {
-        const bossJobId = jobIds[index];
-        if (!bossJobId) {
-            return [];
-        }
-        return [
-            {
-                type: 'enqueue-report-status',
-                jobName: 'update-report-status',
-                bossJobId,
-                input: {
-                    accountId: record.accountId,
-                    countryCode: record.countryCode,
-                    timestamp: record.periodStart.toISOString(),
-                    aggregation: record.aggregation,
-                    entityType: record.entityType,
-                },
-            },
-        ];
-    });
+    const enqueuedCount = jobIds.filter(Boolean).length;
 
     return {
-        count: actions.length,
-        actions,
+        count: enqueuedCount,
     };
 }

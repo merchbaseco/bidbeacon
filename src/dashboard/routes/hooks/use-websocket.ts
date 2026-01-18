@@ -27,19 +27,8 @@ type Event =
       }
     | { type: 'job-metrics:updated'; jobName: string; timestamp: string }
     | {
-          type: 'job-sessions:updated';
-          jobName: string;
-          session: {
-              id: string;
-              bossJobId: string;
-              jobName: string;
-              status: string;
-              startedAt: string;
-              finishedAt: string | null;
-              error: string | null;
-              input: Record<string, unknown> | null;
-              actions: Array<Record<string, unknown>>;
-          };
+          type: 'events:updated';
+          accountId: string | null;
           timestamp: string;
       }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
@@ -128,8 +117,8 @@ export const useWebSocket = () => {
                         // Invalidate job metrics queries to refresh the chart
                         utils.metrics.job.invalidate();
                         break;
-                    case 'job-sessions:updated':
-                        utils.metrics.jobSessions.invalidate();
+                    case 'events:updated':
+                        utils.metrics.events.invalidate();
                         break;
                     case 'account-dataset-metadata:updated':
                         // Invalidate account dataset metadata query to refresh the sync status

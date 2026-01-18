@@ -12,8 +12,6 @@
     "dev:dashboard": "vite dev --config vite.config.dashboard.ts",
     "preview:dashboard": "vite preview --config vite.config.dashboard.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio",
     "worker": "dotenv -e .env tsx src/worker/index.ts",
     "peek-dlq": "tsx scripts/peek-dlq.ts",

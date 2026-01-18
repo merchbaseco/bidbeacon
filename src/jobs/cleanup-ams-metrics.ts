@@ -7,7 +7,7 @@ import { lt } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { amsMetrics } from '@/db/schema';
 import { boss } from '@/jobs/boss';
-import { withJobSession } from '@/utils/job-sessions';
+import { withJobMetrics } from '@/utils/job-metrics';
 
 // ============================================================================
 // Job Definition
@@ -21,7 +21,7 @@ export const cleanupAmsMetricsJob = boss
     .work(async jobs => {
         await Promise.all(
             jobs.map(job =>
-                withJobSession(
+                withJobMetrics(
                     {
                         jobName: 'cleanup-ams-metrics',
                         bossJobId: job.id,
@@ -29,10 +29,14 @@ export const cleanupAmsMetricsJob = boss
                     },
                     async recorder => {
                         const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
-                        await db.delete(amsMetrics).where(lt(amsMetrics.timestamp, cutoff));
-                        await recorder.addAction({
-                            type: 'cleanup-ams-metrics',
-                            cutoff: cutoff.toISOString(),
+                        const deletedRows = await db.delete(amsMetrics).where(lt(amsMetrics.timestamp, cutoff)).returning({ id: amsMetrics.id });
+                        const deletedCount = deletedRows.length;
+                        recorder.addEvent({
+                            message: `Deleted ${deletedCount} AMS metrics rows (before ${cutoff.toISOString()}).`,
+                            payload: {
+                                deletedCount,
+                                cutoff: cutoff.toISOString(),
+                            },
                         });
                     }
                 )
