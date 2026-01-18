@@ -99,12 +99,12 @@ export const EventStream = () => {
 
     return (
         <>
-            <Card className="p-4 gap-0 text-neutral-300 font-mono">
-                <div className="flex items-center gap-2 mb-4">
+            <Card className="font-mono">
+                <div className="flex items-center gap-2 mb-4 px-4">
                     <Button
                         variant="outline"
                         size="icon"
-                        className="h-11 w-11 border-neutral-700 bg-transparent hover:bg-neutral-800"
+                        className="h-11 w-11"
                         onClick={() => setSelectedBucket(null)}
                         disabled={!selectedBucket}
                         title={selectedBucket ? 'Clear filter' : 'No filter'}
@@ -112,22 +112,19 @@ export const EventStream = () => {
                         <Filter className="h-5 w-5" />
                     </Button>
 
-                    <div className="flex-1 flex items-center gap-3 h-11 px-4 bg-transparent border border-neutral-700 rounded-md text-sm">
-                        <Search className="h-5 w-5 text-neutral-500" />
-                        <span className="text-neutral-500">
+                    <div className="flex-1 flex items-center gap-3 h-11 px-4 border border-input rounded-md text-sm text-muted-foreground bg-background">
+                        <Search className="h-5 w-5 text-muted-foreground" />
+                        <span className="text-muted-foreground">
                             {selectedLabel
                                 ? `Filtered to ${selectedLabel}`
                                 : `${totalCount.toLocaleString()} events (last 1h)`}
                         </span>
-                        <ChevronDown className="h-5 w-5 text-neutral-500 ml-auto" />
+                        <ChevronDown className="h-5 w-5 text-muted-foreground ml-auto" />
                     </div>
 
                     <Button
                         variant="outline"
-                        className={cn(
-                            'h-11 px-4 gap-2 border-neutral-700 bg-transparent hover:bg-neutral-800',
-                            isLive ? 'text-white' : 'text-neutral-500'
-                        )}
+                        className={cn('h-11 px-4 gap-2', isLive ? 'text-foreground' : 'text-muted-foreground')}
                         onClick={() => setIsLive(current => !current)}
                     >
                         <Play className="h-4 w-4 fill-current" />
@@ -137,7 +134,7 @@ export const EventStream = () => {
                     <Button
                         variant="outline"
                         size="icon"
-                        className="h-11 w-11 border-neutral-700 bg-transparent hover:bg-neutral-800"
+                        className="h-11 w-11"
                         onClick={() => {
                             setSelectedBucket(null);
                             refetch();
@@ -146,29 +143,31 @@ export const EventStream = () => {
                         <RefreshCw className="h-5 w-5" />
                     </Button>
 
-                    <Button variant="outline" size="icon" className="h-11 w-11 border-neutral-700 bg-transparent hover:bg-neutral-800">
+                    <Button variant="outline" size="icon" className="h-11 w-11">
                         <MoreVertical className="h-5 w-5" />
                     </Button>
                 </div>
 
                 {!hasSelection ? (
                     <div className="flex items-center justify-center py-10">
-                        <p className="text-sm text-neutral-500">Select an account to view events</p>
+                        <p className="text-sm text-muted-foreground">Select an account to view events</p>
                     </div>
                 ) : isLoading || isFetching ? (
                     <div className="flex items-center justify-center py-10">
-                        <Spinner className="size-5 text-neutral-500" />
+                        <Spinner className="size-5 text-muted-foreground" />
                     </div>
                 ) : error ? (
                     <div className="flex items-center justify-center py-10">
                         <div className="text-center">
-                            <p className="text-sm text-neutral-500">Unable to load events</p>
-                            <p className="text-xs text-neutral-600 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
+                            <p className="text-sm text-muted-foreground">Unable to load events</p>
+                            <p className="text-xs text-muted-foreground/70 mt-1">
+                                {error instanceof Error ? error.message : 'Please try again later'}
+                            </p>
                         </div>
                     </div>
                 ) : (
                     <>
-                        <div className="h-16 flex items-end gap-px mb-4 px-2">
+                        <div className="h-16 flex items-end gap-px mb-4 px-4">
                             {histogram.map(bucket => {
                                 const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * 48)) : 2;
                                 const isSelected = selectedBucket === bucket.interval;
@@ -180,8 +179,8 @@ export const EventStream = () => {
                                         type="button"
                                         className={cn(
                                             'flex-1 min-w-[2px] transition-colors',
-                                            bucket.count > 0 ? 'bg-neutral-600' : 'bg-neutral-800',
-                                            isSelected && 'bg-neutral-200'
+                                            bucket.count > 0 ? 'bg-muted-foreground/50' : 'bg-muted/70',
+                                            isSelected && 'bg-foreground'
                                         )}
                                         style={{ height }}
                                         title={`${formattedBucket} · ${bucket.count} events`}
@@ -191,7 +190,7 @@ export const EventStream = () => {
                             })}
                         </div>
 
-                        <div className="grid grid-cols-[200px_160px_70px_1fr] gap-4 px-4 py-2 text-xs text-neutral-500 border-b border-neutral-800">
+                        <div className="grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-xs text-muted-foreground border-b border-border">
                             {HEADER_COLUMNS.map(column => (
                                 <div key={column}>{column}</div>
                             ))}
@@ -199,34 +198,34 @@ export const EventStream = () => {
 
                         {events.length === 0 ? (
                             <div className="flex items-center justify-center py-8">
-                                <p className="text-sm text-neutral-500">No events recorded yet</p>
+                                <p className="text-sm text-muted-foreground">No events recorded yet</p>
                             </div>
                         ) : (
-                            <div className="divide-y divide-neutral-800/50">
+                            <div className="divide-y divide-border/60">
                                 {events.map(row => {
                                     const isError = row.event.outcome === 'error';
                                     return (
                                         <div
                                             key={row.event.id}
                                             className={cn(
-                                                'grid grid-cols-[200px_160px_70px_1fr] gap-4 px-4 py-2 text-sm hover:bg-neutral-800/30 transition-colors cursor-pointer',
-                                                isError && 'bg-red-950/40'
+                                                'grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-sm hover:bg-muted/50 transition-colors cursor-pointer min-w-0',
+                                                isError && 'bg-destructive/10'
                                             )}
                                             onClick={() => setSelectedEvent(row.event)}
                                         >
                                             <div className="flex items-center gap-2">
-                                                {isError && <AlertTriangle className="h-4 w-4 text-amber-500" />}
-                                                <span className={isError ? 'text-red-300' : 'text-neutral-300'}>{row.formattedTime}</span>
+                                                {isError && <AlertTriangle className="h-4 w-4 text-warning-foreground" />}
+                                                <span className={cn(isError ? 'text-destructive-foreground' : 'text-foreground')}>{row.formattedTime}</span>
                                             </div>
                                             <div className="flex items-center gap-2 truncate">
-                                                <span className="text-neutral-300 truncate" title={row.event.jobName}>
+                                                <span className="truncate" title={row.event.jobName}>
                                                     {formatJobName(row.event.jobName)}
                                                 </span>
                                             </div>
-                                            <div className={cn('font-mono text-xs', isError ? 'text-red-400' : 'text-green-500')}>
+                                            <div className={cn('font-mono text-xs', isError ? 'text-destructive-foreground' : 'text-success-foreground')}>
                                                 {OUTCOME_COPY[row.event.outcome]?.label ?? row.event.outcome}
                                             </div>
-                                            <div className="text-neutral-400 truncate">
+                                            <div className="text-muted-foreground truncate whitespace-nowrap min-w-0">
                                                 {renderMessage(row.event.message, row.event.badges)}
                                             </div>
                                         </div>
