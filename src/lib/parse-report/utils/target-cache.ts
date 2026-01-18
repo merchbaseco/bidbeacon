@@ -57,7 +57,11 @@ export class TargetCache {
         return cache;
     }
 
-    getTargetId(adGroupId: string, targetValue: string, matchType: string): string {
+    getTargetId(adGroupId: string, targetValue: string | null, matchType: string | null): string {
+        if (!matchType || !targetValue) {
+            throw new Error(`Row has null target.value or target.matchType`);
+        }
+
         switch (matchType) {
             case 'PHRASE':
             case 'BROAD':
