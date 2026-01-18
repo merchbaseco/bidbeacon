@@ -1,10 +1,10 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useAtomValue } from 'jotai';
+import { AlertTriangle, ChevronDown, Filter, MoreVertical, Play, RefreshCw, Search } from 'lucide-react';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
-import { Card } from '../../components/ui/card';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
 import { Spinner } from '../../components/ui/spinner';
 import { cn } from '../../lib/utils';
@@ -38,6 +38,7 @@ export const EventStream = () => {
 
     const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<EventRow | null>(null);
+    const [isLive, setIsLive] = useState(true);
 
     const baseRange = useMemo(() => {
         const to = roundUpToNearestMinute(new Date());
@@ -54,7 +55,7 @@ export const EventStream = () => {
         return { from: start, to: end };
     }, [selectedBucket]);
 
-    const { data, isLoading, isFetching, error } = useEvents({
+    const { data, isLoading, isFetching, error, refetch } = useEvents({
         accountId: accountId ?? '',
         countryCode: countryCode ?? '',
         from: baseRange.from.toISOString(),
@@ -63,6 +64,7 @@ export const EventStream = () => {
         filterTo: filterRange?.to.toISOString(),
         limit: 200,
         enabled: hasSelection,
+        refetchInterval: isLive ? 60000 : false,
     });
 
     const timezone = data?.timezone ?? 'UTC';
@@ -82,6 +84,10 @@ export const EventStream = () => {
         return histogram.reduce((max, bucket) => Math.max(max, bucket.count), 0);
     }, [histogram]);
 
+    const totalCount = useMemo(() => {
+        return histogram.reduce((sum, bucket) => sum + bucket.count, 0);
+    }, [histogram]);
+
     const selectedLabel = selectedBucket
         ? formatInTimeZone(new Date(selectedBucket), timezone, 'MMM dd HH:mm')
         : null;
@@ -92,101 +98,142 @@ export const EventStream = () => {
 
     return (
         <>
-            <Card className="p-3 space-y-3">
-                <div className="flex items-center justify-between px-1">
-                    <div>
-                        <h3 className="text-sm font-medium">Event Stream</h3>
-                        {selectedLabel && (
-                            <div className="mt-1 text-xs text-muted-foreground">
-                                Filtered to {selectedLabel}
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    className="ml-2 h-auto px-2 py-0 text-xs"
-                                    onClick={() => setSelectedBucket(null)}
-                                >
-                                    Clear
-                                </Button>
-                            </div>
-                        )}
+            <div className="rounded-xl border border-neutral-800 bg-[#0d0d0d] text-neutral-300 p-4 font-mono">
+                <div className="flex items-center gap-2 mb-4">
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-11 w-11 border-neutral-700 bg-transparent hover:bg-neutral-800"
+                        onClick={() => setSelectedBucket(null)}
+                        disabled={!selectedBucket}
+                        title={selectedBucket ? 'Clear filter' : 'No filter'}
+                    >
+                        <Filter className="h-5 w-5" />
+                    </Button>
+
+                    <div className="flex-1 flex items-center gap-3 h-11 px-4 bg-transparent border border-neutral-700 rounded-md text-sm">
+                        <Search className="h-5 w-5 text-neutral-500" />
+                        <span className="text-neutral-500">
+                            {selectedLabel
+                                ? `Filtered to ${selectedLabel}`
+                                : `${totalCount.toLocaleString()} events (last 1h)`}
+                        </span>
+                        <ChevronDown className="h-5 w-5 text-neutral-500 ml-auto" />
                     </div>
+
+                    <Button
+                        variant="outline"
+                        className={cn(
+                            'h-11 px-4 gap-2 border-neutral-700 bg-transparent hover:bg-neutral-800',
+                            isLive ? 'text-white' : 'text-neutral-500'
+                        )}
+                        onClick={() => setIsLive(current => !current)}
+                    >
+                        <Play className="h-4 w-4 fill-current" />
+                        Live
+                    </Button>
+
+                    <Button
+                        variant="outline"
+                        size="icon"
+                        className="h-11 w-11 border-neutral-700 bg-transparent hover:bg-neutral-800"
+                        onClick={() => {
+                            setSelectedBucket(null);
+                            refetch();
+                        }}
+                    >
+                        <RefreshCw className="h-5 w-5" />
+                    </Button>
+
+                    <Button variant="outline" size="icon" className="h-11 w-11 border-neutral-700 bg-transparent hover:bg-neutral-800">
+                        <MoreVertical className="h-5 w-5" />
+                    </Button>
                 </div>
 
                 {!hasSelection ? (
                     <div className="flex items-center justify-center py-10">
-                        <p className="text-sm text-muted-foreground">Select an account to view events</p>
+                        <p className="text-sm text-neutral-500">Select an account to view events</p>
                     </div>
                 ) : isLoading || isFetching ? (
                     <div className="flex items-center justify-center py-10">
-                        <Spinner className="size-5 text-muted-foreground" />
+                        <Spinner className="size-5 text-neutral-500" />
                     </div>
                 ) : error ? (
                     <div className="flex items-center justify-center py-10">
                         <div className="text-center">
-                            <p className="text-sm text-muted-foreground">Unable to load events</p>
-                            <p className="text-xs text-muted-foreground/60 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
+                            <p className="text-sm text-neutral-500">Unable to load events</p>
+                            <p className="text-xs text-neutral-600 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
                         </div>
                     </div>
                 ) : (
                     <>
-                        <div className="rounded-md border bg-muted/20 px-2 py-1">
-                            <div className="flex items-end gap-0.5 h-7">
-                                {histogram.map(bucket => {
-                                    const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * 24)) : 2;
-                                    const isSelected = selectedBucket === bucket.interval;
-                                    const formattedBucket = formatInTimeZone(new Date(bucket.interval), timezone, 'MMM dd HH:mm');
+                        <div className="h-16 flex items-end gap-px mb-4 px-2">
+                            {histogram.map(bucket => {
+                                const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * 48)) : 2;
+                                const isSelected = selectedBucket === bucket.interval;
+                                const formattedBucket = formatInTimeZone(new Date(bucket.interval), timezone, 'MMM dd HH:mm');
 
-                                    return (
-                                        <button
-                                            key={bucket.interval}
-                                            type="button"
-                                            className={cn(
-                                                'flex-1 rounded-[2px] transition-colors',
-                                                bucket.count > 0 ? 'bg-foreground/70' : 'bg-muted-foreground/20',
-                                                isSelected && 'bg-primary'
-                                            )}
-                                            style={{ height }}
-                                            title={`${formattedBucket} · ${bucket.count} events`}
-                                            onClick={() => handleBucketClick(bucket)}
-                                        />
-                                    );
-                                })}
-                            </div>
+                                return (
+                                    <button
+                                        key={bucket.interval}
+                                        type="button"
+                                        className={cn(
+                                            'flex-1 min-w-[2px] transition-colors',
+                                            bucket.count > 0 ? 'bg-neutral-600' : 'bg-neutral-800',
+                                            isSelected && 'bg-neutral-200'
+                                        )}
+                                        style={{ height }}
+                                        title={`${formattedBucket} · ${bucket.count} events`}
+                                        onClick={() => handleBucketClick(bucket)}
+                                    />
+                                );
+                            })}
                         </div>
 
-                        <div className="grid grid-cols-[160px_160px_90px_1fr] gap-3 px-3 pt-1 text-[11px] uppercase tracking-wide text-muted-foreground">
+                        <div className="grid grid-cols-[200px_160px_110px_1fr] gap-4 px-4 py-2 text-xs text-neutral-500 border-b border-neutral-800">
                             {HEADER_COLUMNS.map(column => (
-                                <span key={column}>{column}</span>
+                                <div key={column}>{column}</div>
                             ))}
                         </div>
 
                         {events.length === 0 ? (
                             <div className="flex items-center justify-center py-8">
-                                <p className="text-sm text-muted-foreground">No events recorded yet</p>
+                                <p className="text-sm text-neutral-500">No events recorded yet</p>
                             </div>
                         ) : (
-                            <ul className="space-y-1">
-                                {events.map(row => (
-                                    <li
-                                        key={row.event.id}
-                                        className="grid grid-cols-[160px_160px_90px_1fr] items-center gap-3 rounded-lg px-3 py-2 transition-colors hover:bg-muted/50 cursor-pointer min-w-0"
-                                        onClick={() => setSelectedEvent(row.event)}
-                                    >
-                                        <span className="font-mono text-xs text-muted-foreground">{row.formattedTime}</span>
-                                        <span className="text-sm text-foreground truncate" title={row.event.jobName}>
-                                            {formatJobName(row.event.jobName)}
-                                        </span>
-                                        <OutcomeBadge outcome={row.event.outcome} />
-                                        <div className="text-sm text-foreground/80">
-                                            {renderMessage(row.event.message, row.event.badges)}
+                            <div className="divide-y divide-neutral-800/50">
+                                {events.map(row => {
+                                    const isError = row.event.outcome === 'error';
+                                    return (
+                                        <div
+                                            key={row.event.id}
+                                            className={cn(
+                                                'grid grid-cols-[200px_160px_110px_1fr] gap-4 px-4 py-2 text-sm hover:bg-neutral-800/30 transition-colors cursor-pointer',
+                                                isError && 'bg-red-950/40'
+                                            )}
+                                            onClick={() => setSelectedEvent(row.event)}
+                                        >
+                                            <div className="flex items-center gap-2">
+                                                {isError && <AlertTriangle className="h-4 w-4 text-amber-500" />}
+                                                <span className={isError ? 'text-red-300' : 'text-neutral-300'}>{row.formattedTime}</span>
+                                            </div>
+                                            <div className="flex items-center gap-2 truncate">
+                                                <span className="text-neutral-300 truncate" title={row.event.jobName}>
+                                                    {formatJobName(row.event.jobName)}
+                                                </span>
+                                            </div>
+                                            <div className={cn('font-mono', isError ? 'text-red-400' : 'text-green-500')}>
+                                                {OUTCOME_COPY[row.event.outcome]?.label ?? row.event.outcome}
+                                            </div>
+                                            <div className="text-neutral-400 truncate">{renderMessage(row.event.message, row.event.badges)}</div>
                                         </div>
-                                    </li>
-                                ))}
-                            </ul>
+                                    );
+                                })}
+                            </div>
                         )}
                     </>
                 )}
-            </Card>
+            </div>
 
             <Dialog open={Boolean(selectedEvent)} onOpenChange={(open: boolean) => !open && setSelectedEvent(null)}>
                 <DialogPopup className="sm:max-w-2xl">

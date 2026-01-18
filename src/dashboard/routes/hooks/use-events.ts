@@ -10,6 +10,7 @@ type UseEventsParams = {
     limit?: number;
     jobName?: string;
     enabled?: boolean;
+    refetchInterval?: number | false;
 };
 
 export const useEvents = (params: UseEventsParams) => {
@@ -26,7 +27,7 @@ export const useEvents = (params: UseEventsParams) => {
 
     return api.metrics.events.useQuery(input, {
         enabled: params.enabled ?? true,
-        refetchInterval: 60000,
+        refetchInterval: params.refetchInterval ?? 60000,
         staleTime: 30000,
     });
 };
