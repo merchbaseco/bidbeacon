@@ -91,8 +91,8 @@ const formatTimestamp = (value: string) => {
     };
 };
 
-const Tag = ({ children }: { children: ReactNode }) => (
-    <Badge variant="outline" className="font-mono text-[10px] uppercase tracking-[0.15em]">
+const Tag = ({ children, variant = 'outline' }: { children: ReactNode; variant?: 'outline' | 'secondary' }) => (
+    <Badge variant={variant} className="text-[11px] font-medium">
         {children}
     </Badge>
 );
@@ -197,12 +197,10 @@ const renderActionContent = (action: JobAction) => {
             const input = typeof action.input === 'object' && action.input ? (action.input as Record<string, unknown>) : {};
             const timestamp = typeof input.timestamp === 'string' ? input.timestamp : undefined;
             const aggregation = typeof input.aggregation === 'string' ? input.aggregation : undefined;
-            return (
-                <span className="flex items-center gap-2">
-                    <span>Queued report status</span>
-                    {timestamp && <Badge variant="secondary">{formatReportTimestamp(timestamp, aggregation)}</Badge>}
-                </span>
-            );
+            if (timestamp) {
+                return `Queued report status · ${formatReportTimestamp(timestamp, aggregation)}`;
+            }
+            return 'Queued report status';
         }
         case 'report-status-queued':
         case 'report-status-processed':
@@ -215,166 +213,79 @@ const renderActionContent = (action: JobAction) => {
                     : actionType === 'report-status-processed'
                       ? 'Processed report'
                       : 'Checked report';
-            return (
-                <span className="flex items-center gap-2">
-                    <span>{label}</span>
-                    {timestamp && <Badge variant="secondary">{formatReportTimestamp(timestamp, aggregation)}</Badge>}
-                </span>
-            );
+            if (timestamp) {
+                return `${label} · ${formatReportTimestamp(timestamp, aggregation)}`;
+            }
+            return label;
         }
         case 'report-dataset-scan': {
-            const dailyEnqueued = typeof action.dailyEnqueuedCount === 'number' ? action.dailyEnqueuedCount : 0;
-            const hourlyEnqueued = typeof action.hourlyEnqueuedCount === 'number' ? action.hourlyEnqueuedCount : 0;
             const totalEnqueued = typeof action.totalEnqueuedCount === 'number' ? action.totalEnqueuedCount : 0;
-            return (
-                <span className="flex items-center gap-2">
-                    <span>Checked report datasets</span>
-                    <Badge variant="secondary">{totalEnqueued} enqueued</Badge>
-                    <Badge variant="outline">Daily {dailyEnqueued}</Badge>
-                    <Badge variant="outline">Hourly {hourlyEnqueued}</Badge>
-                </span>
-            );
+            return `Checked datasets · ${totalEnqueued} enqueued`;
         }
         case 'report-dataset-enqueue-summary': {
             const accountsEnqueued = typeof action.accountsEnqueued === 'number' ? action.accountsEnqueued : 0;
-            return (
-                <span className="flex items-center gap-2">
-                    <span>Queued report datasets</span>
-                    <Badge variant="secondary">{accountsEnqueued} accounts</Badge>
-                </span>
-            );
+            return `Queued report datasets · ${accountsEnqueued} accounts`;
         }
         case 'report-dataset-cleanup': {
             const deletedCount = typeof action.deletedCount === 'number' ? action.deletedCount : 0;
             const aggregation = typeof action.aggregation === 'string' ? action.aggregation : 'report';
-            const cutoff = typeof action.cutoff === 'string' ? action.cutoff : undefined;
-            return (
-                <span className="flex items-center gap-2">
-                    <span>Cleaned {aggregation} incomplete datasets</span>
-                    <Badge variant="secondary">{deletedCount} removed</Badge>
-                    {cutoff && <Badge variant="outline">older than {formatActionTimestamp(cutoff)}</Badge>}
-                </span>
-            );
+            return `Cleaned ${aggregation} datasets · ${deletedCount} removed`;
         }
         case 'report-dataset-backfill': {
             const insertedCount = typeof action.insertedCount === 'number' ? action.insertedCount : 0;
-            const totalPeriods = typeof action.totalPeriods === 'number' ? action.totalPeriods : 0;
             const aggregation = typeof action.aggregation === 'string' ? action.aggregation : 'report';
-            const windowStart = typeof action.windowStart === 'string' ? action.windowStart : undefined;
-            const windowEnd = typeof action.windowEnd === 'string' ? action.windowEnd : undefined;
-            return (
-                <span className="flex flex-wrap items-center gap-2">
-                    <span>Backfilled {aggregation} datasets</span>
-                    <Badge variant="secondary">{insertedCount} added</Badge>
-                    <Badge variant="outline">{totalPeriods} checked</Badge>
-                    {windowStart && windowEnd && (
-                        <Badge variant="outline">
-                            {formatActionTimestamp(windowStart)} to {formatActionTimestamp(windowEnd)}
-                        </Badge>
-                    )}
-                </span>
-            );
+            return `Backfilled ${aggregation} datasets · ${insertedCount} added`;
         }
         case 'enqueue-report-dataset-for-account': {
             const input = typeof action.input === 'object' && action.input ? (action.input as Record<string, unknown>) : {};
             const accountId = typeof input.accountId === 'string' ? input.accountId : undefined;
             const countryCode = typeof input.countryCode === 'string' ? input.countryCode : undefined;
-            return (
-                <span className="flex items-center gap-2">
-                    <span>Queued account dataset refresh</span>
-                    {accountId && countryCode && <Badge variant="outline">{formatAccountTag(accountId, countryCode)}</Badge>}
-                </span>
-            );
+            if (accountId && countryCode) {
+                return `Queued dataset refresh · ${formatAccountTag(accountId, countryCode)}`;
+            }
+            return 'Queued dataset refresh';
         }
         case 'ams-summary-enqueue': {
             const cadence = typeof action.cadence === 'string' ? action.cadence : 'ams';
             const accountsEnqueued = typeof action.accountsEnqueued === 'number' ? action.accountsEnqueued : 0;
-            return (
-                <span className="flex items-center gap-2">
-                    <span>Queued {cadence} AMS summaries</span>
-                    <Badge variant="secondary">{accountsEnqueued} accounts</Badge>
-                </span>
-            );
+            return `Queued ${cadence} summaries · ${accountsEnqueued} accounts`;
         }
         case 'ams-summary-complete': {
             const cadence = typeof action.cadence === 'string' ? action.cadence : 'ams';
             const rowsInserted = typeof action.rowsInserted === 'number' ? action.rowsInserted : 0;
             const bucketDate = typeof action.bucketDate === 'string' ? action.bucketDate : undefined;
-            const windowStart = typeof action.windowStart === 'string' ? action.windowStart : undefined;
-            const windowEnd = typeof action.windowEnd === 'string' ? action.windowEnd : undefined;
-            return (
-                <span className="flex flex-wrap items-center gap-2">
-                    <span>Summarized {cadence} AMS data</span>
-                    <Badge variant="secondary">{rowsInserted} rows</Badge>
-                    {bucketDate && <Badge variant="outline">{bucketDate}</Badge>}
-                    {windowStart && windowEnd && (
-                        <Badge variant="outline">
-                            {formatActionTimestamp(windowStart)} to {formatActionTimestamp(windowEnd)}
-                        </Badge>
-                    )}
-                </span>
-            );
+            if (bucketDate) {
+                return `Summarized ${cadence} data · ${rowsInserted} rows · ${bucketDate}`;
+            }
+            return `Summarized ${cadence} data · ${rowsInserted} rows`;
         }
         case 'ams-summary-skipped': {
             const cadence = typeof action.cadence === 'string' ? action.cadence : 'ams';
             const reason = typeof action.reason === 'string' ? action.reason : 'skipped';
-            return (
-                <span className="flex items-center gap-2">
-                    <span>Skipped {cadence} AMS summary</span>
-                    <Badge variant="outline">{reason}</Badge>
-                </span>
-            );
+            return `Skipped ${cadence} summary · ${reason}`;
         }
         case 'exports-created': {
             const exportsRecord = typeof action.exports === 'object' && action.exports ? (action.exports as Record<string, unknown>) : {};
-            const exportIds = Object.values(exportsRecord).filter(value => typeof value === 'string') as string[];
-            return (
-                <span className="flex flex-wrap items-center gap-2">
-                    <span>Created exports</span>
-                    {exportIds.map(exportId => (
-                        <Badge key={exportId} variant="outline">
-                            {exportId}
-                        </Badge>
-                    ))}
-                </span>
-            );
+            const exportCount = Object.keys(exportsRecord).length;
+            return `Created ${exportCount} export${exportCount !== 1 ? 's' : ''}`;
         }
         case 'export-failed': {
             const entityType = typeof action.entityType === 'string' ? action.entityType : 'entity';
-            const error = typeof action.error === 'string' ? action.error : 'Unknown error';
-            return (
-                <span className="flex items-center gap-2">
-                    <span>Export failed ({entityType})</span>
-                    <Badge variant="outline">{error}</Badge>
-                </span>
-            );
+            return `Export failed · ${entityType}`;
         }
         case 'entities-synced': {
-            const totals = typeof action.totals === 'object' && action.totals ? (action.totals as Record<string, unknown>) : {};
             const totalRecords = typeof action.totalRecords === 'number' ? action.totalRecords : 0;
-            return (
-                <span className="flex flex-wrap items-center gap-2">
-                    <span>Synced entities</span>
-                    <Badge variant="secondary">{totalRecords} rows</Badge>
-                    {Object.entries(totals).map(([key, value]) => (
-                        <Badge key={key} variant="outline">
-                            {key}: {value as number}
-                        </Badge>
-                    ))}
-                </span>
-            );
+            return `Synced entities · ${totalRecords} rows`;
         }
         case 'cleanup-ams-metrics': {
             const cutoff = typeof action.cutoff === 'string' ? action.cutoff : undefined;
-            return (
-                <span className="flex items-center gap-2">
-                    <span>Cleaned AMS metrics</span>
-                    {cutoff && <Badge variant="outline">cutoff {formatActionTimestamp(cutoff)}</Badge>}
-                </span>
-            );
+            if (cutoff) {
+                return `Cleaned AMS metrics · before ${formatActionTimestamp(cutoff)}`;
+            }
+            return 'Cleaned AMS metrics';
         }
         default:
-            return <span>{actionType}</span>;
+            return actionType;
     }
 };
 
@@ -434,11 +345,9 @@ export function JobSessionsFeed() {
 
     return (
         <>
-            <Card className="p-3 px-0 pb-1 space-y-0 gap-0">
-                <div className="flex items-start justify-between pb-1 pr-3 pl-4">
-                    <div>
-                        <div className="text-sm font-medium">Event Stream</div>
-                    </div>
+            <Card className="p-3 space-y-0 gap-0">
+                <div className="flex items-center justify-between pb-2 px-1">
+                    <h3 className="text-sm font-medium">Event Stream</h3>
                 </div>
                 {!hasSelection ? (
                     <div className="flex items-center justify-center py-12">
@@ -460,38 +369,33 @@ export function JobSessionsFeed() {
                         <p className="text-sm text-muted-foreground">No events recorded yet</p>
                     </div>
                 ) : (
-                    <div className="relative">
-                        <span className="pointer-events-none absolute left-6 top-0 h-full w-px bg-muted-foreground/30" aria-hidden />
-                        <ul className="space-y-1">
-                            {timelineRows.map(row => (
-                                <SessionRow key={row.id} row={row} onSelect={handleSelect} />
-                            ))}
-                        </ul>
-                    </div>
+                    <ul className="px-1">
+                        {timelineRows.map(row => (
+                            <SessionRow key={row.id} row={row} onSelect={handleSelect} />
+                        ))}
+                    </ul>
                 )}
             </Card>
 
             <Dialog open={Boolean(selectedRow)} onOpenChange={(open: boolean) => !open && setSelectedRow(null)}>
-                <DialogPopup className="sm:max-w-3xl">
+                <DialogPopup className="sm:max-w-2xl">
                     <DialogHeader>
-                        <DialogTitle className="font-mono text-base tracking-wide">{selectedRow ? formatRowHeadline(selectedRow) : 'Job Activity'}</DialogTitle>
-                        <DialogDescription className="font-mono text-xs uppercase tracking-[0.3em]">Full payload for this job activity.</DialogDescription>
+                        <DialogTitle>{selectedRow ? formatRowHeadline(selectedRow) : 'Job Activity'}</DialogTitle>
+                        <DialogDescription>Event details and payload</DialogDescription>
                     </DialogHeader>
                     {selectedRow && (
-                        <DialogPanel className="space-y-6 font-mono text-sm">
-                            <div className="grid gap-2 text-[11px] uppercase tracking-[0.3em] text-muted-foreground">
-                                <div className="flex items-center justify-between">
-                                    <span>{selectedRow.session.jobName}</span>
-                                    <span>{formatTimestamp(getRowTimestamp(selectedRow)).absolute}</span>
-                                </div>
-                                <div className="flex flex-wrap gap-2 text-[11px]">
-                                    {selectedRow.isSession && selectedRow.session.status && <Tag>{selectedRow.session.status}</Tag>}
-                                    {selectedRow.isSession && selectedRow.session.error && <Tag>error</Tag>}
-                                    {!selectedRow.isSession && selectedRow.action && getActionType(selectedRow.action) && <Tag>{getActionType(selectedRow.action)}</Tag>}
-                                </div>
+                        <DialogPanel className="space-y-4">
+                            <div className="flex items-center justify-between text-sm">
+                                <span className="font-mono text-muted-foreground">{selectedRow.session.jobName}</span>
+                                <span className="text-muted-foreground">{formatTimestamp(getRowTimestamp(selectedRow)).absolute}</span>
                             </div>
-                            <div className="rounded-xl border border-muted bg-muted/40 p-4 text-xs text-muted-foreground">
-                                <pre className="max-h-[55vh] overflow-auto">
+                            <div className="flex flex-wrap gap-2">
+                                {selectedRow.isSession && selectedRow.session.status && <Tag variant="secondary">{selectedRow.session.status}</Tag>}
+                                {selectedRow.isSession && selectedRow.session.error && <Tag>error</Tag>}
+                                {!selectedRow.isSession && selectedRow.action && getActionType(selectedRow.action) && <Tag>{getActionType(selectedRow.action)}</Tag>}
+                            </div>
+                            <div className="rounded-lg border bg-muted/30 p-3">
+                                <pre className="max-h-[50vh] overflow-auto text-xs font-mono text-muted-foreground">
                                     <code>{JSON.stringify(selectedRow.isSession ? selectedRow.session : selectedRow.action, null, 2)}</code>
                                 </pre>
                             </div>
@@ -499,9 +403,7 @@ export function JobSessionsFeed() {
                     )}
                     <DialogFooter>
                         <DialogClose>
-                            <Button variant="outline" className="font-mono uppercase tracking-[0.3em]">
-                                Close
-                            </Button>
+                            <Button variant="outline">Close</Button>
                         </DialogClose>
                     </DialogFooter>
                 </DialogPopup>
@@ -530,33 +432,67 @@ const SessionRow = ({ row, onSelect }: { row: TimelineRow; onSelect: (row: Timel
     const marker = isSession ? getSessionMarker(session.status) : getActionMarker(getActionType(row.action));
     const accountTag = isSession ? getSessionAccountTag(session) : null;
 
+    if (isSession) {
+        return (
+            <li
+                className="group flex cursor-pointer gap-3 rounded-lg px-3 py-2 hover:bg-muted/50 transition-colors"
+                onClick={() => onSelect(row)}
+            >
+                <div className="flex flex-col items-center pt-0.5">
+                    <span
+                        className={cn(
+                            'flex size-6 items-center justify-center rounded-full border-2 bg-background',
+                            marker.className
+                        )}
+                    >
+                        <HugeiconsIcon icon={marker.icon} size={14} color="currentColor" />
+                    </span>
+                    <span className="mt-1.5 w-px flex-1 bg-border group-last:hidden" />
+                </div>
+                <div className="flex-1 min-w-0 pb-2">
+                    <div className="flex items-center gap-2">
+                        <span className="font-medium text-sm text-foreground">
+                            {getSessionHeadline(session)}
+                        </span>
+                        {accountTag && <Tag>{accountTag}</Tag>}
+                        {session.status && (
+                            <Tag variant={session.status === 'succeeded' ? 'secondary' : 'outline'}>
+                                {session.status}
+                            </Tag>
+                        )}
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                        <span>{timestamp.absolute}</span>
+                        <span className="text-muted-foreground/40">·</span>
+                        <span className="text-emerald-600 dark:text-emerald-400">{timestamp.relativeShort}</span>
+                    </div>
+                </div>
+            </li>
+        );
+    }
+
     return (
         <li
-            className={cn(
-                'flex cursor-pointer items-center gap-2 rounded pl-10 pr-3 font-mono text-[13px] hover:bg-muted/40',
-                isSession ? 'text-foreground font-semibold' : 'text-muted-foreground pl-14'
-            )}
+            className="group flex cursor-pointer gap-3 rounded-lg px-3 py-1 hover:bg-muted/50 transition-colors"
             onClick={() => onSelect(row)}
         >
-            <span
-                className={cn(
-                    'mr-1 flex size-5 -translate-x-5 items-center justify-center rounded-full border bg-background text-[10px]',
-                    !isSession && '-translate-x-9',
-                    marker.className
-                )}
-            >
-                <HugeiconsIcon icon={marker.icon} size={14} color="currentColor" />
-            </span>
-            <span className="flex items-center gap-2 text-[10px] uppercase tracking-[0.12em] text-muted-foreground">
-                {timestamp.absolute}
-                <span className="text-muted-foreground/40">-</span>
-                <span className="text-emerald-600 dark:text-emerald-300">{timestamp.relativeShort}</span>
-            </span>
-            <span className={cn('truncate', !isSession ? 'font-normal text-foreground' : '')}>
-                {isSession ? getSessionHeadline(session) : renderActionContent(row.action)}
-            </span>
-            {isSession && accountTag && <Tag>{accountTag}</Tag>}
-            {isSession && session.status && <Tag>{session.status}</Tag>}
+            <div className="flex flex-col items-center">
+                <span className="w-px h-1 bg-border" />
+                <span
+                    className={cn(
+                        'flex size-5 items-center justify-center rounded-full border bg-background',
+                        marker.className
+                    )}
+                >
+                    <HugeiconsIcon icon={marker.icon} size={12} color="currentColor" />
+                </span>
+                <span className="mt-1 w-px flex-1 bg-border group-last:hidden" />
+            </div>
+            <div className="flex-1 min-w-0 py-0.5">
+                <div className="text-sm text-muted-foreground">
+                    {renderActionContent(row.action)}
+                </div>
+            </div>
         </li>
     );
 };
