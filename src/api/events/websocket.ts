@@ -71,12 +71,7 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
 
 const getDevUserId = (override?: string | null) => {
     const trimmedOverride = typeof override === 'string' ? override.trim() : '';
-    if (trimmedOverride) {
-        return trimmedOverride;
-    }
-
-    const devUserId = process.env.BIDBEACON_DEV_USER_ID?.trim();
-    return devUserId ? devUserId : null;
+    return trimmedOverride ? trimmedOverride : null;
 };
 
 const fetchAccessibleAccountIds = async (clerkUserId: string) => {
