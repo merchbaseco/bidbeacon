@@ -441,7 +441,7 @@ const SessionRow = ({ row, onSelect }: { row: TimelineRow; onSelect: (row: Timel
                 <div className="flex flex-col items-center pt-0.5">
                     <span
                         className={cn(
-                            'flex size-6 items-center justify-center rounded-full border-2 bg-background',
+                            'flex size-6 shrink-0 items-center justify-center rounded-full border-2 bg-background',
                             marker.className
                         )}
                     >
@@ -449,19 +449,21 @@ const SessionRow = ({ row, onSelect }: { row: TimelineRow; onSelect: (row: Timel
                     </span>
                     <span className="mt-1.5 w-px flex-1 bg-border group-last:hidden" />
                 </div>
-                <div className="flex-1 min-w-0 pb-2">
-                    <div className="flex items-center gap-2">
-                        <span className="font-medium text-sm text-foreground">
-                            {getSessionHeadline(session)}
-                        </span>
-                        {accountTag && <Tag>{accountTag}</Tag>}
-                        {session.status && (
-                            <Tag variant={session.status === 'succeeded' ? 'secondary' : 'outline'}>
-                                {session.status}
-                            </Tag>
-                        )}
+                <div className="flex-1 min-w-0 flex items-start justify-between gap-4 pb-2">
+                    <div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-medium text-sm text-foreground">
+                                {getSessionHeadline(session)}
+                            </span>
+                            {accountTag && <Tag>{accountTag}</Tag>}
+                            {session.status && (
+                                <Tag variant={session.status === 'succeeded' ? 'secondary' : 'outline'}>
+                                    {session.status}
+                                </Tag>
+                            )}
+                        </div>
                     </div>
-                    <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
                         <span>{timestamp.absolute}</span>
                         <span className="text-muted-foreground/40">·</span>
                         <span className="text-emerald-600 dark:text-emerald-400">{timestamp.relativeShort}</span>
@@ -473,25 +475,28 @@ const SessionRow = ({ row, onSelect }: { row: TimelineRow; onSelect: (row: Timel
 
     return (
         <li
-            className="group flex cursor-pointer gap-3 rounded-lg px-3 py-1 hover:bg-muted/50 transition-colors"
+            className="group flex cursor-pointer gap-3 rounded-lg px-3 py-1.5 hover:bg-muted/50 transition-colors"
             onClick={() => onSelect(row)}
         >
             <div className="flex flex-col items-center">
                 <span className="w-px h-1 bg-border" />
                 <span
                     className={cn(
-                        'flex size-5 items-center justify-center rounded-full border bg-background',
+                        'flex size-6 shrink-0 items-center justify-center rounded-full border-2 bg-background',
                         marker.className
                     )}
                 >
-                    <HugeiconsIcon icon={marker.icon} size={12} color="currentColor" />
+                    <HugeiconsIcon icon={marker.icon} size={14} color="currentColor" />
                 </span>
                 <span className="mt-1 w-px flex-1 bg-border group-last:hidden" />
             </div>
-            <div className="flex-1 min-w-0 py-0.5">
-                <div className="text-sm text-muted-foreground">
+            <div className="flex-1 min-w-0 flex items-center justify-between gap-4">
+                <span className="text-sm text-muted-foreground">
                     {renderActionContent(row.action)}
-                </div>
+                </span>
+                <span className="text-xs text-muted-foreground/60 shrink-0">
+                    {timestamp.relativeShort}
+                </span>
             </div>
         </li>
     );
