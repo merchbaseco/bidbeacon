@@ -234,6 +234,8 @@ docker exec bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "SELECT * FROM 
 
 ## Deployment
 
+After every commit, build and restart the BidBeacon Docker services (`server`, `worker`, `caddy`).
+
 ### Build & Deploy
 
 ```bash

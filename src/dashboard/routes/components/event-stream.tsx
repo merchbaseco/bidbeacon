@@ -5,6 +5,7 @@ import { AlertTriangle, ChevronDown, Filter, MoreVertical, Play, RefreshCw, Sear
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
+import { Card } from '../../components/ui/card';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
 import { Spinner } from '../../components/ui/spinner';
 import { cn } from '../../lib/utils';
@@ -98,7 +99,7 @@ export const EventStream = () => {
 
     return (
         <>
-            <div className="rounded-xl border border-neutral-800 bg-[#0d0d0d] text-neutral-300 p-4 font-mono">
+            <Card className="p-4 gap-0 text-neutral-300 font-mono">
                 <div className="flex items-center gap-2 mb-4">
                     <Button
                         variant="outline"
@@ -190,7 +191,7 @@ export const EventStream = () => {
                             })}
                         </div>
 
-                        <div className="grid grid-cols-[200px_160px_110px_1fr] gap-4 px-4 py-2 text-xs text-neutral-500 border-b border-neutral-800">
+                        <div className="grid grid-cols-[200px_160px_70px_1fr] gap-4 px-4 py-2 text-xs text-neutral-500 border-b border-neutral-800">
                             {HEADER_COLUMNS.map(column => (
                                 <div key={column}>{column}</div>
                             ))}
@@ -208,7 +209,7 @@ export const EventStream = () => {
                                         <div
                                             key={row.event.id}
                                             className={cn(
-                                                'grid grid-cols-[200px_160px_110px_1fr] gap-4 px-4 py-2 text-sm hover:bg-neutral-800/30 transition-colors cursor-pointer',
+                                                'grid grid-cols-[200px_160px_70px_1fr] gap-4 px-4 py-2 text-sm hover:bg-neutral-800/30 transition-colors cursor-pointer',
                                                 isError && 'bg-red-950/40'
                                             )}
                                             onClick={() => setSelectedEvent(row.event)}
@@ -222,10 +223,12 @@ export const EventStream = () => {
                                                     {formatJobName(row.event.jobName)}
                                                 </span>
                                             </div>
-                                            <div className={cn('font-mono', isError ? 'text-red-400' : 'text-green-500')}>
+                                            <div className={cn('font-mono text-xs', isError ? 'text-red-400' : 'text-green-500')}>
                                                 {OUTCOME_COPY[row.event.outcome]?.label ?? row.event.outcome}
                                             </div>
-                                            <div className="text-neutral-400 truncate">{renderMessage(row.event.message, row.event.badges)}</div>
+                                            <div className="text-neutral-400 truncate">
+                                                {renderMessage(row.event.message, row.event.badges)}
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -233,7 +236,7 @@ export const EventStream = () => {
                         )}
                     </>
                 )}
-            </div>
+            </Card>
 
             <Dialog open={Boolean(selectedEvent)} onOpenChange={(open: boolean) => !open && setSelectedEvent(null)}>
                 <DialogPopup className="sm:max-w-2xl">
@@ -290,13 +293,13 @@ const renderMessage = (message?: string | null, badges?: string[] | null): React
     }
 
     if (!message.includes('{{badges}}')) {
-        return message;
+        return <span className="inline-flex items-center gap-1 whitespace-nowrap">{message}</span>;
     }
 
     const [before, after] = message.split('{{badges}}');
 
     return (
-        <span className="inline-flex flex-wrap items-center gap-1">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap">
             {before?.trim() && <span>{before.trimEnd()}</span>}
             {badges?.map(badge => (
                 <Badge key={badge} variant="outline" className="text-[11px]">
