@@ -14,7 +14,7 @@ interface ClerkUser {
  * This is where you can add request-specific data like user info, database connections, etc.
  */
 export async function createContext({ req }: CreateFastifyContextOptions) {
-    const devUserId = getDevUserId();
+    const devUserId = getDevUserId(getHeaderValue(req.headers['x-bidbeacon-dev-user-id']));
     if (devUserId) {
         const accessibleAccountIds = await fetchAccessibleAccountIds(devUserId);
         return { user: { sub: devUserId }, accessibleAccountIds, request: req };
@@ -54,9 +54,21 @@ export type Context = Awaited<ReturnType<typeof createContext>>;
 // Helpers
 // ============================================================================
 
-const getDevUserId = () => {
+const getDevUserId = (override?: string | null) => {
+    const trimmedOverride = typeof override === 'string' ? override.trim() : '';
+    if (trimmedOverride) {
+        return trimmedOverride;
+    }
+
     const devUserId = process.env.BIDBEACON_DEV_USER_ID?.trim();
     return devUserId ? devUserId : null;
+};
+
+const getHeaderValue = (value?: string | string[]) => {
+    if (Array.isArray(value)) {
+        return value[0];
+    }
+    return value;
 };
 
 const fetchAccessibleAccountIds = async (clerkUserId: string) => {

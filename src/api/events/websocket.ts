@@ -16,7 +16,8 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
             return;
         }
 
-        const devUserId = getDevUserId();
+        const url = new URL(req.url, `http://${req.headers.host}`);
+        const devUserId = getDevUserId(url.searchParams.get('devUserId'));
         if (devUserId) {
             const accessibleAccountIds = await fetchAccessibleAccountIds(devUserId);
             registerWebSocketConnection(socket, accessibleAccountIds);
@@ -24,7 +25,6 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
         }
 
         // Extract token from query string
-        const url = new URL(req.url, `http://${req.headers.host}`);
         const token = url.searchParams.get('token');
 
         if (!token) {
@@ -69,7 +69,12 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
 // Helpers
 // ============================================================================
 
-const getDevUserId = () => {
+const getDevUserId = (override?: string | null) => {
+    const trimmedOverride = typeof override === 'string' ? override.trim() : '';
+    if (trimmedOverride) {
+        return trimmedOverride;
+    }
+
     const devUserId = process.env.BIDBEACON_DEV_USER_ID?.trim();
     return devUserId ? devUserId : null;
 };
