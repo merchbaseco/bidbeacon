@@ -93,7 +93,7 @@ Clerk User (clerk_user_id)
 2. Handler in `handlers/` (validate → map → upsert)
 3. Route in `router.ts` by prefix
 4. Unique index in `schema.ts`
-5. Run `yarn db:generate`
+5. Run `bun run db:generate`
 
 ### Amazon Ads API
 
@@ -101,7 +101,7 @@ Wrap calls with `withTracking` and add `apiName` to `SUPPORTED_APIS` in api-metr
 
 ### DLQ Triage
 
-Use `yarn peek-dlq` to inspect failures. Common fixes:
+Use `bun run peek-dlq` to inspect failures. Common fixes:
 - Make fields optional: `z.string().optional()`
 - Accept multiple formats: `z.union([...])`
 - Allow nulls: `.nullable().optional()`
@@ -193,13 +193,13 @@ Uses **Drizzle ORM** with migration files in `drizzle/`.
 ### Development Workflow
 
 1. **Modify schema** in `src/db/schema.ts`
-2. **Generate migration**: `yarn db:generate`
+2. **Generate migration**: `bun run db:generate`
 3. **Review** the generated SQL in `drizzle/XXXX_*.sql`
 4. **Rebuild and restart** the Docker services so the server applies migrations on startup
 
 ### Production Deployment
 
-Migrations run automatically on server startup via `src/db/migrate.ts`. The server reads from `drizzle/` folder and tracks applied migrations in `__drizzle_migrations` table. There are no `db:migrate` or `db:push` scripts; always rebuild/restart the container after `yarn db:generate`.
+Migrations run automatically on server startup via `src/db/migrate.ts`. The server reads from `drizzle/` folder and tracks applied migrations in `__drizzle_migrations` table. There are no `db:migrate` or `db:push` scripts; always rebuild/restart the container after `bun run db:generate`.
 
 **If you need to run SQL manually against production:**
 ```bash

@@ -10,7 +10,7 @@ Fastify-based API for BidBeacon's Amazon Ads integration.
 ## Local Development
 
 ```bash
-yarn install
+bun install
 cp .env.example .env
 # Fill in .env with your credentials
 docker compose up --build
@@ -20,10 +20,10 @@ The API will be available at `http://localhost:8091/api/health`.
 
 ## Scripts
 
-- `yarn build` – bundle server and worker
-- `yarn start` – run compiled server
-- `yarn worker` – run worker in dev mode
-- `yarn dev:dashboard` – run dashboard dev server (proxies /api to production)
+- `bun run build` – bundle server and worker
+- `bun run start` – run compiled server
+- `bun run worker` – run worker in dev mode
+- `bun run dev:dashboard` – run dashboard dev server (proxies /api to production)
 - `./test-api.sh` – smoke test the health endpoint
 
 ## Docker Services

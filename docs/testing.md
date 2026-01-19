@@ -1,6 +1,6 @@
 # Testing
 
-We use Vitest for unit tests. Run with `yarn test`.
+We use Vitest for unit tests. Run with `bun run test`.
 
 ## What to test
 - Report state machine eligibility and refresh scheduling.
