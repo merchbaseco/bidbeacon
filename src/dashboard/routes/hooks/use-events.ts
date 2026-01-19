@@ -1,3 +1,4 @@
+import { keepPreviousData } from '@tanstack/react-query';
 import { api } from '../../lib/trpc';
 
 type UseEventsParams = {
@@ -29,5 +30,6 @@ export const useEvents = (params: UseEventsParams) => {
         enabled: params.enabled ?? true,
         refetchInterval: params.refetchInterval ?? 60000,
         staleTime: 30000,
+        placeholderData: keepPreviousData,
     });
 };
