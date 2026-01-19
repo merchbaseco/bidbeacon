@@ -1,13 +1,15 @@
 import { formatInTimeZone } from 'date-fns-tz';
-import { useMemo, useState, type ReactNode } from 'react';
+import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import { useAtomValue } from 'jotai';
-import { AlertTriangle, ChevronDown, Filter, MoreVertical, Play, RefreshCw, Search } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, Filter, RefreshCw } from 'lucide-react';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
+import { Combobox, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxPopup } from '../../components/ui/combobox';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
 import { Spinner } from '../../components/ui/spinner';
+import { Tooltip, TooltipCreateHandle, TooltipPopup, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { cn } from '../../lib/utils';
 import { useEvents } from '../hooks/use-events';
 import { selectedAccountIdAtom, selectedCountryCodeAtom } from './account-selector/atoms';
@@ -30,6 +32,7 @@ const OUTCOME_COPY: Record<string, { label: string; variant: 'success' | 'error'
 };
 
 const HEADER_COLUMNS = ['Time', 'Job', 'Outcome', 'Message'];
+const histogramTooltipHandle = TooltipCreateHandle<ComponentType>();
 
 export const EventStream = () => {
     const accountId = useAtomValue(selectedAccountIdAtom);
@@ -38,7 +41,9 @@ export const EventStream = () => {
 
     const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<EventRow | null>(null);
-    const [isLive, setIsLive] = useState(true);
+    const [jobNameInput, setJobNameInput] = useState('');
+    const [appliedJobName, setAppliedJobName] = useState<string | null>(null);
+    const [showEmptyMessages, setShowEmptyMessages] = useState(false);
 
     const baseRange = useMemo(() => {
         const to = roundUpToNearestFiveMinutes(new Date());
@@ -63,8 +68,9 @@ export const EventStream = () => {
         filterFrom: filterRange?.from.toISOString(),
         filterTo: filterRange?.to.toISOString(),
         limit: 200,
+        jobName: appliedJobName ?? undefined,
         enabled: hasSelection,
-        refetchInterval: isLive ? 60000 : false,
+        refetchInterval: hasSelection ? 60000 : false,
     });
 
     const timezone = data?.timezone ?? 'UTC';
@@ -80,6 +86,34 @@ export const EventStream = () => {
         }));
     }, [data?.events, timezone]);
 
+    const filteredEvents = useMemo(() => {
+        if (showEmptyMessages) {
+            return events;
+        }
+        return events.filter(row => hasRenderableMessage(row.event.message, row.event.badges));
+    }, [events, showEmptyMessages]);
+
+    const jobNameOptions = useMemo(() => {
+        const names = new Set<string>();
+        for (const row of events) {
+            if (row.event.jobName) {
+                names.add(row.event.jobName);
+            }
+        }
+        return Array.from(names).sort();
+    }, [events]);
+
+    const filteredJobNameOptions = useMemo(() => {
+        const query = jobNameInput.trim().toLowerCase();
+        if (!query) {
+            return jobNameOptions;
+        }
+        return jobNameOptions.filter(jobName => {
+            const formatted = formatJobName(jobName).toLowerCase();
+            return jobName.toLowerCase().includes(query) || formatted.includes(query);
+        });
+    }, [jobNameInput, jobNameOptions]);
+
     const maxCount = useMemo(() => {
         return histogram.reduce((max, bucket) => Math.max(max, bucket.count), 0);
     }, [histogram]);
@@ -89,6 +123,32 @@ export const EventStream = () => {
     }, [histogram]);
 
     const selectedLabel = selectedBucket ? formatInTimeZone(new Date(selectedBucket), timezone, 'MMM dd HH:mm') : null;
+    const trimmedJobName = jobNameInput.trim();
+    const hasActiveFilters = Boolean(selectedBucket || appliedJobName);
+    const canApplyJobFilter = trimmedJobName !== (appliedJobName ?? '');
+    const emptyStateCopy =
+        !showEmptyMessages && events.length > 0
+            ? 'No events with messages yet'
+            : hasActiveFilters
+              ? 'No events match the current filters'
+              : 'No events recorded yet';
+
+    const applyFilters = () => {
+        if (!hasSelection) {
+            return;
+        }
+        if (canApplyJobFilter) {
+            const nextJobName = trimmedJobName.length > 0 ? trimmedJobName : null;
+            setAppliedJobName(nextJobName);
+            setJobNameInput(nextJobName ?? '');
+            return;
+        }
+        if (hasActiveFilters) {
+            setSelectedBucket(null);
+            setAppliedJobName(null);
+            setJobNameInput('');
+        }
+    };
 
     const handleBucketClick = (bucket: EventBucket) => {
         setSelectedBucket(current => (current === bucket.interval ? null : bucket.interval));
@@ -97,53 +157,94 @@ export const EventStream = () => {
     return (
         <>
             <Card className="font-mono pb-0 gap-0 overflow-hidden">
-                <div className="flex items-center gap-2 mb-4 px-4">
+                <div className="flex flex-wrap items-center gap-2 mb-4 px-4">
                     <Button
                         variant="outline"
-                        size="icon"
-                        className="h-11 w-11"
-                        onClick={() => setSelectedBucket(null)}
-                        disabled={!selectedBucket}
-                        title={selectedBucket ? 'Clear filter' : 'No filter'}
+                        size="icon-lg"
+                        onClick={applyFilters}
+                        disabled={!hasSelection || (!hasActiveFilters && !canApplyJobFilter)}
+                        title={canApplyJobFilter ? 'Apply filters' : hasActiveFilters ? 'Clear filters' : 'No filters'}
                     >
                         <Filter className="h-5 w-5" />
                     </Button>
 
-                    <div className="flex-1 flex items-center gap-3 h-[32px] px-2 border border-input rounded-lg text-sm text-muted-foreground bg-background">
-                        <Search className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-muted-foreground">{selectedLabel ? `Filtered to ${selectedLabel}` : `${totalCount.toLocaleString()} events (last 12h)`}</span>
-                        <ChevronDown className="h-5 w-5 text-muted-foreground ml-auto" />
+                    <div className="flex-1 min-w-0">
+                        <Combobox
+                            value={appliedJobName ?? ''}
+                            inputValue={jobNameInput}
+                            onInputValueChange={value => {
+                                setJobNameInput(value);
+                                if (!value.trim()) {
+                                    setAppliedJobName(null);
+                                }
+                            }}
+                            onValueChange={value => {
+                                const nextValue = value?.toString() ?? '';
+                                setAppliedJobName(nextValue ? nextValue : null);
+                                setJobNameInput(nextValue);
+                            }}
+                        >
+                            <ComboboxInput
+                                aria-label="Filter by job name"
+                                placeholder="Filter by job name"
+                                showClear
+                                size="lg"
+                                onKeyDown={event => {
+                                    if (event.key === 'Enter') {
+                                        applyFilters();
+                                    }
+                                }}
+                            />
+                            <ComboboxPopup>
+                                <ComboboxList>
+                                    {filteredJobNameOptions.length === 0 ? (
+                                        <ComboboxEmpty>No matching jobs</ComboboxEmpty>
+                                    ) : (
+                                        filteredJobNameOptions.map(jobName => (
+                                            <ComboboxItem key={jobName} value={jobName}>
+                                                {formatJobName(jobName)}
+                                            </ComboboxItem>
+                                        ))
+                                    )}
+                                </ComboboxList>
+                            </ComboboxPopup>
+                        </Combobox>
                     </div>
 
-                    <Button variant="outline" className={cn('h-11 px-4 gap-2', isLive ? 'text-foreground' : 'text-muted-foreground')} onClick={() => setIsLive(current => !current)}>
-                        <Play className="h-4 w-4 fill-current" />
-                        Live
-                    </Button>
+                    <Tooltip>
+                        <TooltipTrigger
+                            render={
+                                <Button
+                                    variant="outline"
+                                    size="icon-lg"
+                                    onClick={() => setShowEmptyMessages(current => !current)}
+                                    aria-pressed={showEmptyMessages}
+                                >
+                                    {showEmptyMessages ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                </Button>
+                            }
+                            delay={0}
+                            closeDelay={0}
+                        />
+                        <TooltipPopup>{showEmptyMessages ? 'Hide empty messages' : 'Show empty messages'}</TooltipPopup>
+                    </Tooltip>
 
                     <Button
                         variant="outline"
-                        size="icon"
-                        className="h-11 w-11"
+                        size="icon-lg"
                         onClick={() => {
-                            setSelectedBucket(null);
                             refetch();
                         }}
+                        disabled={!hasSelection || isFetching}
+                        title={isFetching ? 'Refreshing events' : 'Refresh events'}
                     >
-                        <RefreshCw className="h-5 w-5" />
-                    </Button>
-
-                    <Button variant="outline" size="icon" className="h-11 w-11">
-                        <MoreVertical className="h-5 w-5" />
+                        {isFetching ? <Spinner className="size-4 text-muted-foreground" /> : <RefreshCw className="h-5 w-5" />}
                     </Button>
                 </div>
 
                 {!hasSelection ? (
                     <div className="flex items-center justify-center py-10">
                         <p className="text-sm text-muted-foreground">Select an account to view events</p>
-                    </div>
-                ) : isLoading || isFetching ? (
-                    <div className="flex items-center justify-center py-10">
-                        <Spinner className="size-5 text-muted-foreground" />
                     </div>
                 ) : error ? (
                     <div className="flex items-center justify-center py-10">
@@ -152,26 +253,64 @@ export const EventStream = () => {
                             <p className="text-xs text-muted-foreground/70 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
                         </div>
                     </div>
+                ) : isLoading && !data ? (
+                    <div className="flex items-center justify-center py-10">
+                        <Spinner className="size-5 text-muted-foreground" />
+                    </div>
                 ) : (
                     <>
-                        <div className="h-20 flex items-end gap-px mb-4">
-                            {histogram.map(bucket => {
-                                const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * 48)) : 2;
-                                const isSelected = selectedBucket === bucket.interval;
-                                const formattedBucket = formatInTimeZone(new Date(bucket.interval), timezone, 'MMM dd HH:mm');
-
-                                return (
-                                    <button
-                                        key={bucket.interval}
-                                        type="button"
-                                        className={cn('flex-1 min-w-[2px] transition-colors', bucket.count > 0 ? 'bg-muted-foreground/50' : 'bg-muted/70', isSelected && 'bg-foreground')}
-                                        style={{ height }}
-                                        title={`${formattedBucket} · ${bucket.count} events`}
-                                        onClick={() => handleBucketClick(bucket)}
-                                    />
-                                );
-                            })}
+                        <div className="flex flex-wrap items-center gap-2 px-4 pb-3 text-xs text-muted-foreground">
+                            <span>{`${totalCount.toLocaleString()} events (last 12h)`}</span>
+                            {appliedJobName && <span>{`• Job: ${formatJobName(appliedJobName)}`}</span>}
+                            {selectedLabel && <span>{`• Window: ${selectedLabel}`}</span>}
+                            {!showEmptyMessages && <span>• Hiding empty messages</span>}
                         </div>
+
+                        <TooltipProvider>
+                            <div className="h-20 flex items-end gap-px mb-4 px-4">
+                                {histogram.map(bucket => {
+                                    const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * 48)) : 2;
+                                    const isSelected = selectedBucket === bucket.interval;
+                                    const formattedBucket = formatInTimeZone(new Date(bucket.interval), timezone, 'MMM dd HH:mm');
+                                    const rangeLabel = formatBucketRange(bucket.interval, timezone);
+                                    const RangeContent = () => (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-foreground">{rangeLabel}</span>
+                                            <span className="text-muted-foreground">
+                                                {bucket.count.toLocaleString()} {bucket.count === 1 ? 'event' : 'events'}
+                                            </span>
+                                        </div>
+                                    );
+
+                                    return (
+                                        <TooltipTrigger
+                                            key={bucket.interval}
+                                            className="group flex-1 min-w-[2px] h-full flex items-end"
+                                            onClick={() => handleBucketClick(bucket)}
+                                            aria-label={`Filter to ${formattedBucket}`}
+                                            type="button"
+                                            handle={histogramTooltipHandle}
+                                            payload={RangeContent}
+                                            delay={0}
+                                        >
+                                            <span
+                                                className={cn(
+                                                    'block w-full group-hover:bg-foreground/70',
+                                                    bucket.count > 0 ? 'bg-muted-foreground/50' : 'bg-muted/70',
+                                                    isSelected && 'bg-foreground'
+                                                )}
+                                                style={{ height }}
+                                            />
+                                        </TooltipTrigger>
+                                    );
+                                })}
+                            </div>
+                            <Tooltip handle={histogramTooltipHandle}>
+                                {({ payload: Payload }) => (
+                                    <TooltipPopup>{Payload ? <Payload /> : null}</TooltipPopup>
+                                )}
+                            </Tooltip>
+                        </TooltipProvider>
 
                         <div className="grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-xs text-muted-foreground border-b border-border">
                             {HEADER_COLUMNS.map(column => (
@@ -179,13 +318,13 @@ export const EventStream = () => {
                             ))}
                         </div>
 
-                        {events.length === 0 ? (
+                        {filteredEvents.length === 0 ? (
                             <div className="flex items-center justify-center py-8">
-                                <p className="text-sm text-muted-foreground">No events recorded yet</p>
+                                <p className="text-sm text-muted-foreground">{emptyStateCopy}</p>
                             </div>
                         ) : (
                             <div className="divide-y divide-border/60">
-                                {events.map(row => {
+                                {filteredEvents.map(row => {
                                     const isError = row.event.outcome === 'error';
                                     return (
                                         <div
@@ -230,9 +369,7 @@ export const EventStream = () => {
                             <div className="flex flex-wrap gap-2">
                                 <OutcomeBadge outcome={selectedEvent.outcome} />
                                 {selectedEvent.badges?.map(badge => (
-                                    <Badge key={badge} variant="outline" className="text-[11px]">
-                                        {badge}
-                                    </Badge>
+                                    <EventBadge key={badge} badge={badge} />
                                 ))}
                             </div>
                             <div className="rounded-lg border bg-muted/30 p-3">
@@ -262,9 +399,26 @@ const OutcomeBadge = ({ outcome }: { outcome: string }) => {
     );
 };
 
+const EventBadge = ({ badge }: { badge: string }) => {
+    return (
+        <Badge variant={getBadgeVariant(badge)} className="text-[11px]">
+            {badge}
+        </Badge>
+    );
+};
+
 const renderMessage = (message?: string | null, badges?: string[] | null): ReactNode => {
     if (!message) {
-        return null;
+        if (!badges?.length) {
+            return null;
+        }
+        return (
+            <span className="inline-flex items-center gap-1 whitespace-nowrap">
+                {badges.map(badge => (
+                    <EventBadge key={badge} badge={badge} />
+                ))}
+            </span>
+        );
     }
 
     if (!message.includes('{{badges}}')) {
@@ -277,13 +431,46 @@ const renderMessage = (message?: string | null, badges?: string[] | null): React
         <span className="inline-flex items-center gap-1 whitespace-nowrap">
             {before?.trim() && <span>{before.trimEnd()}</span>}
             {badges?.map(badge => (
-                <Badge key={badge} variant="outline" className="text-[11px]">
-                    {badge}
-                </Badge>
+                <EventBadge key={badge} badge={badge} />
             ))}
             {after?.trim() && <span>{after.trimStart()}</span>}
         </span>
     );
+};
+
+const getBadgeVariant = (badge: string) => {
+    if (badge.includes('·') || badge.includes('hourly') || badge.includes('daily')) {
+        return 'warning' as const;
+    }
+    return 'info' as const;
+};
+
+const hasRenderableMessage = (message?: string | null, badges?: string[] | null) => {
+    if (message) {
+        const trimmed = message.trim();
+        if (!trimmed) {
+            return Boolean(badges?.length);
+        }
+        if (!trimmed.includes('{{badges}}')) {
+            return true;
+        }
+        const cleaned = trimmed.replace('{{badges}}', '').trim();
+        return Boolean(cleaned) || Boolean(badges?.length);
+    }
+    return Boolean(badges?.length);
+};
+
+const formatBucketRange = (interval: string, timezone: string) => {
+    const start = new Date(interval);
+    const end = new Date(start.getTime() + 5 * 60 * 1000);
+    const startDay = formatInTimeZone(start, timezone, 'MMM dd');
+    const endDay = formatInTimeZone(end, timezone, 'MMM dd');
+
+    if (startDay === endDay) {
+        return `${formatInTimeZone(start, timezone, 'MMM dd HH:mm')} - ${formatInTimeZone(end, timezone, 'HH:mm')}`;
+    }
+
+    return `${formatInTimeZone(start, timezone, 'MMM dd HH:mm')} - ${formatInTimeZone(end, timezone, 'MMM dd HH:mm')}`;
 };
 
 const formatJobName = (jobName: string) => {
