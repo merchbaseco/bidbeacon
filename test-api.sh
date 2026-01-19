@@ -15,7 +15,7 @@ if [ $? -eq 0 ]; then
     echo "✅ Health check: $health_response"
 else
     echo "❌ Health check failed - is the server running?"
-    echo "   Start server with: yarn start"
+    echo "   Start server with: bun run start"
     exit 1
 fi
 
@@ -33,4 +33,3 @@ fi
 
 echo ""
 echo "✅ API testing complete!"
-

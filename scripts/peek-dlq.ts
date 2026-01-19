@@ -301,7 +301,7 @@ async function main() {
         } else if (args[i] === '--help' || args[i] === '-h') {
             console.log(`
 Usage: tsx scripts/peek-dlq.ts [options]
-   or: yarn peek-dlq [options]
+   or: bun run peek-dlq [options]
 
 The script automatically loads .env file from the project root.
 
@@ -316,9 +316,9 @@ Environment variables (in .env file):
   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY - AWS credentials (or use ~/.aws/credentials)
 
 Examples:
-  yarn peek-dlq
-  yarn peek-dlq --limit 20
-  yarn peek-dlq --dataset ads-campaign-management-campaigns
+  bun run peek-dlq
+  bun run peek-dlq --limit 20
+  bun run peek-dlq --dataset ads-campaign-management-campaigns
             `);
             process.exit(0);
         }
@@ -369,4 +369,3 @@ Examples:
 }
 
 main();
-

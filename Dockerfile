@@ -1,16 +1,14 @@
-FROM node:20-alpine AS base
+FROM oven/bun:1.3.5-alpine AS base
 WORKDIR /app
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN apk add --no-cache libc6-compat && corepack enable
+RUN apk add --no-cache libc6-compat
 
 FROM base AS deps
 ARG MERCHBASE_NPM_TOKEN
-COPY package.json yarn.lock .yarnrc.yml ./
-COPY .yarn ./.yarn
+COPY package.json bun.lock .npmrc ./
 RUN if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
       printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" > .env; \
     fi && \
-    yarn install --immutable && \
+    bun install --frozen-lockfile && \
     rm -f .env
 
 FROM deps AS build
@@ -21,19 +19,18 @@ RUN { \
       [ -n "$MERCHBASE_NPM_TOKEN" ] && printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN"; \
       [ -n "$VITE_CLERK_PUBLISHABLE_KEY" ] && printf "VITE_CLERK_PUBLISHABLE_KEY=%s\n" "$VITE_CLERK_PUBLISHABLE_KEY"; \
     } > .env && \
-    yarn build && \
-    yarn build:dashboard && \
+    bun run build && \
+    bun run build:dashboard && \
     rm -f .env
 
 # Production dependencies only - prune dev deps from node_modules
 FROM deps AS prod-deps
-RUN npm prune --omit=dev
+RUN bun install --frozen-lockfile --production
 
 FROM node:20-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
-ENV COREPACK_ENABLE_DOWNLOAD_PROMPT=0
-RUN apk add --no-cache dumb-init && corepack enable \
+RUN apk add --no-cache dumb-init \
   && addgroup --system --gid 1001 nodejs \
   && adduser --system --uid 1001 nodejs
 
@@ -55,4 +52,3 @@ CMD ["node", "dist/index.js"]
 FROM caddy:alpine AS caddy
 COPY --from=build /app/dist/dashboard /srv
 EXPOSE 80
-
