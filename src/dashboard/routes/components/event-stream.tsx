@@ -42,7 +42,7 @@ export const EventStream = () => {
 
     const baseRange = useMemo(() => {
         const to = roundUpToNearestFiveMinutes(new Date());
-        const from = new Date(to.getTime() - 60 * 60 * 1000);
+        const from = new Date(to.getTime() - 12 * 60 * 60 * 1000);
         return { from, to };
     }, []);
 
@@ -111,7 +111,7 @@ export const EventStream = () => {
 
                     <div className="flex-1 flex items-center gap-3 h-[32px] px-2 border border-input rounded-lg text-sm text-muted-foreground bg-background">
                         <Search className="h-5 w-5 text-muted-foreground" />
-                        <span className="text-muted-foreground">{selectedLabel ? `Filtered to ${selectedLabel}` : `${totalCount.toLocaleString()} events (last 1h)`}</span>
+                        <span className="text-muted-foreground">{selectedLabel ? `Filtered to ${selectedLabel}` : `${totalCount.toLocaleString()} events (last 12h)`}</span>
                         <ChevronDown className="h-5 w-5 text-muted-foreground ml-auto" />
                     </div>
 
