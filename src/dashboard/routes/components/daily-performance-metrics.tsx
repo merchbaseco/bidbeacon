@@ -300,6 +300,7 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
             acos: legacyLeadingHour.acos,
         };
     }, [data?.leadingPoint, legacyLeadingHour]);
+    const hasLeadingPoint = Boolean(resolvedLeadingPoint);
 
     const chartData = useMemo(() => {
         if (!data) return [];
@@ -364,14 +365,12 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
     }, [isLiveRange]);
 
     // Custom tick formatter for X axis - emphasize key labels without crowding
-    // Note: index 0 is the leading hour (yesterday's last hour), so actual hours start at index 1
     const formatXAxisTick = (value: string, index: number) => {
         const granularity = resolvedGranularity;
         const totalTicks = chartData.length;
+        if (hasLeadingPoint && index === 0) return '';
 
         if (granularity === 'hour') {
-            const isLeading = !!resolvedLeadingPoint && index === 0;
-            if (isLeading) return '';
             if (value === '00:00') return value;
             if (range === 'today' && currentHourLabel && value === currentHourLabel) return value;
             if (range !== 'today' && value === '12:00') return value;
@@ -386,7 +385,7 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
     };
 
     const selectedRange = ALL_RANGE_OPTIONS.find(option => option.value === range);
-    const isStreamingRange = isLiveRange && resolvedGranularity === 'hour';
+    const leadingOffsetPercent = hasLeadingPoint ? 3.5 : 0;
 
     const triggerLabel = isCustomRangeActive ? 'Custom range' : selectedRange?.label ?? 'Today';
     const canApplyCustomRange = Boolean(customRangeDraft.start && customRangeDraft.end);
@@ -519,14 +518,14 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
         <div className={cn('w-full', className)}>
             {header}
 
-            {/* Chart with fade effect - extends past left edge for streaming effect */}
+            {/* Chart with fade effect - extends past left edge for leading datapoint */}
             <div className="relative w-full h-[360px] overflow-hidden">
-                {isStreamingRange ? <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" /> : null}
+                {hasLeadingPoint ? <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" /> : null}
 
-                {/* Chart shifted left so T-1 is mostly off-screen, centering today's data */}
+                {/* Chart shifted left so the leading datapoint is mostly off-screen */}
                 <div
-                    className={cn('absolute inset-0', isStreamingRange ? '-left-[3.5%]' : 'left-0')}
-                    style={isStreamingRange ? { width: 'calc(100% + 3.5%)' } : undefined}
+                    className="absolute inset-0"
+                    style={hasLeadingPoint ? { left: `-${leadingOffsetPercent}%`, width: `calc(100% + ${leadingOffsetPercent}%)` } : undefined}
                     ref={chartRef}
                 >
                     <ResponsiveContainer width="100%" height="100%">
