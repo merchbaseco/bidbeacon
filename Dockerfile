@@ -5,8 +5,9 @@ RUN apk add --no-cache libc6-compat
 FROM base AS deps
 ARG MERCHBASE_NPM_TOKEN
 COPY package.json bun.lock .npmrc ./
-RUN if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
-      printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" > .env; \
+RUN : > .env && \
+    if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
+      printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" >> .env; \
     fi && \
     bun install --frozen-lockfile && \
     rm -f .env
@@ -15,10 +16,11 @@ FROM deps AS build
 ARG MERCHBASE_NPM_TOKEN
 ARG VITE_CLERK_PUBLISHABLE_KEY
 COPY . .
-RUN { \
+RUN : > .env && \
+    { \
       [ -n "$MERCHBASE_NPM_TOKEN" ] && printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN"; \
       [ -n "$VITE_CLERK_PUBLISHABLE_KEY" ] && printf "VITE_CLERK_PUBLISHABLE_KEY=%s\n" "$VITE_CLERK_PUBLISHABLE_KEY"; \
-    } > .env && \
+    } >> .env && \
     bun run build && \
     bun run build:dashboard && \
     rm -f .env
