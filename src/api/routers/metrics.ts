@@ -1,5 +1,6 @@
+import { addDays, addHours, addMonths, endOfDay, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, format } from 'date-fns';
 import { and, desc, eq, gte, lt, lte, sql, isNotNull } from 'drizzle-orm';
-import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
+import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { amsMetrics, apiMetrics, events, jobMetrics, performanceDaily, performanceHourly } from '@/db/schema';
@@ -17,6 +18,7 @@ const SUPPORTED_JOBS = [
     'summarize-hourly-target-stream',
     'summarize-hourly-target-stream-for-account',
 ] as const;
+const PERFORMANCE_RANGES = ['today', 'yesterday', 'this_week', 'this_month', 'this_year', 'last_30_days', 'last_6_months', 'last_12_months', 'all_time'] as const;
 
 export const metricsRouter = router({
     adsApi: protectedProcedure
@@ -605,111 +607,126 @@ export const metricsRouter = router({
             z.object({
                 accountId: z.string(),
                 timezone: z.string(), // Browser timezone - used for display
+                range: z.enum(PERFORMANCE_RANGES).default('today'),
             })
         )
         .query(async ({ ctx, input }) => {
             ctx.assertAccountAccess(input.accountId);
             const browserTimezone = input.timezone;
             const now = new Date();
+            const zonedNow = toZonedTime(now, browserTimezone);
+            const endOfToday = endOfDay(zonedNow);
 
-            // Calculate "today" in the browser's timezone as a UTC time range
-            // This ensures we query the correct data regardless of account timezone
-            const todayDateStr = formatInTimeZone(now, browserTimezone, 'yyyy-MM-dd');
+            let rangeStartZoned = startOfDay(zonedNow);
+            let rangeEndZoned = endOfToday;
+            let granularity: 'hour' | 'day' | 'month' = 'hour';
 
-            // Convert "midnight in browser timezone" to UTC using fromZonedTime
-            // e.g., "2025-12-27 00:00 EST" → "2025-12-27 05:00 UTC"
-            const todayStartUtc = fromZonedTime(`${todayDateStr}T00:00:00`, browserTimezone);
-            const todayEndUtc = fromZonedTime(`${todayDateStr}T23:59:59`, browserTimezone);
-
-            // Yesterday's boundaries (24 hours before today's boundaries)
-            const yesterdayStartUtc = new Date(todayStartUtc.getTime() - 24 * 60 * 60 * 1000);
-            const yesterdayEndUtc = new Date(todayEndUtc.getTime() - 24 * 60 * 60 * 1000);
-
-            // Get current hour in the browser's timezone
-            const currentHourInTimezone = parseInt(formatInTimeZone(now, browserTimezone, 'H'), 10);
-
-            // Query today's hourly data using bucket_start (UTC) and group by hour in browser timezone
-            // Use sql.raw() for timezone to avoid parameterization issues with AT TIME ZONE
-            const tzLiteral = sql.raw(`'${browserTimezone.replace(/'/g, "''")}'`);
-            const todayData = await db
-                .select({
-                    bucketHour: sql<number>`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})::int`.as('bucket_hour'),
-                    impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
-                    clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                    orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
-                    spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
-                    sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
-                })
-                .from(performanceHourly)
-                .where(
-                    and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, todayStartUtc), lt(performanceHourly.bucketStart, new Date(todayEndUtc.getTime() + 1000)))
-                )
-                .groupBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`)
-                .orderBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`);
-
-            // Query yesterday's aggregated data for comparison
-            const [yesterdayTotals] = await db
-                .select({
-                    impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
-                    clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                    orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
-                    spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
-                    sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
-                })
-                .from(performanceHourly)
-                .where(
-                    and(
-                        eq(performanceHourly.accountId, input.accountId),
-                        gte(performanceHourly.bucketStart, yesterdayStartUtc),
-                        lt(performanceHourly.bucketStart, new Date(yesterdayEndUtc.getTime() + 1000))
-                    )
-                );
-
-            // Query yesterday's last hour (hour 23 in browser timezone) for the leading bar
-            const [yesterdayLastHour] = await db
-                .select({
-                    impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
-                    clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                    orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
-                    spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
-                    sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
-                })
-                .from(performanceHourly)
-                .where(
-                    and(
-                        eq(performanceHourly.accountId, input.accountId),
-                        gte(performanceHourly.bucketStart, yesterdayStartUtc),
-                        lt(performanceHourly.bucketStart, new Date(yesterdayEndUtc.getTime() + 1000)),
-                        sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral}) = 23`
-                    )
-                );
-
-            // Build hourly data map
-            const hourlyMap = new Map<number, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
-            for (const row of todayData) {
-                hourlyMap.set(row.bucketHour, {
-                    impressions: Number(row.impressions),
-                    clicks: Number(row.clicks),
-                    orders: Number(row.orders),
-                    spend: Number(row.spend),
-                    sales: Number(row.sales),
-                });
+            if (input.range === 'yesterday') {
+                const yesterday = subDays(zonedNow, 1);
+                rangeStartZoned = startOfDay(yesterday);
+                rangeEndZoned = endOfDay(yesterday);
+                granularity = 'hour';
             }
 
-            // Generate all 24 hours with zeros filled
-            const hourlyChartData: Array<{
-                hour: number;
-                hourLabel: string;
+            if (input.range === 'this_week') {
+                rangeStartZoned = startOfWeek(zonedNow, { weekStartsOn: 0 });
+                rangeEndZoned = endOfToday;
+                granularity = 'day';
+            }
+
+            if (input.range === 'this_month') {
+                rangeStartZoned = startOfMonth(zonedNow);
+                rangeEndZoned = endOfToday;
+                granularity = 'day';
+            }
+
+            if (input.range === 'this_year') {
+                rangeStartZoned = startOfYear(zonedNow);
+                rangeEndZoned = endOfToday;
+                granularity = 'month';
+            }
+
+            if (input.range === 'last_30_days') {
+                rangeStartZoned = startOfDay(subDays(zonedNow, 29));
+                rangeEndZoned = endOfToday;
+                granularity = 'day';
+            }
+
+            if (input.range === 'last_6_months') {
+                rangeStartZoned = startOfMonth(subMonths(zonedNow, 5));
+                rangeEndZoned = endOfToday;
+                granularity = 'month';
+            }
+
+            if (input.range === 'last_12_months') {
+                rangeStartZoned = startOfMonth(subMonths(zonedNow, 11));
+                rangeEndZoned = endOfToday;
+                granularity = 'month';
+            }
+
+            if (input.range === 'all_time') {
+                const [earliest] = await db
+                    .select({
+                        firstSeen: sql<Date>`min(${performanceHourly.bucketStart})`.as('first_seen'),
+                    })
+                    .from(performanceHourly)
+                    .where(eq(performanceHourly.accountId, input.accountId));
+
+                if (earliest?.firstSeen) {
+                    const earliestZoned = toZonedTime(new Date(earliest.firstSeen), browserTimezone);
+                    rangeStartZoned = startOfDay(earliestZoned);
+                }
+
+                rangeEndZoned = endOfToday;
+                granularity = 'month';
+            }
+
+            const rangeEndExclusiveZoned = new Date(rangeEndZoned.getTime() + 1);
+            const rangeStartUtc = fromZonedTime(rangeStartZoned, browserTimezone);
+            const rangeEndUtc = fromZonedTime(rangeEndZoned, browserTimezone);
+            const rangeEndExclusiveUtc = fromZonedTime(rangeEndExclusiveZoned, browserTimezone);
+
+            const shouldCompare = input.range !== 'all_time';
+            let previousTotals: { impressions: number; clicks: number; orders: number; spend: number; sales: number } | null = null;
+
+            if (shouldCompare) {
+                const durationMs = rangeEndExclusiveZoned.getTime() - rangeStartZoned.getTime();
+                const compareStartZoned = new Date(rangeStartZoned.getTime() - durationMs);
+                const compareEndExclusiveZoned = new Date(rangeEndExclusiveZoned.getTime() - durationMs);
+                const compareStartUtc = fromZonedTime(compareStartZoned, browserTimezone);
+                const compareEndExclusiveUtc = fromZonedTime(compareEndExclusiveZoned, browserTimezone);
+
+                const [previousTotalsRow] = await db
+                    .select({
+                        impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                        clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                        orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                        spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                        sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                    })
+                    .from(performanceHourly)
+                    .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, compareStartUtc), lt(performanceHourly.bucketStart, compareEndExclusiveUtc)));
+
+                previousTotals = {
+                    impressions: Number(previousTotalsRow?.impressions ?? 0),
+                    clicks: Number(previousTotalsRow?.clicks ?? 0),
+                    orders: Number(previousTotalsRow?.orders ?? 0),
+                    spend: Number(previousTotalsRow?.spend ?? 0),
+                    sales: Number(previousTotalsRow?.sales ?? 0),
+                };
+            }
+
+            const tzLiteral = sql.raw(`'${browserTimezone.replace(/'/g, "''")}'`);
+            const points: Array<{
+                intervalStart: string;
                 impressions: number;
                 clicks: number;
                 orders: number;
                 spend: number;
-                sales: number;
                 acos: number;
             }> = [];
 
-            // Calculate totals for today
-            const todayTotals = {
+            const totals = {
                 impressions: 0,
                 clicks: 0,
                 orders: 0,
@@ -717,93 +734,239 @@ export const metricsRouter = router({
                 sales: 0,
             };
 
-            for (let hour = 0; hour < 24; hour++) {
-                const hourData = hourlyMap.get(hour) ?? {
-                    impressions: 0,
-                    clicks: 0,
-                    orders: 0,
-                    spend: 0,
-                    sales: 0,
-                };
+            let leadingPoint: {
+                intervalStart: string;
+                impressions: number;
+                clicks: number;
+                orders: number;
+                spend: number;
+                acos: number;
+            } | null = null;
 
-                // Accumulate totals
-                todayTotals.impressions += hourData.impressions;
-                todayTotals.clicks += hourData.clicks;
-                todayTotals.orders += hourData.orders;
-                todayTotals.spend += hourData.spend;
-                todayTotals.sales += hourData.sales;
+            if (granularity === 'hour') {
+                const hourlyData = await db
+                    .select({
+                        bucketHour: sql<number>`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})::int`.as('bucket_hour'),
+                        impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                        clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                        orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                        spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                        sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                    })
+                    .from(performanceHourly)
+                    .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, rangeStartUtc), lt(performanceHourly.bucketStart, rangeEndExclusiveUtc)))
+                    .groupBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`)
+                    .orderBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`);
 
-                // Calculate ACoS for this hour
-                const acos = hourData.sales > 0 ? (hourData.spend / hourData.sales) * 100 : 0;
+                const hourlyMap = new Map<number, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
+                for (const row of hourlyData) {
+                    hourlyMap.set(row.bucketHour, {
+                        impressions: Number(row.impressions),
+                        clicks: Number(row.clicks),
+                        orders: Number(row.orders),
+                        spend: Number(row.spend),
+                        sales: Number(row.sales),
+                    });
+                }
 
-                hourlyChartData.push({
-                    hour,
-                    hourLabel: `${hour.toString().padStart(2, '0')}:00`,
-                    impressions: hourData.impressions,
-                    clicks: hourData.clicks,
-                    orders: hourData.orders,
-                    spend: hourData.spend,
-                    sales: hourData.sales,
-                    acos,
-                });
+                const dayStartZoned = startOfDay(rangeStartZoned);
+                for (let hour = 0; hour < 24; hour++) {
+                    const hourData = hourlyMap.get(hour) ?? {
+                        impressions: 0,
+                        clicks: 0,
+                        orders: 0,
+                        spend: 0,
+                        sales: 0,
+                    };
+
+                    totals.impressions += hourData.impressions;
+                    totals.clicks += hourData.clicks;
+                    totals.orders += hourData.orders;
+                    totals.spend += hourData.spend;
+                    totals.sales += hourData.sales;
+
+                    const acos = hourData.sales > 0 ? (hourData.spend / hourData.sales) * 100 : 0;
+                    const hourStartZoned = addHours(dayStartZoned, hour);
+                    const intervalStartUtc = fromZonedTime(hourStartZoned, browserTimezone);
+
+                    points.push({
+                        intervalStart: intervalStartUtc.toISOString(),
+                        impressions: hourData.impressions,
+                        clicks: hourData.clicks,
+                        orders: hourData.orders,
+                        spend: hourData.spend,
+                        acos,
+                    });
+                }
+
+                if (input.range === 'today') {
+                    const previousDay = subDays(dayStartZoned, 1);
+                    const previousDayStartUtc = fromZonedTime(startOfDay(previousDay), browserTimezone);
+                    const previousDayEndExclusiveUtc = fromZonedTime(new Date(endOfDay(previousDay).getTime() + 1), browserTimezone);
+
+                    const [previousDayLastHour] = await db
+                        .select({
+                            impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                            clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                            orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                            spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                            sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                        })
+                        .from(performanceHourly)
+                        .where(
+                            and(
+                                eq(performanceHourly.accountId, input.accountId),
+                                gte(performanceHourly.bucketStart, previousDayStartUtc),
+                                lt(performanceHourly.bucketStart, previousDayEndExclusiveUtc),
+                                sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral}) = 23`
+                            )
+                        );
+
+                    const previousHourData = {
+                        impressions: Number(previousDayLastHour?.impressions ?? 0),
+                        clicks: Number(previousDayLastHour?.clicks ?? 0),
+                        orders: Number(previousDayLastHour?.orders ?? 0),
+                        spend: Number(previousDayLastHour?.spend ?? 0),
+                        sales: Number(previousDayLastHour?.sales ?? 0),
+                    };
+
+                    const previousHourAcos = previousHourData.sales > 0 ? (previousHourData.spend / previousHourData.sales) * 100 : 0;
+                    const previousHourStartZoned = addHours(startOfDay(previousDay), 23);
+                    const previousHourStartUtc = fromZonedTime(previousHourStartZoned, browserTimezone);
+
+                    leadingPoint = {
+                        intervalStart: previousHourStartUtc.toISOString(),
+                        impressions: previousHourData.impressions,
+                        clicks: previousHourData.clicks,
+                        orders: previousHourData.orders,
+                        spend: previousHourData.spend,
+                        acos: previousHourAcos,
+                    };
+                }
             }
 
-            // Calculate derived metrics for totals
-            const todayAcos = todayTotals.sales > 0 ? (todayTotals.spend / todayTotals.sales) * 100 : 0;
+            if (granularity === 'day' || granularity === 'month') {
+                const intervalExpr =
+                    granularity === 'day'
+                        ? sql`date_trunc('day', ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`
+                        : sql`date_trunc('month', ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`;
+                const intervalLabel =
+                    granularity === 'day'
+                        ? sql<string>`to_char(${intervalExpr}, 'YYYY-MM-DD')`.as('interval')
+                        : sql<string>`to_char(${intervalExpr}, 'YYYY-MM-01')`.as('interval');
 
-            // Calculate yesterday's derived metrics
-            const yesterdayData = {
-                impressions: Number(yesterdayTotals?.impressions ?? 0),
-                clicks: Number(yesterdayTotals?.clicks ?? 0),
-                orders: Number(yesterdayTotals?.orders ?? 0),
-                spend: Number(yesterdayTotals?.spend ?? 0),
-                sales: Number(yesterdayTotals?.sales ?? 0),
-            };
-            const yesterdayAcos = yesterdayData.sales > 0 ? (yesterdayData.spend / yesterdayData.sales) * 100 : 0;
+                const groupedData = await db
+                    .select({
+                        interval: intervalLabel,
+                        impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                        clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                        orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                        spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                        sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                    })
+                    .from(performanceHourly)
+                    .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, rangeStartUtc), lt(performanceHourly.bucketStart, rangeEndExclusiveUtc)))
+                    .groupBy(intervalExpr)
+                    .orderBy(intervalExpr);
 
-            // Calculate percent changes
-            const calculateChange = (today: number, yesterday: number) => {
-                if (yesterday === 0) return today > 0 ? 100 : 0;
-                return ((today - yesterday) / yesterday) * 100;
-            };
+                const groupedMap = new Map<string, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
+                for (const row of groupedData) {
+                    groupedMap.set(row.interval, {
+                        impressions: Number(row.impressions),
+                        clicks: Number(row.clicks),
+                        orders: Number(row.orders),
+                        spend: Number(row.spend),
+                        sales: Number(row.sales),
+                    });
+                }
 
-            // Build yesterday's last hour data point
-            const yesterdayLastHourData = {
-                impressions: Number(yesterdayLastHour?.impressions ?? 0),
-                clicks: Number(yesterdayLastHour?.clicks ?? 0),
-                orders: Number(yesterdayLastHour?.orders ?? 0),
-                spend: Number(yesterdayLastHour?.spend ?? 0),
-                sales: Number(yesterdayLastHour?.sales ?? 0),
+                if (granularity === 'day') {
+                    const startDay = startOfDay(rangeStartZoned);
+                    const endDay = startOfDay(rangeEndZoned);
+
+                    for (let cursor = startDay; cursor <= endDay; cursor = addDays(cursor, 1)) {
+                        const key = format(cursor, 'yyyy-MM-dd');
+                        const dayData = groupedMap.get(key) ?? { impressions: 0, clicks: 0, orders: 0, spend: 0, sales: 0 };
+
+                        totals.impressions += dayData.impressions;
+                        totals.clicks += dayData.clicks;
+                        totals.orders += dayData.orders;
+                        totals.spend += dayData.spend;
+                        totals.sales += dayData.sales;
+
+                        const acos = dayData.sales > 0 ? (dayData.spend / dayData.sales) * 100 : 0;
+                        const intervalStartUtc = fromZonedTime(cursor, browserTimezone);
+
+                        points.push({
+                            intervalStart: intervalStartUtc.toISOString(),
+                            impressions: dayData.impressions,
+                            clicks: dayData.clicks,
+                            orders: dayData.orders,
+                            spend: dayData.spend,
+                            acos,
+                        });
+                    }
+                }
+
+                if (granularity === 'month') {
+                    const startMonth = startOfMonth(rangeStartZoned);
+                    const endMonth = startOfMonth(rangeEndZoned);
+
+                    for (let cursor = startMonth; cursor <= endMonth; cursor = addMonths(cursor, 1)) {
+                        const key = format(cursor, 'yyyy-MM-01');
+                        const monthData = groupedMap.get(key) ?? { impressions: 0, clicks: 0, orders: 0, spend: 0, sales: 0 };
+
+                        totals.impressions += monthData.impressions;
+                        totals.clicks += monthData.clicks;
+                        totals.orders += monthData.orders;
+                        totals.spend += monthData.spend;
+                        totals.sales += monthData.sales;
+
+                        const acos = monthData.sales > 0 ? (monthData.spend / monthData.sales) * 100 : 0;
+                        const intervalStartUtc = fromZonedTime(cursor, browserTimezone);
+
+                        points.push({
+                            intervalStart: intervalStartUtc.toISOString(),
+                            impressions: monthData.impressions,
+                            clicks: monthData.clicks,
+                            orders: monthData.orders,
+                            spend: monthData.spend,
+                            acos,
+                        });
+                    }
+                }
+            }
+
+            const totalAcos = totals.sales > 0 ? (totals.spend / totals.sales) * 100 : 0;
+            const previousAcos = previousTotals && previousTotals.sales > 0 ? (previousTotals.spend / previousTotals.sales) * 100 : 0;
+
+            const calculateChange = (current: number, previous: number) => {
+                if (!shouldCompare) return 0;
+                if (previous === 0) return current > 0 ? 100 : 0;
+                return ((current - previous) / previous) * 100;
             };
-            const yesterdayLastHourAcos = yesterdayLastHourData.sales > 0 ? (yesterdayLastHourData.spend / yesterdayLastHourData.sales) * 100 : 0;
 
             return {
-                hourlyData: hourlyChartData,
-                currentHour: currentHourInTimezone,
-                // Yesterday's hour 23 as a leading bar (hour -1)
-                leadingHour: {
-                    hour: -1,
-                    hourLabel: '23:00',
-                    impressions: yesterdayLastHourData.impressions,
-                    clicks: yesterdayLastHourData.clicks,
-                    orders: yesterdayLastHourData.orders,
-                    spend: yesterdayLastHourData.spend,
-                    sales: yesterdayLastHourData.sales,
-                    acos: yesterdayLastHourAcos,
+                granularity,
+                points,
+                leadingPoint,
+                range: {
+                    start: rangeStartUtc.toISOString(),
+                    end: rangeEndUtc.toISOString(),
                 },
                 totals: {
-                    impressions: todayTotals.impressions,
-                    clicks: todayTotals.clicks,
-                    orders: todayTotals.orders,
-                    spend: todayTotals.spend,
-                    acos: todayAcos,
+                    impressions: totals.impressions,
+                    clicks: totals.clicks,
+                    orders: totals.orders,
+                    spend: totals.spend,
+                    acos: totalAcos,
                 },
                 changes: {
-                    impressions: calculateChange(todayTotals.impressions, yesterdayData.impressions),
-                    clicks: calculateChange(todayTotals.clicks, yesterdayData.clicks),
-                    orders: calculateChange(todayTotals.orders, yesterdayData.orders),
-                    spend: calculateChange(todayTotals.spend, yesterdayData.spend),
-                    acos: calculateChange(todayAcos, yesterdayAcos),
+                    impressions: calculateChange(totals.impressions, previousTotals?.impressions ?? 0),
+                    clicks: calculateChange(totals.clicks, previousTotals?.clicks ?? 0),
+                    orders: calculateChange(totals.orders, previousTotals?.orders ?? 0),
+                    spend: calculateChange(totals.spend, previousTotals?.spend ?? 0),
+                    acos: calculateChange(totalAcos, previousAcos),
                 },
             };
         }),

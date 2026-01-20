@@ -1,7 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { Area, Bar, ComposedChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { ChevronsUpDown } from 'lucide-react';
 import { api } from '@/dashboard/lib/trpc';
 import { cn } from '@/dashboard/lib/utils';
+import { Button } from '../../components/ui/button';
+import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from '../../components/ui/menu';
 import { Spinner } from '../../components/ui/spinner';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid';
 
@@ -11,14 +14,6 @@ type MetricConfig = {
     formatter: (value: number) => string;
     color?: string;
     isGood?: 'up' | 'down'; // Whether increase is good (up) or bad (down)
-};
-
-const formatHourAmPm = (hourLabel: string): string => {
-    const hour = parseInt(hourLabel.split(':')[0] ?? '0', 10);
-    if (hour === 0) return '12am';
-    if (hour === 12) return '12pm';
-    if (hour < 12) return `${hour}am`;
-    return `${hour - 12}pm`;
 };
 
 const METRICS: MetricConfig[] = [
@@ -56,6 +51,26 @@ const METRICS: MetricConfig[] = [
     },
 ];
 
+const PERIOD_OPTIONS = [
+    { value: 'today', label: 'Today' },
+    { value: 'yesterday', label: 'Yesterday' },
+    { value: 'this_week', label: 'This week' },
+    { value: 'this_month', label: 'This month' },
+    { value: 'this_year', label: 'This year' },
+] as const;
+
+const RANGE_OPTIONS = [
+    { value: 'last_30_days', label: '30 days' },
+    { value: 'last_6_months', label: '6 months' },
+    { value: 'last_12_months', label: '12 months' },
+] as const;
+
+const ALL_TIME_OPTION = { value: 'all_time', label: 'All time' } as const;
+
+const ALL_RANGE_OPTIONS = [...PERIOD_OPTIONS, ...RANGE_OPTIONS, ALL_TIME_OPTION] as const;
+
+type PerformanceRange = (typeof ALL_RANGE_OPTIONS)[number]['value'];
+
 const MetricLabel = ({ metric, value, change }: { metric: MetricConfig; value: number; change: number }) => {
     const isPositiveChange = change > 0;
     const isGoodChange = metric.isGood === 'up' ? isPositiveChange : !isPositiveChange;
@@ -83,17 +98,21 @@ const MetricLabel = ({ metric, value, change }: { metric: MetricConfig; value: n
 // Metrics that are displayed on the chart (for tooltip)
 const CHARTED_METRICS = METRICS.filter(m => m.key === 'impressions' || m.key === 'clicks' || m.key === 'orders');
 
-const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ dataKey: string; value: number; payload: Record<string, number | string> }> }) => {
+const CustomTooltip = ({
+    active,
+    payload,
+}: {
+    active?: boolean;
+    payload?: Array<{ dataKey: string; value: number; payload: { label?: string; tooltipLabel?: string } & Record<string, number | string> }>;
+}) => {
     if (!active || !payload || payload.length === 0) return null;
 
     const dataPoint = payload[0]?.payload;
     if (!dataPoint) return null;
 
-    const hourLabel = typeof dataPoint.hourLabel === 'string' ? dataPoint.hourLabel : '';
-
     return (
         <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
-            <div className="text-sm font-medium text-foreground mb-2">{formatHourAmPm(hourLabel)}</div>
+            <div className="text-sm font-medium text-foreground mb-2">{dataPoint.tooltipLabel ?? dataPoint.label}</div>
             <div className="space-y-1.5">
                 {CHARTED_METRICS.map(metric => {
                     const value = dataPoint[metric.key];
@@ -119,61 +138,266 @@ const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<
 
 export const DailyPerformanceMetrics = ({ className }: { className?: string }) => {
     const accountId = useSelectedAccountId();
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
+    const [range, setRange] = useState<PerformanceRange>('today');
 
-    const { data, isLoading, error } = api.metrics.hourlyPerformance.useQuery(
-        { accountId: accountId!, timezone },
-        {
-            enabled: !!accountId,
-            refetchInterval: 60000, // 1 minute for hourly data
-            staleTime: 30000,
+    const fallbackRange = useMemo(() => {
+        const now = new Date();
+        const todayStart = new Date(now);
+        todayStart.setHours(0, 0, 0, 0);
+        const todayEnd = new Date(now);
+        todayEnd.setHours(23, 59, 59, 999);
+
+        let start = todayStart;
+        let end = todayEnd;
+
+        if (range === 'yesterday') {
+            start = new Date(todayStart);
+            start.setDate(start.getDate() - 1);
+            end = new Date(todayEnd);
+            end.setDate(end.getDate() - 1);
         }
+
+        if (range === 'this_week') {
+            start = new Date(todayStart);
+            start.setDate(start.getDate() - start.getDay());
+        }
+
+        if (range === 'this_month') {
+            start = new Date(todayStart);
+            start.setDate(1);
+        }
+
+        if (range === 'this_year') {
+            start = new Date(todayStart);
+            start.setMonth(0, 1);
+        }
+
+        if (range === 'last_30_days') {
+            start = new Date(todayStart);
+            start.setDate(start.getDate() - 29);
+        }
+
+        if (range === 'last_6_months') {
+            start = new Date(todayStart);
+            start.setMonth(start.getMonth() - 5, 1);
+        }
+
+        if (range === 'last_12_months') {
+            start = new Date(todayStart);
+            start.setMonth(start.getMonth() - 11, 1);
+        }
+
+        return { start: start.toISOString(), end: end.toISOString() };
+    }, [range]);
+
+    const rangeConfig = useMemo(
+        () => ({
+            accountId: accountId!,
+            timezone,
+            range,
+        }),
+        [accountId, range, timezone]
     );
 
-    const chartData = useMemo(() => {
-        const hourlyData = data?.hourlyData ?? [];
-        const leadingHour = data?.leadingHour;
-        // Prepend yesterday's last hour as the leading bar
-        if (leadingHour) {
-            return [leadingHour, ...hourlyData];
-        }
-        return hourlyData;
-    }, [data?.hourlyData, data?.leadingHour]);
+    const refetchInterval = range === 'today' ? 60000 : 300000;
+    const staleTime = range === 'today' ? 30000 : 120000;
 
-    // Calculate Y-axis domains from TODAY's data only (exclude leading hour)
-    // This prevents yesterday's potentially much larger values from crushing today's bars
+    const { data, isLoading, error } = api.metrics.hourlyPerformance.useQuery(rangeConfig, {
+        enabled: !!accountId,
+        refetchInterval,
+        staleTime,
+    });
+
+    const resolvedRange = data?.range ?? fallbackRange;
+    const resolvedGranularity = data?.granularity ?? 'hour';
+    const legacyHourlyData = (data as { hourlyData?: Array<{ hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number }> })?.hourlyData;
+    const legacyLeadingHour = (data as { leadingHour?: { hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number } })?.leadingHour;
+
+    const resolvedPoints = useMemo(() => {
+        if (data?.points) return data.points;
+        if (!legacyHourlyData) return [];
+
+        const today = new Date();
+        today.setMinutes(0, 0, 0);
+        return legacyHourlyData.map(point => {
+            const date = new Date(today);
+            date.setHours(point.hour, 0, 0, 0);
+            return {
+                intervalStart: date.toISOString(),
+                impressions: point.impressions,
+                clicks: point.clicks,
+                orders: point.orders,
+                spend: Number(point.spend),
+                acos: point.acos,
+            };
+        });
+    }, [data?.points, legacyHourlyData]);
+
+    const resolvedLeadingPoint = useMemo(() => {
+        if (data?.leadingPoint) return data.leadingPoint;
+        if (!legacyLeadingHour) return null;
+        const yesterday = new Date();
+        yesterday.setDate(yesterday.getDate() - 1);
+        yesterday.setHours(23, 0, 0, 0);
+        return {
+            intervalStart: yesterday.toISOString(),
+            impressions: legacyLeadingHour.impressions,
+            clicks: legacyLeadingHour.clicks,
+            orders: legacyLeadingHour.orders,
+            spend: Number(legacyLeadingHour.spend),
+            acos: legacyLeadingHour.acos,
+        };
+    }, [data?.leadingPoint, legacyLeadingHour]);
+
+    const chartData = useMemo(() => {
+        if (!data) return [];
+        const leading = resolvedLeadingPoint ? [resolvedLeadingPoint, ...resolvedPoints] : resolvedPoints;
+        const rangeStart = resolvedRange?.start ? new Date(resolvedRange.start) : null;
+        const rangeEnd = resolvedRange?.end ? new Date(resolvedRange.end) : null;
+        const spansYears = !!rangeStart && !!rangeEnd && rangeStart.getFullYear() !== rangeEnd.getFullYear();
+
+        const dayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
+        const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', year: spansYears ? '2-digit' : undefined });
+        const tooltipDayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const tooltipMonthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
+        const tooltipHourFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+
+        return leading.map(point => {
+            const date = new Date(point.intervalStart);
+            let label = '';
+            let tooltipLabel = '';
+
+            if (resolvedGranularity === 'hour') {
+                const hourLabel = `${date.getHours().toString().padStart(2, '0')}:00`;
+                label = hourLabel;
+                tooltipLabel = `${tooltipDayFormatter.format(date)} · ${tooltipHourFormatter.format(date)}`;
+            }
+
+            if (resolvedGranularity === 'day') {
+                label = dayFormatter.format(date);
+                tooltipLabel = tooltipDayFormatter.format(date);
+            }
+
+            if (resolvedGranularity === 'month') {
+                label = monthFormatter.format(date);
+                tooltipLabel = tooltipMonthFormatter.format(date);
+            }
+
+            return {
+                ...point,
+                label,
+                tooltipLabel,
+            };
+        });
+    }, [data, resolvedGranularity, resolvedLeadingPoint, resolvedPoints, resolvedRange?.end, resolvedRange?.start]);
+
+    // Calculate Y-axis domains from in-range data only (exclude leading hour)
+    // This prevents leading context values from crushing the visible bars/lines
     const yAxisDomains = useMemo(() => {
-        const hourlyData = data?.hourlyData ?? [];
-        const maxImpressions = Math.max(...hourlyData.map(d => d.impressions), 1);
-        const maxClicks = Math.max(...hourlyData.map(d => d.clicks), 1);
-        const maxOrders = Math.max(...hourlyData.map(d => d.orders), 1);
+        const points = resolvedPoints;
+        const maxImpressions = Math.max(1, ...points.map(point => point.impressions));
+        const maxClicks = Math.max(1, ...points.map(point => point.clicks));
+        const maxOrders = Math.max(1, ...points.map(point => point.orders));
         return {
             impressions: [0, maxImpressions * 1.1] as [number, number],
             clicks: [0, maxClicks * 1.1] as [number, number],
             orders: [0, maxOrders * 1.1] as [number, number],
         };
-    }, [data?.hourlyData]);
+    }, [resolvedPoints]);
 
-    const currentHour = data?.currentHour ?? new Date().getHours();
+    const currentHourLabel = useMemo(() => {
+        if (range !== 'today') return null;
+        const now = new Date();
+        return `${now.getHours().toString().padStart(2, '0')}:00`;
+    }, [range]);
 
-    // Custom tick formatter for X axis - only show 00:00, current hour, and 23:00
+    // Custom tick formatter for X axis - emphasize key labels without crowding
     // Note: index 0 is the leading hour (yesterday's last hour), so actual hours start at index 1
     const formatXAxisTick = (value: string, index: number) => {
-        if (index === 0) return ''; // Leading hour has no label
-        if (index === 1) return '00:00';
-        if (index === currentHour + 1) return value;
-        if (index === 24) return '23:00';
+        const granularity = resolvedGranularity;
+        const totalTicks = chartData.length;
+
+        if (granularity === 'hour') {
+            const isLeading = !!resolvedLeadingPoint && index === 0;
+            if (isLeading) return '';
+            if (value === '00:00') return value;
+            if (range === 'today' && currentHourLabel && value === currentHourLabel) return value;
+            if (range !== 'today' && value === '12:00') return value;
+            if (value === '23:00') return value;
+            return '';
+        }
+
+        if (totalTicks <= 6) return value;
+        const interval = Math.ceil((totalTicks - 1) / 5);
+        if (index % interval === 0 || index === totalTicks - 1) return value;
         return '';
     };
+
+    const selectedRange = ALL_RANGE_OPTIONS.find(option => option.value === range);
+    const rangeLabel = useMemo(() => {
+        if (!resolvedRange?.start || !resolvedRange?.end) return '';
+        const start = new Date(resolvedRange.start);
+        const end = new Date(resolvedRange.end);
+        const formatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        if (start.toDateString() === end.toDateString()) {
+            return formatter.format(start);
+        }
+        return `${formatter.format(start)} – ${formatter.format(end)}`;
+    }, [resolvedRange?.end, resolvedRange?.start]);
+
+    const isStreamingRange = range === 'today' && resolvedGranularity === 'hour';
+
+    const header = (
+        <>
+            <div className="flex items-center justify-between px-4 max-w-background-frame-max mx-auto">
+                <Menu>
+                    <MenuTrigger
+                        render={
+                            <Button variant="outline" size="sm" className="rounded-full px-3 gap-2 text-sm font-medium">
+                                {selectedRange?.label ?? 'Today'}
+                                <ChevronsUpDown className="size-4 text-muted-foreground" />
+                            </Button>
+                        }
+                    />
+                    <MenuPopup className="w-[220px]" align="start">
+                        <MenuRadioGroup value={range} onValueChange={value => setRange(value as PerformanceRange)}>
+                            <MenuGroup>
+                                <MenuGroupLabel>Period</MenuGroupLabel>
+                                {PERIOD_OPTIONS.map(option => (
+                                    <MenuRadioItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </MenuRadioItem>
+                                ))}
+                            </MenuGroup>
+                            <MenuSeparator />
+                            <MenuGroup>
+                                <MenuGroupLabel>Range</MenuGroupLabel>
+                                {RANGE_OPTIONS.map(option => (
+                                    <MenuRadioItem key={option.value} value={option.value}>
+                                        {option.label}
+                                    </MenuRadioItem>
+                                ))}
+                            </MenuGroup>
+                            <MenuSeparator />
+                            <MenuRadioItem value={ALL_TIME_OPTION.value}>{ALL_TIME_OPTION.label}</MenuRadioItem>
+                        </MenuRadioGroup>
+                    </MenuPopup>
+                </Menu>
+                {rangeLabel ? <span className="text-xs text-muted-foreground">{rangeLabel}</span> : null}
+            </div>
+            <div className="flex items-start justify-start gap-6 md:gap-12 mb-4 px-4 max-w-background-frame-max mx-auto overflow-x-auto">
+                {METRICS.map(metric => (
+                    <MetricLabel key={metric.key} metric={metric} value={data?.totals?.[metric.key] ?? 0} change={data?.changes?.[metric.key] ?? 0} />
+                ))}
+            </div>
+        </>
+    );
 
     if (isLoading) {
         return (
             <div className={cn('w-full', className)}>
-                <div className="flex items-start justify-start gap-6 md:gap-12 mb-4 px-4 max-w-background-frame-max mx-auto">
-                    {METRICS.map(metric => (
-                        <MetricLabel key={metric.key} metric={metric} value={0} change={0} />
-                    ))}
-                </div>
+                {header}
                 <div className="flex items-center justify-center h-[360px]">
                     <Spinner className="size-6 text-muted-foreground" />
                 </div>
@@ -184,11 +408,7 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
     if (error) {
         return (
             <div className={cn('w-full', className)}>
-                <div className="flex items-start justify-start gap-6 md:gap-12 mb-4 px-4 max-w-background-frame-max mx-auto">
-                    {METRICS.map(metric => (
-                        <MetricLabel key={metric.key} metric={metric} value={0} change={0} />
-                    ))}
-                </div>
+                {header}
                 <div className="flex items-center justify-center h-[360px]">
                     <div className="text-center">
                         <p className="text-sm text-muted-foreground">Unable to load performance data</p>
@@ -199,25 +419,16 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
         );
     }
 
-    // Get current hour label for the reference line
-    const currentHourLabel = `${currentHour.toString().padStart(2, '0')}:00`;
-
     return (
         <div className={cn('w-full', className)}>
-            {/* Metric Labels */}
-            <div className="flex items-start justify-start gap-6 md:gap-12 mb-4 px-4 max-w-background-frame-max mx-auto overflow-x-auto">
-                {METRICS.map(metric => (
-                    <MetricLabel key={metric.key} metric={metric} value={data?.totals[metric.key] ?? 0} change={data?.changes[metric.key] ?? 0} />
-                ))}
-            </div>
+            {header}
 
             {/* Chart with fade effect - extends past left edge for streaming effect */}
             <div className="relative w-full h-[360px] overflow-hidden">
-                {/* Fade gradient overlay on left side - stronger gradient for streaming effect */}
-                <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" />
+                {isStreamingRange ? <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" /> : null}
 
                 {/* Chart shifted left so T-1 is mostly off-screen, centering today's data */}
-                <div className="absolute inset-0 -left-[3.5%]" style={{ width: 'calc(100% + 3.5%)' }}>
+                <div className={cn('absolute inset-0', isStreamingRange ? '-left-[3.5%]' : 'left-0')} style={isStreamingRange ? { width: 'calc(100% + 3.5%)' } : undefined}>
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
                             <defs>
@@ -231,16 +442,16 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
                                 </linearGradient>
                             </defs>
 
-                            <XAxis dataKey="hourLabel" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} interval={0} />
+                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} interval={0} />
 
-                            {/* Hidden Y axes for each metric - domains based on TODAY's data only */}
+                            {/* Hidden Y axes for each metric - domains based on in-range data only */}
                             {/* allowDataOverflow clips yesterday's leading bar if it exceeds today's scale */}
                             <YAxis yAxisId="impressions" hide domain={yAxisDomains.impressions} allowDataOverflow />
                             <YAxis yAxisId="clicks" hide domain={yAxisDomains.clicks} allowDataOverflow />
                             <YAxis yAxisId="orders" hide domain={yAxisDomains.orders} allowDataOverflow />
 
                             {/* Reference line for current hour */}
-                            <ReferenceLine x={currentHourLabel} stroke="#d1d5db" strokeDasharray="4 4" yAxisId="impressions" />
+                            {currentHourLabel ? <ReferenceLine x={currentHourLabel} stroke="#d1d5db" strokeDasharray="4 4" yAxisId="impressions" /> : null}
 
                             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
 
