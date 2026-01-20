@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { db } from '@/db/index';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceHourly } from '@/db/schema';
 import { boss } from '@/jobs/boss';
+import { zonedTopOfHour } from '@/utils/date';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { withJobMetrics, type JobMetricsRecorder } from '@/utils/job-metrics';
 
@@ -62,7 +63,8 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
     const windowEnd = new Date();
     const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1000);
     const timezone = getTimezoneForCountry(countryCode);
-    const datasetBadge = `hourly target · ${formatInTimeZone(windowEnd, timezone, 'MMM d HH:mm')}`;
+    const windowEndHourStart = zonedTopOfHour(windowEnd, timezone);
+    const datasetBadge = `hourly target · ${formatInTimeZone(windowEndHourStart, timezone, 'MMM d HH:mm')}`;
 
     if (!entityId) {
         recorder.addEvent({
