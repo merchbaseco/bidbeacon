@@ -1,7 +1,7 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useAtomValue } from 'jotai';
-import { AlertTriangle, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import CircleArrowDown02Icon from '@merchbaseco/icons/core-solid-rounded/CircleArrowDown02Icon';
 import FilterResetIcon from '@merchbaseco/icons/core-solid-rounded/FilterResetIcon';
@@ -303,8 +303,7 @@ export const EventStream = () => {
                                                 className={cn('grid grid-cols-[140px_210px_56px_1fr] gap-4 px-4 py-2 text-sm hover:bg-muted/50 cursor-pointer min-w-0', isError && 'bg-destructive/10')}
                                                 onClick={() => setSelectedEvent(row.event)}
                                             >
-                                                <div className="flex items-center gap-2">
-                                                    {isError && <AlertTriangle className="h-4 w-4 text-warning-foreground" />}
+                                                <div className="flex items-center">
                                                     <span className={cn(isError ? 'text-destructive-foreground/80' : 'text-muted-foreground')}>{row.formattedTime}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2 truncate">
