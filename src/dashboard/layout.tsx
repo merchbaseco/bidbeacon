@@ -18,6 +18,7 @@ import { MoreMenu } from './components/more-menu';
 import { Toaster } from './components/ui/toast';
 import { TRPCProvider } from './lib/trpc-provider';
 import { AccountSelector } from './routes/components/account-selector/account-selector';
+import { AccountEnabledSwitch } from './routes/components/account-selector/account-enabled-switch';
 import { useWebSocket } from './routes/hooks/use-websocket';
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
@@ -53,6 +54,7 @@ export function RootRoute() {
                                 <div className="md:hidden">
                                     <AccountSelector />
                                 </div>
+                                <AccountEnabledSwitch />
                                 <MoreMenu />
                                 {!DEV_AUTH_ENABLED && <UserButton />}
                             </div>
