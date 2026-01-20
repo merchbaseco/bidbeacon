@@ -291,3 +291,16 @@ docker logs bidbeacon-worker --tail 50
    ```bash
    docker compose build --no-cache server
    ```
+
+---
+
+## Production Database Access
+
+This machine has a configured `.pgpass` for the production database, so you can run read-only queries for debugging. Do **not** take any write actions (inserts/updates/deletes/migrations) without explicit user confirmation first.
+
+**Test connection:**
+```bash
+psql -h zachs-mac-mini.taila0b849.ts.net -p 5432 -U bidbeacon -d bidbeacon -c "SELECT 1;"
+```
+
+See `docs/database-queries.md` for the full query workflow and examples.

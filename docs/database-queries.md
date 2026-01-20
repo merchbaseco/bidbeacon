@@ -3,6 +3,7 @@
 ## For Claude Code
 
 When you need to inspect the production database (verify data, debug issues, check record counts), use a sub-agent pattern that keeps query results isolated from the main conversation context.
+Use the direct `psql` command (backed by `.pgpass`) for production access instead of Docker.
 
 ## Pattern
 
@@ -14,13 +15,13 @@ Task({
   prompt: `Query the BidBeacon production database to answer: [YOUR QUESTION HERE]
 
   Database access instructions:
-  1. Use docker exec to run queries inside the postgres container:
-     docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "SELECT ..."
+  1. Use direct psql (auth via .pgpass) to run queries:
+     psql -h zachs-mac-mini.taila0b849.ts.net -p 5432 -U bidbeacon -d bidbeacon -c "SELECT ..."
 
-  2. For multi-line output or complex queries, you can enter interactive psql:
-     docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon
+  2. For multi-line output or complex queries, enter interactive psql:
+     psql -h zachs-mac-mini.taila0b849.ts.net -p 5432 -U bidbeacon -d bidbeacon
 
-  3. Return concise summary of findings
+  3. Return a concise summary of findings
 
   Schema reference: src/db/schema.ts
   Common tables: advertiser_account, report_dataset_metadata, performance_hourly, performance_daily`
@@ -83,12 +84,23 @@ Key tables (see `src/db/schema.ts` for complete schema):
 
 ## Query Execution
 
+### Direct psql (preferred)
+
+This repo uses a `.pgpass` file on the machine to provide credentials for the production database, so `psql` connects without prompting for a password. The command structure is:
+
+```bash
+psql -h zachs-mac-mini.taila0b849.ts.net -p 5432 -U bidbeacon -d bidbeacon -c "SELECT 1;"
+```
+
+- `-h` host, `-p` port, `-U` user, `-d` database
+- `.pgpass` supplies the password so the command can run non-interactively
+
 ```bash
 # One-line query
-docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "SELECT COUNT(*) FROM advertiser_account;"
+psql -h zachs-mac-mini.taila0b849.ts.net -p 5432 -U bidbeacon -d bidbeacon -c "SELECT COUNT(*) FROM advertiser_account;"
 
 # Interactive psql session
-docker exec -it bidbeacon-postgres psql -U bidbeacon -d bidbeacon
+psql -h zachs-mac-mini.taila0b849.ts.net -p 5432 -U bidbeacon -d bidbeacon
 # Then run queries interactively
 # \dt to list tables
 # \d table_name to describe a table
