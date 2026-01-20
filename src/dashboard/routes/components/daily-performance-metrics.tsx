@@ -560,7 +560,12 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
                             {/* Reference line for current hour */}
                             {currentHourLabel ? <ReferenceLine x={currentHourLabel} stroke="#d1d5db" strokeDasharray="4 4" yAxisId="impressions" /> : null}
 
-                            <Tooltip content={<CustomTooltip onHoverChange={handleHoverChange} />} cursor={{ fill: 'transparent' }} />
+                            <Tooltip
+                                content={<CustomTooltip onHoverChange={handleHoverChange} />}
+                                cursor={{ fill: 'transparent' }}
+                                isAnimationActive={false}
+                                position={{ y: 12 }}
+                            />
 
                             {/* Impressions as bars - subtle gray (zIndex 0 = behind) */}
                             <Bar
