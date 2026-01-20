@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Area, Bar, ComposedChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { ChevronsUpDown } from 'lucide-react';
 import { api } from '@/dashboard/lib/trpc';
@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/button';
 import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from '../../components/ui/menu';
 import { Spinner } from '../../components/ui/spinner';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid';
+import { ChartHoverIndicator } from './chart-hover-indicator';
 
 type MetricConfig = {
     key: 'impressions' | 'clicks' | 'orders' | 'spend' | 'acos';
@@ -97,22 +98,48 @@ const MetricLabel = ({ metric, value, change }: { metric: MetricConfig; value: n
 
 // Metrics that are displayed on the chart (for tooltip)
 const CHARTED_METRICS = METRICS.filter(m => m.key === 'impressions' || m.key === 'clicks' || m.key === 'orders');
+type HoverState = {
+    coordinate: { x: number; y: number };
+    label: string;
+};
 
 const CustomTooltip = ({
     active,
     payload,
+    label,
+    coordinate,
+    onHoverChange,
 }: {
     active?: boolean;
-    payload?: Array<{ dataKey: string; value: number; payload: { label?: string; tooltipLabel?: string } & Record<string, number | string> }>;
+    payload?: Array<{
+        dataKey: string;
+        value: number;
+        payload: { label?: string; tooltipLabel?: string } & Record<string, number | string>;
+    }>;
+    label?: string | number;
+    coordinate?: { x: number; y: number };
+    onHoverChange?: (state: HoverState | null) => void;
 }) => {
+    useEffect(() => {
+        if (!onHoverChange) return;
+        if (active && coordinate && label !== undefined) {
+            onHoverChange({
+                coordinate,
+                label: typeof label === 'string' ? label : label.toString(),
+            });
+        } else {
+            onHoverChange(null);
+        }
+    }, [active, coordinate, label, onHoverChange]);
     if (!active || !payload || payload.length === 0) return null;
 
     const dataPoint = payload[0]?.payload;
     if (!dataPoint) return null;
+    const heading = dataPoint.tooltipLabel ?? dataPoint.label ?? label;
 
     return (
         <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
-            <div className="text-sm font-medium text-foreground mb-2">{dataPoint.tooltipLabel ?? dataPoint.label}</div>
+            <div className="text-sm font-medium text-foreground mb-2">{heading}</div>
             <div className="space-y-1.5">
                 {CHARTED_METRICS.map(metric => {
                     const value = dataPoint[metric.key];
@@ -142,6 +169,15 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
     const [range, setRange] = useState<PerformanceRange>('today');
     const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(null);
     const [customRangeDraft, setCustomRangeDraft] = useState<{ start: string; end: string }>({ start: '', end: '' });
+    const chartRef = useRef<HTMLDivElement>(null);
+    const [hoverState, setHoverState] = useState<HoverState | null>(null);
+    const handleHoverChange = useCallback((state: HoverState | null) => {
+        setHoverState(state);
+    }, []);
+    const handleChartLeave = useCallback(() => {
+        setHoverState(null);
+    }, []);
+
 
     const fallbackRange = useMemo(() => {
         if (customRange?.start && customRange?.end) {
@@ -495,9 +531,13 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
                 {isStreamingRange ? <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" /> : null}
 
                 {/* Chart shifted left so T-1 is mostly off-screen, centering today's data */}
-                <div className={cn('absolute inset-0', isStreamingRange ? '-left-[3.5%]' : 'left-0')} style={isStreamingRange ? { width: 'calc(100% + 3.5%)' } : undefined}>
+                <div
+                    className={cn('absolute inset-0', isStreamingRange ? '-left-[3.5%]' : 'left-0')}
+                    style={isStreamingRange ? { width: 'calc(100% + 3.5%)' } : undefined}
+                    ref={chartRef}
+                >
                     <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }}>
+                        <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }} onMouseLeave={handleChartLeave}>
                             <defs>
                                 <linearGradient id="clicksGradient" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
@@ -520,7 +560,7 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
                             {/* Reference line for current hour */}
                             {currentHourLabel ? <ReferenceLine x={currentHourLabel} stroke="#d1d5db" strokeDasharray="4 4" yAxisId="impressions" /> : null}
 
-                            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'transparent' }} />
+                            <Tooltip content={<CustomTooltip onHoverChange={handleHoverChange} />} cursor={{ fill: 'transparent' }} />
 
                             {/* Impressions as bars - subtle gray (zIndex 0 = behind) */}
                             <Bar
@@ -539,6 +579,12 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
+                <ChartHoverIndicator
+                    active={!!hoverState}
+                    coordinate={hoverState?.coordinate}
+                    label={hoverState?.label}
+                    containerRef={chartRef}
+                />
             </div>
         </div>
     );
