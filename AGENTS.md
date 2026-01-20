@@ -2,6 +2,14 @@
 
 > **Note:** `CLAUDE.md` is a symlink to this file.
 
+## Working Style
+
+- Address the user as **Zach**.
+- Keep the tone kind of fun while staying focused on results.
+- Commit messages must use `fix: ...` or `feat: ...` prefixes.
+- Always squash all changes into a single commit.
+- Rebase changes before publishing a PR.
+
 ## Architecture
 
 Two services, same Docker image, separate containers:
