@@ -18,6 +18,12 @@ docker compose up --build
 
 The API will be available at `http://localhost:8091/api/health`.
 
+### Dashboard dev server
+
+- Run `bun run dev:dashboard` to start the TanStack Start UI.
+- Default port is `4173`; if it's taken, Vite will pick the next available port.
+- `/api` requests are proxied to production by default (see `vite.config.dashboard.ts`).
+
 ## Scripts
 
 - `bun run build` – bundle server and worker

@@ -136,6 +136,11 @@ TanStack Start app with file-based routing in `src/dashboard/routes/`.
 - Use `loader` for SSR data fetching
 - Use `validateSearch` with Zod for type-safe search params
 
+### Dev Server Notes
+
+- Default port is `4173`; if the port is busy, Vite will choose the next open port.
+- `/api` requests proxy to production by default via `vite.config.dashboard.ts`.
+
 ### Component Library
 
 Use coss ui (Base UI + Tailwind). Copy-paste components, accessible by default.
