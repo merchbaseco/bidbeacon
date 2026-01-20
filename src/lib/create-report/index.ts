@@ -1,3 +1,4 @@
+import { formatInTimeZone } from 'date-fns-tz';
 import { eq } from 'drizzle-orm';
 import { createReport } from '@/amazon-ads/create-report.js';
 import { reportConfigs } from '@/config/reports/configs.js';
@@ -5,6 +6,7 @@ import { db } from '@/db/index.js';
 import { advertiserAccount } from '@/db/schema.js';
 import type { AggregationType, EntityType } from '@/types/reports.js';
 import { utcAddHours } from '@/utils/date.js';
+import { getTimezoneForCountry } from '@/utils/timezones';
 
 export type CreateReportForDatasetInput = {
     accountId: string;
@@ -38,14 +40,8 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
     const windowStart = new Date(input.timestamp);
     const windowEnd = input.aggregation === 'hourly' ? utcAddHours(windowStart, 1) : windowStart;
 
-    const formatDate = (date: Date): string => {
-        const isoString = date.toISOString();
-        const datePart = isoString.split('T')[0];
-        if (!datePart) {
-            throw new Error('Failed to format date');
-        }
-        return datePart;
-    };
+    const timezone = getTimezoneForCountry(input.countryCode);
+    const formatDate = (date: Date): string => formatInTimeZone(date, timezone, 'yyyy-MM-dd');
 
     const startDate = formatDate(windowStart);
     const endDate = formatDate(windowEnd);
