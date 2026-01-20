@@ -8,6 +8,7 @@ import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Combobox, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxPopup } from '../../components/ui/combobox';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
+import { ScrollArea } from '../../components/ui/scroll-area';
 import { Spinner } from '../../components/ui/spinner';
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { cn } from '../../lib/utils';
@@ -311,38 +312,45 @@ export const EventStream = () => {
                             ))}
                         </div>
 
-                        {filteredEvents.length === 0 ? (
-                            <div className="flex items-center justify-center py-8">
-                                <p className="text-sm text-muted-foreground">{emptyStateCopy}</p>
-                            </div>
-                        ) : (
-                            <div className="divide-y divide-border/60">
-                                {filteredEvents.map(row => {
-                                    const isError = row.event.outcome === 'error';
-                                    return (
-                                        <div
-                                            key={row.event.id}
-                                            className={cn('grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-sm hover:bg-muted/50 cursor-pointer min-w-0', isError && 'bg-destructive/10')}
-                                            onClick={() => setSelectedEvent(row.event)}
-                                        >
-                                            <div className="flex items-center gap-2">
-                                                {isError && <AlertTriangle className="h-4 w-4 text-warning-foreground" />}
-                                                <span className={cn(isError ? 'text-destructive-foreground' : 'text-foreground')}>{row.formattedTime}</span>
+                        <ScrollArea className="h-[420px] max-h-[420px]" scrollFade scrollbarGutter>
+                            {filteredEvents.length === 0 ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <p className="text-sm text-muted-foreground">{emptyStateCopy}</p>
+                                </div>
+                            ) : (
+                                <div className="divide-y divide-border/60">
+                                    {filteredEvents.map(row => {
+                                        const isError = row.event.outcome === 'error';
+                                        return (
+                                            <div
+                                                key={row.event.id}
+                                                className={cn(
+                                                    'grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-sm hover:bg-muted/50 cursor-pointer min-w-0',
+                                                    isError && 'bg-destructive/10'
+                                                )}
+                                                onClick={() => setSelectedEvent(row.event)}
+                                            >
+                                                <div className="flex items-center gap-2">
+                                                    {isError && <AlertTriangle className="h-4 w-4 text-warning-foreground" />}
+                                                    <span className={cn(isError ? 'text-destructive-foreground' : 'text-foreground')}>{row.formattedTime}</span>
+                                                </div>
+                                                <div className="flex items-center gap-2 truncate">
+                                                    <span className="truncate" title={row.event.jobName}>
+                                                        {formatJobName(row.event.jobName)}
+                                                    </span>
+                                                </div>
+                                                <div className={cn('font-mono text-xs', isError ? 'text-destructive-foreground' : 'text-success-foreground')}>
+                                                    {OUTCOME_COPY[row.event.outcome]?.label ?? row.event.outcome}
+                                                </div>
+                                                <div className="text-muted-foreground truncate whitespace-nowrap min-w-0">
+                                                    {renderMessage(row.event.message, row.event.badges)}
+                                                </div>
                                             </div>
-                                            <div className="flex items-center gap-2 truncate">
-                                                <span className="truncate" title={row.event.jobName}>
-                                                    {formatJobName(row.event.jobName)}
-                                                </span>
-                                            </div>
-                                            <div className={cn('font-mono text-xs', isError ? 'text-destructive-foreground' : 'text-success-foreground')}>
-                                                {OUTCOME_COPY[row.event.outcome]?.label ?? row.event.outcome}
-                                            </div>
-                                            <div className="text-muted-foreground truncate whitespace-nowrap min-w-0">{renderMessage(row.event.message, row.event.badges)}</div>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        )}
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </ScrollArea>
                     </>
                 )}
             </Card>
