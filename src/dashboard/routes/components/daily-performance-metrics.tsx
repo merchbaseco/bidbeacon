@@ -140,8 +140,17 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
     const accountId = useSelectedAccountId();
     const timezone = useMemo(() => Intl.DateTimeFormat().resolvedOptions().timeZone, []);
     const [range, setRange] = useState<PerformanceRange>('today');
+    const [customRange, setCustomRange] = useState<{ start: string; end: string } | null>(null);
+    const [customRangeDraft, setCustomRangeDraft] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
     const fallbackRange = useMemo(() => {
+        if (customRange?.start && customRange?.end) {
+            const customDates = normalizeLocalDateRange(customRange.start, customRange.end);
+            if (customDates) {
+                return { start: customDates.start.toISOString(), end: customDates.end.toISOString() };
+            }
+        }
+
         const now = new Date();
         const todayStart = new Date(now);
         todayStart.setHours(0, 0, 0, 0);
@@ -189,19 +198,23 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
         }
 
         return { start: start.toISOString(), end: end.toISOString() };
-    }, [range]);
+    }, [customRange, range]);
+
+    const isCustomRangeActive = Boolean(customRange?.start && customRange?.end);
 
     const rangeConfig = useMemo(
         () => ({
             accountId: accountId!,
             timezone,
             range,
+            customRange: isCustomRangeActive ? customRange : null,
         }),
-        [accountId, range, timezone]
+        [accountId, customRange, isCustomRangeActive, range, timezone]
     );
 
-    const refetchInterval = range === 'today' ? 60000 : 300000;
-    const staleTime = range === 'today' ? 30000 : 120000;
+    const isLiveRange = range === 'today' && !isCustomRangeActive;
+    const refetchInterval = isLiveRange ? 60000 : 300000;
+    const staleTime = isLiveRange ? 30000 : 120000;
 
     const { data, isLoading, error } = api.metrics.hourlyPerformance.useQuery(rangeConfig, {
         enabled: !!accountId,
@@ -307,10 +320,10 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
     }, [resolvedPoints]);
 
     const currentHourLabel = useMemo(() => {
-        if (range !== 'today') return null;
+        if (!isLiveRange) return null;
         const now = new Date();
         return `${now.getHours().toString().padStart(2, '0')}:00`;
-    }, [range]);
+    }, [isLiveRange]);
 
     // Custom tick formatter for X axis - emphasize key labels without crowding
     // Note: index 0 is the leading hour (yesterday's last hour), so actual hours start at index 1
@@ -346,7 +359,10 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
         return `${formatter.format(start)} – ${formatter.format(end)}`;
     }, [resolvedRange?.end, resolvedRange?.start]);
 
-    const isStreamingRange = range === 'today' && resolvedGranularity === 'hour';
+    const isStreamingRange = isLiveRange && resolvedGranularity === 'hour';
+
+    const triggerLabel = isCustomRangeActive ? 'Custom range' : selectedRange?.label ?? 'Today';
+    const canApplyCustomRange = Boolean(customRangeDraft.start && customRangeDraft.end);
 
     const header = (
         <>
@@ -355,13 +371,19 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
                     <MenuTrigger
                         render={
                             <Button variant="outline" size="sm" className="rounded-full px-3 gap-2 text-sm font-medium">
-                                {selectedRange?.label ?? 'Today'}
+                                {triggerLabel}
                                 <ChevronsUpDown className="size-4 text-muted-foreground" />
                             </Button>
                         }
                     />
-                    <MenuPopup className="w-[220px]" align="start">
-                        <MenuRadioGroup value={range} onValueChange={value => setRange(value as PerformanceRange)}>
+                    <MenuPopup className="w-[240px] overflow-x-hidden" align="start">
+                        <MenuRadioGroup
+                            value={range}
+                            onValueChange={value => {
+                                setRange(value as PerformanceRange);
+                                setCustomRange(null);
+                            }}
+                        >
                             <MenuGroup>
                                 <MenuGroupLabel>Period</MenuGroupLabel>
                                 {PERIOD_OPTIONS.map(option => (
@@ -382,6 +404,51 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
                             <MenuSeparator />
                             <MenuRadioItem value={ALL_TIME_OPTION.value}>{ALL_TIME_OPTION.label}</MenuRadioItem>
                         </MenuRadioGroup>
+                        <MenuSeparator />
+                        <MenuGroup>
+                            <MenuGroupLabel>Custom range</MenuGroupLabel>
+                            <div className="mx-2 mb-2 flex min-w-0 flex-col gap-2 rounded-lg border border-border/60 bg-muted/30 px-3 py-2 shadow-sm">
+                                <label className="text-xs text-muted-foreground">Start</label>
+                                <input
+                                    type="date"
+                                    value={customRangeDraft.start}
+                                    onChange={event => setCustomRangeDraft(current => ({ ...current, start: event.target.value }))}
+                                    className="h-8 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm text-foreground shadow-inner"
+                                />
+                                <label className="text-xs text-muted-foreground">End</label>
+                                <input
+                                    type="date"
+                                    value={customRangeDraft.end}
+                                    onChange={event => setCustomRangeDraft(current => ({ ...current, end: event.target.value }))}
+                                    className="h-8 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm text-foreground shadow-inner"
+                                />
+                                <div className="flex min-w-0 gap-2">
+                                    <Button
+                                        size="sm"
+                                        className="min-w-0 flex-1"
+                                        disabled={!canApplyCustomRange}
+                                        onClick={() => {
+                                            if (!canApplyCustomRange) return;
+                                            setCustomRange({
+                                                start: customRangeDraft.start,
+                                                end: customRangeDraft.end,
+                                            });
+                                        }}
+                                    >
+                                        Apply
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="ghost"
+                                        className="min-w-0 flex-1"
+                                        onClick={() => setCustomRange(null)}
+                                        disabled={!isCustomRangeActive}
+                                    >
+                                        Clear
+                                    </Button>
+                                </div>
+                            </div>
+                        </MenuGroup>
                     </MenuPopup>
                 </Menu>
                 {rangeLabel ? <span className="text-xs text-muted-foreground">{rangeLabel}</span> : null}
@@ -475,4 +542,22 @@ export const DailyPerformanceMetrics = ({ className }: { className?: string }) =
             </div>
         </div>
     );
+};
+
+const normalizeLocalDateRange = (startValue: string, endValue: string) => {
+    const start = parseLocalDateInput(startValue);
+    const end = parseLocalDateInput(endValue);
+    if (!start || !end) return null;
+
+    const normalized = start.getTime() <= end.getTime() ? { start, end } : { start: end, end: start };
+    normalized.start.setHours(0, 0, 0, 0);
+    normalized.end.setHours(23, 59, 59, 999);
+    return normalized;
+};
+
+const parseLocalDateInput = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    const date = new Date(year, month - 1, day);
+    return Number.isNaN(date.getTime()) ? null : date;
 };

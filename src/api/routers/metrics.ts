@@ -1,9 +1,10 @@
-import { addDays, addHours, addMonths, endOfDay, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, format } from 'date-fns';
+import { addDays, addHours, addMonths, endOfDay, startOfDay, startOfMonth, subDays, format } from 'date-fns';
 import { and, desc, eq, gte, lt, lte, sql, isNotNull } from 'drizzle-orm';
-import { formatInTimeZone, fromZonedTime, toZonedTime } from 'date-fns-tz';
+import { fromZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { amsMetrics, apiMetrics, events, jobMetrics, performanceDaily, performanceHourly } from '@/db/schema';
+import { getPerformanceRange } from '@/lib/performance-range';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { protectedProcedure, router } from '../trpc';
 
@@ -608,63 +609,21 @@ export const metricsRouter = router({
                 accountId: z.string(),
                 timezone: z.string(), // Browser timezone - used for display
                 range: z.enum(PERFORMANCE_RANGES).default('today'),
+                customRange: z
+                    .object({
+                        start: z.string(),
+                        end: z.string(),
+                    })
+                    .nullable()
+                    .optional(),
             })
         )
         .query(async ({ ctx, input }) => {
             ctx.assertAccountAccess(input.accountId);
             const browserTimezone = input.timezone;
             const now = new Date();
-            const zonedNow = toZonedTime(now, browserTimezone);
-            const endOfToday = endOfDay(zonedNow);
-
-            let rangeStartZoned = startOfDay(zonedNow);
-            let rangeEndZoned = endOfToday;
-            let granularity: 'hour' | 'day' | 'month' = 'hour';
-
-            if (input.range === 'yesterday') {
-                const yesterday = subDays(zonedNow, 1);
-                rangeStartZoned = startOfDay(yesterday);
-                rangeEndZoned = endOfDay(yesterday);
-                granularity = 'hour';
-            }
-
-            if (input.range === 'this_week') {
-                rangeStartZoned = startOfWeek(zonedNow, { weekStartsOn: 0 });
-                rangeEndZoned = endOfToday;
-                granularity = 'day';
-            }
-
-            if (input.range === 'this_month') {
-                rangeStartZoned = startOfMonth(zonedNow);
-                rangeEndZoned = endOfToday;
-                granularity = 'day';
-            }
-
-            if (input.range === 'this_year') {
-                rangeStartZoned = startOfYear(zonedNow);
-                rangeEndZoned = endOfToday;
-                granularity = 'month';
-            }
-
-            if (input.range === 'last_30_days') {
-                rangeStartZoned = startOfDay(subDays(zonedNow, 29));
-                rangeEndZoned = endOfToday;
-                granularity = 'day';
-            }
-
-            if (input.range === 'last_6_months') {
-                rangeStartZoned = startOfMonth(subMonths(zonedNow, 5));
-                rangeEndZoned = endOfToday;
-                granularity = 'month';
-            }
-
-            if (input.range === 'last_12_months') {
-                rangeStartZoned = startOfMonth(subMonths(zonedNow, 11));
-                rangeEndZoned = endOfToday;
-                granularity = 'month';
-            }
-
-            if (input.range === 'all_time') {
+            let allTimeStartUtc: Date | null = null;
+            if (input.range === 'all_time' && !input.customRange) {
                 const [earliest] = await db
                     .select({
                         firstSeen: sql<Date>`min(${performanceHourly.bucketStart})`.as('first_seen'),
@@ -672,30 +631,22 @@ export const metricsRouter = router({
                     .from(performanceHourly)
                     .where(eq(performanceHourly.accountId, input.accountId));
 
-                if (earliest?.firstSeen) {
-                    const earliestZoned = toZonedTime(new Date(earliest.firstSeen), browserTimezone);
-                    rangeStartZoned = startOfDay(earliestZoned);
-                }
-
-                rangeEndZoned = endOfToday;
-                granularity = 'month';
+                allTimeStartUtc = earliest?.firstSeen ? new Date(earliest.firstSeen) : null;
             }
 
-            const rangeEndExclusiveZoned = new Date(rangeEndZoned.getTime() + 1);
-            const rangeStartUtc = fromZonedTime(rangeStartZoned, browserTimezone);
-            const rangeEndUtc = fromZonedTime(rangeEndZoned, browserTimezone);
-            const rangeEndExclusiveUtc = fromZonedTime(rangeEndExclusiveZoned, browserTimezone);
+            const rangeResult = getPerformanceRange({
+                range: input.range,
+                timezone: browserTimezone,
+                now,
+                allTimeStartUtc,
+                customRange: input.customRange ?? null,
+            });
 
-            const shouldCompare = input.range !== 'all_time';
+            const { rangeStartZoned, rangeEndZoned, rangeStartUtc, rangeEndUtc, rangeEndExclusiveUtc, granularity, shouldCompare, compareStartUtc, compareEndExclusiveUtc } =
+                rangeResult;
             let previousTotals: { impressions: number; clicks: number; orders: number; spend: number; sales: number } | null = null;
 
-            if (shouldCompare) {
-                const durationMs = rangeEndExclusiveZoned.getTime() - rangeStartZoned.getTime();
-                const compareStartZoned = new Date(rangeStartZoned.getTime() - durationMs);
-                const compareEndExclusiveZoned = new Date(rangeEndExclusiveZoned.getTime() - durationMs);
-                const compareStartUtc = fromZonedTime(compareStartZoned, browserTimezone);
-                const compareEndExclusiveUtc = fromZonedTime(compareEndExclusiveZoned, browserTimezone);
-
+            if (shouldCompare && compareStartUtc && compareEndExclusiveUtc) {
                 const [previousTotalsRow] = await db
                     .select({
                         impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
