@@ -1,4 +1,4 @@
-import { addDays, addHours, addMonths, endOfDay, startOfDay, startOfMonth, subDays, format } from 'date-fns';
+import { addDays, addHours, addMonths, endOfDay, startOfDay, startOfMonth, subDays, subMonths, format } from 'date-fns';
 import { and, desc, eq, gte, lt, lte, sql, isNotNull } from 'drizzle-orm';
 import { fromZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
@@ -750,50 +750,41 @@ export const metricsRouter = router({
                     });
                 }
 
-                if (input.range === 'today') {
-                    const previousDay = subDays(dayStartZoned, 1);
-                    const previousDayStartUtc = fromZonedTime(startOfDay(previousDay), browserTimezone);
-                    const previousDayEndExclusiveUtc = fromZonedTime(new Date(endOfDay(previousDay).getTime() + 1), browserTimezone);
+                // Always include a leading point (even for custom ranges) so charts can render
+                // a contextual lead-in and shift the visible window consistently.
+                const previousHourStartZoned = addHours(dayStartZoned, -1);
+                const previousHourStartUtc = fromZonedTime(previousHourStartZoned, browserTimezone);
+                const previousHourEndUtc = fromZonedTime(addHours(previousHourStartZoned, 1), browserTimezone);
 
-                    const [previousDayLastHour] = await db
-                        .select({
-                            impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
-                            clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                            orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
-                            spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
-                            sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
-                        })
-                        .from(performanceHourly)
-                        .where(
-                            and(
-                                eq(performanceHourly.accountId, input.accountId),
-                                gte(performanceHourly.bucketStart, previousDayStartUtc),
-                                lt(performanceHourly.bucketStart, previousDayEndExclusiveUtc),
-                                sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral}) = 23`
-                            )
-                        );
+                const [previousHourRow] = await db
+                    .select({
+                        impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                        clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                        orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                        spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                        sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                    })
+                    .from(performanceHourly)
+                    .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, previousHourStartUtc), lt(performanceHourly.bucketStart, previousHourEndUtc)));
 
-                    const previousHourData = {
-                        impressions: Number(previousDayLastHour?.impressions ?? 0),
-                        clicks: Number(previousDayLastHour?.clicks ?? 0),
-                        orders: Number(previousDayLastHour?.orders ?? 0),
-                        spend: Number(previousDayLastHour?.spend ?? 0),
-                        sales: Number(previousDayLastHour?.sales ?? 0),
-                    };
+                const previousHourData = {
+                    impressions: Number(previousHourRow?.impressions ?? 0),
+                    clicks: Number(previousHourRow?.clicks ?? 0),
+                    orders: Number(previousHourRow?.orders ?? 0),
+                    spend: Number(previousHourRow?.spend ?? 0),
+                    sales: Number(previousHourRow?.sales ?? 0),
+                };
 
-                    const previousHourAcos = previousHourData.sales > 0 ? (previousHourData.spend / previousHourData.sales) * 100 : 0;
-                    const previousHourStartZoned = addHours(startOfDay(previousDay), 23);
-                    const previousHourStartUtc = fromZonedTime(previousHourStartZoned, browserTimezone);
+                const previousHourAcos = previousHourData.sales > 0 ? (previousHourData.spend / previousHourData.sales) * 100 : 0;
 
-                    leadingPoint = {
-                        intervalStart: previousHourStartUtc.toISOString(),
-                        impressions: previousHourData.impressions,
-                        clicks: previousHourData.clicks,
-                        orders: previousHourData.orders,
-                        spend: previousHourData.spend,
-                        acos: previousHourAcos,
-                    };
-                }
+                leadingPoint = {
+                    intervalStart: previousHourStartUtc.toISOString(),
+                    impressions: previousHourData.impressions,
+                    clicks: previousHourData.clicks,
+                    orders: previousHourData.orders,
+                    spend: previousHourData.spend,
+                    acos: previousHourAcos,
+                };
             }
 
             if (granularity === 'day' || granularity === 'month') {
@@ -885,6 +876,79 @@ export const metricsRouter = router({
                             acos,
                         });
                     }
+                }
+
+                if (granularity === 'day') {
+                    const leadingDayStartZoned = addDays(startOfDay(rangeStartZoned), -1);
+                    const leadingDayStartUtc = fromZonedTime(leadingDayStartZoned, browserTimezone);
+                    const leadingDayEndUtc = fromZonedTime(startOfDay(rangeStartZoned), browserTimezone);
+
+                    const [leadingDayRow] = await db
+                        .select({
+                            impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                            clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                            orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                            spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                            sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                        })
+                        .from(performanceHourly)
+                        .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, leadingDayStartUtc), lt(performanceHourly.bucketStart, leadingDayEndUtc)));
+
+                    const leadingDayData = {
+                        impressions: Number(leadingDayRow?.impressions ?? 0),
+                        clicks: Number(leadingDayRow?.clicks ?? 0),
+                        orders: Number(leadingDayRow?.orders ?? 0),
+                        spend: Number(leadingDayRow?.spend ?? 0),
+                        sales: Number(leadingDayRow?.sales ?? 0),
+                    };
+
+                    const leadingDayAcos = leadingDayData.sales > 0 ? (leadingDayData.spend / leadingDayData.sales) * 100 : 0;
+
+                    leadingPoint = {
+                        intervalStart: leadingDayStartUtc.toISOString(),
+                        impressions: leadingDayData.impressions,
+                        clicks: leadingDayData.clicks,
+                        orders: leadingDayData.orders,
+                        spend: leadingDayData.spend,
+                        acos: leadingDayAcos,
+                    };
+                }
+
+                if (granularity === 'month') {
+                    const rangeMonthStartZoned = startOfMonth(rangeStartZoned);
+                    const leadingMonthStartZoned = startOfMonth(subMonths(rangeMonthStartZoned, 1));
+                    const leadingMonthStartUtc = fromZonedTime(leadingMonthStartZoned, browserTimezone);
+                    const leadingMonthEndUtc = fromZonedTime(rangeMonthStartZoned, browserTimezone);
+
+                    const [leadingMonthRow] = await db
+                        .select({
+                            impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                            clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                            orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                            spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                            sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                        })
+                        .from(performanceHourly)
+                        .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, leadingMonthStartUtc), lt(performanceHourly.bucketStart, leadingMonthEndUtc)));
+
+                    const leadingMonthData = {
+                        impressions: Number(leadingMonthRow?.impressions ?? 0),
+                        clicks: Number(leadingMonthRow?.clicks ?? 0),
+                        orders: Number(leadingMonthRow?.orders ?? 0),
+                        spend: Number(leadingMonthRow?.spend ?? 0),
+                        sales: Number(leadingMonthRow?.sales ?? 0),
+                    };
+
+                    const leadingMonthAcos = leadingMonthData.sales > 0 ? (leadingMonthData.spend / leadingMonthData.sales) * 100 : 0;
+
+                    leadingPoint = {
+                        intervalStart: leadingMonthStartUtc.toISOString(),
+                        impressions: leadingMonthData.impressions,
+                        clicks: leadingMonthData.clicks,
+                        orders: leadingMonthData.orders,
+                        spend: leadingMonthData.spend,
+                        acos: leadingMonthAcos,
+                    };
                 }
             }
 
