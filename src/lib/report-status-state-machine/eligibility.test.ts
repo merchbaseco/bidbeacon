@@ -42,4 +42,26 @@ describe('report eligibility timezone handling', () => {
 
         expect(eligible).toBe(false);
     });
+
+    it('keeps hourly offsets stable across spring-forward transitions', () => {
+        vi.useFakeTimers();
+
+        const countryCode = 'US';
+        const periodStart = new Date(Date.UTC(2025, 2, 9, 9, 0, 0)); // 2025-03-09 01:00 PST
+        const lastReportCreatedAt = new Date(2025, 2, 10, 1, 0, 0); // 2025-03-10 01:00 local (PDT)
+        const now = new Date(Date.UTC(2025, 2, 10, 10, 0, 0)); // 25h after periodStart
+
+        vi.setSystemTime(now);
+
+        const nextRefreshAt = getNextRefreshTime({
+            reportId: null,
+            periodStart,
+            aggregation: 'hourly',
+            lastReportCreatedAt,
+            countryCode,
+        });
+
+        const expected = new Date(Date.UTC(2025, 2, 10, 9, 0, 0)); // periodStart + 24h
+        expect(nextRefreshAt?.getTime()).toBe(expected.getTime());
+    });
 });
