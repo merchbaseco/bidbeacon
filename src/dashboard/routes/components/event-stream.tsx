@@ -1,14 +1,17 @@
 import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo, useState, type ReactNode } from 'react';
 import { useAtomValue } from 'jotai';
-import { AlertTriangle, Eye, EyeOff, Filter, RefreshCw } from 'lucide-react';
+import { AlertTriangle, Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { HugeiconsIcon } from '@hugeicons/react';
+import CircleArrowDown02Icon from '@merchbaseco/icons/core-solid-rounded/CircleArrowDown02Icon';
+import FilterResetIcon from '@merchbaseco/icons/core-solid-rounded/FilterResetIcon';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
-import { Combobox, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxPopup } from '../../components/ui/combobox';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
 import { ScrollArea } from '../../components/ui/scroll-area';
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '../../components/ui/select';
 import { Spinner } from '../../components/ui/spinner';
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { cn } from '../../lib/utils';
@@ -33,6 +36,8 @@ const OUTCOME_COPY: Record<string, { label: string; variant: 'success' | 'error'
 };
 
 const HEADER_COLUMNS = ['Time', 'Job', 'Outcome', 'Message'];
+const ALL_EVENTS_VALUE = '__all__';
+const HISTOGRAM_MAX_HEIGHT = 64;
 export const EventStream = () => {
     const accountId = useAtomValue(selectedAccountIdAtom);
     const countryCode = useAtomValue(selectedCountryCodeAtom);
@@ -40,7 +45,6 @@ export const EventStream = () => {
 
     const [selectedBucket, setSelectedBucket] = useState<string | null>(null);
     const [selectedEvent, setSelectedEvent] = useState<EventRow | null>(null);
-    const [jobNameInput, setJobNameInput] = useState('');
     const [appliedJobName, setAppliedJobName] = useState<string | null>(null);
     const [showEmptyMessages, setShowEmptyMessages] = useState(false);
 
@@ -81,7 +85,7 @@ export const EventStream = () => {
         }
         return data.events.map(event => ({
             event,
-            formattedTime: formatInTimeZone(new Date(event.createdAt), timezone, 'MMM dd HH:mm:ss.SSS'),
+            formattedTime: formatInTimeZone(new Date(event.createdAt), timezone, 'MMM dd HH:mm:ss'),
         }));
     }, [data?.events, timezone]);
 
@@ -102,17 +106,6 @@ export const EventStream = () => {
         return Array.from(names).sort();
     }, [events]);
 
-    const filteredJobNameOptions = useMemo(() => {
-        const query = jobNameInput.trim().toLowerCase();
-        if (!query) {
-            return jobNameOptions;
-        }
-        return jobNameOptions.filter(jobName => {
-            const formatted = formatJobName(jobName).toLowerCase();
-            return jobName.toLowerCase().includes(query) || formatted.includes(query);
-        });
-    }, [jobNameInput, jobNameOptions]);
-
     const maxCount = useMemo(() => {
         return histogram.reduce((max, bucket) => Math.max(max, bucket.count), 0);
     }, [histogram]);
@@ -122,31 +115,16 @@ export const EventStream = () => {
     }, [histogram]);
 
     const selectedLabel = selectedBucket ? formatInTimeZone(new Date(selectedBucket), timezone, 'MMM dd HH:mm') : null;
-    const trimmedJobName = jobNameInput.trim();
     const hasActiveFilters = Boolean(selectedBucket || appliedJobName);
-    const canApplyJobFilter = trimmedJobName !== (appliedJobName ?? '');
-    const emptyStateCopy =
-        !showEmptyMessages && events.length > 0
-            ? 'No events with messages yet'
-            : hasActiveFilters
-              ? 'No events match the current filters'
-              : 'No events recorded yet';
+    const selectedJobLabel = appliedJobName ? formatJobName(appliedJobName) : 'All Events';
+    const emptyStateCopy = !showEmptyMessages && events.length > 0 ? 'No events with messages yet' : hasActiveFilters ? 'No events match the current filters' : 'No events recorded yet';
 
-    const applyFilters = () => {
+    const clearFilters = () => {
         if (!hasSelection) {
             return;
         }
-        if (canApplyJobFilter) {
-            const nextJobName = trimmedJobName.length > 0 ? trimmedJobName : null;
-            setAppliedJobName(nextJobName);
-            setJobNameInput(nextJobName ?? '');
-            return;
-        }
-        if (hasActiveFilters) {
-            setSelectedBucket(null);
-            setAppliedJobName(null);
-            setJobNameInput('');
-        }
+        setSelectedBucket(null);
+        setAppliedJobName(null);
     };
 
     const handleBucketClick = (bucket: EventBucket) => {
@@ -155,90 +133,95 @@ export const EventStream = () => {
 
     return (
         <>
-            <Card className="font-mono pb-0 gap-0 overflow-hidden">
-                <div className="flex flex-wrap items-center gap-2 mb-4 px-4">
-                    <Button
-                        variant="outline"
-                        size="icon-lg"
-                        onClick={applyFilters}
-                        disabled={!hasSelection || (!hasActiveFilters && !canApplyJobFilter)}
-                        title={canApplyJobFilter ? 'Apply filters' : hasActiveFilters ? 'Clear filters' : 'No filters'}
-                    >
-                        <Filter className="h-5 w-5" />
-                    </Button>
-
-                    <div className="flex-1 min-w-0">
-                        <Combobox
-                            value={appliedJobName ?? ''}
-                            inputValue={jobNameInput}
-                            onInputValueChange={value => {
-                                setJobNameInput(value);
-                                if (!value.trim()) {
-                                    setAppliedJobName(null);
-                                }
-                            }}
-                            onValueChange={value => {
-                                const nextValue = value?.toString() ?? '';
-                                setAppliedJobName(nextValue ? nextValue : null);
-                                setJobNameInput(nextValue);
-                            }}
-                        >
-                            <ComboboxInput
-                                aria-label="Filter by job name"
-                                placeholder="Filter by job name"
-                                showClear
-                                size="lg"
-                                onKeyDown={event => {
-                                    if (event.key === 'Enter') {
-                                        applyFilters();
+            <Card className="font-mono pb-0 pt-4 gap-0 overflow-hidden">
+                <div className="flex flex-wrap items-start justify-between gap-2 px-4">
+                    <div className="flex flex-col gap-1 -mt-1">
+                        <div className="flex min-w-0 flex-1 items-center gap-3">
+                            <span className="text-sm font-medium text-muted-foreground">Event Stream</span>
+                            <Select
+                                disabled={!hasSelection}
+                                value={appliedJobName ?? ALL_EVENTS_VALUE}
+                                onValueChange={value => {
+                                    if (value === ALL_EVENTS_VALUE) {
+                                        setAppliedJobName(null);
+                                        return;
                                     }
+                                    setAppliedJobName(value);
                                 }}
-                            />
-                            <ComboboxPopup>
-                                <ComboboxList>
-                                    {filteredJobNameOptions.length === 0 ? (
-                                        <ComboboxEmpty>No matching jobs</ComboboxEmpty>
+                            >
+                                <SelectTrigger
+                                    size="sm"
+                                    className="h-auto w-auto min-w-0 justify-start gap-2 border-transparent bg-transparent px-0 py-0 text-foreground shadow-none hover:bg-transparent focus-visible:ring-0 data-pressed:bg-transparent data-placeholder:text-muted-foreground sm:text-sm dark:bg-transparent dark:data-pressed:bg-transparent [&_[data-slot=select-icon]]:hidden before:hidden"
+                                >
+                                    <span className="flex items-center gap-2">
+                                        <span className="text-sm font-medium">{selectedJobLabel}</span>
+                                        <SelectValue className="sr-only" />
+                                        <HugeiconsIcon icon={CircleArrowDown02Icon} className="shrink-0 size-5" />
+                                    </span>
+                                </SelectTrigger>
+                                <SelectPopup>
+                                    <SelectItem value={ALL_EVENTS_VALUE}>All Events</SelectItem>
+                                    {jobNameOptions.length === 0 ? (
+                                        <SelectItem disabled value="__empty__">
+                                            No jobs yet
+                                        </SelectItem>
                                     ) : (
-                                        filteredJobNameOptions.map(jobName => (
-                                            <ComboboxItem key={jobName} value={jobName}>
+                                        jobNameOptions.map(jobName => (
+                                            <SelectItem key={jobName} value={jobName}>
                                                 {formatJobName(jobName)}
-                                            </ComboboxItem>
+                                            </SelectItem>
                                         ))
                                     )}
-                                </ComboboxList>
-                            </ComboboxPopup>
-                        </Combobox>
+                                </SelectPopup>
+                            </Select>
+
+                            {hasActiveFilters && (
+                                <Tooltip>
+                                    <TooltipTrigger
+                                        render={
+                                            <Button size="icon" variant="ghost" onClick={clearFilters} disabled={!hasSelection}>
+                                                <HugeiconsIcon icon={FilterResetIcon} className="size-5" />
+                                            </Button>
+                                        }
+                                        delay={0}
+                                        closeDelay={0}
+                                    />
+                                    <TooltipPopup>Clear filters</TooltipPopup>
+                                </Tooltip>
+                            )}
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 pb-3 text-xs text-muted-foreground">
+                            <span>{`${totalCount.toLocaleString()} events (last 12h)`}</span>
+                            {selectedLabel && <span>{`• Window: ${selectedLabel}`}</span>}
+                        </div>
                     </div>
 
-                    <Tooltip>
-                        <TooltipTrigger
-                            render={
-                                <Button
-                                    variant="outline"
-                                    size="icon-lg"
-                                    onClick={() => setShowEmptyMessages(current => !current)}
-                                    aria-pressed={showEmptyMessages}
-                                >
-                                    {showEmptyMessages ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
-                                </Button>
-                            }
-                            delay={0}
-                            closeDelay={0}
-                        />
-                        <TooltipPopup>{showEmptyMessages ? 'Hide empty messages' : 'Show empty messages'}</TooltipPopup>
-                    </Tooltip>
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Tooltip>
+                            <TooltipTrigger
+                                render={
+                                    <Button variant="outline" size="icon-lg" onClick={() => setShowEmptyMessages(current => !current)} aria-pressed={showEmptyMessages}>
+                                        {showEmptyMessages ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
+                                    </Button>
+                                }
+                                delay={0}
+                                closeDelay={0}
+                            />
+                            <TooltipPopup>{showEmptyMessages ? 'Hide empty messages' : 'Show empty messages'}</TooltipPopup>
+                        </Tooltip>
 
-                    <Button
-                        variant="outline"
-                        size="icon-lg"
-                        onClick={() => {
-                            refetch();
-                        }}
-                        disabled={!hasSelection || isFetching}
-                        title={isFetching ? 'Refreshing events' : 'Refresh events'}
-                    >
-                        {isFetching ? <Spinner className="size-4 text-muted-foreground" /> : <RefreshCw className="h-5 w-5" />}
-                    </Button>
+                        <Button
+                            variant="outline"
+                            size="icon-lg"
+                            onClick={() => {
+                                refetch();
+                            }}
+                            disabled={!hasSelection || isFetching}
+                            title={isFetching ? 'Refreshing events' : 'Refresh events'}
+                        >
+                            {isFetching ? <Spinner className="size-4 text-muted-foreground" /> : <RefreshCw className="h-5 w-5" />}
+                        </Button>
+                    </div>
                 </div>
 
                 {!hasSelection ? (
@@ -258,17 +241,10 @@ export const EventStream = () => {
                     </div>
                 ) : (
                     <>
-                        <div className="flex flex-wrap items-center gap-2 px-4 pb-3 text-xs text-muted-foreground">
-                            <span>{`${totalCount.toLocaleString()} events (last 12h)`}</span>
-                            {appliedJobName && <span>{`• Job: ${formatJobName(appliedJobName)}`}</span>}
-                            {selectedLabel && <span>{`• Window: ${selectedLabel}`}</span>}
-                            {!showEmptyMessages && <span>• Hiding empty messages</span>}
-                        </div>
-
                         <TooltipProvider delay={0} closeDelay={0}>
-                            <div className="h-20 flex items-end gap-px mb-4 px-4">
+                            <div className="h-16 flex items-end gap-px mb-4 px-4 mt-4">
                                 {histogram.map(bucket => {
-                                    const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * 48)) : 2;
+                                    const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * HISTOGRAM_MAX_HEIGHT)) : 2;
                                     const isSelected = selectedBucket === bucket.interval;
                                     const formattedBucket = formatInTimeZone(new Date(bucket.interval), timezone, 'MMM dd HH:mm');
                                     const rangeLabel = formatBucketRange(bucket.interval, timezone);
@@ -306,7 +282,7 @@ export const EventStream = () => {
                             </div>
                         </TooltipProvider>
 
-                        <div className="grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-xs text-muted-foreground border-b border-border">
+                        <div className="grid grid-cols-[140px_210px_56px_1fr] gap-4 px-4 py-2 text-xs text-muted-foreground border-b border-border">
                             {HEADER_COLUMNS.map(column => (
                                 <div key={column}>{column}</div>
                             ))}
@@ -324,15 +300,12 @@ export const EventStream = () => {
                                         return (
                                             <div
                                                 key={row.event.id}
-                                                className={cn(
-                                                    'grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-sm hover:bg-muted/50 cursor-pointer min-w-0',
-                                                    isError && 'bg-destructive/10'
-                                                )}
+                                                className={cn('grid grid-cols-[140px_210px_56px_1fr] gap-4 px-4 py-2 text-sm hover:bg-muted/50 cursor-pointer min-w-0', isError && 'bg-destructive/10')}
                                                 onClick={() => setSelectedEvent(row.event)}
                                             >
                                                 <div className="flex items-center gap-2">
                                                     {isError && <AlertTriangle className="h-4 w-4 text-warning-foreground" />}
-                                                    <span className={cn(isError ? 'text-destructive-foreground' : 'text-foreground')}>{row.formattedTime}</span>
+                                                    <span className={cn(isError ? 'text-destructive-foreground/80' : 'text-muted-foreground')}>{row.formattedTime}</span>
                                                 </div>
                                                 <div className="flex items-center gap-2 truncate">
                                                     <span className="truncate" title={row.event.jobName}>
@@ -475,9 +448,27 @@ const formatBucketRange = (interval: string, timezone: string) => {
 };
 
 const formatJobName = (jobName: string) => {
-    return jobName.replace(/-/g, ' ');
+    if (JOB_NAME_LABELS[jobName]) {
+        return JOB_NAME_LABELS[jobName];
+    }
+    const normalized = jobName.replace(/[-_]+/g, ' ').trim();
+    if (!normalized) {
+        return jobName;
+    }
+    return normalized
+        .split(' ')
+        .filter(Boolean)
+        .map(word => `${word[0]?.toUpperCase() ?? ''}${word.slice(1).toLowerCase()}`)
+        .join(' ');
 };
 
 const roundUpToNearestFiveMinutes = (date: Date): Date => {
     return new Date(Math.ceil(date.getTime() / (5 * 60 * 1000)) * (5 * 60 * 1000));
+};
+
+const JOB_NAME_LABELS: Record<string, string> = {
+    'summarize-daily-target-stream': 'Summarize Daily Target Stream',
+    'summarize-hourly-target-stream': 'Summarize Hourly Target Stream',
+    'update-report-dataset': 'Update Report Dataset',
+    'update-report-status': 'Update Report Status',
 };
