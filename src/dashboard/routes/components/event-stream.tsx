@@ -1,5 +1,5 @@
 import { formatInTimeZone } from 'date-fns-tz';
-import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useAtomValue } from 'jotai';
 import { AlertTriangle, Eye, EyeOff, Filter, RefreshCw } from 'lucide-react';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
@@ -9,7 +9,7 @@ import { Card } from '../../components/ui/card';
 import { Combobox, ComboboxEmpty, ComboboxInput, ComboboxItem, ComboboxList, ComboboxPopup } from '../../components/ui/combobox';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from '../../components/ui/dialog';
 import { Spinner } from '../../components/ui/spinner';
-import { Tooltip, TooltipCreateHandle, TooltipPopup, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
+import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { cn } from '../../lib/utils';
 import { useEvents } from '../hooks/use-events';
 import { selectedAccountIdAtom, selectedCountryCodeAtom } from './account-selector/atoms';
@@ -32,8 +32,6 @@ const OUTCOME_COPY: Record<string, { label: string; variant: 'success' | 'error'
 };
 
 const HEADER_COLUMNS = ['Time', 'Job', 'Outcome', 'Message'];
-const histogramTooltipHandle = TooltipCreateHandle<ComponentType>();
-
 export const EventStream = () => {
     const accountId = useAtomValue(selectedAccountIdAtom);
     const countryCode = useAtomValue(selectedCountryCodeAtom);
@@ -266,50 +264,45 @@ export const EventStream = () => {
                             {!showEmptyMessages && <span>• Hiding empty messages</span>}
                         </div>
 
-                        <TooltipProvider>
+                        <TooltipProvider delay={0} closeDelay={0}>
                             <div className="h-20 flex items-end gap-px mb-4 px-4">
                                 {histogram.map(bucket => {
                                     const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * 48)) : 2;
                                     const isSelected = selectedBucket === bucket.interval;
                                     const formattedBucket = formatInTimeZone(new Date(bucket.interval), timezone, 'MMM dd HH:mm');
                                     const rangeLabel = formatBucketRange(bucket.interval, timezone);
-                                    const RangeContent = () => (
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-foreground">{rangeLabel}</span>
-                                            <span className="text-muted-foreground">
-                                                {bucket.count.toLocaleString()} {bucket.count === 1 ? 'event' : 'events'}
-                                            </span>
-                                        </div>
-                                    );
 
                                     return (
-                                        <TooltipTrigger
-                                            key={bucket.interval}
-                                            className="group flex-1 min-w-[2px] h-full flex items-end"
-                                            onClick={() => handleBucketClick(bucket)}
-                                            aria-label={`Filter to ${formattedBucket}`}
-                                            type="button"
-                                            handle={histogramTooltipHandle}
-                                            payload={RangeContent}
-                                            delay={0}
-                                        >
-                                            <span
-                                                className={cn(
-                                                    'block w-full group-hover:bg-foreground/70',
-                                                    bucket.count > 0 ? 'bg-muted-foreground/50' : 'bg-muted/70',
-                                                    isSelected && 'bg-foreground'
-                                                )}
-                                                style={{ height }}
-                                            />
-                                        </TooltipTrigger>
+                                        <Tooltip key={bucket.interval}>
+                                            <TooltipTrigger
+                                                className="group flex-1 min-w-[2px] h-full flex items-end"
+                                                onClick={() => handleBucketClick(bucket)}
+                                                aria-label={`Filter to ${formattedBucket}`}
+                                                type="button"
+                                                delay={0}
+                                                closeDelay={0}
+                                            >
+                                                <span
+                                                    className={cn(
+                                                        'block w-full group-hover:bg-foreground/70',
+                                                        bucket.count > 0 ? 'bg-muted-foreground/50' : 'bg-muted/70',
+                                                        isSelected && 'bg-foreground'
+                                                    )}
+                                                    style={{ height }}
+                                                />
+                                            </TooltipTrigger>
+                                            <TooltipPopup>
+                                                <div className="flex flex-col gap-1">
+                                                    <span className="text-foreground">{rangeLabel}</span>
+                                                    <span className="text-muted-foreground">
+                                                        {bucket.count.toLocaleString()} {bucket.count === 1 ? 'event' : 'events'}
+                                                    </span>
+                                                </div>
+                                            </TooltipPopup>
+                                        </Tooltip>
                                     );
                                 })}
                             </div>
-                            <Tooltip handle={histogramTooltipHandle}>
-                                {({ payload: Payload }) => (
-                                    <TooltipPopup>{Payload ? <Payload /> : null}</TooltipPopup>
-                                )}
-                            </Tooltip>
                         </TooltipProvider>
 
                         <div className="grid grid-cols-[200px_160px_56px_1fr] gap-4 px-4 py-2 text-xs text-muted-foreground border-b border-border">
