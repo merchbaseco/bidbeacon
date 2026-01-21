@@ -35,6 +35,8 @@ export function IndexRoute() {
         <div>
             <PerformanceMetrics className="pt-4" />
 
+            <PerformanceTable className="max-w-background-frame-max mx-auto px-4 mt-4" />
+
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4 max-w-background-frame-max mx-auto px-4 mt-4">
                 <div className="md:col-span-2">
                     <AccountDataCard />
@@ -47,8 +49,6 @@ export function IndexRoute() {
             <div className="max-w-background-frame-max mx-auto px-4 mt-4">
                 <EventStream />
             </div>
-
-            <PerformanceTable className="max-w-background-frame-max mx-auto px-4 mt-6" />
 
             <ReportsTable className="max-w-background-frame-max mx-auto px-4 mt-6" />
         </div>
