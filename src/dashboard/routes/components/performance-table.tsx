@@ -2,12 +2,14 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { useDeferredValue, useMemo, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
 import { Badge } from '@/dashboard/components/ui/badge';
+import { Button } from '@/dashboard/components/ui/button';
 import { Frame, FrameFooter } from '@/dashboard/components/ui/frame';
 import { Input } from '@/dashboard/components/ui/input';
 import { ScrollArea } from '@/dashboard/components/ui/scroll-area';
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '@/dashboard/components/ui/select';
 import { Skeleton } from '@/dashboard/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/dashboard/components/ui/table';
+import { EntityDetailsDialog } from '@/dashboard/routes/components/entity-details-dialog';
 import { useSelectedAccountId } from '@/dashboard/routes/hooks/use-selected-accountid';
 import { useSelectedCountryCode } from '@/dashboard/routes/hooks/use-selected-country-code';
 import { usePerformanceTable } from '@/dashboard/routes/hooks/use-performance-table';
@@ -25,6 +27,7 @@ const PerformanceTable = ({ className }: { className?: string }) => {
     const [statusFilter, setStatusFilter] = useState('all');
     const [adProductFilter, setAdProductFilter] = useState('all');
     const [searchInput, setSearchInput] = useState('');
+    const [detailsRow, setDetailsRow] = useState<PerformanceTableRow | null>(null);
     const deferredSearchInput = useDeferredValue(searchInput);
     const forceSkeleton = useMemo(() => {
         if (typeof window === 'undefined') return false;
@@ -160,6 +163,7 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                             <TableHead className="text-right">Orders</TableHead>
                             <TableHead className="text-right">ACOS</TableHead>
                             <TableHead className="text-right">ROAS</TableHead>
+                            <TableHead className="text-right">Details</TableHead>
                         </TableRow>
                     </TableHeader>
                 </Table>
@@ -179,17 +183,20 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                             <TableBody className="before:hidden">
                                 {showSkeleton ? (
                                     <TableRow className="border-0 h-[520px]">
-                                        <TableCell colSpan={7} className="h-[520px] p-0 align-top border-0">
+                                        <TableCell colSpan={8} className="h-[520px] p-0 align-top border-0">
                                             <div className="box-border grid h-full grid-rows-[repeat(12,minmax(0,1fr))] gap-0">
                                                 {Array.from({ length: 12 }).map((_, index) => (
                                                     <div
                                                         key={index}
-                                                        className="grid grid-cols-[minmax(0,1fr)_80px_110px_110px_110px_110px_110px] items-center"
+                                                        className="grid grid-cols-[minmax(0,1fr)_80px_110px_110px_110px_110px_110px_90px] items-center"
                                                     >
                                                         <div className="px-2">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
                                                         <div className="px-2">
+                                                            <Skeleton className="h-4 w-full" />
+                                                        </div>
+                                                        <div className="px-2 flex justify-end">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
                                                         <div className="px-2 flex justify-end">
@@ -214,7 +221,7 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                                     </TableRow>
                                 ) : isEmpty ? (
                                     <TableRow>
-                                        <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
+                                        <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
                                             No campaign performance data found for this range.
                                         </TableCell>
                                     </TableRow>
@@ -246,6 +253,15 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                                                 <TableCell className="text-right">{formatNumber(row.metrics.orders)}</TableCell>
                                                 <TableCell className="text-right">{formatPercent(row.metrics.acos)}</TableCell>
                                                 <TableCell className="text-right">{formatRatio(row.metrics.roas)}</TableCell>
+                                                <TableCell className="text-right">
+                                                    <Button
+                                                        size="xs"
+                                                        variant="outline"
+                                                        onClick={() => setDetailsRow(row)}
+                                                    >
+                                                        Details
+                                                    </Button>
+                                                </TableCell>
                                             </TableRow>
                                         );
                                     })
@@ -260,6 +276,14 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                     </FrameFooter>
                 ) : null}
             </Frame>
+            <EntityDetailsDialog
+                open={Boolean(detailsRow)}
+                onOpenChange={open => {
+                    if (!open) setDetailsRow(null);
+                }}
+                row={detailsRow}
+                accountId={accountId}
+            />
         </div>
     );
 };
@@ -487,7 +511,7 @@ const AD_PRODUCT_OPTIONS = [
     { value: 'AMAZON_DSP', label: 'Amazon DSP' },
 ] as const;
 
-const COLUMN_WIDTHS = ['w-[80px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[110px]'] as const;
+const COLUMN_WIDTHS = ['w-[80px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[90px]'] as const;
 
 export { PerformanceTable };
 

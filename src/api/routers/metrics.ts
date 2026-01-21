@@ -8,7 +8,18 @@ import { getPerformanceRange } from '@/lib/performance-range';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { protectedProcedure, router } from '../trpc';
 
-const SUPPORTED_APIS = ['listAdvertiserAccounts', 'createReport', 'retrieveReport', 'exportCampaigns', 'exportAdGroups', 'exportAds', 'exportTargets', 'getExportStatus'] as const;
+const SUPPORTED_APIS = [
+    'listAdvertiserAccounts',
+    'createReport',
+    'retrieveReport',
+    'exportCampaigns',
+    'exportAdGroups',
+    'exportAds',
+    'exportTargets',
+    'getExportStatus',
+    'updateAdGroupBid',
+    'updateTargetBid',
+] as const;
 const SUPPORTED_JOBS = [
     'update-report-datasets',
     'update-report-dataset-for-account',
