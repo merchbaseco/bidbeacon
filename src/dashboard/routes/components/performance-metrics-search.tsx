@@ -1,6 +1,6 @@
 import { useDeferredValue } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import { SearchIcon } from '@hugeicons/core-free-icons';
+import SearchIcon from '@merchbaseco/icons/core-solid-rounded/SearchIcon';
 import { useAtom } from 'jotai';
 import {
     Combobox,
