@@ -1,18 +1,21 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import { migrate } from 'drizzle-orm/postgres-js/migrator';
 import postgres from 'postgres';
+import { getDatabaseConfig } from './database-config.js';
 
 export async function runMigrations() {
     console.log('Starting database migrations');
 
     try {
+        const databaseConfig = getDatabaseConfig();
+
         // Create a dedicated connection for migrations
         const migrationClient = postgres({
-            host: 'postgres',
-            port: 5432,
-            database: 'bidbeacon',
-            username: 'bidbeacon',
-            password: process.env.BIDBEACON_DATABASE_PASSWORD!,
+            host: databaseConfig.host,
+            port: databaseConfig.port,
+            database: databaseConfig.name,
+            username: databaseConfig.user,
+            password: databaseConfig.password,
             max: 1, // Single connection for migrations
             onnotice: process.env.NODE_ENV === 'development' ? console.log : undefined,
         });
@@ -34,3 +37,5 @@ export async function runMigrations() {
         throw error;
     }
 }
+
+// Helpers live in src/db/database-config.ts
