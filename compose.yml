@@ -4,10 +4,10 @@ services:
     container_name: bidbeacon-postgres
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "${HOST_IP}:5432:5432"
     environment:
-      POSTGRES_DB: bidbeacon
-      POSTGRES_USER: bidbeacon
+      POSTGRES_DB: ${BIDBEACON_DATABASE_NAME:-bidbeacon}
+      POSTGRES_USER: ${BIDBEACON_DATABASE_USER:-bidbeacon}
       POSTGRES_PASSWORD: ${BIDBEACON_DATABASE_PASSWORD}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -33,10 +33,10 @@ services:
     restart: unless-stopped
     environment:
       PORT: 8080
-      BIDBEACON_DATABASE_HOST: postgres
-      BIDBEACON_DATABASE_PORT: 5432
-      BIDBEACON_DATABASE_NAME: bidbeacon
-      BIDBEACON_DATABASE_USER: bidbeacon
+      BIDBEACON_DATABASE_HOST: ${BIDBEACON_DATABASE_HOST:-postgres}
+      BIDBEACON_DATABASE_PORT: ${BIDBEACON_DATABASE_PORT:-5432}
+      BIDBEACON_DATABASE_NAME: ${BIDBEACON_DATABASE_NAME:-bidbeacon}
+      BIDBEACON_DATABASE_USER: ${BIDBEACON_DATABASE_USER:-bidbeacon}
       BIDBEACON_DATABASE_PASSWORD: ${BIDBEACON_DATABASE_PASSWORD}
       ADS_API_REFRESH_TOKEN: ${ADS_API_REFRESH_TOKEN}
       ADS_API_CLIENT_ID: ${ADS_API_CLIENT_ID}
@@ -63,10 +63,10 @@ services:
     container_name: bidbeacon-worker
     restart: unless-stopped
     environment:
-      BIDBEACON_DATABASE_HOST: postgres
-      BIDBEACON_DATABASE_PORT: 5432
-      BIDBEACON_DATABASE_NAME: bidbeacon
-      BIDBEACON_DATABASE_USER: bidbeacon
+      BIDBEACON_DATABASE_HOST: ${BIDBEACON_DATABASE_HOST:-postgres}
+      BIDBEACON_DATABASE_PORT: ${BIDBEACON_DATABASE_PORT:-5432}
+      BIDBEACON_DATABASE_NAME: ${BIDBEACON_DATABASE_NAME:-bidbeacon}
+      BIDBEACON_DATABASE_USER: ${BIDBEACON_DATABASE_USER:-bidbeacon}
       BIDBEACON_DATABASE_PASSWORD: ${BIDBEACON_DATABASE_PASSWORD}
       ADS_API_REFRESH_TOKEN: ${ADS_API_REFRESH_TOKEN}
       ADS_API_CLIENT_ID: ${ADS_API_CLIENT_ID}
