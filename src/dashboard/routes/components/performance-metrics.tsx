@@ -55,7 +55,7 @@ const PerformanceMetrics = ({ className }: { className?: string }) => {
 
     return (
         <div className={cn('w-full', className)}>
-            <PerformanceMetricsControls totals={data?.totals} changes={data?.changes} />
+            <PerformanceMetricsControls totals={data?.totals} changes={data?.changes} range={data?.range} timezone={data?.timezone} />
             <PerformanceMetricsChart data={data} isLoading={isLoading} error={error} />
         </div>
     );
