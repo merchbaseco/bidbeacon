@@ -1,18 +1,8 @@
 import { useDeferredValue } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
-import SearchIcon from '@merchbaseco/icons/core-solid-rounded/SearchIcon';
+import Search01Icon from '@merchbaseco/icons/core-solid-rounded/Search01Icon';
 import { useAtom } from 'jotai';
-import {
-    Combobox,
-    ComboboxEmpty,
-    ComboboxGroup,
-    ComboboxGroupLabel,
-    ComboboxInput,
-    ComboboxItem,
-    ComboboxList,
-    ComboboxPopup,
-    ComboboxStatus,
-} from '../../components/ui/combobox';
+import { Combobox, ComboboxEmpty, ComboboxGroup, ComboboxGroupLabel, ComboboxInput, ComboboxItem, ComboboxList, ComboboxPopup, ComboboxStatus } from '../../components/ui/combobox';
 import { usePerformanceEntitySearch } from '../hooks/use-performance-entity-search';
 import { entityFiltersAtom, searchInputAtom } from './performance-metrics-atoms';
 
@@ -21,7 +11,11 @@ const PerformanceMetricsSearch = ({ accountId }: { accountId: string }) => {
     const [entityFilters, setEntityFilters] = useAtom(entityFiltersAtom);
     const deferredSearchInput = useDeferredValue(searchInput);
 
-    const { results: searchResults, isFetching: isSearching, shouldSearch } = usePerformanceEntitySearch({
+    const {
+        results: searchResults,
+        isFetching: isSearching,
+        shouldSearch,
+    } = usePerformanceEntitySearch({
         accountId: accountId!,
         query: deferredSearchInput,
     });
@@ -31,9 +25,7 @@ const PerformanceMetricsSearch = ({ accountId }: { accountId: string }) => {
         value: `${result.type}:${result.id}`,
     }));
 
-    const availableSearchResults = searchResultsWithValues.filter(
-        result => !entityFilters.some(filter => filter.type === result.type && filter.id === result.id)
-    );
+    const availableSearchResults = searchResultsWithValues.filter(result => !entityFilters.some(filter => filter.type === result.type && filter.id === result.id));
 
     const groupedSearchResults = {
         campaigns: availableSearchResults.filter(result => result.type === 'campaign'),
@@ -42,11 +34,7 @@ const PerformanceMetricsSearch = ({ accountId }: { accountId: string }) => {
     };
 
     const searchResultsCount = availableSearchResults.length;
-    const searchStatusLabel = isSearching
-        ? 'Searching...'
-        : shouldSearch
-          ? `${searchResultsCount} result${searchResultsCount === 1 ? '' : 's'}`
-          : 'Type at least 2 characters to search';
+    const searchStatusLabel = isSearching ? 'Searching...' : shouldSearch ? `${searchResultsCount} result${searchResultsCount === 1 ? '' : 's'}` : 'Type at least 2 characters to search';
     const searchEmptyLabel = shouldSearch ? 'No matches found.' : 'Start typing to search campaigns, ads, and targets.';
 
     return (
@@ -85,17 +73,8 @@ const PerformanceMetricsSearch = ({ accountId }: { accountId: string }) => {
                 autoHighlight
             >
                 <div className="relative">
-                    <HugeiconsIcon
-                        icon={SearchIcon}
-                        size={18}
-                        className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground"
-                    />
-                    <ComboboxInput
-                        placeholder="Search by campaign name, ad ASIN, or target keyword..."
-                        size="lg"
-                        showTrigger={false}
-                        className="text-base *:data-[slot=input]:ps-12"
-                    />
+                    <HugeiconsIcon icon={Search01Icon} size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <ComboboxInput placeholder="Search by campaign name, ad ASIN, or target keyword..." size="lg" showTrigger={false} className="text-base *:data-[slot=input]:ps-12 pl-8" />
                 </div>
                 <ComboboxPopup sideOffset={8}>
                     <ComboboxStatus>{searchStatusLabel}</ComboboxStatus>
@@ -107,9 +86,7 @@ const PerformanceMetricsSearch = ({ accountId }: { accountId: string }) => {
                                     <ComboboxItem key={result.value} value={result.value}>
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-sm font-medium">{result.label}</span>
-                                            {result.description ? (
-                                                <span className="text-xs text-muted-foreground">{result.description}</span>
-                                            ) : null}
+                                            {result.description ? <span className="text-xs text-muted-foreground">{result.description}</span> : null}
                                         </div>
                                     </ComboboxItem>
                                 ))}
@@ -122,9 +99,7 @@ const PerformanceMetricsSearch = ({ accountId }: { accountId: string }) => {
                                     <ComboboxItem key={result.value} value={result.value}>
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-sm font-medium">{result.label}</span>
-                                            {result.description ? (
-                                                <span className="text-xs text-muted-foreground">{result.description}</span>
-                                            ) : null}
+                                            {result.description ? <span className="text-xs text-muted-foreground">{result.description}</span> : null}
                                         </div>
                                     </ComboboxItem>
                                 ))}
@@ -137,9 +112,7 @@ const PerformanceMetricsSearch = ({ accountId }: { accountId: string }) => {
                                     <ComboboxItem key={result.value} value={result.value}>
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-sm font-medium">{result.label}</span>
-                                            {result.description ? (
-                                                <span className="text-xs text-muted-foreground">{result.description}</span>
-                                            ) : null}
+                                            {result.description ? <span className="text-xs text-muted-foreground">{result.description}</span> : null}
                                         </div>
                                     </ComboboxItem>
                                 ))}
