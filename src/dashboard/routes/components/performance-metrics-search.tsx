@@ -73,7 +73,7 @@ const PerformanceMetricsSearch = ({ accountId }: { accountId: string }) => {
                 autoHighlight
             >
                 <div className="relative">
-                    <HugeiconsIcon icon={Search01Icon} size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground" />
+                    <HugeiconsIcon icon={Search01Icon} size={18} className="absolute left-4 top-1/2 z-10 -translate-y-1/2 text-muted-foreground pointer-events-none" />
                     <ComboboxInput placeholder="Search by campaign name, ad ASIN, or target keyword..." size="lg" showTrigger={false} className="text-base *:data-[slot=input]:ps-12 pl-8" />
                 </div>
                 <ComboboxPopup sideOffset={8}>
