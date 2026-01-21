@@ -27,7 +27,7 @@ export const StatusFilter = () => {
                 }
             }}
         >
-            <SelectTrigger size="sm" className="w-[140px] md:w-[180px] text-xs md:text-sm h-7">
+            <SelectTrigger className="w-[140px] md:w-[180px] text-sm">
                 <SelectValue>
                     {value => {
                         const option = STATUS_OPTIONS.find(opt => opt.value === value);

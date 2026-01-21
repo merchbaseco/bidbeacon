@@ -38,8 +38,7 @@ export const TableResultsRange = ({
             >
                 <SelectTrigger
                     aria-label="Select result range"
-                    className="w-fit min-w-none"
-                    size="sm"
+                    className="w-fit min-w-none text-sm"
                 >
                     <SelectValue>{getCurrentRange()}</SelectValue>
                 </SelectTrigger>
@@ -62,4 +61,3 @@ export const TableResultsRange = ({
         </div>
     );
 };
-

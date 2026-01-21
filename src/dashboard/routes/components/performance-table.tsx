@@ -89,27 +89,22 @@ const PerformanceTable = ({ className }: { className?: string }) => {
 
     return (
         <div className={className ?? ''}>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                    <p className="text-sm font-semibold">Performance table</p>
-                    <p className="text-xs text-muted-foreground">
-                        {rangePreset === 'custom' && !isCustomRangeValid ? 'Enter a custom date range' : `${range.startDate} - ${range.endDate}`} · Target metrics
-                    </p>
+            {isFetching && !isLoading ? (
+                <div className="mb-2 flex justify-end">
+                    <span className="text-xs text-muted-foreground">Refreshing…</span>
                 </div>
-                {isFetching && !isLoading ? <span className="text-xs text-muted-foreground">Refreshing…</span> : null}
-            </div>
+            ) : null}
             <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Input
                     aria-label={`Search ${getPrimaryColumnLabel(dimension)}`}
-                    size="sm"
                     type="search"
                     placeholder={`Search ${getPrimaryColumnLabel(dimension)}`}
                     value={searchInput}
                     onChange={event => setSearchInput(event.target.value)}
-                    className="w-[220px] text-xs md:text-sm h-7"
+                    className="w-[220px] text-sm"
                 />
                 <Select aria-label="Select dimension" value={dimension} onValueChange={value => value && setDimension(value as PerformanceDimension)}>
-                    <SelectTrigger size="sm" className="w-[150px] text-xs md:text-sm h-7">
+                    <SelectTrigger className="w-[150px] text-sm">
                         <SelectValue>
                             {value => DIMENSION_OPTIONS.find(option => option.value === value)?.label ?? 'Dimension'}
                         </SelectValue>
@@ -126,7 +121,6 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                     type="single"
                     value={rangePreset}
                     onValueChange={value => value && setRangePreset(value as RangePreset)}
-                    size="sm"
                     variant="outline"
                 >
                     <Toggle value="last_7">Last 7</Toggle>
@@ -136,24 +130,22 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                 {rangePreset === 'custom' ? (
                     <div className="flex items-center gap-2">
                         <Input
-                            size="sm"
                             placeholder="MM-DD-YYYY"
                             value={customStart}
                             onChange={event => setCustomStart(event.target.value)}
-                            className="w-[130px] text-xs"
+                            className="w-[130px] text-sm"
                         />
                         <span className="text-xs text-muted-foreground">to</span>
                         <Input
-                            size="sm"
                             placeholder="MM-DD-YYYY"
                             value={customEnd}
                             onChange={event => setCustomEnd(event.target.value)}
-                            className="w-[130px] text-xs"
+                            className="w-[130px] text-sm"
                         />
                     </div>
                 ) : null}
                 <Select aria-label="Select status" value={statusFilter} onValueChange={value => value && setStatusFilter(value)}>
-                    <SelectTrigger size="sm" className="w-[140px] text-xs md:text-sm h-7">
+                    <SelectTrigger className="w-[140px] text-sm">
                         <SelectValue>
                             {value => STATUS_OPTIONS.find(option => option.value === value)?.label ?? 'Status'}
                         </SelectValue>
@@ -167,7 +159,7 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                     </SelectPopup>
                 </Select>
                 <Select aria-label="Select ad product" value={adProductFilter} onValueChange={value => value && setAdProductFilter(value)}>
-                    <SelectTrigger size="sm" className="w-[180px] text-xs md:text-sm h-7">
+                    <SelectTrigger className="w-[180px] text-sm">
                         <SelectValue>
                             {value => AD_PRODUCT_OPTIONS.find(option => option.value === value)?.label ?? 'Ad product'}
                         </SelectValue>

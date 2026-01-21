@@ -149,10 +149,7 @@ export const EventStream = () => {
                                     setAppliedJobName(value);
                                 }}
                             >
-                                <SelectTrigger
-                                    size="sm"
-                                    className="h-auto w-auto min-w-0 justify-start gap-2 border-transparent bg-transparent px-0 py-0 text-foreground shadow-none hover:bg-transparent focus-visible:ring-0 data-pressed:bg-transparent data-placeholder:text-muted-foreground sm:text-sm dark:bg-transparent dark:data-pressed:bg-transparent [&_[data-slot=select-icon]]:hidden before:hidden"
-                                >
+                                <SelectTrigger className="h-auto w-auto min-w-0 justify-start gap-2 border-transparent bg-transparent px-0 py-0 text-foreground shadow-none hover:bg-transparent focus-visible:ring-0 data-pressed:bg-transparent data-placeholder:text-muted-foreground sm:text-sm dark:bg-transparent dark:data-pressed:bg-transparent [&_[data-slot=select-icon]]:hidden before:hidden">
                                     <span className="flex items-center gap-2">
                                         <span className="text-sm font-medium">{selectedJobLabel}</span>
                                         <SelectValue className="sr-only" />
