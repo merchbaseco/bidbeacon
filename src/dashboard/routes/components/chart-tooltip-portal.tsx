@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ChartTooltipPortalProps {
@@ -22,7 +22,7 @@ export const ChartTooltipPortal = ({ active, coordinate, children }: ChartToolti
         setMounted(true);
     }, []);
 
-    useLayoutEffect(() => {
+    const updatePosition = useCallback(() => {
         if (!active || !coordinate || !tooltipRef.current || !markerRef.current) return;
 
         // Find the recharts-wrapper by traversing up from our marker element
@@ -54,6 +54,32 @@ export const ChartTooltipPortal = ({ active, coordinate, children }: ChartToolti
         setPosition({ x, y });
     }, [active, coordinate]);
 
+    useLayoutEffect(() => {
+        updatePosition();
+    }, [updatePosition]);
+
+    useEffect(() => {
+        if (!active) return;
+        let frame = 0;
+        const handleUpdate = () => {
+            if (frame) cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => {
+                updatePosition();
+            });
+        };
+
+        handleUpdate();
+        const scrollOptions: AddEventListenerOptions = { passive: true, capture: true };
+        window.addEventListener('scroll', handleUpdate, scrollOptions);
+        window.addEventListener('resize', handleUpdate);
+
+        return () => {
+            if (frame) cancelAnimationFrame(frame);
+            window.removeEventListener('scroll', handleUpdate, { capture: true });
+            window.removeEventListener('resize', handleUpdate);
+        };
+    }, [active, updatePosition]);
+
     if (!active) return null;
 
     return (
@@ -78,4 +104,3 @@ export const ChartTooltipPortal = ({ active, coordinate, children }: ChartToolti
         </>
     );
 };
-
