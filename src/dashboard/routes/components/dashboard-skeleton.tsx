@@ -50,6 +50,7 @@ const DashboardSkeleton = () => {
                         <Skeleton className="h-3 w-20" />
                     </div>
                     <div className="mb-3 flex flex-wrap items-center gap-2">
+                        <Skeleton className="h-7 w-52" />
                         <Skeleton className="h-7 w-32" />
                         <Skeleton className="h-7 w-36" />
                         <Skeleton className="h-7 w-32" />
