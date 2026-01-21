@@ -7,6 +7,7 @@ import { ConnectionStatusBadge } from '../../components/connection-status-badge'
 import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from '../../components/ui/menu';
 import { connectionStatusAtom } from '../atoms';
 import { ALL_RANGE_OPTIONS, METRICS, PERIOD_OPTIONS, RANGE_OPTIONS, type MetricConfig, type PerformanceRange } from './performance-metrics-config';
+import type { PerformanceEntityFilter } from './performance-metrics-atoms';
 import { customRangeAtom, customRangeDraftAtom, entityFiltersAtom, performanceRangeAtom } from './performance-metrics-atoms';
 
 type PerformanceMetricsControlsProps = {
@@ -135,7 +136,9 @@ const PerformanceMetricsControls = ({ totals, changes }: PerformanceMetricsContr
                                         variant="outline"
                                         className="h-8 rounded-full gap-2 pl-3 pr-1 text-sm font-medium sm:h-7"
                                     >
-                                        <span className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">{filter.type}</span>
+                                        <span className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">
+                                            {getEntityFilterTypeLabel(filter.type)}
+                                        </span>
                                         <span
                                             className="min-w-0 max-w-[160px] truncate text-sm font-medium"
                                             style={{ direction: 'rtl', unicodeBidi: 'plaintext' }}
@@ -204,4 +207,17 @@ const MetricLabel = ({ metric, value, change }: { metric: MetricConfig; value: n
             </div>
         </div>
     );
+};
+
+const getEntityFilterTypeLabel = (type: PerformanceEntityFilter['type']) => {
+    switch (type) {
+        case 'adGroup':
+            return 'Ad group';
+        case 'campaign':
+            return 'Campaign';
+        case 'ad':
+            return 'Ad';
+        case 'target':
+            return 'Target';
+    }
 };

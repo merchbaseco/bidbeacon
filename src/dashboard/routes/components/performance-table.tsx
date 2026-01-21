@@ -1,6 +1,7 @@
 import { subDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useAtom } from 'jotai';
 import { Badge } from '@/dashboard/components/ui/badge';
 import { Frame, FrameFooter } from '@/dashboard/components/ui/frame';
 import { Input } from '@/dashboard/components/ui/input';
@@ -12,8 +13,10 @@ import { Toggle, ToggleGroup } from '@/dashboard/components/ui/toggle-group';
 import { useSelectedAccountId } from '@/dashboard/routes/hooks/use-selected-accountid';
 import { useSelectedCountryCode } from '@/dashboard/routes/hooks/use-selected-country-code';
 import { usePerformanceTable } from '@/dashboard/routes/hooks/use-performance-table';
+import type { PerformanceEntityFilter } from '@/dashboard/routes/components/performance-metrics-atoms';
+import { entityFiltersAtom } from '@/dashboard/routes/components/performance-metrics-atoms';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import type { PerformanceDimension } from '@/types/performance-api';
+import type { PerformanceDimension, PerformanceTableOutput } from '@/types/performance-api';
 
 const PerformanceTable = ({ className }: { className?: string }) => {
     const accountId = useSelectedAccountId();
@@ -24,12 +27,7 @@ const PerformanceTable = ({ className }: { className?: string }) => {
     const [customEnd, setCustomEnd] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [adProductFilter, setAdProductFilter] = useState('all');
-    const [searchInput, setSearchInput] = useState('');
-    const deferredSearchInput = useDeferredValue(searchInput);
-    const forceSkeleton = useMemo(() => {
-        if (typeof window === 'undefined') return false;
-        return new URLSearchParams(window.location.search).has('showSkeleton');
-    }, []);
+    const [, setEntityFilters] = useAtom(entityFiltersAtom);
 
     if (!accountId || !countryCode) {
         return null;
@@ -55,11 +53,10 @@ const PerformanceTable = ({ className }: { className?: string }) => {
 
     const filters = useMemo(
         () => ({
-            search: deferredSearchInput.trim() ? deferredSearchInput.trim() : undefined,
             state: statusFilter !== 'all' ? statusFilter : undefined,
             adProduct: adProductFilter !== 'all' ? adProductFilter : undefined,
         }),
-        [statusFilter, adProductFilter, deferredSearchInput]
+        [statusFilter, adProductFilter]
     );
 
     const { data, isLoading, isFetching } = usePerformanceTable({
@@ -72,8 +69,15 @@ const PerformanceTable = ({ className }: { className?: string }) => {
     });
 
     const rows = data?.rows ?? [];
-    const showSkeleton = isLoading || forceSkeleton;
     const isEmpty = !isLoading && rows.length === 0;
+    const addEntityFilter = (filter: PerformanceEntityFilter) => {
+        setEntityFilters(current => {
+            if (current.some(item => item.type === filter.type && item.id === filter.id)) {
+                return current;
+            }
+            return [...current, filter];
+        });
+    };
 
     return (
         <div className={className ?? ''}>
@@ -87,15 +91,6 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                 {isFetching && !isLoading ? <span className="text-xs text-muted-foreground">Refreshing…</span> : null}
             </div>
             <div className="mb-3 flex flex-wrap items-center gap-2">
-                <Input
-                    aria-label={`Search ${getPrimaryColumnLabel(dimension)}`}
-                    size="sm"
-                    type="search"
-                    placeholder={`Search ${getPrimaryColumnLabel(dimension)}`}
-                    value={searchInput}
-                    onChange={event => setSearchInput(event.target.value)}
-                    className="w-[220px] text-xs md:text-sm h-7"
-                />
                 <Select aria-label="Select dimension" value={dimension} onValueChange={value => value && setDimension(value as PerformanceDimension)}>
                     <SelectTrigger size="sm" className="w-[150px] text-xs md:text-sm h-7">
                         <SelectValue>
@@ -190,7 +185,11 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                     </TableHeader>
                 </Table>
                 <div className="relative rounded-xl border border-border bg-background bg-clip-padding shadow-xs before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-xl)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-clip-border dark:before:shadow-[0_-1px_--theme(--color-white/8%)]">
-                    <ScrollArea className="h-[520px] max-h-[520px] [&_[data-slot=scroll-area-scrollbar]]:hidden" scrollFade>
+                    <ScrollArea
+                        className="h-[520px] max-h-[520px] [&_[data-slot=scroll-area-scrollbar]]:hidden"
+                        scrollFade
+                        allowScrollChaining
+                    >
                         <Table className="table-fixed">
                             <colgroup>
                                 <col />
@@ -205,36 +204,19 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                                             Enter a start and end date in MM-DD-YYYY to load results.
                                         </TableCell>
                                 </TableRow>
-                            ) : showSkeleton ? (
-                                <TableRow className="border-0 h-[520px]">
-                                    <TableCell colSpan={7} className="h-[520px] p-0 align-top border-0">
-                                        <div className="box-border grid h-full grid-rows-[repeat(12,minmax(0,1fr))] gap-0">
-                                            {Array.from({ length: 12 }).map((_, index) => (
-                                                <div
-                                                    key={index}
-                                                    className="grid grid-cols-[minmax(0,1fr)_80px_110px_110px_110px_110px_110px] items-center"
-                                                >
-                                                    <div className="px-2">
-                                                        <Skeleton className="h-4 w-full" />
-                                                    </div>
-                                                    <div className="px-2">
-                                                        <Skeleton className="h-4 w-full" />
-                                                    </div>
-                                                    <div className="px-2 flex justify-end">
-                                                        <Skeleton className="h-4 w-full" />
-                                                    </div>
-                                                    <div className="px-2 flex justify-end">
-                                                        <Skeleton className="h-4 w-full" />
-                                                    </div>
-                                                    <div className="px-2 flex justify-end">
-                                                        <Skeleton className="h-4 w-full" />
-                                                    </div>
-                                                    <div className="px-2 flex justify-end">
-                                                        <Skeleton className="h-4 w-full" />
-                                                    </div>
-                                                    <div className="px-2 flex justify-end">
-                                                        <Skeleton className="h-4 w-full" />
-                                                    </div>
+                            ) : isLoading ? (
+                                <TableRow>
+                                    <TableCell colSpan={7} className="py-10">
+                                        <div className="space-y-3">
+                                            {Array.from({ length: 4 }).map((_, index) => (
+                                                <div key={index} className="flex items-center justify-between gap-3">
+                                                    <Skeleton className="h-4 w-48" />
+                                                    <Skeleton className="h-4 w-16" />
+                                                    <Skeleton className="h-4 w-20" />
+                                                    <Skeleton className="h-4 w-20" />
+                                                    <Skeleton className="h-4 w-16" />
+                                                    <Skeleton className="h-4 w-16" />
+                                                    <Skeleton className="h-4 w-16" />
                                                 </div>
                                             ))}
                                         </div>
@@ -250,10 +232,23 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                                 rows.map(row => {
                                     if (row.dimension !== dimension) return null;
 
+                                    const filter = getEntityFilterForRow(row);
+
                                     return (
                                         <TableRow key={getRowKey(row)}>
                                             <TableCell className="font-medium">
-                                                <div className="min-w-0 w-full">{renderPrimaryCell(row)}</div>
+                                                {filter ? (
+                                                    <button
+                                                        type="button"
+                                                        className="group flex w-full min-w-0 flex-col text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 cursor-pointer"
+                                                        onClick={() => addEntityFilter(filter)}
+                                                        aria-label={`Filter chart by ${filter.label}`}
+                                                    >
+                                                        {renderPrimaryCell(row)}
+                                                    </button>
+                                                ) : (
+                                                    <div className="min-w-0 w-full">{renderPrimaryCell(row)}</div>
+                                                )}
                                             </TableCell>
                                             <TableCell className="max-w-[80px] w-[80px]">{renderStatus(row.state)}</TableCell>
                                             <TableCell className="text-right">{formatCurrency(row.metrics.spend)}</TableCell>
@@ -359,6 +354,43 @@ const getRowKey = (row: { dimension: PerformanceDimension } & Record<string, unk
     return String(row.targetId);
 };
 
+const getEntityFilterForRow = (row: PerformanceTableRow): PerformanceEntityFilter | null => {
+    switch (row.dimension) {
+        case 'campaign':
+            return {
+                type: 'campaign',
+                id: row.campaignId,
+                label: row.name ?? row.campaignId,
+                description: row.campaignId,
+            };
+        case 'adGroup':
+            return {
+                type: 'adGroup',
+                id: row.adGroupId,
+                label: row.name ?? row.adGroupId,
+                description: row.adGroupId,
+            };
+        case 'ad': {
+            const label = row.productAsin ?? row.adId;
+            return {
+                type: 'ad',
+                id: row.adId,
+                label,
+                description: row.productAsin ? row.adId : null,
+            };
+        }
+        case 'target': {
+            const description = row.targetMatchType ? `${row.targetType} · ${row.targetMatchType}` : row.targetType;
+            return {
+                type: 'target',
+                id: row.targetId,
+                label: row.targetDisplay ?? row.targetId,
+                description,
+            };
+        }
+    }
+};
+
 const renderPrimaryCell = (row: {
     dimension: PerformanceDimension;
     name?: string;
@@ -408,6 +440,7 @@ const renderPrimaryCell = (row: {
 const isValidDateString = (value: string) => /^\d{2}-\d{2}-\d{4}$/.test(value);
 
 type RangePreset = 'last_7' | 'last_30' | 'custom';
+type PerformanceTableRow = PerformanceTableOutput['rows'][number];
 
 const DIMENSION_OPTIONS = [
     { value: 'campaign', label: 'Campaigns' },

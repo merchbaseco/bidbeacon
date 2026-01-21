@@ -8,7 +8,6 @@ import { customRangeAtom, entityFiltersAtom, performanceRangeAtom } from './perf
 import { selectedCountryCodeAtom } from './account-selector/atoms';
 import { PerformanceMetricsChart } from './performance-metrics-chart';
 import { PerformanceMetricsControls } from './performance-metrics-controls';
-import { PerformanceMetricsSearch } from './performance-metrics-search';
 
 const PerformanceMetrics = ({ className }: { className?: string }) => {
     const accountId = useSelectedAccountId();
@@ -58,7 +57,6 @@ const PerformanceMetrics = ({ className }: { className?: string }) => {
         <div className={cn('w-full', className)}>
             <PerformanceMetricsControls totals={data?.totals} changes={data?.changes} />
             <PerformanceMetricsChart data={data} isLoading={isLoading} error={error} />
-            <PerformanceMetricsSearch accountId={accountId!} />
         </div>
     );
 };
