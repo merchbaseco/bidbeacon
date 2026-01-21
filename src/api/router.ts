@@ -1,4 +1,5 @@
 import { accountsRouter } from './routers/accounts';
+import { adsRouter } from './routers/ads';
 import { metricsRouter } from './routers/metrics';
 import { performanceRouter } from './routers/performance';
 import { reportsRouter } from './routers/reports';
@@ -9,6 +10,7 @@ import { router } from './trpc';
 export const appRouter = router({
     reports: reportsRouter,
     accounts: accountsRouter,
+    ads: adsRouter,
     metrics: metricsRouter,
     performance: performanceRouter,
     users: usersRouter,
