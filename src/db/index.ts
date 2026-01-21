@@ -1,14 +1,17 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
+import { getDatabaseConfig } from './database-config.js';
 import * as schema from './schema.js';
+
+const databaseConfig = getDatabaseConfig();
 
 // Create postgres connection
 const queryClient = postgres({
-    host: 'postgres',
-    port: 5432,
-    database: 'bidbeacon',
-    username: 'bidbeacon',
-    password: process.env.BIDBEACON_DATABASE_PASSWORD!,
+    host: databaseConfig.host,
+    port: databaseConfig.port,
+    database: databaseConfig.name,
+    username: databaseConfig.user,
+    password: databaseConfig.password,
     max: 5,
     idle_timeout: 10000,
     max_lifetime: 30000,

@@ -148,6 +148,7 @@ TanStack Start app with file-based routing in `src/dashboard/routes/`.
 
 ### Dev Server Notes
 
+- `bun run dev` starts the API server + dashboard locally (no worker).
 - Default port is `4173`; if the port is busy, Vite will choose the next open port.
 - `/api` requests proxy to production by default via `vite.config.dashboard.ts`.
 
