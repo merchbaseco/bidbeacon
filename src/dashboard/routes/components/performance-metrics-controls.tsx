@@ -4,6 +4,7 @@ import { cn } from '@/dashboard/lib/utils';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { ConnectionStatusBadge } from '../../components/connection-status-badge';
+import { Input } from '../../components/ui/input';
 import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from '../../components/ui/menu';
 import { connectionStatusAtom } from '../atoms';
 import { ALL_RANGE_OPTIONS, METRICS, PERIOD_OPTIONS, RANGE_OPTIONS, type MetricConfig, type PerformanceRange } from './performance-metrics-config';
@@ -47,7 +48,7 @@ const PerformanceMetricsControls = ({ totals, changes }: PerformanceMetricsContr
                         <Menu>
                             <MenuTrigger
                                 render={
-                                    <Button variant="outline" size="sm" className="rounded-full px-3 gap-2 text-sm font-medium">
+                                    <Button variant="outline" className="gap-2 font-medium">
                                         {triggerLabel}
                                         <ChevronsUpDown className="size-4 text-muted-foreground" />
                                     </Button>
@@ -86,17 +87,17 @@ const PerformanceMetricsControls = ({ totals, changes }: PerformanceMetricsContr
                                         <div className="grid grid-cols-2 gap-2">
                                             <label className="text-xs text-muted-foreground">Start</label>
                                             <label className="text-xs text-muted-foreground">End</label>
-                                            <input
+                                            <Input
                                                 type="date"
                                                 value={customRangeDraft.start}
                                                 onChange={event => setCustomRangeDraft(current => ({ ...current, start: event.target.value }))}
-                                                className="h-8 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm text-foreground shadow-inner"
+                                                className="min-w-0 text-sm"
                                             />
-                                            <input
+                                            <Input
                                                 type="date"
                                                 value={customRangeDraft.end}
                                                 onChange={event => setCustomRangeDraft(current => ({ ...current, end: event.target.value }))}
-                                                className="h-8 w-full min-w-0 rounded-md border border-border bg-background px-2 text-sm text-foreground shadow-inner"
+                                                className="min-w-0 text-sm"
                                             />
                                         </div>
                                         <div className="flex min-w-0 gap-2">
