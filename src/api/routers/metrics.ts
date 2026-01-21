@@ -749,33 +749,38 @@ export const metricsRouter = router({
         }),
     hourlyPerformance: protectedProcedure
         .input(
-            z.object({
-                accountId: z.string(),
-                timezone: z.string(), // Browser timezone - used for display
-                range: z.enum(PERFORMANCE_RANGES).default('today'),
-                customRange: z
-                    .object({
-                        start: z.string(),
-                        end: z.string(),
-                    })
-                    .nullable()
-                    .optional(),
-                entityFilters: z
-                    .array(
-                        z.object({
-                            type: z.enum(['campaign', 'ad', 'target']),
-                            id: z.string(),
+            z
+                .object({
+                    accountId: z.string(),
+                    countryCode: z.string().min(1).optional(),
+                    timezone: z.string().min(1).optional(),
+                    range: z.enum(PERFORMANCE_RANGES).default('today'),
+                    customRange: z
+                        .object({
+                            start: z.string(),
+                            end: z.string(),
                         })
-                    )
-                    .optional(),
-            })
+                        .nullable()
+                        .optional(),
+                    entityFilters: z
+                        .array(
+                            z.object({
+                                type: z.enum(['campaign', 'ad', 'target']),
+                                id: z.string(),
+                            })
+                        )
+                        .optional(),
+                })
+                .refine(data => data.countryCode || data.timezone, {
+                    message: 'hourlyPerformance requires countryCode or timezone',
+                })
         )
         .query(async ({ ctx, input }) => {
             ctx.assertAccountAccess(input.accountId);
-            const browserTimezone = input.timezone;
+            const accountTimezone = input.countryCode ? getTimezoneForCountry(input.countryCode) : input.timezone!;
             const now = new Date();
             const activeEntityFilters = input.entityFilters?.length ? input.entityFilters : null;
-            const entityFilterCondition = activeEntityFilters
+            const hourlyEntityFilterCondition = activeEntityFilters
                 ? or(
                       ...activeEntityFilters.map(filter => {
                           if (filter.type === 'campaign') {
@@ -785,6 +790,19 @@ export const metricsRouter = router({
                               return eq(performanceHourly.adId, filter.id);
                           }
                           return and(eq(performanceHourly.entityType, 'target'), eq(performanceHourly.entityId, filter.id));
+                      })
+                  )
+                : null;
+            const dailyEntityFilterCondition = activeEntityFilters
+                ? or(
+                      ...activeEntityFilters.map(filter => {
+                          if (filter.type === 'campaign') {
+                              return eq(performanceDaily.campaignId, filter.id);
+                          }
+                          if (filter.type === 'ad') {
+                              return eq(performanceDaily.adId, filter.id);
+                          }
+                          return and(eq(performanceDaily.entityType, 'target'), eq(performanceDaily.entityId, filter.id));
                       })
                   )
                 : null;
@@ -798,7 +816,7 @@ export const metricsRouter = router({
                     .where(
                         and(
                             eq(performanceHourly.accountId, input.accountId),
-                            ...(entityFilterCondition ? [entityFilterCondition] : [])
+                            ...(hourlyEntityFilterCondition ? [hourlyEntityFilterCondition] : [])
                         )
                     );
 
@@ -807,34 +825,66 @@ export const metricsRouter = router({
 
             const rangeResult = getPerformanceRange({
                 range: input.range,
-                timezone: browserTimezone,
+                timezone: accountTimezone,
                 now,
                 allTimeStartUtc,
                 customRange: input.customRange ?? null,
             });
 
-            const { rangeStartZoned, rangeEndZoned, rangeStartUtc, rangeEndUtc, rangeEndExclusiveUtc, granularity, shouldCompare, compareStartUtc, compareEndExclusiveUtc } =
-                rangeResult;
+            const {
+                rangeStartZoned,
+                rangeEndZoned,
+                rangeStartUtc,
+                rangeEndUtc,
+                rangeEndExclusiveUtc,
+                granularity,
+                shouldCompare,
+                compareStartZoned,
+                compareEndExclusiveZoned,
+                compareStartUtc,
+                compareEndExclusiveUtc,
+            } = rangeResult;
             let previousTotals: { impressions: number; clicks: number; orders: number; spend: number; sales: number } | null = null;
 
             if (shouldCompare && compareStartUtc && compareEndExclusiveUtc) {
-                const [previousTotalsRow] = await db
-                    .select({
-                        impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
-                        clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                        orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
-                        spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
-                        sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
-                    })
-                    .from(performanceHourly)
-                    .where(
-                        and(
-                            eq(performanceHourly.accountId, input.accountId),
-                            gte(performanceHourly.bucketStart, compareStartUtc),
-                            lt(performanceHourly.bucketStart, compareEndExclusiveUtc),
-                            ...(entityFilterCondition ? [entityFilterCondition] : [])
-                        )
-                    );
+                const [previousTotalsRow] =
+                    granularity === 'hour'
+                        ? await db
+                              .select({
+                                  impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
+                                  clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
+                                  orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                                  spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
+                                  sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                              })
+                              .from(performanceHourly)
+                              .where(
+                                  and(
+                                      eq(performanceHourly.accountId, input.accountId),
+                                      gte(performanceHourly.bucketStart, compareStartUtc),
+                                      lt(performanceHourly.bucketStart, compareEndExclusiveUtc),
+                                      ...(hourlyEntityFilterCondition ? [hourlyEntityFilterCondition] : [])
+                                  )
+                              )
+                        : await db
+                              .select({
+                                  impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
+                                  clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
+                                  orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                                  spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
+                                  sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
+                              })
+                              .from(performanceDaily)
+                              .where(
+                                  and(
+                                      eq(performanceDaily.accountId, input.accountId),
+                                      compareStartZoned ? gte(performanceDaily.bucketDate, format(compareStartZoned, 'yyyy-MM-dd')) : sql`true`,
+                                      compareEndExclusiveZoned
+                                          ? lt(performanceDaily.bucketDate, format(compareEndExclusiveZoned, 'yyyy-MM-dd'))
+                                          : sql`true`,
+                                      ...(dailyEntityFilterCondition ? [dailyEntityFilterCondition] : [])
+                                  )
+                              );
 
                 previousTotals = {
                     impressions: Number(previousTotalsRow?.impressions ?? 0),
@@ -845,7 +895,6 @@ export const metricsRouter = router({
                 };
             }
 
-            const tzLiteral = sql.raw(`'${browserTimezone.replace(/'/g, "''")}'`);
             const points: Array<{
                 intervalStart: string;
                 impressions: number;
@@ -875,7 +924,7 @@ export const metricsRouter = router({
             if (granularity === 'hour') {
                 const hourlyData = await db
                     .select({
-                        bucketHour: sql<number>`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})::int`.as('bucket_hour'),
+                        bucketHour: performanceHourly.bucketHour,
                         impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
                         clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
                         orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
@@ -888,11 +937,11 @@ export const metricsRouter = router({
                             eq(performanceHourly.accountId, input.accountId),
                             gte(performanceHourly.bucketStart, rangeStartUtc),
                             lt(performanceHourly.bucketStart, rangeEndExclusiveUtc),
-                            ...(entityFilterCondition ? [entityFilterCondition] : [])
+                            ...(hourlyEntityFilterCondition ? [hourlyEntityFilterCondition] : [])
                         )
                     )
-                    .groupBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`)
-                    .orderBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`);
+                    .groupBy(performanceHourly.bucketHour)
+                    .orderBy(performanceHourly.bucketHour);
 
                 const hourlyMap = new Map<number, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
                 for (const row of hourlyData) {
@@ -923,7 +972,7 @@ export const metricsRouter = router({
 
                     const acos = hourData.sales > 0 ? (hourData.spend / hourData.sales) * 100 : 0;
                     const hourStartZoned = addHours(dayStartZoned, hour);
-                    const intervalStartUtc = fromZonedTime(hourStartZoned, browserTimezone);
+                    const intervalStartUtc = fromZonedTime(hourStartZoned, accountTimezone);
 
                     points.push({
                         intervalStart: intervalStartUtc.toISOString(),
@@ -938,8 +987,8 @@ export const metricsRouter = router({
                 // Always include a leading point (even for custom ranges) so charts can render
                 // a contextual lead-in and shift the visible window consistently.
                 const previousHourStartZoned = addHours(dayStartZoned, -1);
-                const previousHourStartUtc = fromZonedTime(previousHourStartZoned, browserTimezone);
-                const previousHourEndUtc = fromZonedTime(addHours(previousHourStartZoned, 1), browserTimezone);
+                const previousHourStartUtc = fromZonedTime(previousHourStartZoned, accountTimezone);
+                const previousHourEndUtc = fromZonedTime(addHours(previousHourStartZoned, 1), accountTimezone);
 
                 const [previousHourRow] = await db
                     .select({
@@ -955,7 +1004,7 @@ export const metricsRouter = router({
                             eq(performanceHourly.accountId, input.accountId),
                             gte(performanceHourly.bucketStart, previousHourStartUtc),
                             lt(performanceHourly.bucketStart, previousHourEndUtc),
-                            ...(entityFilterCondition ? [entityFilterCondition] : [])
+                            ...(hourlyEntityFilterCondition ? [hourlyEntityFilterCondition] : [])
                         )
                     );
 
@@ -982,29 +1031,32 @@ export const metricsRouter = router({
             if (granularity === 'day' || granularity === 'month') {
                 const intervalExpr =
                     granularity === 'day'
-                        ? sql`date_trunc('day', ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`
-                        : sql`date_trunc('month', ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`;
+                        ? sql`${performanceDaily.bucketDate}`
+                        : sql`date_trunc('month', ${performanceDaily.bucketDate})`;
                 const intervalLabel =
                     granularity === 'day'
                         ? sql<string>`to_char(${intervalExpr}, 'YYYY-MM-DD')`.as('interval')
                         : sql<string>`to_char(${intervalExpr}, 'YYYY-MM-01')`.as('interval');
 
+                const rangeStartDate = format(rangeStartZoned, 'yyyy-MM-dd');
+                const rangeEndDate = format(rangeEndZoned, 'yyyy-MM-dd');
+
                 const groupedData = await db
                     .select({
                         interval: intervalLabel,
-                        impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
-                        clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                        orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
-                        spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
-                        sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                        impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
+                        clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
+                        orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                        spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
+                        sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
                     })
-                    .from(performanceHourly)
+                    .from(performanceDaily)
                     .where(
                         and(
-                            eq(performanceHourly.accountId, input.accountId),
-                            gte(performanceHourly.bucketStart, rangeStartUtc),
-                            lt(performanceHourly.bucketStart, rangeEndExclusiveUtc),
-                            ...(entityFilterCondition ? [entityFilterCondition] : [])
+                            eq(performanceDaily.accountId, input.accountId),
+                            gte(performanceDaily.bucketDate, rangeStartDate),
+                            lte(performanceDaily.bucketDate, rangeEndDate),
+                            ...(dailyEntityFilterCondition ? [dailyEntityFilterCondition] : [])
                         )
                     )
                     .groupBy(intervalExpr)
@@ -1036,7 +1088,7 @@ export const metricsRouter = router({
                         totals.sales += dayData.sales;
 
                         const acos = dayData.sales > 0 ? (dayData.spend / dayData.sales) * 100 : 0;
-                        const intervalStartUtc = fromZonedTime(cursor, browserTimezone);
+                        const intervalStartUtc = fromZonedTime(cursor, accountTimezone);
 
                         points.push({
                             intervalStart: intervalStartUtc.toISOString(),
@@ -1064,7 +1116,7 @@ export const metricsRouter = router({
                         totals.sales += monthData.sales;
 
                         const acos = monthData.sales > 0 ? (monthData.spend / monthData.sales) * 100 : 0;
-                        const intervalStartUtc = fromZonedTime(cursor, browserTimezone);
+                        const intervalStartUtc = fromZonedTime(cursor, accountTimezone);
 
                         points.push({
                             intervalStart: intervalStartUtc.toISOString(),
@@ -1079,19 +1131,24 @@ export const metricsRouter = router({
 
                 if (granularity === 'day') {
                     const leadingDayStartZoned = addDays(startOfDay(rangeStartZoned), -1);
-                    const leadingDayStartUtc = fromZonedTime(leadingDayStartZoned, browserTimezone);
-                    const leadingDayEndUtc = fromZonedTime(startOfDay(rangeStartZoned), browserTimezone);
+                    const leadingDayDate = format(leadingDayStartZoned, 'yyyy-MM-dd');
 
                     const [leadingDayRow] = await db
                         .select({
-                            impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
-                            clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                            orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
-                            spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
-                            sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                            impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
+                            clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
+                            orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                            spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
+                            sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
                         })
-                        .from(performanceHourly)
-                        .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, leadingDayStartUtc), lt(performanceHourly.bucketStart, leadingDayEndUtc)));
+                        .from(performanceDaily)
+                        .where(
+                            and(
+                                eq(performanceDaily.accountId, input.accountId),
+                                eq(performanceDaily.bucketDate, leadingDayDate),
+                                ...(dailyEntityFilterCondition ? [dailyEntityFilterCondition] : [])
+                            )
+                        );
 
                     const leadingDayData = {
                         impressions: Number(leadingDayRow?.impressions ?? 0),
@@ -1104,7 +1161,7 @@ export const metricsRouter = router({
                     const leadingDayAcos = leadingDayData.sales > 0 ? (leadingDayData.spend / leadingDayData.sales) * 100 : 0;
 
                     leadingPoint = {
-                        intervalStart: leadingDayStartUtc.toISOString(),
+                        intervalStart: fromZonedTime(leadingDayStartZoned, accountTimezone).toISOString(),
                         impressions: leadingDayData.impressions,
                         clicks: leadingDayData.clicks,
                         orders: leadingDayData.orders,
@@ -1116,19 +1173,26 @@ export const metricsRouter = router({
                 if (granularity === 'month') {
                     const rangeMonthStartZoned = startOfMonth(rangeStartZoned);
                     const leadingMonthStartZoned = startOfMonth(subMonths(rangeMonthStartZoned, 1));
-                    const leadingMonthStartUtc = fromZonedTime(leadingMonthStartZoned, browserTimezone);
-                    const leadingMonthEndUtc = fromZonedTime(rangeMonthStartZoned, browserTimezone);
+                    const leadingMonthStartDate = format(leadingMonthStartZoned, 'yyyy-MM-dd');
+                    const rangeMonthStartDate = format(rangeMonthStartZoned, 'yyyy-MM-dd');
 
                     const [leadingMonthRow] = await db
                         .select({
-                            impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
-                            clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                            orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
-                            spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
-                            sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
+                            impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
+                            clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
+                            orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                            spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
+                            sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
                         })
-                        .from(performanceHourly)
-                        .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, leadingMonthStartUtc), lt(performanceHourly.bucketStart, leadingMonthEndUtc)));
+                        .from(performanceDaily)
+                        .where(
+                            and(
+                                eq(performanceDaily.accountId, input.accountId),
+                                gte(performanceDaily.bucketDate, leadingMonthStartDate),
+                                lt(performanceDaily.bucketDate, rangeMonthStartDate),
+                                ...(dailyEntityFilterCondition ? [dailyEntityFilterCondition] : [])
+                            )
+                        );
 
                     const leadingMonthData = {
                         impressions: Number(leadingMonthRow?.impressions ?? 0),
@@ -1141,7 +1205,7 @@ export const metricsRouter = router({
                     const leadingMonthAcos = leadingMonthData.sales > 0 ? (leadingMonthData.spend / leadingMonthData.sales) * 100 : 0;
 
                     leadingPoint = {
-                        intervalStart: leadingMonthStartUtc.toISOString(),
+                        intervalStart: fromZonedTime(leadingMonthStartZoned, accountTimezone).toISOString(),
                         impressions: leadingMonthData.impressions,
                         clicks: leadingMonthData.clicks,
                         orders: leadingMonthData.orders,
@@ -1164,6 +1228,7 @@ export const metricsRouter = router({
                 granularity,
                 points,
                 leadingPoint,
+                timezone: accountTimezone,
                 range: {
                     start: rangeStartUtc.toISOString(),
                     end: rangeEndUtc.toISOString(),

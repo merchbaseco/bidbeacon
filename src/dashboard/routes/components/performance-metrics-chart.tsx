@@ -97,6 +97,7 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
 
     const resolvedRange = data?.range ?? fallbackRange;
     const resolvedGranularity = data?.granularity ?? 'hour';
+    const resolvedTimezone = data?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
     const legacyHourlyData = (data as { hourlyData?: Array<{ hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number }> })
         ?.hourlyData;
     const legacyLeadingHour = (data as { leadingHour?: { hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number } })
@@ -146,11 +147,12 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
         const rangeEnd = resolvedRange?.end ? new Date(resolvedRange.end) : null;
         const spansYears = !!rangeStart && !!rangeEnd && rangeStart.getFullYear() !== rangeEnd.getFullYear();
 
-        const dayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric' });
-        const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', year: spansYears ? '2-digit' : undefined });
-        const tooltipDayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        const tooltipMonthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric' });
-        const tooltipHourFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' });
+        const dayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: resolvedTimezone });
+        const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', year: spansYears ? '2-digit' : undefined, timeZone: resolvedTimezone });
+        const tooltipDayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: resolvedTimezone });
+        const tooltipMonthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: resolvedTimezone });
+        const tooltipHourFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: resolvedTimezone });
+        const hourLabelFormatter = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: resolvedTimezone });
 
         return leading.map(point => {
             const date = new Date(point.intervalStart);
@@ -158,7 +160,7 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
             let tooltipLabel = '';
 
             if (resolvedGranularity === 'hour') {
-                const hourLabel = `${date.getHours().toString().padStart(2, '0')}:00`;
+                const hourLabel = hourLabelFormatter.format(date);
                 label = hourLabel;
                 tooltipLabel = `${tooltipDayFormatter.format(date)} · ${tooltipHourFormatter.format(date)}`;
             }
@@ -179,7 +181,7 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                 tooltipLabel,
             };
         });
-    }, [data, resolvedGranularity, resolvedLeadingPoint, resolvedPoints, resolvedRange?.end, resolvedRange?.start]);
+    }, [data, resolvedGranularity, resolvedLeadingPoint, resolvedPoints, resolvedRange?.end, resolvedRange?.start, resolvedTimezone]);
 
     const yAxisDomains = useMemo(() => {
         const points = resolvedPoints;
@@ -200,8 +202,8 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     const currentHourLabel = useMemo(() => {
         if (!isLiveRange) return null;
         const now = new Date();
-        return `${now.getHours().toString().padStart(2, '0')}:00`;
-    }, [isLiveRange]);
+        return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: resolvedTimezone }).format(now);
+    }, [isLiveRange, resolvedTimezone]);
 
     // Custom tick formatter for X axis - emphasize key labels without crowding
     const formatXAxisTick = (value: string, index: number) => {
@@ -209,10 +211,9 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
         if (hasLeadingPoint && index === 0) return '';
 
         if (resolvedGranularity === 'hour') {
-            if (value === '00:00') return value;
+            const highlightLabels = new Set(['00:00', '12:00', '23:00']);
+            if (highlightLabels.has(value)) return value;
             if (range === 'today' && currentHourLabel && value === currentHourLabel) return value;
-            if (range !== 'today' && value === '12:00') return value;
-            if (value === '23:00') return value;
             return '';
         }
 
