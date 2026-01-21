@@ -327,6 +327,8 @@ const formatNumber = (value: number) => {
 
 const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(value);
@@ -345,6 +347,35 @@ const formatRatio = (value: number) => {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
     }).format(value)}x`;
+};
+
+const truncateEnd = (value: string, maxLength = 48) => {
+    if (value.length <= maxLength) return value;
+    const visibleLength = Math.max(maxLength - 3, 0);
+    return `${value.slice(0, visibleLength)}...`;
+};
+
+const formatSecondaryText = (value?: string | null) => {
+    if (!value) return null;
+    return truncateEnd(value);
+};
+
+const formatBreadcrumb = (campaignName?: string | null, adGroupName?: string | null, maxLength = 48) => {
+    const campaign = campaignName?.trim();
+    const adGroup = adGroupName?.trim();
+
+    if (!campaign && !adGroup) return null;
+    if (!campaign) return truncateEnd(adGroup ?? '', maxLength);
+    if (!adGroup) return truncateEnd(campaign, maxLength);
+
+    const separator = ' / ';
+    if (adGroup.length + separator.length >= maxLength) {
+        return truncateEnd(adGroup, maxLength);
+    }
+
+    const availableForCampaign = maxLength - adGroup.length - separator.length;
+    const campaignText = truncateEnd(campaign, availableForCampaign);
+    return `${campaignText}${separator}${adGroup}`;
 };
 
 const getPrimaryColumnLabel = (dimension: PerformanceDimension) => {
@@ -427,38 +458,42 @@ const renderPrimaryCell = (row: {
     targetDisplay?: string;
     targetId?: string;
     targetType?: string;
+    campaignName?: string | null;
+    adGroupName?: string | null;
 }) => {
     if (row.dimension === 'campaign') {
         return (
             <div className="flex min-w-0 flex-col">
                 <span className="truncate">{row.name ?? row.campaignId}</span>
-                <span className="truncate text-xs text-muted-foreground">{row.campaignId}</span>
             </div>
         );
     }
 
     if (row.dimension === 'adGroup') {
+        const secondaryText = formatSecondaryText(row.campaignName);
         return (
             <div className="flex min-w-0 flex-col">
                 <span className="truncate">{row.name ?? row.adGroupId}</span>
-                <span className="truncate text-xs text-muted-foreground">{row.adGroupId}</span>
+                {secondaryText ? <span className="truncate text-xs text-muted-foreground tracking-tight">{secondaryText}</span> : null}
             </div>
         );
     }
 
     if (row.dimension === 'ad') {
+        const secondaryText = formatBreadcrumb(row.campaignName, row.adGroupName);
         return (
             <div className="flex min-w-0 flex-col">
                 <span className="truncate">{row.productAsin ?? row.adId}</span>
-                <span className="truncate text-xs text-muted-foreground">{row.adId}</span>
+                {secondaryText ? <span className="truncate text-xs text-muted-foreground tracking-tight">{secondaryText}</span> : null}
             </div>
         );
     }
 
+    const secondaryText = formatBreadcrumb(row.campaignName, row.adGroupName);
     return (
         <div className="flex min-w-0 flex-col">
             <span className="truncate">{row.targetDisplay ?? row.targetId}</span>
-            <span className="truncate text-xs text-muted-foreground">{row.targetType ?? 'Target'}</span>
+            {secondaryText ? <span className="truncate text-xs text-muted-foreground tracking-tight">{secondaryText}</span> : null}
         </div>
     );
 };
