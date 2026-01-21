@@ -1,9 +1,9 @@
 import { addDays, addHours, addMonths, endOfDay, startOfDay, startOfMonth, subDays, subMonths, format } from 'date-fns';
-import { and, desc, eq, gte, lt, lte, sql, isNotNull } from 'drizzle-orm';
+import { and, desc, eq, gte, ilike, isNotNull, lt, lte, or, sql } from 'drizzle-orm';
 import { fromZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { amsMetrics, apiMetrics, events, jobMetrics, performanceDaily, performanceHourly } from '@/db/schema';
+import { ad, amsMetrics, apiMetrics, campaign, events, jobMetrics, performanceDaily, performanceHourly, target } from '@/db/schema';
 import { getPerformanceRange } from '@/lib/performance-range';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { protectedProcedure, router } from '../trpc';
@@ -603,6 +603,150 @@ export const metricsRouter = router({
                 data: chartData,
             };
         }),
+    searchEntities: protectedProcedure
+        .input(
+            z.object({
+                accountId: z.string(),
+                query: z.string(),
+                limit: z.number().min(1).max(200).default(60),
+            })
+        )
+        .query(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
+
+            const trimmedQuery = input.query.trim();
+            if (trimmedQuery.length < 2) {
+                return { results: [] };
+            }
+
+            const tokens = trimmedQuery.split(/\s+/).filter(Boolean);
+            if (tokens.length === 0) {
+                return { results: [] };
+            }
+
+            const perTypeLimit = Math.max(10, Math.ceil(input.limit / 3));
+            const tokenFiltersForColumns = (columns: Array<Parameters<typeof ilike>[0]>) =>
+                tokens.map(token => or(...columns.map(column => ilike(column, `%${token}%`))));
+
+            const campaignRows = await db
+                .select({
+                    campaignId: campaign.campaignId,
+                    name: campaign.name,
+                })
+                .from(campaign)
+                .where(and(eq(campaign.accountId, input.accountId), ...tokenFiltersForColumns([campaign.name, campaign.campaignId])))
+                .orderBy(desc(campaign.lastUpdatedDateTime))
+                .limit(perTypeLimit);
+
+            const adRows = await db
+                .select({
+                    adId: ad.adId,
+                    productAsin: ad.productAsin,
+                    campaignName: campaign.name,
+                })
+                .from(ad)
+                .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
+                .where(
+                    and(
+                        eq(campaign.accountId, input.accountId),
+                        ...tokenFiltersForColumns([ad.adId, ad.productAsin, campaign.name])
+                    )
+                )
+                .orderBy(desc(ad.lastUpdatedDateTime))
+                .limit(perTypeLimit);
+
+            const targetRows = await db
+                .select({
+                    targetId: target.targetId,
+                    targetKeyword: target.targetKeyword,
+                    targetAsin: target.targetAsin,
+                    targetMatchType: target.targetMatchType,
+                    campaignName: campaign.name,
+                })
+                .from(target)
+                .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
+                .where(
+                    and(
+                        eq(campaign.accountId, input.accountId),
+                        ...tokenFiltersForColumns([target.targetKeyword, target.targetAsin, target.targetId, campaign.name])
+                    )
+                )
+                .orderBy(desc(target.lastUpdatedDateTime))
+                .limit(perTypeLimit);
+
+            const normalizeSearchText = (value: string) =>
+                value
+                    .toLowerCase()
+                    .replace(/[^a-z0-9]+/g, ' ')
+                    .trim();
+
+            const scoreSearchMatch = (query: string, text: string) => {
+                const normalizedQuery = normalizeSearchText(query);
+                const normalizedText = normalizeSearchText(text);
+                if (!normalizedQuery || !normalizedText) return 0;
+                if (normalizedText === normalizedQuery) return 100;
+                if (normalizedText.startsWith(normalizedQuery)) return 90;
+                if (normalizedText.includes(normalizedQuery)) return 80;
+
+                let matched = 0;
+                let queryIndex = 0;
+                for (let i = 0; i < normalizedText.length && queryIndex < normalizedQuery.length; i++) {
+                    if (normalizedText[i] === normalizedQuery[queryIndex]) {
+                        matched += 1;
+                        queryIndex += 1;
+                    }
+                }
+
+                if (queryIndex < normalizedQuery.length) return 0;
+                return 60 + Math.round((matched / normalizedQuery.length) * 20);
+            };
+
+            const results = [
+                ...campaignRows.map(row => {
+                    const description = `Campaign · ${row.campaignId}`;
+                    return {
+                        type: 'campaign' as const,
+                        id: row.campaignId,
+                        label: row.name,
+                        description,
+                        score: scoreSearchMatch(trimmedQuery, `${row.name} ${row.campaignId}`),
+                    };
+                }),
+                ...adRows.map(row => {
+                    const label = row.productAsin ? `ASIN ${row.productAsin}` : `Ad ${row.adId}`;
+                    const description = `Ad · ${row.adId}${row.campaignName ? ` · ${row.campaignName}` : ''}`;
+                    return {
+                        type: 'ad' as const,
+                        id: row.adId,
+                        label,
+                        description,
+                        score: scoreSearchMatch(trimmedQuery, `${label} ${row.adId} ${row.productAsin ?? ''} ${row.campaignName ?? ''}`),
+                    };
+                }),
+                ...targetRows.map(row => {
+                    const label = row.targetKeyword ?? row.targetAsin ?? row.targetId;
+                    const matchTypeLabel = row.targetMatchType ? ` · ${row.targetMatchType}` : '';
+                    const description = `Target${matchTypeLabel}${row.campaignName ? ` · ${row.campaignName}` : ''}`;
+                    return {
+                        type: 'target' as const,
+                        id: row.targetId,
+                        label,
+                        description,
+                        score: scoreSearchMatch(trimmedQuery, `${label} ${row.targetId} ${row.targetKeyword ?? ''} ${row.targetAsin ?? ''} ${row.campaignName ?? ''}`),
+                    };
+                }),
+            ];
+
+            const rankedResults = results
+                .sort((a, b) => {
+                    if (b.score !== a.score) return b.score - a.score;
+                    return a.label.localeCompare(b.label);
+                })
+                .slice(0, input.limit)
+                .map(({ score, ...rest }) => rest);
+
+            return { results: rankedResults };
+        }),
     hourlyPerformance: protectedProcedure
         .input(
             z.object({
@@ -616,12 +760,34 @@ export const metricsRouter = router({
                     })
                     .nullable()
                     .optional(),
+                entityFilters: z
+                    .array(
+                        z.object({
+                            type: z.enum(['campaign', 'ad', 'target']),
+                            id: z.string(),
+                        })
+                    )
+                    .optional(),
             })
         )
         .query(async ({ ctx, input }) => {
             ctx.assertAccountAccess(input.accountId);
             const browserTimezone = input.timezone;
             const now = new Date();
+            const activeEntityFilters = input.entityFilters?.length ? input.entityFilters : null;
+            const entityFilterCondition = activeEntityFilters
+                ? or(
+                      ...activeEntityFilters.map(filter => {
+                          if (filter.type === 'campaign') {
+                              return eq(performanceHourly.campaignId, filter.id);
+                          }
+                          if (filter.type === 'ad') {
+                              return eq(performanceHourly.adId, filter.id);
+                          }
+                          return and(eq(performanceHourly.entityType, 'target'), eq(performanceHourly.entityId, filter.id));
+                      })
+                  )
+                : null;
             let allTimeStartUtc: Date | null = null;
             if (input.range === 'all_time' && !input.customRange) {
                 const [earliest] = await db
@@ -629,7 +795,12 @@ export const metricsRouter = router({
                         firstSeen: sql<Date>`min(${performanceHourly.bucketStart})`.as('first_seen'),
                     })
                     .from(performanceHourly)
-                    .where(eq(performanceHourly.accountId, input.accountId));
+                    .where(
+                        and(
+                            eq(performanceHourly.accountId, input.accountId),
+                            ...(entityFilterCondition ? [entityFilterCondition] : [])
+                        )
+                    );
 
                 allTimeStartUtc = earliest?.firstSeen ? new Date(earliest.firstSeen) : null;
             }
@@ -656,7 +827,14 @@ export const metricsRouter = router({
                         sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                     })
                     .from(performanceHourly)
-                    .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, compareStartUtc), lt(performanceHourly.bucketStart, compareEndExclusiveUtc)));
+                    .where(
+                        and(
+                            eq(performanceHourly.accountId, input.accountId),
+                            gte(performanceHourly.bucketStart, compareStartUtc),
+                            lt(performanceHourly.bucketStart, compareEndExclusiveUtc),
+                            ...(entityFilterCondition ? [entityFilterCondition] : [])
+                        )
+                    );
 
                 previousTotals = {
                     impressions: Number(previousTotalsRow?.impressions ?? 0),
@@ -705,7 +883,14 @@ export const metricsRouter = router({
                         sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                     })
                     .from(performanceHourly)
-                    .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, rangeStartUtc), lt(performanceHourly.bucketStart, rangeEndExclusiveUtc)))
+                    .where(
+                        and(
+                            eq(performanceHourly.accountId, input.accountId),
+                            gte(performanceHourly.bucketStart, rangeStartUtc),
+                            lt(performanceHourly.bucketStart, rangeEndExclusiveUtc),
+                            ...(entityFilterCondition ? [entityFilterCondition] : [])
+                        )
+                    )
                     .groupBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`)
                     .orderBy(sql`EXTRACT(HOUR FROM ${performanceHourly.bucketStart} AT TIME ZONE ${tzLiteral})`);
 
@@ -765,7 +950,14 @@ export const metricsRouter = router({
                         sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                     })
                     .from(performanceHourly)
-                    .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, previousHourStartUtc), lt(performanceHourly.bucketStart, previousHourEndUtc)));
+                    .where(
+                        and(
+                            eq(performanceHourly.accountId, input.accountId),
+                            gte(performanceHourly.bucketStart, previousHourStartUtc),
+                            lt(performanceHourly.bucketStart, previousHourEndUtc),
+                            ...(entityFilterCondition ? [entityFilterCondition] : [])
+                        )
+                    );
 
                 const previousHourData = {
                     impressions: Number(previousHourRow?.impressions ?? 0),
@@ -807,7 +999,14 @@ export const metricsRouter = router({
                         sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                     })
                     .from(performanceHourly)
-                    .where(and(eq(performanceHourly.accountId, input.accountId), gte(performanceHourly.bucketStart, rangeStartUtc), lt(performanceHourly.bucketStart, rangeEndExclusiveUtc)))
+                    .where(
+                        and(
+                            eq(performanceHourly.accountId, input.accountId),
+                            gte(performanceHourly.bucketStart, rangeStartUtc),
+                            lt(performanceHourly.bucketStart, rangeEndExclusiveUtc),
+                            ...(entityFilterCondition ? [entityFilterCondition] : [])
+                        )
+                    )
                     .groupBy(intervalExpr)
                     .orderBy(intervalExpr);
 
