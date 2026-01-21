@@ -9,8 +9,8 @@ import { Input } from '../../components/ui/input';
 import { Menu, MenuGroup, MenuGroupLabel, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuSeparator, MenuTrigger } from '../../components/ui/menu';
 import { connectionStatusAtom } from '../atoms';
 import { ALL_RANGE_OPTIONS, METRICS, PERIOD_OPTIONS, RANGE_OPTIONS, type MetricConfig, type PerformanceRange } from './performance-metrics-config';
-import type { PerformanceEntityFilter } from './performance-metrics-atoms';
-import { customRangeAtom, customRangeDraftAtom, entityFiltersAtom, performanceRangeAtom } from './performance-metrics-atoms';
+import type { PerformanceEntityFilter } from '@/dashboard/state/performance-metrics-state';
+import { customRangeAtom, customRangeDraftAtom, entityFiltersAtom, performanceRangeAtom } from '@/dashboard/state/performance-metrics-state';
 
 type PerformanceMetricsControlsProps = {
     totals?: {
