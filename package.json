@@ -10,7 +10,7 @@
     "start": "dotenv --no-expand -e .env -- node dist/index.js",
     "start:worker": "dotenv --no-expand -e .env -- node dist/worker.js",
     "dev:server": "dotenv --no-expand -e .env -- tsx src/index.ts",
-    "dev": "concurrently -k -n server,dashboard -c cyan,magenta \"bun run dev:server\" \"bun run dev:dashboard\"",
+    "dev": "concurrently -k -n server,dashboard -c cyan,magenta \"bun run dev:server\" \"DASHBOARD_API_PROXY_TARGET=http://localhost:8080 VITE_API_BASE_URL=http://localhost:8080 bun run dev:dashboard\"",
     "dev:dashboard": "vite dev --config vite.config.dashboard.ts",
     "preview:dashboard": "vite preview --config vite.config.dashboard.ts",
     "db:generate": "drizzle-kit generate",
