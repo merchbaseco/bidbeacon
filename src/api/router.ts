@@ -1,14 +1,16 @@
-import { accountsRouter } from './routers/accounts.js';
-import { metricsRouter } from './routers/metrics.js';
-import { reportsRouter } from './routers/reports.js';
-import { usersRouter } from './routers/users.js';
-import { workerRouter } from './routers/worker.js';
-import { router } from './trpc.js';
+import { accountsRouter } from './routers/accounts';
+import { metricsRouter } from './routers/metrics';
+import { performanceRouter } from './routers/performance';
+import { reportsRouter } from './routers/reports';
+import { usersRouter } from './routers/users';
+import { workerRouter } from './routers/worker';
+import { router } from './trpc';
 
 export const appRouter = router({
     reports: reportsRouter,
     accounts: accountsRouter,
     metrics: metricsRouter,
+    performance: performanceRouter,
     users: usersRouter,
     worker: workerRouter,
 });
