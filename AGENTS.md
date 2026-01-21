@@ -10,6 +10,7 @@
 - Always squash all changes into a single commit.
 - Rebase changes before publishing a PR.
 - Timezone reference doc: `docs/timezones.md` (critical for Amazon Ads parity and future changes).
+- Performance data reference doc: `docs/performance-data.md` (hourly vs daily reconciliation).
 - Tests: run `bun run test` (Vitest). Avoid `bun test` (missing Vitest helpers).
 
 ## Architecture
