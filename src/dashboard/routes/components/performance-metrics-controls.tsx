@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { ChevronsUpDown, XIcon } from 'lucide-react';
 import { useAtom, useAtomValue } from 'jotai';
 import { cn } from '@/dashboard/lib/utils';
@@ -26,9 +27,14 @@ type PerformanceMetricsControlsProps = {
         spend: number;
         acos: number;
     } | null;
+    range?: {
+        start: string;
+        end: string;
+    } | null;
+    timezone?: string;
 };
 
-const PerformanceMetricsControls = ({ totals, changes }: PerformanceMetricsControlsProps) => {
+const PerformanceMetricsControls = ({ totals, changes, range: dataRange, timezone }: PerformanceMetricsControlsProps) => {
     const connectionStatus = useAtomValue(connectionStatusAtom);
     const [range, setRange] = useAtom(performanceRangeAtom);
     const [customRange, setCustomRange] = useAtom(customRangeAtom);
@@ -39,6 +45,21 @@ const PerformanceMetricsControls = ({ totals, changes }: PerformanceMetricsContr
     const selectedRange = ALL_RANGE_OPTIONS.find(option => option.value === range);
     const triggerLabel = isCustomRangeActive ? 'Custom range' : selectedRange?.label ?? 'Today';
     const canApplyCustomRange = Boolean(customRangeDraft.start && customRangeDraft.end);
+    const resolvedTimezone = timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+    const dateDisplay = useMemo(() => {
+        const resolved = getResolvedRangeDates({
+            range,
+            customRange: isCustomRangeActive ? customRange : null,
+            dataRange,
+        });
+        if (!resolved) return null;
+        const isSingleDate = range === 'today' || range === 'yesterday' || isSameCalendarDay(resolved.start, resolved.end, resolvedTimezone);
+        if (isSingleDate) {
+            return formatSingleDate(resolved.start, resolvedTimezone);
+        }
+        return formatDateRange(resolved.start, resolved.end, resolvedTimezone);
+    }, [customRange, dataRange, isCustomRangeActive, range, resolvedTimezone]);
 
     return (
         <div className="max-w-background-frame-max mx-auto px-4">
@@ -129,6 +150,7 @@ const PerformanceMetricsControls = ({ totals, changes }: PerformanceMetricsContr
                                 </MenuGroup>
                             </MenuPopup>
                         </Menu>
+                        {dateDisplay ? <span className="text-xs text-muted-foreground/70 whitespace-nowrap">{dateDisplay}</span> : null}
                         {entityFilters.length > 0 ? (
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                                 {entityFilters.map(filter => (
@@ -221,4 +243,111 @@ const getEntityFilterTypeLabel = (type: PerformanceEntityFilter['type']) => {
         case 'target':
             return 'Target';
     }
+};
+
+const getResolvedRangeDates = ({
+    range,
+    customRange,
+    dataRange,
+}: {
+    range: PerformanceRange;
+    customRange: { start: string; end: string } | null;
+    dataRange?: { start: string; end: string } | null;
+}) => {
+    if (dataRange?.start && dataRange?.end) {
+        return {
+            start: new Date(dataRange.start),
+            end: new Date(dataRange.end),
+        };
+    }
+
+    if (customRange?.start && customRange?.end) {
+        const parsedStart = parseLocalDateInput(customRange.start);
+        const parsedEnd = parseLocalDateInput(customRange.end);
+        if (!parsedStart || !parsedEnd) return null;
+        return parsedStart.getTime() <= parsedEnd.getTime()
+            ? { start: parsedStart, end: parsedEnd }
+            : { start: parsedEnd, end: parsedStart };
+    }
+
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
+    const todayEnd = new Date(now);
+    todayEnd.setHours(23, 59, 59, 999);
+
+    let start = todayStart;
+    let end = todayEnd;
+
+    if (range === 'yesterday') {
+        start = new Date(todayStart);
+        start.setDate(start.getDate() - 1);
+        end = new Date(todayEnd);
+        end.setDate(end.getDate() - 1);
+    }
+
+    if (range === 'this_month') {
+        start = new Date(todayStart);
+        start.setDate(1);
+    }
+
+    if (range === 'this_year') {
+        start = new Date(todayStart);
+        start.setMonth(0, 1);
+    }
+
+    if (range === 'last_30_days') {
+        start = new Date(todayStart);
+        start.setDate(start.getDate() - 29);
+    }
+
+    if (range === 'last_6_months') {
+        start = new Date(todayStart);
+        start.setMonth(start.getMonth() - 5, 1);
+    }
+
+    if (range === 'last_12_months') {
+        start = new Date(todayStart);
+        start.setMonth(start.getMonth() - 11, 1);
+    }
+
+    return { start, end };
+};
+
+const parseLocalDateInput = (value: string) => {
+    const [year, month, day] = value.split('-').map(Number);
+    if (!year || !month || !day) return null;
+    const date = new Date(year, month - 1, day);
+    return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const isSameCalendarDay = (start: Date, end: Date, timezone: string) => {
+    const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+    return formatter.format(start) === formatter.format(end);
+};
+
+const formatSingleDate = (date: Date, timezone: string) => {
+    return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: timezone }).format(date);
+};
+
+const formatDateRange = (start: Date, end: Date, timezone: string) => {
+    const yearFormatter = new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: timezone });
+    const monthDayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: timezone });
+    const dayFormatter = new Intl.DateTimeFormat('en-US', { day: 'numeric', timeZone: timezone });
+    const monthDayYearFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: timezone });
+    const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', timeZone: timezone });
+
+    const startYear = yearFormatter.format(start);
+    const endYear = yearFormatter.format(end);
+    const startMonth = monthFormatter.format(start);
+    const endMonth = monthFormatter.format(end);
+
+    if (startYear === endYear) {
+        if (startMonth === endMonth) {
+            return `${monthDayFormatter.format(start)}–${dayFormatter.format(end)}, ${endYear}`;
+        }
+        return `${monthDayFormatter.format(start)}–${monthDayFormatter.format(end)}, ${endYear}`;
+    }
+
+    return `${monthDayYearFormatter.format(start)}–${monthDayYearFormatter.format(end)}`;
 };
