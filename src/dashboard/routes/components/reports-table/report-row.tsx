@@ -24,7 +24,7 @@ interface ReportRowProps {
 const getStatusBadgeType = (status: string) => {
     switch (status) {
         case 'completed':
-            return 'success';
+            return 'outline';
         case 'error':
             return 'error';
         case 'fetching':
@@ -41,7 +41,7 @@ const getStatusBadgeType = (status: string) => {
 const getStatusColor = (status: string) => {
     switch (status) {
         case 'completed':
-            return 'bg-success';
+            return 'bg-emerald-500';
         case 'error':
             return 'bg-destructive';
         case 'fetching':
