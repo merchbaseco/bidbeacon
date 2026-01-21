@@ -151,7 +151,7 @@ function ComboboxItem({ className, children, ...props }: ComboboxPrimitive.Item.
             data-slot="combobox-item"
             {...props}
         >
-            <ComboboxPrimitive.ItemIndicator className="col-start-1">
+            <ComboboxPrimitive.ItemIndicator className="col-start-1" data-slot="combobox-item-indicator">
                 <svg
                     fill="none"
                     height="24"
