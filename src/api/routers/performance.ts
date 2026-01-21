@@ -76,6 +76,7 @@ export const performanceRouter = router({
                         .select({
                             adGroupId: performanceDaily.adGroupId,
                             campaignId: performanceDaily.campaignId,
+                            campaignName: campaign.name,
                             name: adGroup.name,
                             state: adGroup.state,
                             adProduct: adGroup.adProduct,
@@ -87,8 +88,16 @@ export const performanceRouter = router({
                         })
                         .from(performanceDaily)
                         .leftJoin(adGroup, eq(performanceDaily.adGroupId, adGroup.adGroupId))
+                        .leftJoin(campaign, eq(performanceDaily.campaignId, campaign.campaignId))
                         .where(and(...conditions))
-                        .groupBy(performanceDaily.adGroupId, performanceDaily.campaignId, adGroup.name, adGroup.state, adGroup.adProduct)
+                        .groupBy(
+                            performanceDaily.adGroupId,
+                            performanceDaily.campaignId,
+                            campaign.name,
+                            adGroup.name,
+                            adGroup.state,
+                            adGroup.adProduct
+                        )
                         .orderBy(orderDirection, performanceDaily.adGroupId)
                         .limit(pagination.limit + 1)
                         .offset(pagination.offset);
@@ -104,7 +113,9 @@ export const performanceRouter = router({
                         .select({
                             adId: performanceDaily.adId,
                             campaignId: performanceDaily.campaignId,
+                            campaignName: campaign.name,
                             adGroupId: performanceDaily.adGroupId,
+                            adGroupName: adGroup.name,
                             adProduct: ad.adProduct,
                             adType: ad.adType,
                             state: ad.state,
@@ -117,11 +128,15 @@ export const performanceRouter = router({
                         })
                         .from(performanceDaily)
                         .leftJoin(ad, eq(performanceDaily.adId, ad.adId))
+                        .leftJoin(adGroup, eq(performanceDaily.adGroupId, adGroup.adGroupId))
+                        .leftJoin(campaign, eq(performanceDaily.campaignId, campaign.campaignId))
                         .where(and(...conditions))
                         .groupBy(
                             performanceDaily.adId,
                             performanceDaily.campaignId,
                             performanceDaily.adGroupId,
+                            campaign.name,
+                            adGroup.name,
                             ad.adProduct,
                             ad.adType,
                             ad.state,
@@ -142,7 +157,9 @@ export const performanceRouter = router({
                         .select({
                             targetId: performanceDaily.entityId,
                             campaignId: performanceDaily.campaignId,
+                            campaignName: campaign.name,
                             adGroupId: performanceDaily.adGroupId,
+                            adGroupName: adGroup.name,
                             state: target.state,
                             negative: target.negative,
                             targetType: target.targetType,
@@ -157,11 +174,15 @@ export const performanceRouter = router({
                         })
                         .from(performanceDaily)
                         .leftJoin(target, eq(performanceDaily.entityId, target.targetId))
+                        .leftJoin(adGroup, eq(performanceDaily.adGroupId, adGroup.adGroupId))
+                        .leftJoin(campaign, eq(performanceDaily.campaignId, campaign.campaignId))
                         .where(and(...conditions, eq(performanceDaily.entityType, 'target')))
                         .groupBy(
                             performanceDaily.entityId,
                             performanceDaily.campaignId,
                             performanceDaily.adGroupId,
+                            campaign.name,
+                            adGroup.name,
                             target.state,
                             target.negative,
                             target.targetType,
@@ -416,6 +437,7 @@ const formatResponse = (
                 dimension,
                 adGroupId: String(row.adGroupId),
                 campaignId: String(row.campaignId),
+                campaignName: row.campaignName ? String(row.campaignName) : null,
                 name: String(row.name ?? row.adGroupId ?? ''),
                 state: String(row.state ?? ''),
                 adProduct: String(row.adProduct ?? ''),
@@ -428,7 +450,9 @@ const formatResponse = (
                 dimension,
                 adId: String(row.adId),
                 campaignId: String(row.campaignId),
+                campaignName: row.campaignName ? String(row.campaignName) : null,
                 adGroupId: String(row.adGroupId),
+                adGroupName: row.adGroupName ? String(row.adGroupName) : null,
                 adProduct: String(row.adProduct ?? ''),
                 adType: String(row.adType ?? ''),
                 state: String(row.state ?? ''),
@@ -441,7 +465,9 @@ const formatResponse = (
             dimension,
             targetId: String(row.targetId),
             campaignId: String(row.campaignId),
+            campaignName: row.campaignName ? String(row.campaignName) : null,
             adGroupId: row.adGroupId ? String(row.adGroupId) : null,
+            adGroupName: row.adGroupName ? String(row.adGroupName) : null,
             state: String(row.state ?? ''),
             negative: Boolean(row.negative),
             targetType: String(row.targetType ?? ''),
