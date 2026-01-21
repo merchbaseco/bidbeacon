@@ -128,16 +128,24 @@ const PerformanceMetricsControls = ({ totals, changes }: PerformanceMetricsContr
                             </MenuPopup>
                         </Menu>
                         {entityFilters.length > 0 ? (
-                            <div className="flex flex-wrap items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                                 {entityFilters.map(filter => (
-                                    <Badge key={`${filter.type}-${filter.id}`} variant="outline" className="rounded-full gap-1 pl-2 pr-1">
-                                        <span className="max-w-[160px] truncate text-xs font-medium" title={filter.label}>
+                                    <Badge
+                                        key={`${filter.type}-${filter.id}`}
+                                        variant="outline"
+                                        className="h-8 rounded-full gap-2 pl-3 pr-1 text-sm font-medium sm:h-7"
+                                    >
+                                        <span className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">{filter.type}</span>
+                                        <span
+                                            className="min-w-0 max-w-[160px] truncate text-sm font-medium"
+                                            style={{ direction: 'rtl', unicodeBidi: 'plaintext' }}
+                                            title={filter.label}
+                                        >
                                             {filter.label}
                                         </span>
-                                        <span className="text-[0.65rem] uppercase tracking-wide text-muted-foreground">{filter.type}</span>
                                         <button
                                             type="button"
-                                            className="inline-flex items-center justify-center rounded-full p-0.5 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
+                                            className="inline-flex items-center justify-center rounded-full p-1 text-muted-foreground transition-colors hover:bg-accent/60 hover:text-foreground"
                                             onClick={() =>
                                                 setEntityFilters(current => current.filter(item => !(item.id === filter.id && item.type === filter.type)))
                                             }
