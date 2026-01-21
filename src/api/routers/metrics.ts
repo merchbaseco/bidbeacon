@@ -765,7 +765,7 @@ export const metricsRouter = router({
                     entityFilters: z
                         .array(
                             z.object({
-                                type: z.enum(['campaign', 'ad', 'target']),
+                                type: z.enum(['campaign', 'adGroup', 'ad', 'target']),
                                 id: z.string(),
                             })
                         )
@@ -786,6 +786,9 @@ export const metricsRouter = router({
                           if (filter.type === 'campaign') {
                               return eq(performanceHourly.campaignId, filter.id);
                           }
+                          if (filter.type === 'adGroup') {
+                              return eq(performanceHourly.adGroupId, filter.id);
+                          }
                           if (filter.type === 'ad') {
                               return eq(performanceHourly.adId, filter.id);
                           }
@@ -798,6 +801,9 @@ export const metricsRouter = router({
                       ...activeEntityFilters.map(filter => {
                           if (filter.type === 'campaign') {
                               return eq(performanceDaily.campaignId, filter.id);
+                          }
+                          if (filter.type === 'adGroup') {
+                              return eq(performanceDaily.adGroupId, filter.id);
                           }
                           if (filter.type === 'ad') {
                               return eq(performanceDaily.adId, filter.id);
