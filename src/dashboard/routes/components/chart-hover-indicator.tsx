@@ -1,5 +1,5 @@
 import type { RefObject } from 'react';
-import { useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 
 interface ChartHoverIndicatorProps {
@@ -24,14 +24,17 @@ export const ChartHoverIndicator = ({ active, coordinate, label, containerRef }:
         setMounted(true);
     }, []);
 
-    useLayoutEffect(() => {
+    const updatePosition = useCallback(() => {
         if (!active || !coordinate || !containerRef.current) {
             setPosition(null);
             return;
         }
 
         const wrapper = containerRef.current.querySelector('.recharts-wrapper') as HTMLElement | null;
-        if (!wrapper) return;
+        if (!wrapper) {
+            setPosition(null);
+            return;
+        }
 
         const rect = wrapper.getBoundingClientRect();
         setPosition({
@@ -41,6 +44,32 @@ export const ChartHoverIndicator = ({ active, coordinate, label, containerRef }:
             y: rect.top + coordinate.y,
         });
     }, [active, coordinate, containerRef]);
+
+    useLayoutEffect(() => {
+        updatePosition();
+    }, [updatePosition]);
+
+    useEffect(() => {
+        if (!active) return;
+        let frame = 0;
+        const handleUpdate = () => {
+            if (frame) cancelAnimationFrame(frame);
+            frame = requestAnimationFrame(() => {
+                updatePosition();
+            });
+        };
+
+        handleUpdate();
+        const scrollOptions: AddEventListenerOptions = { passive: true, capture: true };
+        window.addEventListener('scroll', handleUpdate, scrollOptions);
+        window.addEventListener('resize', handleUpdate);
+
+        return () => {
+            if (frame) cancelAnimationFrame(frame);
+            window.removeEventListener('scroll', handleUpdate, { capture: true });
+            window.removeEventListener('resize', handleUpdate);
+        };
+    }, [active, updatePosition]);
 
     if (!mounted || !active || !position || !label) return null;
 
