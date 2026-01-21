@@ -1,7 +1,6 @@
-import { subDays } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useDeferredValue, useMemo, useState } from 'react';
-import { useAtom } from 'jotai';
+import { useAtom, useAtomValue } from 'jotai';
 import { Badge } from '@/dashboard/components/ui/badge';
 import { Frame, FrameFooter } from '@/dashboard/components/ui/frame';
 import { Input } from '@/dashboard/components/ui/input';
@@ -9,12 +8,13 @@ import { ScrollArea } from '@/dashboard/components/ui/scroll-area';
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '@/dashboard/components/ui/select';
 import { Skeleton } from '@/dashboard/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/dashboard/components/ui/table';
-import { Toggle, ToggleGroup } from '@/dashboard/components/ui/toggle-group';
 import { useSelectedAccountId } from '@/dashboard/routes/hooks/use-selected-accountid';
 import { useSelectedCountryCode } from '@/dashboard/routes/hooks/use-selected-country-code';
 import { usePerformanceTable } from '@/dashboard/routes/hooks/use-performance-table';
-import type { PerformanceEntityFilter } from '@/dashboard/routes/components/performance-metrics-atoms';
-import { entityFiltersAtom } from '@/dashboard/routes/components/performance-metrics-atoms';
+import type { PerformanceEntityFilter } from '@/dashboard/state/performance-metrics-state';
+import { customRangeAtom, entityFiltersAtom, performanceRangeAtom } from '@/dashboard/state/performance-metrics-state';
+import type { PerformanceRange } from '@/dashboard/routes/components/performance-metrics-config';
+import { getPerformanceRange } from '@/lib/performance-range';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import type { PerformanceDimension, PerformanceTableOutput } from '@/types/performance-api';
 
@@ -22,9 +22,6 @@ const PerformanceTable = ({ className }: { className?: string }) => {
     const accountId = useSelectedAccountId();
     const countryCode = useSelectedCountryCode();
     const [dimension, setDimension] = useState<PerformanceDimension>('campaign');
-    const [rangePreset, setRangePreset] = useState<RangePreset>('last_30');
-    const [customStart, setCustomStart] = useState('');
-    const [customEnd, setCustomEnd] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [adProductFilter, setAdProductFilter] = useState('all');
     const [searchInput, setSearchInput] = useState('');
@@ -34,28 +31,27 @@ const PerformanceTable = ({ className }: { className?: string }) => {
         return new URLSearchParams(window.location.search).has('showSkeleton');
     }, []);
     const [, setEntityFilters] = useAtom(entityFiltersAtom);
+    const range = useAtomValue(performanceRangeAtom);
+    const customRange = useAtomValue(customRangeAtom);
 
     if (!accountId || !countryCode) {
         return null;
     }
 
     const timezone = useMemo(() => getTimezoneForCountry(countryCode), [countryCode]);
-    const presetRange = useMemo(() => {
-        const now = new Date();
-        const days = rangePreset === 'last_7' ? 6 : 29;
-        const start = subDays(now, days);
-
-        return {
-            startDate: formatInTimeZone(start, timezone, 'MM-dd-yyyy'),
-            endDate: formatInTimeZone(now, timezone, 'MM-dd-yyyy'),
-        };
-    }, [rangePreset, timezone]);
-
-    const isCustomRangeValid = isValidDateString(customStart) && isValidDateString(customEnd);
-    const range = useMemo(
-        () => (rangePreset === 'custom' && isCustomRangeValid ? { startDate: customStart, endDate: customEnd } : presetRange),
-        [rangePreset, isCustomRangeValid, customStart, customEnd, presetRange]
+    const tableRange = useMemo(
+        () =>
+            getTableRange({
+                range,
+                customRange,
+                timezone,
+            }),
+        [customRange, range, timezone]
     );
+    const rangeLabel = useMemo(() => {
+        if (range === 'all_time') return 'All time';
+        return `${tableRange.startDate} - ${tableRange.endDate}`;
+    }, [range, tableRange]);
 
     const filters = useMemo(
         () => ({
@@ -68,11 +64,10 @@ const PerformanceTable = ({ className }: { className?: string }) => {
 
     const { data, isLoading, isFetching } = usePerformanceTable({
         accountId,
-        range,
+        range: tableRange,
         dimension,
         metricsEntityType: 'target',
         filters,
-        enabled: rangePreset !== 'custom' || isCustomRangeValid,
     });
 
     const rows = data?.rows ?? [];
@@ -89,11 +84,13 @@ const PerformanceTable = ({ className }: { className?: string }) => {
 
     return (
         <div className={className ?? ''}>
-            {isFetching && !isLoading ? (
-                <div className="mb-2 flex justify-end">
-                    <span className="text-xs text-muted-foreground">Refreshing…</span>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                    <p className="text-sm font-semibold">Performance table</p>
+                    <p className="text-xs text-muted-foreground">{rangeLabel} · Target metrics</p>
                 </div>
-            ) : null}
+                {isFetching && !isLoading ? <span className="text-xs text-muted-foreground">Refreshing…</span> : null}
+            </div>
             <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Input
                     aria-label={`Search ${getPrimaryColumnLabel(dimension)}`}
@@ -117,33 +114,6 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                         ))}
                     </SelectPopup>
                 </Select>
-                <ToggleGroup
-                    type="single"
-                    value={rangePreset}
-                    onValueChange={value => value && setRangePreset(value as RangePreset)}
-                    variant="outline"
-                >
-                    <Toggle value="last_7">Last 7</Toggle>
-                    <Toggle value="last_30">Last 30</Toggle>
-                    <Toggle value="custom">Custom</Toggle>
-                </ToggleGroup>
-                {rangePreset === 'custom' ? (
-                    <div className="flex items-center gap-2">
-                        <Input
-                            placeholder="MM-DD-YYYY"
-                            value={customStart}
-                            onChange={event => setCustomStart(event.target.value)}
-                            className="w-[130px] text-sm"
-                        />
-                        <span className="text-xs text-muted-foreground">to</span>
-                        <Input
-                            placeholder="MM-DD-YYYY"
-                            value={customEnd}
-                            onChange={event => setCustomEnd(event.target.value)}
-                            className="w-[130px] text-sm"
-                        />
-                    </div>
-                ) : null}
                 <Select aria-label="Select status" value={statusFilter} onValueChange={value => value && setStatusFilter(value)}>
                     <SelectTrigger className="w-[140px] text-sm">
                         <SelectValue>
@@ -207,13 +177,7 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                                 ))}
                             </colgroup>
                             <TableBody className="before:hidden">
-                                {rangePreset === 'custom' && !isCustomRangeValid ? (
-                                    <TableRow>
-                                        <TableCell colSpan={7} className="py-10 text-center text-sm text-muted-foreground">
-                                            Enter a start and end date in MM-DD-YYYY to load results.
-                                        </TableCell>
-                                    </TableRow>
-                                ) : showSkeleton ? (
+                                {showSkeleton ? (
                                     <TableRow className="border-0 h-[520px]">
                                         <TableCell colSpan={7} className="h-[520px] p-0 align-top border-0">
                                             <div className="box-border grid h-full grid-rows-[repeat(12,minmax(0,1fr))] gap-0">
@@ -498,9 +462,6 @@ const renderPrimaryCell = (row: {
     );
 };
 
-const isValidDateString = (value: string) => /^\d{2}-\d{2}-\d{4}$/.test(value);
-
-type RangePreset = 'last_7' | 'last_30' | 'custom';
 type PerformanceTableRow = PerformanceTableOutput['rows'][number];
 
 const DIMENSION_OPTIONS = [
@@ -529,3 +490,28 @@ const AD_PRODUCT_OPTIONS = [
 const COLUMN_WIDTHS = ['w-[80px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[110px]'] as const;
 
 export { PerformanceTable };
+
+const ALL_TIME_FALLBACK_START = new Date(Date.UTC(2000, 0, 1));
+
+const getTableRange = ({
+    range,
+    customRange,
+    timezone,
+}: {
+    range: PerformanceRange;
+    customRange: { start: string; end: string } | null;
+    timezone: string;
+}) => {
+    const hasCustomRange = Boolean(customRange?.start && customRange?.end);
+    const rangeResult = getPerformanceRange({
+        range,
+        timezone,
+        customRange: hasCustomRange ? customRange : null,
+        allTimeStartUtc: range === 'all_time' ? ALL_TIME_FALLBACK_START : null,
+    });
+
+    return {
+        startDate: formatInTimeZone(rangeResult.rangeStartZoned, timezone, 'MM-dd-yyyy'),
+        endDate: formatInTimeZone(rangeResult.rangeEndZoned, timezone, 'MM-dd-yyyy'),
+    };
+};

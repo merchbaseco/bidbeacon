@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import type { PerformanceRange } from './performance-metrics-config';
+import type { PerformanceRange } from '@/dashboard/routes/components/performance-metrics-config';
 
 export type PerformanceEntityFilter = {
     type: 'campaign' | 'adGroup' | 'ad' | 'target';

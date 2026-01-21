@@ -4,7 +4,7 @@ import { useAtomValue } from 'jotai';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { cn } from '@/dashboard/lib/utils';
 import { Spinner } from '../../components/ui/spinner';
-import { performanceRangeAtom, customRangeAtom } from './performance-metrics-atoms';
+import { performanceRangeAtom, customRangeAtom } from '@/dashboard/state/performance-metrics-state';
 import { METRICS } from './performance-metrics-config';
 import { ChartHoverIndicator } from './chart-hover-indicator';
 

@@ -4,7 +4,7 @@ import { api } from '@/dashboard/lib/trpc';
 import { cn } from '@/dashboard/lib/utils';
 import { Spinner } from '../../components/ui/spinner';
 import { useSelectedAccountId } from '../hooks/use-selected-accountid';
-import { customRangeAtom, entityFiltersAtom, performanceRangeAtom } from './performance-metrics-atoms';
+import { customRangeAtom, entityFiltersAtom, performanceRangeAtom } from '@/dashboard/state/performance-metrics-state';
 import { selectedCountryCodeAtom } from './account-selector/atoms';
 import { PerformanceMetricsChart } from './performance-metrics-chart';
 import { PerformanceMetricsControls } from './performance-metrics-controls';
