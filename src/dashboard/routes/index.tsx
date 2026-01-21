@@ -3,7 +3,7 @@ import ChartBarLineIcon from '@merchbaseco/icons/core-stroke-rounded/ChartBarLin
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../components/ui/empty';
 import { AccountDataCard } from './components/account-data-card';
 import { AmsMetricsCard } from './components/ams-metrics-card';
-import { DailyPerformanceMetrics } from './components/daily-performance-metrics';
+import { PerformanceMetrics } from './components/performance-metrics';
 import { ReportsTable } from './components/reports-table/reports-table';
 import { EventStream } from './components/event-stream';
 import { useSelectedAccountId } from './hooks/use-selected-accountid';
@@ -32,7 +32,7 @@ export function IndexRoute() {
 
     return (
         <div>
-            <DailyPerformanceMetrics className="pt-4" />
+            <PerformanceMetrics className="pt-4" />
 
             <div className="grid grid-cols-1 md:grid-cols-6 gap-4 max-w-background-frame-max mx-auto px-4 mt-4">
                 <div className="md:col-span-2">
