@@ -65,101 +65,103 @@ const PerformanceMetricsControls = ({ totals, changes, range: dataRange, timezon
         <div className="max-w-background-frame-max mx-auto px-4">
             <div className="flex flex-col gap-4 mb-6">
                 <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Menu>
-                            <MenuTrigger
-                                render={
-                                    <Button variant="outline" className="gap-2 font-medium">
-                                        {triggerLabel}
-                                        <ChevronsUpDown className="size-4 text-muted-foreground" />
-                                    </Button>
-                                }
-                            />
-                            <MenuPopup className="w-[260px] overflow-x-hidden" align="start">
-                                <MenuRadioGroup
-                                    value={range}
-                                    onValueChange={value => {
-                                        setRange(value as PerformanceRange);
-                                        setCustomRange(null);
-                                    }}
-                                >
-                                    <MenuGroup className="py-0.5">
-                                        <MenuGroupLabel className="pb-1">Period</MenuGroupLabel>
-                                        {PERIOD_OPTIONS.map(option => (
-                                            <MenuRadioItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuRadioItem>
-                                        ))}
-                                    </MenuGroup>
+                    <div className="flex flex-col gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                            <Menu>
+                                <MenuTrigger
+                                    render={
+                                        <Button variant="outline" className="gap-2 font-medium">
+                                            {triggerLabel}
+                                            <ChevronsUpDown className="size-4 text-muted-foreground" />
+                                        </Button>
+                                    }
+                                />
+                                <MenuPopup className="w-[260px] overflow-x-hidden" align="start">
+                                    <MenuRadioGroup
+                                        value={range}
+                                        onValueChange={value => {
+                                            setRange(value as PerformanceRange);
+                                            setCustomRange(null);
+                                        }}
+                                    >
+                                        <MenuGroup className="py-0.5">
+                                            <MenuGroupLabel className="pb-1">Period</MenuGroupLabel>
+                                            {PERIOD_OPTIONS.map(option => (
+                                                <MenuRadioItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuRadioItem>
+                                            ))}
+                                        </MenuGroup>
+                                        <MenuSeparator className="my-2" />
+                                        <MenuGroup className="py-0.5">
+                                            <MenuGroupLabel className="pb-1">Range</MenuGroupLabel>
+                                            {RANGE_OPTIONS.map(option => (
+                                                <MenuRadioItem key={option.value} value={option.value}>
+                                                    {option.label}
+                                                </MenuRadioItem>
+                                            ))}
+                                        </MenuGroup>
+                                    </MenuRadioGroup>
                                     <MenuSeparator className="my-2" />
-                                    <MenuGroup className="py-0.5">
-                                        <MenuGroupLabel className="pb-1">Range</MenuGroupLabel>
-                                        {RANGE_OPTIONS.map(option => (
-                                            <MenuRadioItem key={option.value} value={option.value}>
-                                                {option.label}
-                                            </MenuRadioItem>
-                                        ))}
+                                    <MenuGroup>
+                                        <MenuGroupLabel className="pb-1">Custom range</MenuGroupLabel>
+                                        <div className="mx-2 mb-2 flex min-w-0 flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 shadow-sm">
+                                            <div className="grid grid-cols-2 gap-2">
+                                                <label className="text-xs text-muted-foreground">Start</label>
+                                                <label className="text-xs text-muted-foreground">End</label>
+                                                <Input
+                                                    type="date"
+                                                    value={customRangeDraft.start}
+                                                    onChange={event => setCustomRangeDraft(current => ({ ...current, start: event.target.value }))}
+                                                    className="min-w-0 text-sm"
+                                                />
+                                                <Input
+                                                    type="date"
+                                                    value={customRangeDraft.end}
+                                                    onChange={event => setCustomRangeDraft(current => ({ ...current, end: event.target.value }))}
+                                                    className="min-w-0 text-sm"
+                                                />
+                                            </div>
+                                            <div className="flex min-w-0 gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    className="min-w-0 flex-1"
+                                                    disabled={!canApplyCustomRange}
+                                                    onClick={() => {
+                                                        if (!canApplyCustomRange) return;
+                                                        setCustomRange({
+                                                            start: customRangeDraft.start,
+                                                            end: customRangeDraft.end,
+                                                        });
+                                                    }}
+                                                >
+                                                    Apply
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="min-w-0 flex-1"
+                                                    onClick={() => setCustomRange(null)}
+                                                    disabled={!isCustomRangeActive}
+                                                >
+                                                    Clear
+                                                </Button>
+                                            </div>
+                                        </div>
                                     </MenuGroup>
-                                </MenuRadioGroup>
-                                <MenuSeparator className="my-2" />
-                                <MenuGroup>
-                                    <MenuGroupLabel className="pb-1">Custom range</MenuGroupLabel>
-                                    <div className="mx-2 mb-2 flex min-w-0 flex-col gap-2 rounded-lg border border-border/60 bg-muted/20 px-3 py-2 shadow-sm">
-                                        <div className="grid grid-cols-2 gap-2">
-                                            <label className="text-xs text-muted-foreground">Start</label>
-                                            <label className="text-xs text-muted-foreground">End</label>
-                                            <Input
-                                                type="date"
-                                                value={customRangeDraft.start}
-                                                onChange={event => setCustomRangeDraft(current => ({ ...current, start: event.target.value }))}
-                                                className="min-w-0 text-sm"
-                                            />
-                                            <Input
-                                                type="date"
-                                                value={customRangeDraft.end}
-                                                onChange={event => setCustomRangeDraft(current => ({ ...current, end: event.target.value }))}
-                                                className="min-w-0 text-sm"
-                                            />
-                                        </div>
-                                        <div className="flex min-w-0 gap-2">
-                                            <Button
-                                                size="sm"
-                                                className="min-w-0 flex-1"
-                                                disabled={!canApplyCustomRange}
-                                                onClick={() => {
-                                                    if (!canApplyCustomRange) return;
-                                                    setCustomRange({
-                                                        start: customRangeDraft.start,
-                                                        end: customRangeDraft.end,
-                                                    });
-                                                }}
-                                            >
-                                                Apply
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="ghost"
-                                                className="min-w-0 flex-1"
-                                                onClick={() => setCustomRange(null)}
-                                                disabled={!isCustomRangeActive}
-                                            >
-                                                Clear
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </MenuGroup>
-                            </MenuPopup>
-                        </Menu>
-                        {dateDisplay ? (
-                            <span className="ml-1 text-sm md:text-base text-muted-foreground/70 whitespace-nowrap">{dateDisplay}</span>
-                        ) : null}
+                                </MenuPopup>
+                            </Menu>
+                            {dateDisplay ? (
+                                <span className="text-sm md:text-base text-muted-foreground/70 whitespace-nowrap">{dateDisplay}</span>
+                            ) : null}
+                        </div>
                         {entityFilters.length > 0 ? (
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                                 {entityFilters.map(filter => (
                                     <Badge
                                         key={`${filter.type}-${filter.id}`}
                                         variant="outline"
-                                        className="h-8 rounded-full gap-2 pl-3 pr-1 text-sm font-medium sm:h-7"
+                                        className="h-9 rounded-lg gap-2 pl-3 pr-1 text-sm font-medium sm:h-8"
                                     >
                                         <span className="text-[0.7rem] uppercase tracking-wide text-muted-foreground">
                                             {getEntityFilterTypeLabel(filter.type)}
