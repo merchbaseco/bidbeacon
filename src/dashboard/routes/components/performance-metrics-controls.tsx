@@ -150,7 +150,9 @@ const PerformanceMetricsControls = ({ totals, changes, range: dataRange, timezon
                                 </MenuGroup>
                             </MenuPopup>
                         </Menu>
-                        {dateDisplay ? <span className="text-xs text-muted-foreground/70 whitespace-nowrap">{dateDisplay}</span> : null}
+                        {dateDisplay ? (
+                            <span className="ml-1 text-sm md:text-base text-muted-foreground/70 whitespace-nowrap">{dateDisplay}</span>
+                        ) : null}
                         {entityFilters.length > 0 ? (
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
                                 {entityFilters.map(filter => (
