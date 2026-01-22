@@ -51,11 +51,6 @@ const PerformanceTable = ({ className }: { className?: string }) => {
             }),
         [customRange, range, timezone]
     );
-    const rangeLabel = useMemo(() => {
-        if (range === 'all_time') return 'All time';
-        return `${tableRange.startDate} - ${tableRange.endDate}`;
-    }, [range, tableRange]);
-
     const filters = useMemo(
         () => ({
             search: deferredSearchInput.trim() ? deferredSearchInput.trim() : undefined,
@@ -87,13 +82,7 @@ const PerformanceTable = ({ className }: { className?: string }) => {
 
     return (
         <div className={className ?? ''}>
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-                <div>
-                    <p className="text-sm font-semibold">Performance table</p>
-                    <p className="text-xs text-muted-foreground">{rangeLabel} · Target metrics</p>
-                </div>
-                {isFetching && !isLoading ? <span className="text-xs text-muted-foreground">Refreshing…</span> : null}
-            </div>
+            {isFetching && !isLoading ? <div className="mb-2 text-right text-xs text-muted-foreground">Refreshing…</div> : null}
             <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Input
                     aria-label={`Search ${getPrimaryColumnLabel(dimension)}`}
