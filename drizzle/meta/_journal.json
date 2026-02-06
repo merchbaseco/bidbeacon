@@ -295,6 +295,13 @@
       "when": 1768713696641,
       "tag": "0041_heavy_mac_gargan",
       "breakpoints": true
+    },
+    {
+      "idx": 42,
+      "version": "7",
+      "when": 1770345918836,
+      "tag": "0042_dizzy_lily_hollister",
+      "breakpoints": true
     }
   ]
 }

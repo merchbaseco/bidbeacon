@@ -6,7 +6,7 @@ import { db } from '@/db/index';
 import { ad, amsMetrics, apiMetrics, campaign, events, jobMetrics, performanceDaily, performanceHourly, target } from '@/db/schema';
 import { getPerformanceRange } from '@/lib/performance-range';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import { protectedProcedure, router } from '../trpc';
+import { privateProcedure, router } from '../trpc';
 
 const SUPPORTED_APIS = [
     'listAdvertiserAccounts',
@@ -33,7 +33,7 @@ const SUPPORTED_JOBS = [
 const PERFORMANCE_RANGES = ['today', 'yesterday', 'this_week', 'this_month', 'this_year', 'last_30_days', 'last_6_months', 'last_12_months', 'all_time'] as const;
 
 export const metricsRouter = router({
-    adsApi: protectedProcedure
+    adsApi: privateProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -143,7 +143,7 @@ export const metricsRouter = router({
                 apiNames: [...SUPPORTED_APIS],
             };
         }),
-    job: protectedProcedure
+    job: privateProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -209,7 +209,7 @@ export const metricsRouter = router({
                 to: to.toISOString(),
             };
         }),
-    events: protectedProcedure
+    events: privateProcedure
         .input(
             z.object({
                 accountId: z.string(),
@@ -310,7 +310,7 @@ export const metricsRouter = router({
                 to: roundedTo.toISOString(),
             };
         }),
-    ams: protectedProcedure
+    ams: privateProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -361,7 +361,7 @@ export const metricsRouter = router({
                 entityTypes: [...entityTypes],
             };
         }),
-    aggregation: protectedProcedure
+    aggregation: privateProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -405,7 +405,7 @@ export const metricsRouter = router({
                 data: chartData,
             };
         }),
-    amsHourly: protectedProcedure
+    amsHourly: privateProcedure
         .input(
             z.object({
                 from: z.string().datetime(),
@@ -457,7 +457,7 @@ export const metricsRouter = router({
             };
         }),
     // Real-time AMS metrics with 5-minute granularity for the last 60 minutes
-    amsRecent: protectedProcedure.query(async ({ ctx }) => {
+    amsRecent: privateProcedure.query(async ({ ctx }) => {
         // Only show operational metrics to users with account access
         if (ctx.accessibleAccountIds.length === 0) {
             return { data: {}, entityTypes: [], lastActivity: {} };
@@ -524,7 +524,7 @@ export const metricsRouter = router({
             lastActivity: lastActivityMap,
         };
     }),
-    dailyPerformance: protectedProcedure
+    dailyPerformance: privateProcedure
         .input(
             z.object({
                 accountId: z.string(),
@@ -614,7 +614,7 @@ export const metricsRouter = router({
                 data: chartData,
             };
         }),
-    searchEntities: protectedProcedure
+    searchEntities: privateProcedure
         .input(
             z.object({
                 accountId: z.string(),
@@ -758,7 +758,7 @@ export const metricsRouter = router({
 
             return { results: rankedResults };
         }),
-    hourlyPerformance: protectedProcedure
+    hourlyPerformance: privateProcedure
         .input(
             z
                 .object({
@@ -1266,7 +1266,7 @@ export const metricsRouter = router({
                 },
             };
         }),
-    messageThroughput: protectedProcedure.query(async ({ ctx }) => {
+    messageThroughput: privateProcedure.query(async ({ ctx }) => {
         // Only show operational metrics to users with account access
         if (ctx.accessibleAccountIds.length === 0) {
             return { currentHourTotal: 0, previousHourTotal: 0, percentChange: 0, sparkline: [] };
@@ -1335,7 +1335,7 @@ export const metricsRouter = router({
             sparkline,
         };
     }),
-    apiHealth: protectedProcedure.query(async ({ ctx }) => {
+    apiHealth: privateProcedure.query(async ({ ctx }) => {
         // Only show operational metrics to users with account access
         if (ctx.accessibleAccountIds.length === 0) {
             return { successRate: 100, total: 0, successCount: 0, errorCount: 0, rateLimitCount: 0 };

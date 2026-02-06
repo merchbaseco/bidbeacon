@@ -2,17 +2,17 @@ import { and, eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { advertiserAccount, userAccountAccess, userPreferences } from '@/db/schema';
-import { protectedProcedure, router } from '../trpc';
+import { privateProcedure, router } from '../trpc';
 
 export const usersRouter = router({
-    me: protectedProcedure.query(async ({ ctx }) => {
+    me: privateProcedure.query(async ({ ctx }) => {
         return {
             clerkUserId: ctx.user.sub,
             accessibleAccountIds: ctx.accessibleAccountIds,
         };
     }),
 
-    linkAccount: protectedProcedure
+    linkAccount: privateProcedure
         .input(z.object({ adsAccountId: z.string() }))
         .mutation(async ({ ctx, input }) => {
             // Verify the account exists
@@ -35,7 +35,7 @@ export const usersRouter = router({
             return true;
         }),
 
-    unlinkAccount: protectedProcedure
+    unlinkAccount: privateProcedure
         .input(z.object({ adsAccountId: z.string() }))
         .mutation(async ({ ctx, input }) => {
             await db.delete(userAccountAccess).where(
@@ -48,7 +48,7 @@ export const usersRouter = router({
             return true;
         }),
 
-    getSelectedAccount: protectedProcedure.query(async ({ ctx }) => {
+    getSelectedAccount: privateProcedure.query(async ({ ctx }) => {
         const prefs = await db.query.userPreferences.findFirst({
             where: eq(userPreferences.clerkUserId, ctx.user.sub),
         });
@@ -68,7 +68,7 @@ export const usersRouter = router({
         };
     }),
 
-    setSelectedAccount: protectedProcedure
+    setSelectedAccount: privateProcedure
         .input(
             z.object({
                 adsAccountId: z.string(),

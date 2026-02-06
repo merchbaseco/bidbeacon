@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db } from '@/db/index';
 import { workerControl } from '@/db/schema';
 import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqsClient';
-import { protectedProcedure, router } from '../trpc';
+import { privateProcedure, router } from '../trpc';
 
 // Cache for worker metrics - CloudWatch API calls are slow and data is delayed anyway
 type WorkerMetricsResult = Awaited<ReturnType<typeof getQueueMetrics>>;
@@ -11,7 +11,7 @@ let metricsCache: { data: { mainQueue: WorkerMetricsResult; dlq: WorkerMetricsRe
 const METRICS_CACHE_TTL_MS = 30_000; // 30 seconds
 
 export const workerRouter = router({
-    status: protectedProcedure.query(async ({ ctx }) => {
+    status: privateProcedure.query(async ({ ctx }) => {
         // Only show worker status to users with account access
         if (ctx.accessibleAccountIds.length === 0) {
             return { enabled: false, messagesPerSecond: 0 };
@@ -38,7 +38,7 @@ export const workerRouter = router({
         };
     }),
 
-    start: protectedProcedure.mutation(async ({ ctx }) => {
+    start: privateProcedure.mutation(async ({ ctx }) => {
         // Only allow users with account access to control worker
         if (ctx.accessibleAccountIds.length === 0) {
             return { enabled: false, messagesPerSecond: 0 };
@@ -63,7 +63,7 @@ export const workerRouter = router({
         };
     }),
 
-    stop: protectedProcedure.mutation(async ({ ctx }) => {
+    stop: privateProcedure.mutation(async ({ ctx }) => {
         // Only allow users with account access to control worker
         if (ctx.accessibleAccountIds.length === 0) {
             return { enabled: false, messagesPerSecond: 0 };
@@ -88,7 +88,7 @@ export const workerRouter = router({
         };
     }),
 
-    speed: protectedProcedure
+    speed: privateProcedure
         .input(
             z.object({
                 messagesPerSecond: z.number().min(0),
@@ -119,7 +119,7 @@ export const workerRouter = router({
             };
         }),
 
-    metrics: protectedProcedure.query(async ({ ctx }) => {
+    metrics: privateProcedure.query(async ({ ctx }) => {
         const emptyMetrics = {
             sparkline: new Array(60).fill(0),
             sparklineSent: new Array(60).fill(0),
