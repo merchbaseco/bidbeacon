@@ -3,6 +3,8 @@ import { createTRPCProxyClient, httpLink } from '@trpc/client';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { createInterface } from 'node:readline/promises';
+import { stdin, stdout } from 'node:process';
 import type { AppRouter } from '../api/router';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
@@ -19,6 +21,11 @@ const main = async () => {
 
     const [command, subcommand, action] = positional;
 
+    if (command === 'login') {
+        await handleLogin(flags);
+        return;
+    }
+
     if (command === 'config') {
         await handleConfigCommand(subcommand, action, positional.slice(3));
         return;
@@ -28,7 +35,7 @@ const main = async () => {
     const resolved = resolveRuntimeConfig(config, flags);
 
     if (!resolved.apiKey) {
-        throw new Error('Missing API key. Set BIDBEACON_API_KEY or run: bb config set api-key <value>');
+        throw new Error('Missing API key. Set BIDBEACON_API_KEY or run: bb login');
     }
 
     const client = createTRPCProxyClient<AppRouter>({
@@ -132,10 +139,39 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
     console.log('Saved.');
 };
 
+const handleLogin = async (flags: ParsedFlags) => {
+    const providedApiKey = readFlag(flags, ['api-key']);
+    let apiKey = providedApiKey;
+
+    if (!apiKey) {
+        if (!stdin.isTTY || !stdout.isTTY) {
+            throw new Error('Cannot prompt for API key in non-interactive mode. Use: bb login --api-key <value>');
+        }
+
+        const rl = createInterface({ input: stdin, output: stdout });
+        try {
+            const enteredApiKey = await rl.question('Enter BidBeacon API key: ');
+            apiKey = enteredApiKey.trim();
+        } finally {
+            rl.close();
+        }
+    }
+
+    if (!apiKey) {
+        throw new Error('API key is required.');
+    }
+
+    const config = await loadConfig();
+    config.apiKey = apiKey;
+    await saveConfig(config);
+    console.log('API key saved.');
+};
+
 const printHelp = () => {
     console.log(`BidBeacon CLI
 
 Usage:
+  bb login [--api-key <value>]
   bb config show
   bb config set api-key <value>
   bb config set base-url <value>
