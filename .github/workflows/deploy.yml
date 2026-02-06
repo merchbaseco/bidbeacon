@@ -23,8 +23,9 @@ jobs:
           docker compose build
           docker compose up -d
 
-          # Install host CLI wrapper
-          cat > /usr/local/bin/bb <<'EOF'
+          # Install host CLI wrapper next to bun (on PATH)
+          BB_BIN_DIR="$(dirname "$(command -v bun)")"
+          cat > "${BB_BIN_DIR}/bb" <<'EOF'
           #!/usr/bin/env bash
           set -euo pipefail
 
@@ -36,7 +37,7 @@ jobs:
           export BIDBEACON_API_BASE_URL="${BIDBEACON_API_BASE_URL:-http://localhost:8091}"
           exec bun /Users/zknicker/srv/bidbeacon/src/cli/index.ts "$@"
           EOF
-          chmod +x /usr/local/bin/bb
+          chmod +x "${BB_BIN_DIR}/bb"
 
           # Show status
           docker compose ps
