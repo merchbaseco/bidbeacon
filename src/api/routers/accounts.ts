@@ -3,10 +3,10 @@ import { z } from 'zod';
 import { db } from '@/db/index';
 import { advertiserAccount, userAccountAccess } from '@/db/schema';
 import { syncAdEntitiesJob } from '@/jobs/sync-ad-entities';
-import { protectedProcedure, router } from '../trpc';
+import { privateProcedure, router } from '../trpc';
 
 export const accountsRouter = router({
-    list: protectedProcedure.query(async ({ ctx }) => {
+    list: privateProcedure.query(async ({ ctx }) => {
         // Filter to only return accounts the user has access to
         if (ctx.accessibleAccountIds.length === 0) {
             return [];
@@ -17,7 +17,7 @@ export const accountsRouter = router({
             .where(inArray(advertiserAccount.adsAccountId, ctx.accessibleAccountIds));
     }),
 
-    toggle: protectedProcedure
+    toggle: privateProcedure
         .input(
             z.object({
                 adsAccountId: z.string(),
@@ -43,7 +43,7 @@ export const accountsRouter = router({
             return true;
         }),
 
-    sync: protectedProcedure.mutation(async ({ ctx }) => {
+    sync: privateProcedure.mutation(async ({ ctx }) => {
         const { listAdvertiserAccounts } = await import('@/amazon-ads/list-advertiser-accounts');
 
         const result = await listAdvertiserAccounts(undefined, 'na');
@@ -90,7 +90,7 @@ export const accountsRouter = router({
         return true;
     }),
 
-    datasetMetadata: protectedProcedure
+    datasetMetadata: privateProcedure
         .input(
             z.object({
                 accountId: z.string(),
@@ -107,7 +107,7 @@ export const accountsRouter = router({
             return data;
         }),
 
-    syncAdEntities: protectedProcedure
+    syncAdEntities: privateProcedure
         .input(
             z.object({
                 accountId: z.string(),

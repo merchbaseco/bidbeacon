@@ -13,6 +13,7 @@
     "dev": "concurrently -k -n server,dashboard -c cyan,magenta \"bun run dev:server\" \"DASHBOARD_API_PROXY_TARGET=http://localhost:8080 VITE_API_BASE_URL=http://localhost:8080 bun run dev:dashboard\"",
     "dev:dashboard": "vite dev --config vite.config.dashboard.ts",
     "preview:dashboard": "vite preview --config vite.config.dashboard.ts",
+    "bb": "bun src/cli/index.ts",
     "db:generate": "drizzle-kit generate",
     "db:studio": "drizzle-kit studio",
     "worker": "dotenv --no-expand -e .env -- tsx src/worker/index.ts",

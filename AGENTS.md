@@ -48,6 +48,26 @@ Clerk User (clerk_user_id)
 
 **New accounts:** When `accounts.sync` discovers new accounts from Amazon Ads API, they're automatically linked to the current user.
 
+### API Keys & CLI
+
+API keys are scoped to advertiser accounts and are used by the `bb` CLI and any API-key automation.
+- `src/db/schema.ts` - `api_key` and `api_key_account_access` tables (hashed secrets, revocable keys)
+- `src/api/context.ts` - API key auth (`Authorization: Bearer bbk_...` or `x-bidbeacon-api-key`)
+- `src/api/routers/api-keys.ts` - create/list/revoke keys (creating a new key revokes prior keys)
+- `src/cli/index.ts` - CLI entrypoint (`bun run bb`)
+
+**CLI defaults:** If no `--account` is provided, `bb` uses the dashboard-selected account from `api.users.getSelectedAccount`, then falls back to the first accessible account.
+
+### Procedures & Routers
+
+- `publicProcedure` - no auth
+- `privateProcedure` - Clerk (or dev override) only
+- `apiProcedure` - Clerk/dev/API key auth
+
+**Router split:**
+- Clerk/private routers live in `src/api/routers/*`
+- API key routers live in `src/api/routers/api/*` and are mounted under `api.*`
+
 ---
 
 ## Code Style

@@ -1,5 +1,7 @@
 import { accountsRouter } from './routers/accounts';
 import { adsRouter } from './routers/ads';
+import { apiRouter } from './routers/api';
+import { apiKeysRouter } from './routers/api-keys';
 import { metricsRouter } from './routers/metrics';
 import { performanceRouter } from './routers/performance';
 import { reportsRouter } from './routers/reports';
@@ -11,6 +13,8 @@ export const appRouter = router({
     reports: reportsRouter,
     accounts: accountsRouter,
     ads: adsRouter,
+    api: apiRouter,
+    apiKeys: apiKeysRouter,
     metrics: metricsRouter,
     performance: performanceRouter,
     users: usersRouter,

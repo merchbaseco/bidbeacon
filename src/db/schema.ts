@@ -750,6 +750,46 @@ export const userAccountAccess = pgTable(
 
 /**
  * ----------------------------------------------------------------------------
+ * API Keys
+ * ----------------------------------------------------------------------------
+ *
+ * API keys are created by a Clerk user and grant scoped access to advertiser
+ * accounts. The raw secret is never stored; only a hash + suffix is kept.
+ */
+export const apiKey = pgTable(
+    'api_key',
+    {
+        id: uuid('id').defaultRandom().primaryKey(),
+        label: text('label').notNull(),
+        secretHash: text('secret_hash').notNull(),
+        secretSuffix: text('secret_suffix').notNull(),
+        createdBy: text('created_by').notNull(),
+        createdAt: timestamp('created_at').notNull().defaultNow(),
+        lastUsedAt: timestamp('last_used_at'),
+        revokedAt: timestamp('revoked_at'),
+    },
+    table => [index('api_key_created_by_idx').on(table.createdBy), index('api_key_revoked_at_idx').on(table.revokedAt)]
+);
+
+export const apiKeyAccountAccess = pgTable(
+    'api_key_account_access',
+    {
+        id: uuid('id').defaultRandom().primaryKey(),
+        apiKeyId: uuid('api_key_id')
+            .notNull()
+            .references(() => apiKey.id, { onDelete: 'cascade' }),
+        adsAccountId: text('ads_account_id').notNull(),
+        createdAt: timestamp('created_at').notNull().defaultNow(),
+    },
+    table => [
+        uniqueIndex('api_key_account_access_unique_idx').on(table.apiKeyId, table.adsAccountId),
+        index('api_key_account_access_api_key_idx').on(table.apiKeyId),
+        index('api_key_account_access_account_idx').on(table.adsAccountId),
+    ]
+);
+
+/**
+ * ----------------------------------------------------------------------------
  * User Preferences
  * ----------------------------------------------------------------------------
  *

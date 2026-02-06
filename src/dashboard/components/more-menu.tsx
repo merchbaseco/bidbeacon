@@ -3,13 +3,16 @@ import Moon02Icon from '@merchbaseco/icons/core-solid-rounded/Moon02Icon';
 import MoreVerticalIcon from '@merchbaseco/icons/core-solid-rounded/MoreVerticalIcon';
 import Sun03Icon from '@merchbaseco/icons/core-solid-rounded/Sun03Icon';
 import DatabaseSync01Icon from '@merchbaseco/icons/core-stroke-rounded/DatabaseSync01Icon';
+import Key01Icon from '@merchbaseco/icons/core-stroke-rounded/Key01Icon';
 import { useAtomValue, useSetAtom } from 'jotai';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { api } from '../lib/trpc';
 import { cn } from '../lib/utils';
 import { syncAccountsInProgressAtom } from '../routes/atoms';
 import { useTheme } from '../routes/hooks/use-theme';
-import { buttonVariants } from './ui/button';
+import { Button, buttonVariants } from './ui/button';
+import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle } from './ui/dialog';
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from './ui/menu';
 
 export function MoreMenu() {
@@ -17,6 +20,16 @@ export function MoreMenu() {
     const isSyncing = useAtomValue(syncAccountsInProgressAtom);
     const setIsSyncing = useSetAtom(syncAccountsInProgressAtom);
     const { theme, toggleTheme } = useTheme();
+    const [apiKeyOpen, setApiKeyOpen] = useState(false);
+    const [apiKeyValue, setApiKeyValue] = useState<string | null>(null);
+    const [isGeneratingApiKey, setIsGeneratingApiKey] = useState(false);
+    const [apiKeyCopied, setApiKeyCopied] = useState(false);
+
+    const { data: accounts = [] } = api.accounts.list.useQuery();
+    const accountIds = useMemo(() => {
+        const unique = new Set(accounts.map(account => account.adsAccountId));
+        return Array.from(unique);
+    }, [accounts]);
 
     const syncMutation = api.accounts.sync.useMutation({
         onSuccess: () => {
@@ -37,6 +50,14 @@ export function MoreMenu() {
         },
     });
 
+    const apiKeyMutation = api.apiKeys.create.useMutation({
+        onError: err => {
+            toast.error('API key creation failed', {
+                description: err.message || 'Unable to generate an API key',
+            });
+        },
+    });
+
     const handleSyncAccounts = async () => {
         setIsSyncing(true);
 
@@ -53,21 +74,108 @@ export function MoreMenu() {
         }
     };
 
+    const handleApiKeyOpenChange = (open: boolean) => {
+        setApiKeyOpen(open);
+        if (!open) {
+            setApiKeyValue(null);
+            setApiKeyCopied(false);
+        }
+    };
+
+    const handleGetApiKey = async () => {
+        if (isGeneratingApiKey) {
+            setApiKeyOpen(true);
+            return;
+        }
+
+        setApiKeyOpen(true);
+        setApiKeyValue(null);
+        setApiKeyCopied(false);
+
+        if (accountIds.length === 0) {
+            toast.error('No accounts available', {
+                description: 'Add or sync an advertising account before generating an API key.',
+            });
+            return;
+        }
+
+        setIsGeneratingApiKey(true);
+        try {
+            const label = `dashboard-${new Date().toISOString()}`;
+            const result = await apiKeyMutation.mutateAsync({
+                label,
+                adsAccountIds: accountIds,
+            });
+            setApiKeyValue(result.apiKey);
+        } finally {
+            setIsGeneratingApiKey(false);
+        }
+    };
+
+    const handleCopyApiKey = async () => {
+        if (!apiKeyValue) {
+            return;
+        }
+        await navigator.clipboard.writeText(apiKeyValue);
+        setApiKeyCopied(true);
+        toast.success('API key copied');
+    };
+
     return (
-        <Menu>
-            <MenuTrigger className={cn(buttonVariants({ variant: 'secondary', size: 'icon' }))} disabled={isSyncing}>
-                <HugeiconsIcon icon={MoreVerticalIcon} size={24} />
-            </MenuTrigger>
-            <MenuPopup>
-                <MenuItem onClick={handleSyncAccounts} disabled={isSyncing}>
-                    <HugeiconsIcon icon={DatabaseSync01Icon} size={20} />
-                    {isSyncing ? 'Syncing...' : 'Sync accounts'}
-                </MenuItem>
-                <MenuItem onClick={toggleTheme}>
-                    <HugeiconsIcon icon={theme === 'dark' ? Sun03Icon : Moon02Icon} size={20} />
-                    {theme === 'dark' ? 'Light mode' : 'Dark mode'}
-                </MenuItem>
-            </MenuPopup>
-        </Menu>
+        <>
+            <Menu>
+                <MenuTrigger className={cn(buttonVariants({ variant: 'secondary', size: 'icon' }))} disabled={isSyncing}>
+                    <HugeiconsIcon icon={MoreVerticalIcon} size={24} />
+                </MenuTrigger>
+                <MenuPopup>
+                    <MenuItem onClick={handleGetApiKey} disabled={isGeneratingApiKey}>
+                        <HugeiconsIcon icon={Key01Icon} size={20} />
+                        {isGeneratingApiKey ? 'Generating key...' : 'Get API key'}
+                    </MenuItem>
+                    <MenuItem onClick={handleSyncAccounts} disabled={isSyncing}>
+                        <HugeiconsIcon icon={DatabaseSync01Icon} size={20} />
+                        {isSyncing ? 'Syncing...' : 'Sync accounts'}
+                    </MenuItem>
+                    <MenuItem onClick={toggleTheme}>
+                        <HugeiconsIcon icon={theme === 'dark' ? Sun03Icon : Moon02Icon} size={20} />
+                        {theme === 'dark' ? 'Light mode' : 'Dark mode'}
+                    </MenuItem>
+                </MenuPopup>
+            </Menu>
+
+            <Dialog open={apiKeyOpen} onOpenChange={handleApiKeyOpenChange}>
+                <DialogPopup className="sm:max-w-xl">
+                    <DialogHeader>
+                        <DialogTitle>Get API key</DialogTitle>
+                        <DialogDescription>
+                            Copy this key now. You will not be able to retrieve it again once this dialog is closed. Each new key replaces the
+                            one shown here.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogPanel>
+                        <div className="rounded-lg border bg-muted/50 p-4">
+                            {isGeneratingApiKey ? (
+                                <p className="text-sm text-muted-foreground">Generating API key...</p>
+                            ) : apiKeyValue ? (
+                                <pre className="overflow-auto text-sm">
+                                    <code>{apiKeyValue}</code>
+                                </pre>
+                            ) : (
+                                <p className="text-sm text-muted-foreground">No key available.</p>
+                            )}
+                        </div>
+                    </DialogPanel>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={handleGetApiKey} disabled={isGeneratingApiKey}>
+                            {isGeneratingApiKey ? 'Generating...' : 'Generate new key'}
+                        </Button>
+                        <Button variant="outline" onClick={handleCopyApiKey} disabled={!apiKeyValue}>
+                            {apiKeyCopied ? 'Copied!' : 'Copy key'}
+                        </Button>
+                        <Button onClick={() => handleApiKeyOpenChange(false)}>Close</Button>
+                    </DialogFooter>
+                </DialogPopup>
+            </Dialog>
+        </>
     );
 }
