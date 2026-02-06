@@ -23,5 +23,20 @@ jobs:
           docker compose build
           docker compose up -d
 
+          # Install host CLI wrapper
+          cat > /usr/local/bin/bb <<'EOF'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          if ! command -v bun >/dev/null 2>&1; then
+            echo "Error: bun is required for BidBeacon CLI but is not installed." >&2
+            exit 1
+          fi
+
+          export BIDBEACON_API_BASE_URL="${BIDBEACON_API_BASE_URL:-http://localhost:8091}"
+          exec bun /Users/zknicker/srv/bidbeacon/src/cli/index.ts "$@"
+          EOF
+          chmod +x /usr/local/bin/bb
+
           # Show status
           docker compose ps
