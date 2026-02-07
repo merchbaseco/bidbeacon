@@ -21,6 +21,7 @@ import {
 
 export type CliConfig = {
     accountId: string;
+    countryCode?: string;
     range: string;
 };
 
@@ -45,9 +46,7 @@ export const assertAccountAccess = (ctx: Context, config: CliConfig) => {
 };
 
 export const resolveAccountContext = async (config: CliConfig): Promise<AccountContext> => {
-    const account = await db.query.advertiserAccount.findFirst({
-        where: eq(advertiserAccount.adsAccountId, config.accountId),
-    });
+    const account = await resolveAdvertiserAccount(config);
 
     if (!account) {
         throw new TRPCError({
@@ -74,6 +73,7 @@ export const resolveAccountContext = async (config: CliConfig): Promise<AccountC
 };
 
 export const listCampaigns = async (config: CliConfig): Promise<CampaignShape[]> => {
+    const countryCode = normalizeCountryCode(config.countryCode);
     const rows = await db
         .select({
             campaignId: campaign.campaignId,
@@ -86,13 +86,19 @@ export const listCampaigns = async (config: CliConfig): Promise<CampaignShape[]>
             portfolioId: sql<string | null>`NULL`.as('portfolioId'),
         })
         .from(campaign)
-        .where(eq(campaign.accountId, config.accountId))
+        .where(
+            and(
+                eq(campaign.accountId, config.accountId),
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+            )
+        )
         .orderBy(desc(campaign.lastUpdatedDateTime), campaign.campaignId);
 
     return rows.map(row => mapCampaignRow(row));
 };
 
 export const getCampaign = async (config: CliConfig, campaignId: string): Promise<CampaignShape> => {
+    const countryCode = normalizeCountryCode(config.countryCode);
     const [row] = await db
         .select({
             campaignId: campaign.campaignId,
@@ -105,7 +111,13 @@ export const getCampaign = async (config: CliConfig, campaignId: string): Promis
             portfolioId: sql<string | null>`NULL`.as('portfolioId'),
         })
         .from(campaign)
-        .where(and(eq(campaign.accountId, config.accountId), eq(campaign.campaignId, campaignId)))
+        .where(
+            and(
+                eq(campaign.accountId, config.accountId),
+                eq(campaign.campaignId, campaignId),
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+            )
+        )
         .limit(1);
 
     if (!row) {
@@ -116,6 +128,7 @@ export const getCampaign = async (config: CliConfig, campaignId: string): Promis
 };
 
 export const listAdGroups = async (config: CliConfig): Promise<AdGroupShape[]> => {
+    const countryCode = normalizeCountryCode(config.countryCode);
     const rows = await db
         .select({
             adGroupId: adGroup.adGroupId,
@@ -126,13 +139,19 @@ export const listAdGroups = async (config: CliConfig): Promise<AdGroupShape[]> =
         })
         .from(adGroup)
         .innerJoin(campaign, eq(adGroup.campaignId, campaign.campaignId))
-        .where(eq(campaign.accountId, config.accountId))
+        .where(
+            and(
+                eq(campaign.accountId, config.accountId),
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+            )
+        )
         .orderBy(desc(adGroup.lastUpdatedDateTime), adGroup.adGroupId);
 
     return rows.map(row => mapAdGroupRow(row));
 };
 
 export const getAdGroup = async (config: CliConfig, adGroupId: string): Promise<AdGroupShape> => {
+    const countryCode = normalizeCountryCode(config.countryCode);
     const [row] = await db
         .select({
             adGroupId: adGroup.adGroupId,
@@ -143,7 +162,13 @@ export const getAdGroup = async (config: CliConfig, adGroupId: string): Promise<
         })
         .from(adGroup)
         .innerJoin(campaign, eq(adGroup.campaignId, campaign.campaignId))
-        .where(and(eq(adGroup.adGroupId, adGroupId), eq(campaign.accountId, config.accountId)))
+        .where(
+            and(
+                eq(adGroup.adGroupId, adGroupId),
+                eq(campaign.accountId, config.accountId),
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+            )
+        )
         .limit(1);
 
     if (!row) {
@@ -154,6 +179,7 @@ export const getAdGroup = async (config: CliConfig, adGroupId: string): Promise<
 };
 
 export const listAds = async (config: CliConfig): Promise<AdShape[]> => {
+    const countryCode = normalizeCountryCode(config.countryCode);
     const rows = await db
         .select({
             adId: ad.adId,
@@ -164,13 +190,19 @@ export const listAds = async (config: CliConfig): Promise<AdShape[]> => {
         })
         .from(ad)
         .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
-        .where(eq(campaign.accountId, config.accountId))
+        .where(
+            and(
+                eq(campaign.accountId, config.accountId),
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+            )
+        )
         .orderBy(desc(ad.lastUpdatedDateTime), ad.adId);
 
     return rows.map(row => mapAdRow(row));
 };
 
 export const getAd = async (config: CliConfig, adId: string): Promise<AdShape> => {
+    const countryCode = normalizeCountryCode(config.countryCode);
     const [row] = await db
         .select({
             adId: ad.adId,
@@ -181,7 +213,13 @@ export const getAd = async (config: CliConfig, adId: string): Promise<AdShape> =
         })
         .from(ad)
         .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
-        .where(and(eq(ad.adId, adId), eq(campaign.accountId, config.accountId)))
+        .where(
+            and(
+                eq(ad.adId, adId),
+                eq(campaign.accountId, config.accountId),
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+            )
+        )
         .limit(1);
 
     if (!row) {
@@ -192,6 +230,7 @@ export const getAd = async (config: CliConfig, adId: string): Promise<AdShape> =
 };
 
 export const listTargets = async (config: CliConfig): Promise<TargetShape[]> => {
+    const countryCode = normalizeCountryCode(config.countryCode);
     const rows = await db
         .select({
             targetId: target.targetId,
@@ -209,6 +248,7 @@ export const listTargets = async (config: CliConfig): Promise<TargetShape[]> => 
         .where(
             and(
                 eq(campaign.accountId, config.accountId),
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
                 inArray(target.targetType, ['KEYWORD', 'PRODUCT'])
             )
         )
@@ -218,6 +258,7 @@ export const listTargets = async (config: CliConfig): Promise<TargetShape[]> => 
 };
 
 export const getTarget = async (config: CliConfig, targetId: string): Promise<TargetShape> => {
+    const countryCode = normalizeCountryCode(config.countryCode);
     const [row] = await db
         .select({
             targetId: target.targetId,
@@ -232,7 +273,13 @@ export const getTarget = async (config: CliConfig, targetId: string): Promise<Ta
         })
         .from(target)
         .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
-        .where(and(eq(target.targetId, targetId), eq(campaign.accountId, config.accountId)))
+        .where(
+            and(
+                eq(target.targetId, targetId),
+                eq(campaign.accountId, config.accountId),
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+            )
+        )
         .limit(1);
 
     if (!row) {
@@ -294,9 +341,7 @@ export const updateTargetRow = async (targetId: string, updates: Partial<{ state
 };
 
 export const getMetrics = async (config: CliConfig, entityType: 'campaign' | 'adGroup' | 'ad' | 'target', entityId?: string) => {
-    const account = await db.query.advertiserAccount.findFirst({
-        where: eq(advertiserAccount.adsAccountId, config.accountId),
-    });
+    const account = await resolveAdvertiserAccount(config);
 
     if (!account) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Account not found.' });
@@ -907,4 +952,37 @@ const toIsoDate = (value: Date | string) => {
         return value.toISOString().slice(0, 10);
     }
     return value;
+};
+
+const normalizeCountryCode = (value?: string) => {
+    if (!value) return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed.toUpperCase() : null;
+};
+
+const resolveAdvertiserAccount = async (config: CliConfig) => {
+    const countryCode = normalizeCountryCode(config.countryCode);
+    if (countryCode) {
+        return db.query.advertiserAccount.findFirst({
+            where: and(eq(advertiserAccount.adsAccountId, config.accountId), eq(advertiserAccount.countryCode, countryCode)),
+        });
+    }
+
+    const accounts = await db.query.advertiserAccount.findMany({
+        where: eq(advertiserAccount.adsAccountId, config.accountId),
+    });
+
+    if (accounts.length === 0) {
+        return null;
+    }
+
+    const countryCodes = Array.from(new Set(accounts.map(account => account.countryCode.toUpperCase()))).sort();
+    if (countryCodes.length > 1) {
+        throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `Multiple country codes found for this account. Set config country to one of: ${countryCodes.join(', ')}.`,
+        });
+    }
+
+    return accounts[0];
 };

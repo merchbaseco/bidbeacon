@@ -490,7 +490,11 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
             config.baseUrl = value;
             break;
         case 'account':
+            if (!rest[1]) {
+                throw new Error('Usage: bb config set account <adsAccountId> <countryCode>');
+            }
             config.accountId = value;
+            config.countryCode = rest[1];
             break;
         case 'range':
             config.range = value;
@@ -511,7 +515,7 @@ Usage:
   bb config clear
   bb config set api-key <value>
   bb config set base-url <value>
-  bb config set account <adsAccountId>
+  bb config set account <adsAccountId> <countryCode>
   bb config set range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD> (default: today)
 
   bb accounts list
@@ -594,11 +598,12 @@ const resolveApiConfig = (config: CliConfig) => {
 };
 
 const requireCliConfig = (config: CliConfig) => {
-    if (!config.accountId) {
-        throw new Error('Missing config: account. Use bb config set account <adsAccountId>.');
+    if (!config.accountId || !config.countryCode) {
+        throw new Error('Missing config: account + country. Use bb config set account <adsAccountId> <countryCode>.');
     }
     return {
         accountId: config.accountId,
+        countryCode: config.countryCode,
         range: config.range ?? DEFAULT_RANGE,
     };
 };
@@ -679,8 +684,8 @@ const buildRangeHelpMessage = async (config: CliConfig) => {
 };
 
 const resolveAccountTimezoneHint = async (config: CliConfig) => {
-    if (!config.accountId) {
-        return 'unknown (set account first)';
+    if (!config.accountId || !config.countryCode) {
+        return 'unknown (set account + country first)';
     }
     if (!config.apiKey) {
         return 'unknown (set api-key first)';
@@ -699,7 +704,15 @@ const resolveAccountTimezoneHint = async (config: CliConfig) => {
             ],
         });
         const data = await client.api.cli.accountsList.query();
-        const account = data.items.find(item => item.accountId === config.accountId);
+        const countryCode = config.countryCode?.toUpperCase();
+        const matches = data.items.filter(item => item.accountId === config.accountId);
+        if (!countryCode && matches.length > 1) {
+            const codes = Array.from(new Set(matches.map(item => (item.countryCode ?? '').toUpperCase()).filter(Boolean))).sort();
+            return `unknown (multiple country codes: ${codes.join(', ') || 'unknown'}; set config country)`;
+        }
+        const account = matches.find(
+            item => !countryCode || (item.countryCode ?? '').toUpperCase() === countryCode
+        );
         if (!account) {
             return `unknown (account ${config.accountId} not found)`;
         }
@@ -717,6 +730,7 @@ type CliConfig = {
     baseUrl?: string;
     apiKey?: string;
     accountId?: string;
+    countryCode?: string;
     range?: string;
 };
 
