@@ -19,6 +19,18 @@ const SUPPORTED_APIS = [
     'getExportStatus',
     'updateAdGroupBid',
     'updateTargetBid',
+    'spCreateCampaigns',
+    'spUpdateCampaigns',
+    'spDeleteCampaigns',
+    'spCreateAdGroups',
+    'spUpdateAdGroups',
+    'spDeleteAdGroups',
+    'spCreateAds',
+    'spUpdateAds',
+    'spDeleteAds',
+    'spCreateTargets',
+    'spUpdateTargets',
+    'spDeleteTargets',
 ] as const;
 const SUPPORTED_JOBS = [
     'update-report-datasets',
