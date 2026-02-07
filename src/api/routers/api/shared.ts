@@ -22,7 +22,6 @@ import {
 export type CliConfig = {
     accountId: string;
     range: string;
-    timezone: 'account' | 'utc';
 };
 
 export type AccountContext = {
@@ -69,7 +68,7 @@ export const resolveAccountContext = async (config: CliConfig): Promise<AccountC
         accountId: config.accountId,
         countryCode: account.countryCode,
         profileId,
-        timezone: resolveTimezone(config.timezone, account.countryCode),
+        timezone: getTimezoneForCountry(account.countryCode),
         region: resolveApiRegion(account.countryCode),
     };
 };
@@ -303,7 +302,7 @@ export const getMetrics = async (config: CliConfig, entityType: 'campaign' | 'ad
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Account not found.' });
     }
 
-    const timezone = resolveTimezone(config.timezone, account.countryCode);
+    const timezone = getTimezoneForCountry(account.countryCode);
     const range = parseConfigRange(config.range, timezone);
 
     if (range.useHourly) {
@@ -586,11 +585,6 @@ const mapTargetRow = (row: {
     };
 };
 
-const resolveTimezone = (setting: CliConfig['timezone'], countryCode: string) => {
-    if (setting === 'utc') return 'UTC';
-    return getTimezoneForCountry(countryCode);
-};
-
 const resolveApiRegion = (countryCode: string): ApiRegion => {
     const code = countryCode.toUpperCase();
     const naCountries = new Set(['US', 'CA', 'MX', 'BR']);
@@ -619,6 +613,25 @@ const resolveApiRegion = (countryCode: string): ApiRegion => {
 };
 
 const parseConfigRange = (range: string, timezone: string) => {
+    const normalized = range.trim().toLowerCase();
+    if (normalized === 'today' || normalized === 't') {
+        const zonedNow = toZonedTime(new Date(), timezone);
+        const dateValue = format(zonedNow, 'yyyy-MM-dd');
+        return buildRange(dateValue, dateValue, timezone);
+    }
+    if (normalized === 'yesterday' || normalized === 'y') {
+        const zonedNow = toZonedTime(new Date(), timezone);
+        const dateValue = format(addDays(startOfDay(zonedNow), -1), 'yyyy-MM-dd');
+        return buildRange(dateValue, dateValue, timezone);
+    }
+
+    if (normalized === 'week' || normalized === 'w') {
+        return parseConfigRange('7d', timezone);
+    }
+    if (normalized === 'month' || normalized === 'm') {
+        return parseConfigRange('30d', timezone);
+    }
+
     if (range.includes('..')) {
         const [start, end] = range.split('..');
         const startDate = normalizeDate(start);

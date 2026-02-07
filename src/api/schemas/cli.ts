@@ -3,7 +3,6 @@ import { z } from 'zod';
 export const cliConfigSchema = z.object({
     accountId: z.string(),
     range: z.string(),
-    timezone: z.enum(['account', 'utc']),
 });
 
 export const cliConfigInputSchema = z.object({
