@@ -2,6 +2,7 @@ import { z } from 'zod';
 
 export const cliConfigSchema = z.object({
     accountId: z.string(),
+    countryCode: z.string().optional(),
     range: z.string(),
 });
 
