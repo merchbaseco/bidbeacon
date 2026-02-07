@@ -25,7 +25,8 @@ const ConfigSchema = z.object({
   timezone: z.enum(["account", "utc"])
 });
 
-const StateSchema = z.enum(["ENABLED", "PAUSED", "ARCHIVED"]);
+const StateSchema = z.enum(["ENABLED", "PAUSED", "ARCHIVED", "OTHER"]);
+const ListStateSchema = z.enum(["ENABLED", "PAUSED", "ARCHIVED", "OTHER", "ALL"]);
 const BidStrategySchema = z.enum(["MANUAL", "RULE_BASED", "SALES_DOWN_ONLY", "SALES_UP_AND_DOWN"]);
 const KeywordMatchTypeSchema = z.enum(["BROAD", "PHRASE", "EXACT"]);
 const ProductMatchTypeSchema = z.enum(["PRODUCT_EXACT", "PRODUCT_SIMILAR"]);
@@ -34,6 +35,12 @@ const PlacementSchema = z.enum(["TOP_OF_SEARCH", "REST_OF_SEARCH", "PRODUCT_PAGE
 
 const MoneySchema = z.number().nonnegative();
 ```
+
+## List Filters
+List commands accept an optional `state` filter.
+Default is `ENABLED` when omitted.
+Use `ALL` to return everything.
+CLI flags: `--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL`, `--all` (alias for `--state ALL`).
 
 ## Entity Shapes
 ```ts
@@ -124,7 +131,9 @@ const Output = z.object({
 ### bb campaigns list
 Router: `src/api/routers/api/campaigns-list.ts`
 ```ts
-const Input = z.object({});
+const Input = z.object({
+  state: ListStateSchema.optional()
+});
 const Output = z.object({ items: z.array(CampaignSchema) });
 ```
 
@@ -215,7 +224,9 @@ const Output = z.object({ item: CampaignSchema });
 ### bb ad-groups list
 Router: `src/api/routers/api/ad-groups-list.ts`
 ```ts
-const Input = z.object({});
+const Input = z.object({
+  state: ListStateSchema.optional()
+});
 const Output = z.object({ items: z.array(AdGroupSchema) });
 ```
 
@@ -283,7 +294,9 @@ const Output = z.object({ item: AdGroupSchema });
 ### bb ads list
 Router: `src/api/routers/api/ads-list.ts`
 ```ts
-const Input = z.object({});
+const Input = z.object({
+  state: ListStateSchema.optional()
+});
 const Output = z.object({ items: z.array(AdSchema) });
 ```
 
@@ -329,7 +342,9 @@ const Output = z.object({ deleted: z.literal(true), adId: z.string() });
 ### bb targets list
 Router: `src/api/routers/api/targets-list.ts`
 ```ts
-const Input = z.object({});
+const Input = z.object({
+  state: ListStateSchema.optional()
+});
 const Output = z.object({ items: z.array(TargetSchema) });
 ```
 

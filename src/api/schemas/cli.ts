@@ -11,6 +11,11 @@ export const cliConfigInputSchema = z.object({
 });
 
 export const stateSchema = z.enum(['ENABLED', 'PAUSED', 'ARCHIVED', 'OTHER']);
+export const listStateSchema = z.enum(['ENABLED', 'PAUSED', 'ARCHIVED', 'OTHER', 'ALL']);
+
+export const cliListInputSchema = cliConfigInputSchema.extend({
+    state: listStateSchema.optional(),
+});
 export const bidStrategySchema = z.enum([
     'MANUAL',
     'RULE_BASED',
