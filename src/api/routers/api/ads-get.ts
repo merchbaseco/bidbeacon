@@ -1,0 +1,13 @@
+import { z } from 'zod';
+import { apiProcedure } from '@/api/trpc';
+import { adsGetOutputSchema, cliConfigInputSchema } from '@/api/schemas/cli';
+import { assertAccountAccess, getAd } from './shared';
+
+export const adsGet = apiProcedure
+    .input(cliConfigInputSchema.extend({ adId: z.string() }))
+    .output(adsGetOutputSchema)
+    .query(async ({ ctx, input }) => {
+        assertAccountAccess(ctx, input.config);
+        const item = await getAd(input.config, input.adId);
+        return { item };
+    });
