@@ -10,12 +10,20 @@ export const cliConfigInputSchema = z.object({
     config: cliConfigSchema,
 });
 
-export const stateSchema = z.enum(['ENABLED', 'PAUSED', 'ARCHIVED']);
-export const bidStrategySchema = z.enum(['MANUAL', 'RULE_BASED', 'SALES_DOWN_ONLY', 'SALES_UP_AND_DOWN']);
+export const stateSchema = z.enum(['ENABLED', 'PAUSED', 'ARCHIVED', 'OTHER']);
+export const bidStrategySchema = z.enum([
+    'MANUAL',
+    'RULE_BASED',
+    'SALES_DOWN_ONLY',
+    'SALES_UP_AND_DOWN',
+    'SALES',
+    'NEW_TO_BRAND',
+    'NONE',
+]);
 export const keywordMatchTypeSchema = z.enum(['BROAD', 'PHRASE', 'EXACT']);
 export const productMatchTypeSchema = z.enum(['PRODUCT_EXACT', 'PRODUCT_SIMILAR']);
 export const productIdTypeSchema = z.enum(['ASIN', 'SKU']);
-export const placementSchema = z.enum(['TOP_OF_SEARCH', 'REST_OF_SEARCH', 'PRODUCT_PAGE', 'SITE_AMAZON_BUSINESS']);
+export const placementSchema = z.enum(['HOME_PAGE', 'TOP_OF_SEARCH', 'REST_OF_SEARCH', 'PRODUCT_PAGE', 'SITE_AMAZON_BUSINESS']);
 
 export const moneySchema = z.number().nonnegative();
 
