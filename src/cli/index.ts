@@ -4,8 +4,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { AppRouter } from '../api/router';
+import { getTimezoneForCountry } from '../utils/timezones';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
+const DEFAULT_RANGE = 'today';
 const CONFIG_DIR = join(homedir(), '.bidbeacon');
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
 
@@ -468,15 +470,18 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
     }
 
     if (subcommand !== 'set' || !action) {
-        throw new Error('Usage: bb config set <api-key|base-url|account|range|timezone> <value>');
-    }
-
-    const value = rest[0];
-    if (!value) {
-        throw new Error('Missing value for config set');
+        throw new Error('Usage: bb config set <api-key|base-url|account|range> <value>');
     }
 
     const config = await loadConfig();
+    const value = rest[0];
+    if (!value) {
+        if (action === 'range') {
+            throw new Error(await buildRangeHelpMessage(config));
+        }
+        throw new Error('Missing value for config set');
+    }
+
     switch (action) {
         case 'api-key':
             config.apiKey = value;
@@ -490,14 +495,8 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
         case 'range':
             config.range = value;
             break;
-        case 'timezone':
-            if (value !== 'account' && value !== 'utc') {
-                throw new Error('timezone must be account or utc');
-            }
-            config.timezone = value;
-            break;
         default:
-            throw new Error('Unknown config key. Use api-key, base-url, account, range, or timezone.');
+            throw new Error('Unknown config key. Use api-key, base-url, account, or range.');
     }
 
     await saveConfig(config);
@@ -513,8 +512,7 @@ Usage:
   bb config set api-key <value>
   bb config set base-url <value>
   bb config set account <adsAccountId>
-  bb config set range <30d|YYYY-MM-DD..YYYY-MM-DD>
-  bb config set timezone <account|utc>
+  bb config set range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD> (default: today)
 
   bb accounts list
 
@@ -596,17 +594,12 @@ const resolveApiConfig = (config: CliConfig) => {
 };
 
 const requireCliConfig = (config: CliConfig) => {
-    const missing: string[] = [];
-    if (!config.accountId) missing.push('account');
-    if (!config.range) missing.push('range');
-    if (!config.timezone) missing.push('timezone');
-    if (missing.length) {
-        throw new Error(`Missing config: ${missing.join(', ')}. Use bb config set <key> <value>.`);
+    if (!config.accountId) {
+        throw new Error('Missing config: account. Use bb config set account <adsAccountId>.');
     }
     return {
         accountId: config.accountId,
-        range: config.range,
-        timezone: config.timezone,
+        range: config.range ?? DEFAULT_RANGE,
     };
 };
 
@@ -680,12 +673,51 @@ const parseJsonArg = (value: string) => {
     }
 };
 
+const buildRangeHelpMessage = async (config: CliConfig) => {
+    const timezoneHint = await resolveAccountTimezoneHint(config);
+    return `Missing value for config set range. Options: today (aliases: 1d, t), yesterday (alias: y), 7d (aliases: week, w), 30d (aliases: month, m), YYYY-MM-DD..YYYY-MM-DD (inclusive). Account timezone: ${timezoneHint}.`;
+};
+
+const resolveAccountTimezoneHint = async (config: CliConfig) => {
+    if (!config.accountId) {
+        return 'unknown (set account first)';
+    }
+    if (!config.apiKey) {
+        return 'unknown (set api-key first)';
+    }
+
+    try {
+        const apiConfig = resolveApiConfig(config);
+        const client = createTRPCProxyClient<AppRouter>({
+            links: [
+                httpLink({
+                    url: `${apiConfig.baseUrl}/api`,
+                    headers() {
+                        return { Authorization: `Bearer ${apiConfig.apiKey}` };
+                    },
+                }),
+            ],
+        });
+        const data = await client.api.cli.accountsList.query();
+        const account = data.items.find(item => item.accountId === config.accountId);
+        if (!account) {
+            return `unknown (account ${config.accountId} not found)`;
+        }
+        if (!account.countryCode) {
+            return 'unknown (missing country code)';
+        }
+        const timezone = getTimezoneForCountry(account.countryCode);
+        return `${timezone} (from ${account.countryCode})`;
+    } catch {
+        return 'unknown (unable to fetch)';
+    }
+};
+
 type CliConfig = {
     baseUrl?: string;
     apiKey?: string;
     accountId?: string;
     range?: string;
-    timezone?: 'account' | 'utc';
 };
 
 type ParsedFlags = Record<string, string | boolean> & {
