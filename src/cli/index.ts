@@ -51,7 +51,8 @@ const main = async () => {
         case 'campaigns': {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
-                const data = await client.api.cli.campaignsList.query({ config: cliConfig });
+                const state = resolveListStateFlag(flags);
+                const data = await client.api.cli.campaignsList.query({ config: cliConfig, state });
                 printOutput(data);
                 return;
             }
@@ -159,7 +160,8 @@ const main = async () => {
         case 'ad-groups': {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
-                const data = await client.api.cli.adGroupsList.query({ config: cliConfig });
+                const state = resolveListStateFlag(flags);
+                const data = await client.api.cli.adGroupsList.query({ config: cliConfig, state });
                 printOutput(data);
                 return;
             }
@@ -232,7 +234,8 @@ const main = async () => {
         case 'ads': {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
-                const data = await client.api.cli.adsList.query({ config: cliConfig });
+                const state = resolveListStateFlag(flags);
+                const data = await client.api.cli.adsList.query({ config: cliConfig, state });
                 printOutput(data);
                 return;
             }
@@ -278,7 +281,8 @@ const main = async () => {
         case 'targets': {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
-                const data = await client.api.cli.targetsList.query({ config: cliConfig });
+                const state = resolveListStateFlag(flags);
+                const data = await client.api.cli.targetsList.query({ config: cliConfig, state });
                 printOutput(data);
                 return;
             }
@@ -520,7 +524,7 @@ Usage:
 
   bb accounts list
 
-  bb campaigns list
+  bb campaigns list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all]
   bb campaigns get <campaign_id>
   bb campaigns create <name> <budget>
   bb campaigns update <campaign_id> --name <name> [--portfolio <id>] [--start <iso>] [--end <iso>]
@@ -531,7 +535,7 @@ Usage:
   bb campaigns set-bid-strategy <campaign_id> <strategy>
   bb campaigns set-bid-adjustments <campaign_id> <placement|audience|creative> <json>
 
-  bb ad-groups list
+  bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all]
   bb ad-groups get <ad_group_id>
   bb ad-groups create <campaign_id> <name> <default_bid>
   bb ad-groups update <ad_group_id> <name>
@@ -540,13 +544,13 @@ Usage:
   bb ad-groups resume <ad_group_id>
   bb ad-groups delete <ad_group_id>
 
-  bb ads list
+  bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all]
   bb ads get <ad_id>
   bb ads create <ad_group_id> <asin|sku> [ASIN|SKU]
   bb ads update <ad_id> <state>
   bb ads delete <ad_id>
 
-  bb targets list
+  bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all]
   bb targets get <target_id>
   bb targets create keyword <ad_group_id> <keyword> <match_type> <bid>
   bb targets create product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU]
@@ -660,6 +664,44 @@ const readFlag = (flags: ParsedFlags, keys: string[]) => {
         }
     }
     return null;
+};
+
+const readBooleanFlag = (flags: ParsedFlags, keys: string[]) => {
+    for (const key of keys) {
+        const value = flags[key];
+        if (value === true) {
+            return true;
+        }
+        if (typeof value === 'string') {
+            const normalized = value.trim().toLowerCase();
+            if (['true', '1', 'yes', 'y'].includes(normalized)) {
+                return true;
+            }
+            if (['false', '0', 'no', 'n'].includes(normalized)) {
+                return false;
+            }
+        }
+    }
+    return false;
+};
+
+const resolveListStateFlag = (flags: ParsedFlags) => {
+    const allEnabled = readBooleanFlag(flags, ['all']);
+    if (allEnabled) {
+        return 'ALL';
+    }
+
+    const raw = readFlag(flags, ['state']);
+    if (!raw) {
+        return undefined;
+    }
+
+    const normalized = raw.trim().toUpperCase();
+    const allowed = new Set(['ENABLED', 'PAUSED', 'ARCHIVED', 'OTHER', 'ALL']);
+    if (!allowed.has(normalized)) {
+        throw new Error('Invalid --state. Use ENABLED, PAUSED, ARCHIVED, OTHER, or ALL.');
+    }
+    return normalized;
 };
 
 const parseNumberArg = (value: string, label: string) => {

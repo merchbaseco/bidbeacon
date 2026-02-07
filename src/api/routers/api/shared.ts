@@ -15,6 +15,7 @@ import {
     adGroupSchema,
     adSchema,
     targetSchema,
+    listStateSchema,
     metricsTotalsSchema,
     metricsPointSchema,
 } from '@/api/schemas/cli';
@@ -23,6 +24,10 @@ export type CliConfig = {
     accountId: string;
     countryCode?: string;
     range: string;
+};
+
+type ListOptions = {
+    state?: ListState;
 };
 
 export type AccountContext = {
@@ -40,6 +45,7 @@ export type TargetShape = z.infer<typeof targetSchema>;
 export type MetricsTotals = z.infer<typeof metricsTotalsSchema>;
 export type MetricsPoint = z.infer<typeof metricsPointSchema>;
 export type BidStrategy = z.infer<typeof bidStrategySchema>;
+export type ListState = z.infer<typeof listStateSchema>;
 
 export const assertAccountAccess = (ctx: Context, config: CliConfig) => {
     ctx.assertAccountAccess(config.accountId);
@@ -72,8 +78,9 @@ export const resolveAccountContext = async (config: CliConfig): Promise<AccountC
     };
 };
 
-export const listCampaigns = async (config: CliConfig): Promise<CampaignShape[]> => {
+export const listCampaigns = async (config: CliConfig, options?: ListOptions): Promise<CampaignShape[]> => {
     const countryCode = normalizeCountryCode(config.countryCode);
+    const stateFilter = resolveListState(options?.state);
     const rows = await db
         .select({
             campaignId: campaign.campaignId,
@@ -89,7 +96,8 @@ export const listCampaigns = async (config: CliConfig): Promise<CampaignShape[]>
         .where(
             and(
                 eq(campaign.accountId, config.accountId),
-                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
+                ...(stateFilter ? [eq(campaign.state, stateFilter)] : [])
             )
         )
         .orderBy(desc(campaign.lastUpdatedDateTime), campaign.campaignId);
@@ -127,8 +135,9 @@ export const getCampaign = async (config: CliConfig, campaignId: string): Promis
     return mapCampaignRow(row);
 };
 
-export const listAdGroups = async (config: CliConfig): Promise<AdGroupShape[]> => {
+export const listAdGroups = async (config: CliConfig, options?: ListOptions): Promise<AdGroupShape[]> => {
     const countryCode = normalizeCountryCode(config.countryCode);
+    const stateFilter = resolveListState(options?.state);
     const rows = await db
         .select({
             adGroupId: adGroup.adGroupId,
@@ -142,7 +151,8 @@ export const listAdGroups = async (config: CliConfig): Promise<AdGroupShape[]> =
         .where(
             and(
                 eq(campaign.accountId, config.accountId),
-                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
+                ...(stateFilter ? [eq(adGroup.state, stateFilter)] : [])
             )
         )
         .orderBy(desc(adGroup.lastUpdatedDateTime), adGroup.adGroupId);
@@ -178,8 +188,9 @@ export const getAdGroup = async (config: CliConfig, adGroupId: string): Promise<
     return mapAdGroupRow(row);
 };
 
-export const listAds = async (config: CliConfig): Promise<AdShape[]> => {
+export const listAds = async (config: CliConfig, options?: ListOptions): Promise<AdShape[]> => {
     const countryCode = normalizeCountryCode(config.countryCode);
+    const stateFilter = resolveListState(options?.state);
     const rows = await db
         .select({
             adId: ad.adId,
@@ -193,7 +204,8 @@ export const listAds = async (config: CliConfig): Promise<AdShape[]> => {
         .where(
             and(
                 eq(campaign.accountId, config.accountId),
-                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])
+                ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
+                ...(stateFilter ? [eq(ad.state, stateFilter)] : [])
             )
         )
         .orderBy(desc(ad.lastUpdatedDateTime), ad.adId);
@@ -229,8 +241,9 @@ export const getAd = async (config: CliConfig, adId: string): Promise<AdShape> =
     return mapAdRow(row);
 };
 
-export const listTargets = async (config: CliConfig): Promise<TargetShape[]> => {
+export const listTargets = async (config: CliConfig, options?: ListOptions): Promise<TargetShape[]> => {
     const countryCode = normalizeCountryCode(config.countryCode);
+    const stateFilter = resolveListState(options?.state);
     const rows = await db
         .select({
             targetId: target.targetId,
@@ -249,7 +262,8 @@ export const listTargets = async (config: CliConfig): Promise<TargetShape[]> => 
             and(
                 eq(campaign.accountId, config.accountId),
                 ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
-                inArray(target.targetType, ['KEYWORD', 'PRODUCT'])
+                inArray(target.targetType, ['KEYWORD', 'PRODUCT']),
+                ...(stateFilter ? [eq(target.state, stateFilter)] : [])
             )
         )
         .orderBy(desc(target.lastUpdatedDateTime), target.targetId);
@@ -628,6 +642,16 @@ const mapTargetRow = (row: {
         productId: String(row.targetAsin ?? ''),
         productMatchType: null,
     };
+};
+
+const resolveListState = (state?: ListState) => {
+    if (!state) {
+        return 'ENABLED';
+    }
+    if (state === 'ALL') {
+        return null;
+    }
+    return state;
 };
 
 const resolveApiRegion = (countryCode: string): ApiRegion => {
