@@ -2,15 +2,22 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
     createCliConfig,
     createTestCaller,
-    getTestAccountId,
     loadEnv,
 } from '../utils/cli-test-harness';
 
+const requireEnv = (key: string) => {
+    const value = process.env[key];
+    if (!value) {
+        throw new Error(`Missing required env var: ${key}. Set it in .env or export it before running tests.`);
+    }
+    return value;
+};
+
 loadEnv();
 
-const testAccountId = getTestAccountId();
-const testAsin = process.env.ADS_API_TEST_ASIN ?? null;
-const describeIntegration = testAccountId && testAsin ? describe : describe.skip;
+const testAccountId = requireEnv('ADS_API_TEST_ACCOUNT_ID');
+const testAsin = requireEnv('ADS_API_TEST_ASIN');
+const describeIntegration = describe;
 
 describeIntegration('cli sp lifecycle', () => {
     let caller: Awaited<ReturnType<typeof createTestCaller>> | null = null;
