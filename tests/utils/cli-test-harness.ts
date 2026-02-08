@@ -28,10 +28,6 @@ export const loadEnv = () => {
     process.env[ENV_LOADED_FLAG] = 'true';
 };
 
-export const getTestAccountId = () => {
-    return process.env.ADS_API_TEST_ACCOUNT_ID ?? null;
-};
-
 export const createCliConfig = (accountId: string) => ({
     accountId,
     range: '7d',
