@@ -16,6 +16,20 @@ export const listStateSchema = z.enum(['ENABLED', 'PAUSED', 'ARCHIVED', 'OTHER',
 export const cliListInputSchema = cliConfigInputSchema.extend({
     state: listStateSchema.optional(),
 });
+
+export const adGroupsListInputSchema = cliListInputSchema.extend({
+    campaignId: z.string().optional(),
+});
+
+export const adsListInputSchema = cliListInputSchema.extend({
+    campaignId: z.string().optional(),
+    adGroupId: z.string().optional(),
+});
+
+export const targetsListInputSchema = cliListInputSchema.extend({
+    campaignId: z.string().optional(),
+    adGroupId: z.string().optional(),
+});
 export const bidStrategySchema = z.enum([
     'MANUAL',
     'RULE_BASED',
@@ -249,6 +263,11 @@ export const bidsAdjustInputSchema = cliConfigInputSchema.extend({
 export const metricsOutputSchema = z.object({
     totals: metricsTotalsSchema,
     series: z.array(metricsPointSchema),
+});
+
+export const metricsListInputSchema = cliConfigInputSchema.extend({
+    campaignId: z.string().optional(),
+    adGroupId: z.string().optional(),
 });
 
 export const metricsEntityInputSchema = cliConfigInputSchema.extend({
