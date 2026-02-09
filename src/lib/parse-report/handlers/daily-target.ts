@@ -7,8 +7,8 @@ import { db } from '@/db/index';
 import { performanceDaily, reportDatasetErrorMetrics, reportDatasetMetadata } from '@/db/schema';
 import { emitEvent } from '@/utils/events';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import { TargetCache } from '../utils/target-cache';
 import { parseDailyTimestamp } from '../utils/parse-period-start-timestamp';
+import { TargetCache } from '../utils/target-cache';
 import type { ParseReportInput, ParseReportOutput } from './input';
 
 const gunzipAsync = promisify(gunzip);
@@ -17,7 +17,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
     const timezone = getTimezoneForCountry(input.countryCode);
 
     const response = await fetch(input.reportUrl, {
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.timeout(60_000),
     });
 
     if (!response.ok) {

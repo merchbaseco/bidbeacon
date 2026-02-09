@@ -20,7 +20,34 @@
     "editor.defaultFormatter": "biomejs.biome"
   },
   "editor.codeActionsOnSave": {
-    "quickfix.biome": "explicit"
+    "source.fixAll.biome": "explicit",
+    "source.organizeImports.biome": "explicit"
+  },
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "editor.formatOnPaste": true,
+  "emmet.showExpandedAbbreviation": "never",
+  "[html]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[vue]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[svelte]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[css]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[yaml]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[graphql]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[markdown]": {
+    "editor.defaultFormatter": "biomejs.biome"
+  },
+  "[mdx]": {
+    "editor.defaultFormatter": "biomejs.biome"
   }
 }
-

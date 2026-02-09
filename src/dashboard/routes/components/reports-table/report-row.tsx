@@ -1,9 +1,9 @@
-import { useMemo } from 'react';
 import { HugeiconsIcon } from '@hugeicons/react';
+import AlarmClockIcon from '@merchbaseco/icons/core-solid-rounded/AlarmClockIcon';
 import ChartColumnIcon from '@merchbaseco/icons/core-solid-rounded/ChartColumnIcon';
 import Clock05Icon from '@merchbaseco/icons/core-solid-rounded/Clock05Icon';
 import TimeScheduleIcon from '@merchbaseco/icons/core-solid-rounded/TimeScheduleIcon';
-import AlarmClockIcon from '@merchbaseco/icons/core-solid-rounded/AlarmClockIcon';
+import { useMemo } from 'react';
 import { Progress } from '@/dashboard/components/ui/progress.js';
 import { Spinner } from '@/dashboard/components/ui/spinner.js';
 import { Badge } from '../../../components/ui/badge.js';
@@ -65,7 +65,7 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
     if (isLoading || !report) {
         return (
             <TableRow>
-                <TableCell colSpan={7} className="text-center text-muted-foreground">
+                <TableCell className="text-center text-muted-foreground" colSpan={7}>
                     Loading...
                 </TableCell>
             </TableRow>
@@ -83,10 +83,10 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
         <TableRow key={rowKey}>
             <TableCell className="pl-4">
                 <div className="flex items-center gap-2">
-                    <Badge variant="info" className="uppercase">
+                    <Badge className="uppercase" variant="info">
                         {report.aggregation}
                     </Badge>
-                    <Badge variant="info" className="uppercase">
+                    <Badge className="uppercase" variant="info">
                         {report.entityType}
                     </Badge>
                     <span className="font-medium">{reportDate}</span>
@@ -94,19 +94,19 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
             </TableCell>
             <TableCell>
                 {isParsingStatus ? (
-                    <Badge variant="secondary" className="gap-0">
+                    <Badge className="gap-0" variant="secondary">
                         <Spinner className="size-3" />
                         &nbsp;
                         <Progress className="w-16" value={((report.successRecords + report.errorRecords) / report.totalRecords) * 100} />
                     </Badge>
                 ) : isRefreshing ? (
-                    <Badge variant="secondary" className="gap-1.5">
+                    <Badge className="gap-1.5" variant="secondary">
                         <Spinner className="size-3" />
                         Refreshing
                     </Badge>
                 ) : (
                     <ErrorDialog row={report}>
-                        <Badge variant={statusBadgeType} className="uppercase flex items-center gap-1">
+                        <Badge className="flex items-center gap-1 uppercase" variant={statusBadgeType}>
                             <span className={`size-1.5 rounded-full ${statusColor}`} />
                             {report.status}
                         </Badge>
@@ -116,7 +116,7 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
             <TableCell>
                 <div className="flex items-center gap-1.5 tracking-tight">
                     {report.refreshing && (
-                        <div className="flex gap-1.5 items-center">
+                        <div className="flex items-center gap-1.5">
                             <HugeiconsIcon icon={TimeScheduleIcon} size={16} />
                             <span className="cursor-help">Now</span>
                         </div>
@@ -124,8 +124,8 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
                     {report.nextRefreshAt && !report.refreshing && (
                         <Tooltip>
                             <TooltipTrigger>
-                                <div className="flex gap-1.5 items-center">
-                                    {nextRefreshSeverity === 'overdue' ? <HugeiconsIcon icon={AlarmClockIcon} size={18} className="-ml-px" /> : <HugeiconsIcon icon={Clock05Icon} size={16} />}
+                                <div className="flex items-center gap-1.5">
+                                    {nextRefreshSeverity === 'overdue' ? <HugeiconsIcon className="-ml-px" icon={AlarmClockIcon} size={18} /> : <HugeiconsIcon icon={Clock05Icon} size={16} />}
                                     <span className={`cursor-help ${nextRefreshSeverity !== 'overdue' ? 'text-muted-foreground' : ''}`}>{nextRefreshTime}</span>
                                 </div>
                             </TooltipTrigger>
@@ -146,9 +146,9 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
                     {report.errorRecords}
                 </div>
             </TableCell>
-            <TableCell>{report.reportId ? <ReportIdDialog row={report} accountId={accountId} /> : ''}</TableCell>
+            <TableCell>{report.reportId ? <ReportIdDialog accountId={accountId} row={report} /> : ''}</TableCell>
             <TableCell className="text-right">
-                <ReportRefreshButton row={report} accountId={accountId} />
+                <ReportRefreshButton accountId={accountId} row={report} />
             </TableCell>
         </TableRow>
     );

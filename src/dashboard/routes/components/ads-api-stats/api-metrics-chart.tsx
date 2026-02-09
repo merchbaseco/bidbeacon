@@ -20,8 +20,8 @@ export const ApiMetricsChart = () => {
     }, []);
 
     const { data, isLoading, error } = api.metrics.adsApi.useQuery(dateRange, {
-        refetchInterval: 300000, // 5 minutes
-        staleTime: 60000,
+        refetchInterval: 300_000, // 5 minutes
+        staleTime: 60_000,
     });
 
     const chartData = data?.data ?? [];
@@ -56,27 +56,27 @@ export const ApiMetricsChart = () => {
     };
 
     if (isLoading) {
-        return <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">Loading throttler metrics...</div>;
+        return <div className="flex h-[200px] items-center justify-center text-muted-foreground text-sm">Loading throttler metrics...</div>;
     }
 
     if (error) {
-        return <div className="flex items-center justify-center h-[200px] text-destructive text-sm">Error loading throttler metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>;
+        return <div className="flex h-[200px] items-center justify-center text-destructive text-sm">Error loading throttler metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>;
     }
 
     return (
-        <div className="w-full h-[200px]">
-            <ResponsiveContainer width="100%" height="100%" debounce={300}>
+        <div className="h-[200px] w-full">
+            <ResponsiveContainer debounce={300} height="100%" width="100%">
                 <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
                     <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
-                    <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} tickFormatter={formatYAxisTick} />
+                    <XAxis axisLine={false} dataKey="interval" interval={0} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} tickLine={false} />
+                    <YAxis axisLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatYAxisTick} tickLine={false} width={40} />
                     <Tooltip content={<ChartTooltip chartData={chartData} intervalMs={5 * 60 * 1000} />} wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }} />
                     <BarStack radius={4}>
                         {(data?.apiNames || []).map((apiName, index) => (
-                            <Bar key={apiName} dataKey={apiName} stackId="apis" fill={LEGEND_COLORS[index % LEGEND_COLORS.length]} name={apiName} isAnimationActive={false} />
+                            <Bar dataKey={apiName} fill={LEGEND_COLORS[index % LEGEND_COLORS.length]} isAnimationActive={false} key={apiName} name={apiName} stackId="apis" />
                         ))}
                     </BarStack>
-                    <Line type="linear" dataKey="429" stroke={LEGEND_COLORS[5]} strokeWidth={1.5} dot={false} name="429" isAnimationActive={false} />
+                    <Line dataKey="429" dot={false} isAnimationActive={false} name="429" stroke={LEGEND_COLORS[5]} strokeWidth={1.5} type="linear" />
                 </ComposedChart>
             </ResponsiveContainer>
         </div>

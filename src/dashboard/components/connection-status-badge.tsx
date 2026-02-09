@@ -12,8 +12,8 @@ export function ConnectionStatusBadge({ status, className }: { status: Connectio
     const config = statusConfig[status];
 
     return (
-        <Badge variant={config.variant} size="lg" className={className}>
-            <span className={cn('mr-0.5 h-1.5 w-1.5 rounded-full', status === 'connected' ? 'bg-success animate-pulse' : status === 'connecting' ? 'bg-info animate-pulse' : 'bg-destructive')} />
+        <Badge className={className} size="lg" variant={config.variant}>
+            <span className={cn('mr-0.5 h-1.5 w-1.5 rounded-full', status === 'connected' ? 'animate-pulse bg-success' : status === 'connecting' ? 'animate-pulse bg-info' : 'bg-destructive')} />
             {config.label}
         </Badge>
     );

@@ -1,5 +1,5 @@
-import { apiProcedure } from '@/api/trpc';
 import { targetsListInputSchema, targetsListOutputSchema } from '@/api/schemas/cli';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, listTargets } from './shared';
 
 export const targetsList = apiProcedure

@@ -21,7 +21,7 @@ export function ReportResponseDialog({ open, onOpenChange, title, data, error }:
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog onOpenChange={onOpenChange} open={open}>
             <DialogPopup className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{title}</DialogTitle>
@@ -35,7 +35,7 @@ export function ReportResponseDialog({ open, onOpenChange, title, data, error }:
                     </div>
                 </DialogPanel>
                 <DialogFooter>
-                    <Button variant="outline" onClick={handleCopy}>
+                    <Button onClick={handleCopy} variant="outline">
                         {copied ? 'Copied!' : 'Copy JSON'}
                     </Button>
                     <Button onClick={() => onOpenChange(false)}>Close</Button>

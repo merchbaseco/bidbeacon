@@ -7,8 +7,8 @@ import { db } from '@/db/index';
 import { performanceHourly, reportDatasetErrorMetrics, reportDatasetMetadata } from '@/db/schema';
 import { emitEvent } from '@/utils/events';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import { TargetCache } from '../utils/target-cache';
 import { normalizeHourlyValue, parseHourlyTimestamp } from '../utils/parse-period-start-timestamp';
+import { TargetCache } from '../utils/target-cache';
 import type { ParseReportInput, ParseReportOutput } from './input';
 
 const gunzipAsync = promisify(gunzip);
@@ -21,7 +21,7 @@ export async function handleHourlyTarget(input: ParseReportInput): Promise<Parse
 
     const fetchStart = performance.now();
     const response = await fetch(input.reportUrl, {
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.timeout(60_000),
     });
     const fetchTime = performance.now() - fetchStart;
     console.log(`[handleHourlyTarget] Fetch report: ${fetchTime.toFixed(2)}ms`);

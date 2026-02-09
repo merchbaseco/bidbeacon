@@ -8,8 +8,8 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { advertiserAccount } from '@/db/schema';
 import { boss } from '@/jobs/boss';
-import { summarizeHourlyTargetStreamForAccountJob } from './summarize-hourly-target-stream-for-account';
 import { withJobMetrics } from '@/utils/job-metrics';
+import { summarizeHourlyTargetStreamForAccountJob } from './summarize-hourly-target-stream-for-account';
 
 // ============================================================================
 // Job Definition

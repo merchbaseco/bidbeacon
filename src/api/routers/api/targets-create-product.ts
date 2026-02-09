@@ -1,6 +1,6 @@
-import { apiProcedure } from '@/api/trpc';
-import { targetsCreateProductInputSchema, targetsGetOutputSchema } from '@/api/schemas/cli';
 import { createTargets, extractMultiStatusEntity } from '@/amazon-ads/sp-entities';
+import { targetsCreateProductInputSchema, targetsGetOutputSchema } from '@/api/schemas/cli';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, buildProductTargetDetails, mapTargetFromApi, resolveAccountContext } from './shared';
 
 export const targetsCreateProduct = apiProcedure

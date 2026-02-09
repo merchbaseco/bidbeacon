@@ -1,26 +1,23 @@
 import { mergeProps } from '@base-ui-components/react/merge-props';
 import { useRender } from '@base-ui-components/react/use-render';
 import { cva, type VariantProps } from 'class-variance-authority';
-import type * as React from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { cn } from '../../lib/utils';
 import { Separator } from './separator';
 
-const groupVariants = cva(
-    'flex w-fit *:focus-visible:z-10 has-[>[data-slot=group]]:gap-2 *:has-focus-visible:z-10',
-    {
-        defaultVariants: {
-            orientation: 'horizontal',
+const groupVariants = cva('flex w-fit *:focus-visible:z-10 has-[>[data-slot=group]]:gap-2 *:has-focus-visible:z-10', {
+    defaultVariants: {
+        orientation: 'horizontal',
+    },
+    variants: {
+        orientation: {
+            horizontal:
+                '*:not-first:rounded-s-none *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:rounded-e-none *:not-first:border-s-0 *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:border-e-0 *:not-first:before:-start-[0.5px] *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:-end-[0.5px] *:not-first:before:rounded-s-none *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:rounded-e-none *:after:absolute *:after:start-full *:after:h-full *:after:w-px *:pointer-coarse:after:min-w-auto',
+            vertical:
+                'flex-col *:not-first:rounded-t-none *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:rounded-b-none *:not-first:border-t-0 *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:border-b-0 *:not-first:before:-top-[0.5px] *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:-bottom-[0.5px] *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:hidden *:not-first:before:rounded-t-none *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:rounded-b-none *:after:absolute *:after:top-full *:after:h-px *:pointer-coarse:after:min-h-auto *:after:w-full dark:*:last:before:hidden dark:*:first:before:block',
         },
-        variants: {
-            orientation: {
-                horizontal:
-                    '*:not-first:before:-start-[0.5px] *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:-end-[0.5px] *:not-first:rounded-s-none *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:rounded-e-none *:not-first:border-s-0 *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:border-e-0 *:not-first:before:rounded-s-none *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:rounded-e-none *:after:absolute *:after:start-full *:after:h-full *:after:w-px *:pointer-coarse:after:min-w-auto',
-                vertical:
-                    '*:not-first:before:-top-[0.5px] *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:-bottom-[0.5px] flex-col *:not-first:rounded-t-none *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:rounded-b-none *:not-first:border-t-0 *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:border-b-0 *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:hidden *:not-first:before:rounded-t-none *:not-[&:nth-last-child(1_of_:not(span[data-base-ui-focus-guard],span[data-base-ui-inert]))]:before:rounded-b-none *:after:absolute *:after:top-full *:after:h-px *:pointer-coarse:after:min-h-auto *:after:w-full dark:*:last:before:hidden dark:*:first:before:block',
-            },
-        },
-    }
-);
+    },
+});
 
 function Group({
     className,
@@ -30,18 +27,12 @@ function Group({
 }: {
     className?: string;
     orientation?: VariantProps<typeof groupVariants>['orientation'];
-    children: React.ReactNode;
-} & React.ComponentProps<'div'>) {
+    children: ReactNode;
+} & ComponentProps<'fieldset'>) {
     return (
-        <div
-            className={cn(groupVariants({ orientation }), className)}
-            data-orientation={orientation}
-            data-slot="group"
-            role="group"
-            {...props}
-        >
+        <fieldset className={cn(groupVariants({ orientation }), className)} data-orientation={orientation} data-slot="group" {...props}>
             {children}
-        </div>
+        </fieldset>
     );
 }
 
@@ -66,11 +57,11 @@ function GroupSeparator({
     ...props
 }: {
     className?: string;
-} & React.ComponentProps<typeof Separator>) {
+} & ComponentProps<typeof Separator>) {
     return (
         <Separator
             className={cn(
-                '[[data-slot=input-control]:focus-within+&,[data-slot=select-trigger]:focus-visible+*+&]:-translate-x-px pointer-events-none relative z-20 has-[+[data-slot=input-control]:focus-within,+[data-slot=select-trigger]:focus-visible+*,+[data-slot=number-field]:focus-within]:translate-x-px has-[+[data-slot=input-control]:focus-within,+[data-slot=select-trigger]:focus-visible+*,+[data-slot=number-field]:focus-within]:bg-ring [[data-slot=input-control]:focus-within+&,[data-slot=select-trigger]:focus-visible+*+&,[data-slot=number-field]:focus-within+&]:bg-ring',
+                'pointer-events-none relative z-20 has-[+[data-slot=input-control]:focus-within,+[data-slot=select-trigger]:focus-visible+*,+[data-slot=number-field]:focus-within]:translate-x-px has-[+[data-slot=input-control]:focus-within,+[data-slot=select-trigger]:focus-visible+*,+[data-slot=number-field]:focus-within]:bg-ring [[data-slot=input-control]:focus-within+&,[data-slot=select-trigger]:focus-visible+*+&,[data-slot=number-field]:focus-within+&]:bg-ring [[data-slot=input-control]:focus-within+&,[data-slot=select-trigger]:focus-visible+*+&]:-translate-x-px',
                 className
             )}
             orientation={orientation}
@@ -79,12 +70,4 @@ function GroupSeparator({
     );
 }
 
-export {
-    Group,
-    Group as ButtonGroup,
-    GroupText,
-    GroupText as ButtonGroupText,
-    GroupSeparator,
-    GroupSeparator as ButtonGroupSeparator,
-    groupVariants,
-};
+export { Group, Group as ButtonGroup, GroupText, GroupText as ButtonGroupText, GroupSeparator, GroupSeparator as ButtonGroupSeparator, groupVariants };

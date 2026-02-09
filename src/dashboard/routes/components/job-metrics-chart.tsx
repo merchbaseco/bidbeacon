@@ -35,10 +35,14 @@ interface CustomTooltipProps {
  * Custom tooltip component matching the design spec
  */
 function CustomTooltip({ active, payload, label, coordinate, chartData }: CustomTooltipProps) {
-    if (!active || !payload || payload.length === 0) return null;
+    if (!(active && payload) || payload.length === 0) {
+        return null;
+    }
 
     const point = chartData.find(p => p.interval === label);
-    if (!point) return null;
+    if (!point) {
+        return null;
+    }
 
     const timestamp = new Date(point.timestamp as string);
     const endTime = new Date(timestamp.getTime() + 5 * 60 * 1000); // 5 min interval
@@ -53,16 +57,16 @@ function CustomTooltip({ active, payload, label, coordinate, chartData }: Custom
 
     return (
         <ChartTooltipPortal active={active} coordinate={coordinate}>
-            <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[180px]">
+            <div className="min-w-[180px] rounded-lg border border-border bg-card p-3 shadow-lg">
                 {/* Series list */}
-                <div className="flex flex-col gap-1.5 mb-3">
+                <div className="mb-3 flex flex-col gap-1.5">
                     {payload.map(entry => (
-                        <div key={entry.dataKey} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3" key={entry.dataKey}>
                             <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-                                <span className="text-sm text-foreground">{entry.name}</span>
+                                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
+                                <span className="text-foreground text-sm">{entry.name}</span>
                             </div>
-                            <span className="text-sm text-foreground font-medium">{entry.value}</span>
+                            <span className="font-medium text-foreground text-sm">{entry.value}</span>
                         </div>
                     ))}
                 </div>
@@ -145,11 +149,11 @@ export function JobMetricsChart() {
     }, [intervals, data]);
 
     if (isLoading) {
-        return <div className="flex items-center justify-center h-[400px] text-muted-foreground text-sm">Loading job metrics...</div>;
+        return <div className="flex h-[400px] items-center justify-center text-muted-foreground text-sm">Loading job metrics...</div>;
     }
 
     if (error) {
-        return <div className="flex items-center justify-center h-[400px] text-destructive text-sm">Error loading job metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>;
+        return <div className="flex h-[400px] items-center justify-center text-destructive text-sm">Error loading job metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>;
     }
 
     // Custom tick formatter to show specific time labels
@@ -184,16 +188,16 @@ export function JobMetricsChart() {
     };
 
     return (
-        <div className="w-full h-[200px]">
-            <ResponsiveContainer width="100%" height="100%" debounce={300}>
+        <div className="h-[200px] w-full">
+            <ResponsiveContainer debounce={300} height="100%" width="100%">
                 <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
                     <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
-                    <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} tickFormatter={formatYAxisTick} />
+                    <XAxis axisLine={false} dataKey="interval" interval={0} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} tickLine={false} />
+                    <YAxis axisLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatYAxisTick} tickLine={false} width={40} />
                     <Tooltip content={<CustomTooltip chartData={chartData} />} wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }} />
                     <BarStack radius={4}>
                         {(data?.jobNames || []).map((jobName, index) => (
-                            <Bar key={jobName} dataKey={jobName} stackId="jobs" fill={COLORS[index % COLORS.length]} name={jobName} isAnimationActive={false} />
+                            <Bar dataKey={jobName} fill={COLORS[index % COLORS.length]} isAnimationActive={false} key={jobName} name={jobName} stackId="jobs" />
                         ))}
                     </BarStack>
                 </ComposedChart>

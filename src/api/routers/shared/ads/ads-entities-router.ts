@@ -1,10 +1,10 @@
 import { TRPCError } from '@trpc/server';
 import { and, asc, desc, eq, ilike, or } from 'drizzle-orm';
+import type { apiProcedure } from '@/api/trpc';
+import { router } from '@/api/trpc';
 import { db } from '@/db/index';
 import { ad, campaign } from '@/db/schema';
 import { adDetailInputSchema, adDetailOutputSchema, adListInputSchema, adListOutputSchema } from '@/types/ads-api';
-import type { apiProcedure } from '@/api/trpc';
-import { router } from '@/api/trpc';
 import { formatDateTime, formatListResponse, getPagination } from '../../ads/shared';
 
 export const buildAdsEntitiesRouter = (procedure: typeof apiProcedure) =>
@@ -116,7 +116,9 @@ export const buildAdsEntitiesRouter = (procedure: typeof apiProcedure) =>
 
 const buildAdSearchCondition = (search: string | null) => {
     const trimmed = search?.trim();
-    if (!trimmed) return null;
+    if (!trimmed) {
+        return null;
+    }
     const query = `%${trimmed}%`;
     return or(ilike(ad.adId, query), ilike(ad.productAsin, query));
 };
@@ -127,7 +129,6 @@ const getAdSortExpression = (field: 'lastUpdatedDateTime' | 'adId' | 'state') =>
             return ad.adId;
         case 'state':
             return ad.state;
-        case 'lastUpdatedDateTime':
         default:
             return ad.lastUpdatedDateTime;
     }

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { formatInTimeZone } from 'date-fns-tz';
+import { describe, expect, it } from 'vitest';
 import { zonedTopOfHour } from '@/utils/date';
 
 describe('zonedTopOfHour', () => {

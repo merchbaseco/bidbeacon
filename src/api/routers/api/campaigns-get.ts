@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { apiProcedure } from '@/api/trpc';
 import { campaignsGetOutputSchema, cliConfigInputSchema } from '@/api/schemas/cli';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, getCampaign } from './shared';
 
 export const campaignsGet = apiProcedure

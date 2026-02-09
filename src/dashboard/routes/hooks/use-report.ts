@@ -7,11 +7,15 @@ interface UseReportOptions {
 
 export const useReport = ({ uid }: UseReportOptions) => {
     const apiUtils = api.useUtils();
-    const { data: report, isLoading, ...rest } = api.reports.get.useQuery(
-        { uid: uid! },
+    const {
+        data: report,
+        isLoading,
+        ...rest
+    } = api.reports.get.useQuery(
+        { uid: uid ?? '' },
         {
             enabled: !!uid,
-            staleTime: Infinity, // Never refetch due to staleness - rely on WebSocket events for invalidation
+            staleTime: Number.POSITIVE_INFINITY, // Never refetch due to staleness - rely on WebSocket events for invalidation
         }
     );
 
@@ -19,14 +23,14 @@ export const useReport = ({ uid }: UseReportOptions) => {
     // Using setData instead of invalidate to avoid re-fetching - the event contains the full row data
     // Note: dates are ISO strings (no superjson transformer on tRPC client)
     useWebSocketEvents('report:refreshed', event => {
-        if (event.row.uid === uid) {
+        if (uid && event.row.uid === uid) {
             const serializedRow = {
                 ...event.row,
                 periodStart: event.row.periodStart.toISOString(),
                 nextRefreshAt: event.row.nextRefreshAt ? event.row.nextRefreshAt.toISOString() : null,
                 lastReportCreatedAt: event.row.lastReportCreatedAt ? event.row.lastReportCreatedAt.toISOString() : null,
             };
-            apiUtils.reports.get.setData({ uid: uid! }, prev => (prev ? { ...prev, ...serializedRow } : undefined));
+            apiUtils.reports.get.setData({ uid }, prev => (prev ? { ...prev, ...serializedRow } : undefined));
         }
     });
 

@@ -1,8 +1,8 @@
-import { apiProcedure } from '@/api/trpc';
-import { campaignsDeleteInputSchema, campaignsGetOutputSchema } from '@/api/schemas/cli';
 import { assertDeleteResponse, deleteCampaigns } from '@/amazon-ads/sp-entities';
-import { assertAccountAccess, resolveAccountContext } from './shared';
+import { campaignsDeleteInputSchema, campaignsGetOutputSchema } from '@/api/schemas/cli';
+import { apiProcedure } from '@/api/trpc';
 import type { CampaignShape } from './shared';
+import { assertAccountAccess, resolveAccountContext } from './shared';
 
 export const campaignsDelete = apiProcedure
     .input(campaignsDeleteInputSchema)

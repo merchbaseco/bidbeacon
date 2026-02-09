@@ -97,7 +97,7 @@ export async function exportAds(options: ExportAdsOptions, region: ApiRegion = '
             method: 'POST',
             headers,
             body: JSON.stringify(validatedRequestBody),
-            signal: AbortSignal.timeout(30000),
+            signal: AbortSignal.timeout(30_000),
         });
 
         // Store status code for tracking (even if error)

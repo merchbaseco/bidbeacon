@@ -5,9 +5,12 @@
  * Logs metrics to the database asynchronously to avoid blocking API calls.
  */
 
-import { db } from '@/db/index.js';
-import { apiMetrics } from '@/db/schema.js';
-import { type ApiMetricsUpdatedEvent, emitEvent } from '@/utils/events.js';
+import { db } from '@/db/index';
+import { apiMetrics } from '@/db/schema';
+import { type ApiMetricsUpdatedEvent, emitEvent } from '@/utils/events';
+
+const STATUS_MESSAGE_REGEX = /(?:status|Status|HTTP)\s*:?\s*(\d{3})|(\d{3})\s+(?:error|Error|status|Status)/i;
+const STATUS_PREFIX_REGEX = /^(\d{3})\s/;
 
 export interface ApiCallOptions {
     apiName: string;
@@ -96,9 +99,9 @@ export async function withTracking<T>(options: ApiCallOptions, fn: () => Promise
                 statusCode = (err as Error & { statusCode: number }).statusCode;
             } else {
                 // Try to extract from error message
-                const statusMatch = err.message.match(/(?:status|Status|HTTP)\s*:?\s*(\d{3})|(\d{3})\s+(?:error|Error|status|Status)/i) || err.message.match(/^(\d{3})\s/);
+                const statusMatch = err.message.match(STATUS_MESSAGE_REGEX) || err.message.match(STATUS_PREFIX_REGEX);
                 if (statusMatch) {
-                    statusCode = parseInt(statusMatch[1] || statusMatch[2], 10);
+                    statusCode = Number.parseInt(statusMatch[1] || statusMatch[2], 10);
                 }
             }
         }

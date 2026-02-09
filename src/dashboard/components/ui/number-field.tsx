@@ -2,11 +2,12 @@
 
 import { NumberField as NumberFieldPrimitive } from '@base-ui-components/react/number-field';
 import { MinusIcon, PlusIcon } from 'lucide-react';
-import * as React from 'react';
+import type { ComponentProps } from 'react';
+import { createContext, useContext, useId } from 'react';
 import { cn } from '../../lib/utils';
 import { Label } from './label';
 
-const NumberFieldContext = React.createContext<{
+const NumberFieldContext = createContext<{
     fieldId: string;
 } | null>(null);
 
@@ -18,18 +19,12 @@ function NumberField({
 }: NumberFieldPrimitive.Root.Props & {
     size?: 'sm' | 'default' | 'lg';
 }) {
-    const generatedId = React.useId();
+    const generatedId = useId();
     const fieldId = id ?? generatedId;
 
     return (
         <NumberFieldContext.Provider value={{ fieldId }}>
-            <NumberFieldPrimitive.Root
-                className={cn('flex w-full flex-col items-start gap-2', className)}
-                data-size={size}
-                data-slot="number-field"
-                id={fieldId}
-                {...props}
-            />
+            <NumberFieldPrimitive.Root className={cn('flex w-full flex-col items-start gap-2', className)} data-size={size} data-slot="number-field" id={fieldId} {...props} />
         </NumberFieldContext.Provider>
     );
 }
@@ -97,20 +92,14 @@ function NumberFieldScrubArea({
 }: NumberFieldPrimitive.ScrubArea.Props & {
     label: string;
 }) {
-    const context = React.useContext(NumberFieldContext);
+    const context = useContext(NumberFieldContext);
 
     if (!context) {
-        throw new Error(
-            'NumberFieldScrubArea must be used within a NumberField component for accessibility.'
-        );
+        throw new Error('NumberFieldScrubArea must be used within a NumberField component for accessibility.');
     }
 
     return (
-        <NumberFieldPrimitive.ScrubArea
-            className={cn('flex cursor-ew-resize', className)}
-            data-slot="number-field-scrub-area"
-            {...props}
-        >
+        <NumberFieldPrimitive.ScrubArea className={cn('flex cursor-ew-resize', className)} data-slot="number-field-scrub-area" {...props}>
             <Label className="cursor-ew-resize" htmlFor={context.fieldId}>
                 {label}
             </Label>
@@ -121,27 +110,13 @@ function NumberFieldScrubArea({
     );
 }
 
-function CursorGrowIcon(props: React.ComponentProps<'svg'>) {
+function CursorGrowIcon(props: ComponentProps<'svg'>) {
     return (
-        <svg
-            fill="black"
-            height="14"
-            stroke="white"
-            viewBox="0 0 24 14"
-            width="26"
-            xmlns="http://www.w3.org/2000/svg"
-            {...props}
-        >
+        <svg fill="black" height="14" stroke="white" viewBox="0 0 24 14" width="26" xmlns="http://www.w3.org/2000/svg" {...props}>
+            <title>Resize</title>
             <path d="M19.5 5.5L6.49737 5.51844V2L1 6.9999L6.5 12L6.49737 8.5L19.5 8.5V12L25 6.9999L19.5 2V5.5Z" />
         </svg>
     );
 }
 
-export {
-    NumberField,
-    NumberFieldScrubArea,
-    NumberFieldDecrement,
-    NumberFieldIncrement,
-    NumberFieldGroup,
-    NumberFieldInput,
-};
+export { NumberField, NumberFieldScrubArea, NumberFieldDecrement, NumberFieldIncrement, NumberFieldGroup, NumberFieldInput };

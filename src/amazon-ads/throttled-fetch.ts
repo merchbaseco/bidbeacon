@@ -29,7 +29,7 @@ function parseRetryAfter(retryAfter: string | null): number | null {
     }
 
     // Try parsing as numeric seconds
-    const numericValue = parseInt(retryAfter, 10);
+    const numericValue = Number.parseInt(retryAfter, 10);
     if (!Number.isNaN(numericValue) && numericValue > 0) {
         return numericValue * 1000; // Convert to milliseconds
     }

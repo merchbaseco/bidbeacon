@@ -16,7 +16,7 @@ export function ErrorDialog({ row, children }: { row: ReportDatasetMetadata; chi
     };
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
+        <Dialog onOpenChange={setOpen} open={open}>
             <DialogTrigger disabled={!row.error}>{children}</DialogTrigger>
             <DialogPopup className="sm:max-w-2xl">
                 <DialogHeader>
@@ -25,13 +25,13 @@ export function ErrorDialog({ row, children }: { row: ReportDatasetMetadata; chi
                 </DialogHeader>
                 <DialogPanel>
                     <div className="rounded-lg border bg-muted/50 p-4">
-                        <pre className="overflow-auto text-sm whitespace-pre-wrap break-words">
+                        <pre className="overflow-auto whitespace-pre-wrap break-words text-sm">
                             <code>{row.error}</code>
                         </pre>
                     </div>
                 </DialogPanel>
                 <DialogFooter>
-                    <Button variant="outline" onClick={handleCopy}>
+                    <Button onClick={handleCopy} variant="outline">
                         {copied ? 'Copied!' : 'Copy Error'}
                     </Button>
                     <DialogClose>

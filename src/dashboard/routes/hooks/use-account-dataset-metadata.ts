@@ -17,10 +17,7 @@ export const useAccountDatasetMetadata = (accountId: string, countryCode: string
 
     const { mutate: sync } = api.accounts.syncAdEntities.useMutation({
         onMutate: () => {
-            utils.accounts.datasetMetadata.setData(
-                { accountId: accountId, countryCode: countryCode },
-                prev => prev && { ...prev, fetchingCampaigns: true, fetchingAdGroups: true, fetchingAds: true, fetchingTargets: true }
-            );
+            utils.accounts.datasetMetadata.setData({ accountId, countryCode }, prev => prev && { ...prev, fetchingCampaigns: true, fetchingAdGroups: true, fetchingAds: true, fetchingTargets: true });
         },
     });
 

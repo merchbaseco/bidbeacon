@@ -10,11 +10,13 @@ export const AccountEnabledSwitch = () => {
 
     const selectedRow = accounts.find(a => a.adsAccountId === accountId && a.profileId === profileId);
 
-    if (!selectedRow) return null;
+    if (!selectedRow) {
+        return null;
+    }
 
     return (
         <div className="flex items-center gap-2">
-            <div className="text-sm font-medium text-muted-foreground">Sync</div>
+            <div className="font-medium text-muted-foreground text-sm">Sync</div>
             <Switch
                 checked={selectedRow.enabled}
                 onCheckedChange={() => {

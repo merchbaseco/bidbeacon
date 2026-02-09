@@ -1,12 +1,4 @@
-import {
-    Pagination,
-    PaginationContent,
-    PaginationEllipsis,
-    PaginationItem,
-    PaginationLink,
-    PaginationNext,
-    PaginationPrevious,
-} from '../../../components/ui/pagination';
+import { Pagination, PaginationContent, PaginationEllipsis, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious } from '../../../components/ui/pagination';
 import { cn } from '../../../lib/utils.js';
 
 type TablePaginationProps = {
@@ -15,13 +7,9 @@ type TablePaginationProps = {
     onPageChange: (page: number) => void;
 };
 
-export const TablePagination = ({
-    currentPage,
-    totalPages,
-    onPageChange,
-}: TablePaginationProps) => {
+export const TablePagination = ({ currentPage, totalPages, onPageChange }: TablePaginationProps) => {
     const renderPaginationItems = () => {
-        const items = [];
+        const items: JSX.Element[] = [];
         const maxVisiblePages = 5;
 
         if (totalPages <= maxVisiblePages) {
@@ -46,7 +34,7 @@ export const TablePagination = ({
             items.push(
                 <PaginationItem key={1}>
                     <PaginationLink
-                        isActive={1 === currentPage}
+                        isActive={currentPage === 1}
                         onClick={e => {
                             e.preventDefault();
                             onPageChange(1);
@@ -130,33 +118,24 @@ export const TablePagination = ({
             <PaginationContent>
                 <PaginationItem>
                     <PaginationPrevious
+                        className={cn(currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer', '[&>span]:hidden')}
                         onClick={e => {
                             e.preventDefault();
                             onPageChange(Math.max(1, currentPage - 1));
                         }}
-                        className={cn(
-                            currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer',
-                            '[&>span]:hidden'
-                        )}
                     />
                 </PaginationItem>
                 {renderPaginationItems()}
                 <PaginationItem>
                     <PaginationNext
+                        className={cn(currentPage === totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer', '[&>span]:hidden')}
                         onClick={e => {
                             e.preventDefault();
                             onPageChange(Math.min(totalPages, currentPage + 1));
                         }}
-                        className={cn(
-                            currentPage === totalPages
-                                ? 'pointer-events-none opacity-50'
-                                : 'cursor-pointer',
-                            '[&>span]:hidden'
-                        )}
                     />
                 </PaginationItem>
             </PaginationContent>
         </Pagination>
     );
 };
-

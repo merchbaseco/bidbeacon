@@ -1,6 +1,6 @@
-import { apiProcedure } from '@/api/trpc';
+import { extractMultiStatusEntity, updateCampaigns } from '@/amazon-ads/sp-entities';
 import { campaignsGetOutputSchema, campaignsSetBidAdjustmentsInputSchema } from '@/api/schemas/cli';
-import { updateCampaigns, extractMultiStatusEntity } from '@/amazon-ads/sp-entities';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, mapCampaignFromApi, resolveAccountContext } from './shared';
 
 export const campaignsSetBidAdjustments = apiProcedure
@@ -14,8 +14,8 @@ export const campaignsSetBidAdjustments = apiProcedure
             input.scope === 'placement'
                 ? { placementBidAdjustments: input.adjustments }
                 : input.scope === 'audience'
-                ? { audienceBidAdjustments: input.adjustments }
-                : { creativeBidAdjustments: input.adjustments };
+                  ? { audienceBidAdjustments: input.adjustments }
+                  : { creativeBidAdjustments: input.adjustments };
 
         const response = await updateCampaigns({
             profileId: account.profileId,

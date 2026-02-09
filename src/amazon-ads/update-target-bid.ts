@@ -30,7 +30,9 @@ export interface UpdateTargetBidOptions {
 }
 
 const isSuccessCode = (code?: string) => {
-    if (!code) return true;
+    if (!code) {
+        return true;
+    }
     const normalized = code.toUpperCase();
     return normalized === 'SUCCESS' || normalized === 'OK' || normalized === 'SUCCESSFUL';
 };
@@ -78,7 +80,7 @@ export async function updateTargetBid(options: UpdateTargetBidOptions, region: A
             method: 'PUT',
             headers,
             body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(30000),
+            signal: AbortSignal.timeout(30_000),
         });
 
         const statusCode = response.status;

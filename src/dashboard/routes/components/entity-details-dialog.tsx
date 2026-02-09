@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/dashboard/components/ui/badge';
 import { Button } from '@/dashboard/components/ui/button';
@@ -14,17 +14,7 @@ import type { PerformanceDimension, PerformanceTableOutput } from '@/types/perfo
 
 const PAGE_SIZE = 10;
 
-const EntityDetailsDialog = ({
-    open,
-    onOpenChange,
-    row,
-    accountId,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    row: PerformanceTableRow | null;
-    accountId: string;
-}) => {
+const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boolean; onOpenChange: (open: boolean) => void; row: PerformanceTableRow | null; accountId: string }) => {
     const [selectedEntity, setSelectedEntity] = useState<DetailsEntity | null>(row ? toDetailsEntity(row) : null);
     const [breadcrumbs, setBreadcrumbs] = useState<Breadcrumb[]>([]);
     const [bidDraft, setBidDraft] = useState('');
@@ -66,7 +56,9 @@ const EntityDetailsDialog = ({
     }, [open, row]);
 
     useEffect(() => {
-        if (!selectedEntity) return;
+        if (!selectedEntity) {
+            return;
+        }
         setBidDirty(false);
         setBidDraft('');
         if (selectedEntity.dimension === 'campaign') {
@@ -93,9 +85,7 @@ const EntityDetailsDialog = ({
     const utils = api.useUtils();
     const updateBid = api.ads.targets.updateBid.useMutation({
         onSuccess: result => {
-            utils.ads.targets.get.setData({ accountId, targetId: result.targetId }, prev =>
-                prev ? { ...prev, bidAmount: result.bidAmount, lastUpdatedDateTime: result.lastUpdatedDateTime } : prev
-            );
+            utils.ads.targets.get.setData({ accountId, targetId: result.targetId }, prev => (prev ? { ...prev, bidAmount: result.bidAmount, lastUpdatedDateTime: result.lastUpdatedDateTime } : prev));
             utils.ads.targets.list.invalidate();
             toast.success('Bid updated', {
                 description: `New bid: ${formatCurrency(result.bidAmount)}`,
@@ -111,9 +101,15 @@ const EntityDetailsDialog = ({
     const targetData = data && 'targetId' in data ? data : null;
 
     useEffect(() => {
-        if (!open) return;
-        if (!targetData) return;
-        if (bidDirty) return;
+        if (!open) {
+            return;
+        }
+        if (!targetData) {
+            return;
+        }
+        if (bidDirty) {
+            return;
+        }
 
         setBidDraft(targetData.bidAmount !== null ? targetData.bidAmount.toFixed(2) : '');
     }, [open, targetData, bidDirty]);
@@ -123,12 +119,7 @@ const EntityDetailsDialog = ({
     const hasBid = targetData?.bidAmount !== null && targetData?.bidAmount !== undefined;
     const bidChanged = hasBid ? Number(targetData?.bidAmount) !== Number(bidValue.toFixed(2)) : Boolean(bidDraft);
 
-    const canEditBid = Boolean(
-        targetData &&
-            !targetData.negative &&
-            targetData.adGroupId &&
-            isSponsoredProducts(targetData.adProduct)
-    );
+    const canEditBid = Boolean(targetData && !targetData.negative && targetData.adGroupId && isSponsoredProducts(targetData.adProduct));
 
     const bidHelper = getBidHelper(targetData);
 
@@ -190,7 +181,9 @@ const EntityDetailsDialog = ({
     }, []);
 
     const details = useMemo(() => {
-        if (!data) return null;
+        if (!data) {
+            return null;
+        }
 
         if ('campaignId' in data && 'targetingSettings' in data) {
             return {
@@ -355,7 +348,7 @@ const EntityDetailsDialog = ({
     }, [data, handleNavigate]);
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog onOpenChange={onOpenChange} open={open}>
             <DialogPopup className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>{details?.title ?? 'Details'}</DialogTitle>
@@ -363,23 +356,23 @@ const EntityDetailsDialog = ({
                 </DialogHeader>
                 <DialogPanel>
                     {breadcrumbs.length > 1 ? (
-                        <div className="mb-4 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                        <div className="mb-4 flex flex-wrap items-center gap-2 text-muted-foreground text-xs">
                             {breadcrumbs.map((crumb, index) => (
-                                <div key={`${crumb.label}-${index}`} className="flex items-center gap-2">
+                                <div className="flex items-center gap-2" key={`${crumb.label}-${index}`}>
                                     {index < breadcrumbs.length - 1 ? (
                                         <Button
-                                            size="xs"
-                                            variant="ghost"
                                             className="h-6 px-2 text-xs"
                                             onClick={() => {
                                                 setSelectedEntity(crumb.entity);
                                                 setBreadcrumbs(breadcrumbs.slice(0, index + 1));
                                             }}
+                                            size="xs"
+                                            variant="ghost"
                                         >
                                             {crumb.label}
                                         </Button>
                                     ) : (
-                                        <span className="text-xs font-semibold text-foreground">{crumb.label}</span>
+                                        <span className="font-semibold text-foreground text-xs">{crumb.label}</span>
                                     )}
                                     {index < breadcrumbs.length - 1 ? <span className="text-muted-foreground">/</span> : null}
                                 </div>
@@ -387,14 +380,12 @@ const EntityDetailsDialog = ({
                         </div>
                     ) : null}
                     {isLoading ? (
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-2 text-muted-foreground text-sm">
                             <Spinner />
                             Loading details…
                         </div>
                     ) : error ? (
-                        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-sm text-destructive-foreground">
-                            {error.message}
-                        </div>
+                        <div className="rounded-lg border border-destructive/30 bg-destructive/5 p-4 text-destructive-foreground text-sm">{error.message}</div>
                     ) : details ? (
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -404,18 +395,22 @@ const EntityDetailsDialog = ({
                             </div>
                             {entityType === 'campaign' ? (
                                 <RelatedList
-                                    title="Ad groups"
-                                    items={adGroupsQuery.data?.rows ?? []}
-                                    isLoading={adGroupsQuery.isLoading}
                                     emptyLabel="No ad groups found for this campaign."
-                                    page={adGroupPage}
-                                    hasPrevious={adGroupOffset > 0}
+                                    getKey={item => item.adGroupId}
+                                    getPrimaryLabel={item => item.name}
+                                    getSecondaryLabel={item => item.adGroupId}
+                                    getState={item => item.state}
                                     hasNext={Boolean(adGroupsQuery.data?.nextCursor)}
-                                    onPrevious={() => setAdGroupOffset(Math.max(0, adGroupOffset - PAGE_SIZE))}
+                                    hasPrevious={adGroupOffset > 0}
+                                    isLoading={adGroupsQuery.isLoading}
+                                    items={adGroupsQuery.data?.rows ?? []}
                                     onNext={() => {
                                         const nextCursor = adGroupsQuery.data?.nextCursor;
-                                        if (nextCursor) setAdGroupOffset(Number(nextCursor));
+                                        if (nextCursor) {
+                                            setAdGroupOffset(Number(nextCursor));
+                                        }
                                     }}
+                                    onPrevious={() => setAdGroupOffset(Math.max(0, adGroupOffset - PAGE_SIZE))}
                                     onSelect={item =>
                                         handleNavigate(
                                             {
@@ -426,27 +421,29 @@ const EntityDetailsDialog = ({
                                             item.name
                                         )
                                     }
-                                    getKey={item => item.adGroupId}
-                                    getPrimaryLabel={item => item.name}
-                                    getSecondaryLabel={item => item.adGroupId}
-                                    getState={item => item.state}
+                                    page={adGroupPage}
+                                    title="Ad groups"
                                 />
                             ) : null}
                             {entityType === 'adGroup' ? (
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <RelatedList
-                                        title="Ads"
-                                        items={adsQuery.data?.rows ?? []}
-                                        isLoading={adsQuery.isLoading}
                                         emptyLabel="No ads found for this ad group."
-                                        page={adsPage}
-                                        hasPrevious={adsOffset > 0}
+                                        getKey={item => item.adId}
+                                        getPrimaryLabel={item => item.productAsin ?? item.adId}
+                                        getSecondaryLabel={item => item.adId}
+                                        getState={item => item.state}
                                         hasNext={Boolean(adsQuery.data?.nextCursor)}
-                                        onPrevious={() => setAdsOffset(Math.max(0, adsOffset - PAGE_SIZE))}
+                                        hasPrevious={adsOffset > 0}
+                                        isLoading={adsQuery.isLoading}
+                                        items={adsQuery.data?.rows ?? []}
                                         onNext={() => {
                                             const nextCursor = adsQuery.data?.nextCursor;
-                                            if (nextCursor) setAdsOffset(Number(nextCursor));
+                                            if (nextCursor) {
+                                                setAdsOffset(Number(nextCursor));
+                                            }
                                         }}
+                                        onPrevious={() => setAdsOffset(Math.max(0, adsOffset - PAGE_SIZE))}
                                         onSelect={item =>
                                             handleNavigate(
                                                 {
@@ -458,24 +455,26 @@ const EntityDetailsDialog = ({
                                                 item.productAsin ?? item.adId
                                             )
                                         }
-                                        getKey={item => item.adId}
-                                        getPrimaryLabel={item => item.productAsin ?? item.adId}
-                                        getSecondaryLabel={item => item.adId}
-                                        getState={item => item.state}
+                                        page={adsPage}
+                                        title="Ads"
                                     />
                                     <RelatedList
-                                        title="Targets"
-                                        items={targetsQuery.data?.rows ?? []}
-                                        isLoading={targetsQuery.isLoading}
                                         emptyLabel="No targets found for this ad group."
-                                        page={targetsPage}
-                                        hasPrevious={targetsOffset > 0}
+                                        getKey={item => item.targetId}
+                                        getPrimaryLabel={item => item.targetDisplay}
+                                        getSecondaryLabel={item => item.targetType}
+                                        getState={item => item.state}
                                         hasNext={Boolean(targetsQuery.data?.nextCursor)}
-                                        onPrevious={() => setTargetsOffset(Math.max(0, targetsOffset - PAGE_SIZE))}
+                                        hasPrevious={targetsOffset > 0}
+                                        isLoading={targetsQuery.isLoading}
+                                        items={targetsQuery.data?.rows ?? []}
                                         onNext={() => {
                                             const nextCursor = targetsQuery.data?.nextCursor;
-                                            if (nextCursor) setTargetsOffset(Number(nextCursor));
+                                            if (nextCursor) {
+                                                setTargetsOffset(Number(nextCursor));
+                                            }
                                         }}
+                                        onPrevious={() => setTargetsOffset(Math.max(0, targetsOffset - PAGE_SIZE))}
                                         onSelect={item =>
                                             handleNavigate(
                                                 {
@@ -487,10 +486,8 @@ const EntityDetailsDialog = ({
                                                 item.targetDisplay
                                             )
                                         }
-                                        getKey={item => item.targetId}
-                                        getPrimaryLabel={item => item.targetDisplay}
-                                        getSecondaryLabel={item => item.targetType}
-                                        getState={item => item.state}
+                                        page={targetsPage}
+                                        title="Targets"
                                     />
                                 </div>
                             ) : null}
@@ -500,8 +497,8 @@ const EntityDetailsDialog = ({
                                     <div className="space-y-3">
                                         <div className="flex items-center justify-between">
                                             <div>
-                                                <p className="text-sm font-semibold">Adjust bid</p>
-                                                <p className="text-xs text-muted-foreground">Sponsored Products targets only</p>
+                                                <p className="font-semibold text-sm">Adjust bid</p>
+                                                <p className="text-muted-foreground text-xs">Sponsored Products targets only</p>
                                             </div>
                                             {targetData.negative ? <Badge variant="outline">Negative target</Badge> : null}
                                         </div>
@@ -509,32 +506,34 @@ const EntityDetailsDialog = ({
                                             <Field>
                                                 <FieldLabel>New bid</FieldLabel>
                                                 <Input
-                                                    size="sm"
-                                                    type="number"
+                                                    disabled={!canEditBid}
                                                     inputMode="decimal"
                                                     min="0"
-                                                    step="0.01"
-                                                    placeholder="0.00"
-                                                    value={bidDraft}
                                                     onChange={event => {
                                                         setBidDraft(event.target.value);
                                                         setBidDirty(true);
                                                     }}
-                                                    disabled={!canEditBid}
+                                                    placeholder="0.00"
+                                                    size="sm"
+                                                    step="0.01"
+                                                    type="number"
+                                                    value={bidDraft}
                                                 />
-                                                {bidHelper ? <p className="text-xs text-muted-foreground">{bidHelper}</p> : null}
+                                                {bidHelper ? <p className="text-muted-foreground text-xs">{bidHelper}</p> : null}
                                             </Field>
                                             <Button
-                                                size="sm"
+                                                disabled={!canEditBid || bidInvalid || !bidChanged || updateBid.isLoading}
                                                 onClick={() => {
-                                                    if (!targetData) return;
+                                                    if (!targetData) {
+                                                        return;
+                                                    }
                                                     updateBid.mutate({
                                                         accountId,
                                                         targetId: targetData.targetId,
                                                         bidAmount: bidValue,
                                                     });
                                                 }}
-                                                disabled={!canEditBid || bidInvalid || !bidChanged || updateBid.isLoading}
+                                                size="sm"
                                             >
                                                 {updateBid.isLoading ? (
                                                     <span className="inline-flex items-center gap-2">
@@ -551,11 +550,11 @@ const EntityDetailsDialog = ({
                             ) : null}
                         </div>
                     ) : (
-                        <div className="text-sm text-muted-foreground">Select a row to view details.</div>
+                        <div className="text-muted-foreground text-sm">Select a row to view details.</div>
                     )}
                 </DialogPanel>
                 <DialogFooter variant="bare">
-                    <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
+                    <Button onClick={() => onOpenChange(false)} size="sm" variant="outline">
                         Close
                     </Button>
                 </DialogFooter>
@@ -566,15 +565,15 @@ const EntityDetailsDialog = ({
 
 const DetailRow = ({ label, value }: { label: string; value: ReactNode }) => (
     <div className="rounded-lg border border-border/60 bg-muted/20 px-3 py-2">
-        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
-        <div className="mt-1 text-sm text-foreground">{value}</div>
+        <p className="font-medium text-muted-foreground text-xs uppercase tracking-wide">{label}</p>
+        <div className="mt-1 text-foreground text-sm">{value}</div>
     </div>
 );
 
 const InlineEntityLink = ({ label, onClick }: { label: string; onClick: () => void }) => (
     <div className="flex items-center gap-2">
         <span className="font-medium text-foreground">{label}</span>
-        <Button size="xs" variant="ghost" onClick={onClick} className="h-6 px-2 text-xs">
+        <Button className="h-6 px-2 text-xs" onClick={onClick} size="xs" variant="ghost">
             View
         </Button>
     </div>
@@ -613,28 +612,28 @@ const RelatedList = <Item,>({
 }) => {
     return (
         <div className="rounded-xl border border-border/60 bg-muted/10">
-            <div className="flex items-center justify-between border-b border-border/50 px-3 py-2">
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+            <div className="flex items-center justify-between border-border/50 border-b px-3 py-2">
+                <p className="font-semibold text-muted-foreground text-xs uppercase tracking-wide">{title}</p>
                 <Badge variant="outline">{items.length}</Badge>
             </div>
             <div className="divide-y divide-border/60">
                 {isLoading ? (
-                    <div className="flex items-center gap-2 px-3 py-3 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-2 px-3 py-3 text-muted-foreground text-xs">
                         <Spinner className="size-3" />
                         Loading {title.toLowerCase()}…
                     </div>
                 ) : items.length === 0 ? (
-                    <div className="px-3 py-3 text-xs text-muted-foreground">{emptyLabel}</div>
+                    <div className="px-3 py-3 text-muted-foreground text-xs">{emptyLabel}</div>
                 ) : (
                     items.map(item => (
-                        <div key={(getKey ? getKey(item) : `${getPrimaryLabel(item)}-${getSecondaryLabel(item)}`)} className="flex items-center justify-between gap-3 px-3 py-2">
+                        <div className="flex items-center justify-between gap-3 px-3 py-2" key={getKey ? getKey(item) : `${getPrimaryLabel(item)}-${getSecondaryLabel(item)}`}>
                             <div className="min-w-0">
-                                <p className="truncate text-sm font-medium text-foreground">{getPrimaryLabel(item)}</p>
-                                <p className="truncate text-xs text-muted-foreground">{getSecondaryLabel(item)}</p>
+                                <p className="truncate font-medium text-foreground text-sm">{getPrimaryLabel(item)}</p>
+                                <p className="truncate text-muted-foreground text-xs">{getSecondaryLabel(item)}</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <StatusBadge state={getState(item)} />
-                                <Button size="xs" variant="outline" onClick={() => onSelect(item)}>
+                                <Button onClick={() => onSelect(item)} size="xs" variant="outline">
                                     Details
                                 </Button>
                             </div>
@@ -642,13 +641,13 @@ const RelatedList = <Item,>({
                     ))
                 )}
             </div>
-            <div className="flex items-center justify-between border-t border-border/50 px-3 py-2">
-                <span className="text-xs text-muted-foreground">Page {page}</span>
+            <div className="flex items-center justify-between border-border/50 border-t px-3 py-2">
+                <span className="text-muted-foreground text-xs">Page {page}</span>
                 <ButtonGroup>
-                    <Button size="xs" variant="ghost" onClick={onPrevious} disabled={!hasPrevious}>
+                    <Button disabled={!hasPrevious} onClick={onPrevious} size="xs" variant="ghost">
                         Prev
                     </Button>
-                    <Button size="xs" variant="ghost" onClick={onNext} disabled={!hasNext}>
+                    <Button disabled={!hasNext} onClick={onNext} size="xs" variant="ghost">
                         Next
                     </Button>
                 </ButtonGroup>
@@ -659,14 +658,7 @@ const RelatedList = <Item,>({
 
 const StatusBadge = ({ state }: { state: string }) => {
     const normalized = state.toLowerCase();
-    const dotClass =
-        normalized === 'enabled'
-            ? 'bg-emerald-500'
-            : normalized === 'paused'
-              ? 'bg-amber-500'
-              : normalized === 'archived'
-                ? 'bg-muted-foreground/50'
-                : 'bg-slate-400';
+    const dotClass = normalized === 'enabled' ? 'bg-emerald-500' : normalized === 'paused' ? 'bg-amber-500' : normalized === 'archived' ? 'bg-muted-foreground/50' : 'bg-slate-400';
 
     return (
         <Badge variant="outline">
@@ -677,10 +669,18 @@ const StatusBadge = ({ state }: { state: string }) => {
 };
 
 const getEntityId = (row: DetailsEntity | null) => {
-    if (!row) return '';
-    if (row.dimension === 'campaign') return String(row.campaignId ?? '');
-    if (row.dimension === 'adGroup') return String(row.adGroupId ?? '');
-    if (row.dimension === 'ad') return String(row.adId ?? '');
+    if (!row) {
+        return '';
+    }
+    if (row.dimension === 'campaign') {
+        return String(row.campaignId ?? '');
+    }
+    if (row.dimension === 'adGroup') {
+        return String(row.adGroupId ?? '');
+    }
+    if (row.dimension === 'ad') {
+        return String(row.adId ?? '');
+    }
     return String(row.targetId ?? '');
 };
 
@@ -701,17 +701,31 @@ const toDetailsEntity = (row: PerformanceTableRow): DetailsEntity => {
 };
 
 const getBreadcrumbLabel = (row: PerformanceTableRow) => {
-    if (row.dimension === 'campaign') return row.name ?? row.campaignId;
-    if (row.dimension === 'adGroup') return row.name ?? row.adGroupId;
-    if (row.dimension === 'ad') return row.productAsin ?? row.adId;
+    if (row.dimension === 'campaign') {
+        return row.name ?? row.campaignId;
+    }
+    if (row.dimension === 'adGroup') {
+        return row.name ?? row.adGroupId;
+    }
+    if (row.dimension === 'ad') {
+        return row.productAsin ?? row.adId;
+    }
     return row.targetDisplay ?? row.targetId;
 };
 
 const isSameEntity = (a: DetailsEntity, b: DetailsEntity) => {
-    if (a.dimension !== b.dimension) return false;
-    if (a.dimension === 'campaign') return a.campaignId === b.campaignId;
-    if (a.dimension === 'adGroup') return a.adGroupId === b.adGroupId;
-    if (a.dimension === 'ad') return a.adId === b.adId;
+    if (a.dimension !== b.dimension) {
+        return false;
+    }
+    if (a.dimension === 'campaign') {
+        return a.campaignId === b.campaignId;
+    }
+    if (a.dimension === 'adGroup') {
+        return a.adGroupId === b.adGroupId;
+    }
+    if (a.dimension === 'ad') {
+        return a.adId === b.adId;
+    }
     return a.targetId === b.targetId;
 };
 
@@ -728,9 +742,13 @@ const formatCurrency = (value: number) => {
 };
 
 const formatDateTime = (value: string) => {
-    if (!value) return '—';
+    if (!value) {
+        return '—';
+    }
     const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
+    if (Number.isNaN(parsed.getTime())) {
+        return value;
+    }
     return parsed.toLocaleString('en-US', {
         year: 'numeric',
         month: 'short',
@@ -741,17 +759,27 @@ const formatDateTime = (value: string) => {
 };
 
 const formatBudget = (amount: number | null, type: string | null, period: string | null) => {
-    if (amount === null) return '—';
+    if (amount === null) {
+        return '—';
+    }
     const budget = formatCurrency(amount);
     const suffix = [type, period].filter(Boolean).join(' · ');
     return suffix ? `${budget} · ${suffix}` : budget;
 };
 
 const getBidHelper = (targetData: TargetDetails | null) => {
-    if (!targetData) return null;
-    if (targetData.negative) return 'Negative targets cannot be edited.';
-    if (!targetData.adGroupId) return 'Campaign-level targets do not support bids.';
-    if (!isSponsoredProducts(targetData.adProduct)) return 'Only Sponsored Products bids are editable.';
+    if (!targetData) {
+        return null;
+    }
+    if (targetData.negative) {
+        return 'Negative targets cannot be edited.';
+    }
+    if (!targetData.adGroupId) {
+        return 'Campaign-level targets do not support bids.';
+    }
+    if (!isSponsoredProducts(targetData.adProduct)) {
+        return 'Only Sponsored Products bids are editable.';
+    }
     return null;
 };
 

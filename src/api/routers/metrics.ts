@@ -1,6 +1,7 @@
-import { addDays, addHours, addMonths, endOfDay, startOfDay, startOfMonth, subDays, subMonths, format } from 'date-fns';
-import { and, desc, eq, gte, ilike, isNotNull, lt, lte, or, sql } from 'drizzle-orm';
+import { TRPCError } from '@trpc/server';
+import { addDays, addHours, addMonths, format, startOfDay, startOfMonth, subMonths } from 'date-fns';
 import { fromZonedTime } from 'date-fns-tz';
+import { and, desc, eq, gte, ilike, isNotNull, lt, lte, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { ad, amsMetrics, apiMetrics, campaign, events, jobMetrics, performanceDaily, performanceHourly, target } from '@/db/schema';
@@ -42,6 +43,8 @@ const SUPPORTED_JOBS = [
     'summarize-hourly-target-stream',
     'summarize-hourly-target-stream-for-account',
 ] as const;
+
+const WHITESPACE_REGEX = /\s+/;
 const PERFORMANCE_RANGES = ['today', 'yesterday', 'this_week', 'this_month', 'this_year', 'last_30_days', 'last_6_months', 'last_12_months', 'all_time'] as const;
 
 export const metricsRouter = router({
@@ -273,9 +276,7 @@ export const metricsRouter = router({
 
             const bucketRows = await db
                 .select({
-                    interval: sql<string>`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`.as(
-                        'interval'
-                    ),
+                    interval: sql<string>`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`.as('interval'),
                     count: sql<number>`count(*)`.as('count'),
                 })
                 .from(events)
@@ -396,14 +397,7 @@ export const metricsRouter = router({
                     totalRowsInserted: sql<number>`COALESCE(sum(COALESCE((${events.payload} ->> 'rowsInserted')::int, 0)), 0)`.as('total_rows_inserted'),
                 })
                 .from(events)
-                .where(
-                    and(
-                        eq(events.jobName, 'summarize-daily-target-stream-for-account'),
-                        eq(events.outcome, 'ok'),
-                        gte(events.createdAt, from),
-                        lte(events.createdAt, to)
-                    )
-                )
+                .where(and(eq(events.jobName, 'summarize-daily-target-stream-for-account'), eq(events.outcome, 'ok'), gte(events.createdAt, from), lte(events.createdAt, to)))
                 .groupBy(sql`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`)
                 .orderBy(sql`date_trunc('hour', ${events.createdAt}) + floor(extract(minute from ${events.createdAt}) / 5) * interval '5 minutes'`);
 
@@ -562,15 +556,14 @@ export const metricsRouter = router({
                     sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
                 })
                 .from(performanceDaily)
-                .where(and(eq(performanceDaily.accountId, input.accountId), gte(performanceDaily.bucketDate, startDate.toISOString().split('T')[0]!)))
+                .where(and(eq(performanceDaily.accountId, input.accountId), gte(performanceDaily.bucketDate, startDate.toISOString().split('T')[0])))
                 .groupBy(performanceDaily.bucketDate)
                 .orderBy(performanceDaily.bucketDate);
 
             // Build a map of bucketDate -> metrics
             const dataMap = new Map<string, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
             for (const row of data) {
-                const dateStr =
-                    typeof row.bucketDate === 'string' ? row.bucketDate : (row.bucketDate as Date).toISOString().split('T')[0]!;
+                const dateStr = typeof row.bucketDate === 'string' ? row.bucketDate : (row.bucketDate as Date).toISOString().split('T')[0];
                 dataMap.set(dateStr, {
                     impressions: Number(row.impressions),
                     clicks: Number(row.clicks),
@@ -595,7 +588,7 @@ export const metricsRouter = router({
             for (let i = 0; i < input.days; i++) {
                 const date = new Date(startDate);
                 date.setDate(date.getDate() + i);
-                const dateStr = date.toISOString().split('T')[0]!;
+                const dateStr = date.toISOString().split('T')[0];
 
                 const dayData = dataMap.get(dateStr) ?? {
                     impressions: 0,
@@ -642,14 +635,13 @@ export const metricsRouter = router({
                 return { results: [] };
             }
 
-            const tokens = trimmedQuery.split(/\s+/).filter(Boolean);
+            const tokens = trimmedQuery.split(WHITESPACE_REGEX).filter(Boolean);
             if (tokens.length === 0) {
                 return { results: [] };
             }
 
             const perTypeLimit = Math.max(10, Math.ceil(input.limit / 3));
-            const tokenFiltersForColumns = (columns: Array<Parameters<typeof ilike>[0]>) =>
-                tokens.map(token => or(...columns.map(column => ilike(column, `%${token}%`))));
+            const tokenFiltersForColumns = (columns: Parameters<typeof ilike>[0][]) => tokens.map(token => or(...columns.map(column => ilike(column, `%${token}%`))));
 
             const campaignRows = await db
                 .select({
@@ -669,12 +661,7 @@ export const metricsRouter = router({
                 })
                 .from(ad)
                 .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
-                .where(
-                    and(
-                        eq(campaign.accountId, input.accountId),
-                        ...tokenFiltersForColumns([ad.adId, ad.productAsin, campaign.name])
-                    )
-                )
+                .where(and(eq(campaign.accountId, input.accountId), ...tokenFiltersForColumns([ad.adId, ad.productAsin, campaign.name])))
                 .orderBy(desc(ad.lastUpdatedDateTime))
                 .limit(perTypeLimit);
 
@@ -688,12 +675,7 @@ export const metricsRouter = router({
                 })
                 .from(target)
                 .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
-                .where(
-                    and(
-                        eq(campaign.accountId, input.accountId),
-                        ...tokenFiltersForColumns([target.targetKeyword, target.targetAsin, target.targetId, campaign.name])
-                    )
-                )
+                .where(and(eq(campaign.accountId, input.accountId), ...tokenFiltersForColumns([target.targetKeyword, target.targetAsin, target.targetId, campaign.name])))
                 .orderBy(desc(target.lastUpdatedDateTime))
                 .limit(perTypeLimit);
 
@@ -706,10 +688,18 @@ export const metricsRouter = router({
             const scoreSearchMatch = (query: string, text: string) => {
                 const normalizedQuery = normalizeSearchText(query);
                 const normalizedText = normalizeSearchText(text);
-                if (!normalizedQuery || !normalizedText) return 0;
-                if (normalizedText === normalizedQuery) return 100;
-                if (normalizedText.startsWith(normalizedQuery)) return 90;
-                if (normalizedText.includes(normalizedQuery)) return 80;
+                if (!(normalizedQuery && normalizedText)) {
+                    return 0;
+                }
+                if (normalizedText === normalizedQuery) {
+                    return 100;
+                }
+                if (normalizedText.startsWith(normalizedQuery)) {
+                    return 90;
+                }
+                if (normalizedText.includes(normalizedQuery)) {
+                    return 80;
+                }
 
                 let matched = 0;
                 let queryIndex = 0;
@@ -720,7 +710,9 @@ export const metricsRouter = router({
                     }
                 }
 
-                if (queryIndex < normalizedQuery.length) return 0;
+                if (queryIndex < normalizedQuery.length) {
+                    return 0;
+                }
                 return 60 + Math.round((matched / normalizedQuery.length) * 20);
             };
 
@@ -762,7 +754,9 @@ export const metricsRouter = router({
 
             const rankedResults = results
                 .sort((a, b) => {
-                    if (b.score !== a.score) return b.score - a.score;
+                    if (b.score !== a.score) {
+                        return b.score - a.score;
+                    }
                     return a.label.localeCompare(b.label);
                 })
                 .slice(0, input.limit)
@@ -800,7 +794,13 @@ export const metricsRouter = router({
         )
         .query(async ({ ctx, input }) => {
             ctx.assertAccountAccess(input.accountId);
-            const accountTimezone = input.countryCode ? getTimezoneForCountry(input.countryCode) : input.timezone!;
+            const accountTimezone = input.countryCode ? getTimezoneForCountry(input.countryCode) : input.timezone;
+            if (!accountTimezone) {
+                throw new TRPCError({
+                    code: 'BAD_REQUEST',
+                    message: 'hourlyPerformance requires countryCode or timezone',
+                });
+            }
             const now = new Date();
             const activeEntityFilters = input.entityFilters?.length ? input.entityFilters : null;
             const hourlyEntityFilterCondition = activeEntityFilters
@@ -842,12 +842,7 @@ export const metricsRouter = router({
                         firstSeen: sql<Date>`min(${performanceHourly.bucketStart})`.as('first_seen'),
                     })
                     .from(performanceHourly)
-                    .where(
-                        and(
-                            eq(performanceHourly.accountId, input.accountId),
-                            ...(hourlyEntityFilterCondition ? [hourlyEntityFilterCondition] : [])
-                        )
-                    );
+                    .where(and(eq(performanceHourly.accountId, input.accountId), ...(hourlyEntityFilterCondition ? [hourlyEntityFilterCondition] : [])));
 
                 allTimeStartUtc = earliest?.firstSeen ? new Date(earliest.firstSeen) : null;
             }
@@ -908,9 +903,7 @@ export const metricsRouter = router({
                                   and(
                                       eq(performanceDaily.accountId, input.accountId),
                                       compareStartZoned ? gte(performanceDaily.bucketDate, format(compareStartZoned, 'yyyy-MM-dd')) : sql`true`,
-                                      compareEndExclusiveZoned
-                                          ? lt(performanceDaily.bucketDate, format(compareEndExclusiveZoned, 'yyyy-MM-dd'))
-                                          : sql`true`,
+                                      compareEndExclusiveZoned ? lt(performanceDaily.bucketDate, format(compareEndExclusiveZoned, 'yyyy-MM-dd')) : sql`true`,
                                       ...(dailyEntityFilterCondition ? [dailyEntityFilterCondition] : [])
                                   )
                               );
@@ -1058,14 +1051,8 @@ export const metricsRouter = router({
             }
 
             if (granularity === 'day' || granularity === 'month') {
-                const intervalExpr =
-                    granularity === 'day'
-                        ? sql`${performanceDaily.bucketDate}`
-                        : sql`date_trunc('month', ${performanceDaily.bucketDate})`;
-                const intervalLabel =
-                    granularity === 'day'
-                        ? sql<string>`to_char(${intervalExpr}, 'YYYY-MM-DD')`.as('interval')
-                        : sql<string>`to_char(${intervalExpr}, 'YYYY-MM-01')`.as('interval');
+                const intervalExpr = granularity === 'day' ? sql`${performanceDaily.bucketDate}` : sql`date_trunc('month', ${performanceDaily.bucketDate})`;
+                const intervalLabel = granularity === 'day' ? sql<string>`to_char(${intervalExpr}, 'YYYY-MM-DD')`.as('interval') : sql<string>`to_char(${intervalExpr}, 'YYYY-MM-01')`.as('interval');
 
                 const rangeStartDate = format(rangeStartZoned, 'yyyy-MM-dd');
                 const rangeEndDate = format(rangeEndZoned, 'yyyy-MM-dd');
@@ -1172,11 +1159,7 @@ export const metricsRouter = router({
                         })
                         .from(performanceDaily)
                         .where(
-                            and(
-                                eq(performanceDaily.accountId, input.accountId),
-                                eq(performanceDaily.bucketDate, leadingDayDate),
-                                ...(dailyEntityFilterCondition ? [dailyEntityFilterCondition] : [])
-                            )
+                            and(eq(performanceDaily.accountId, input.accountId), eq(performanceDaily.bucketDate, leadingDayDate), ...(dailyEntityFilterCondition ? [dailyEntityFilterCondition] : []))
                         );
 
                     const leadingDayData = {
@@ -1248,8 +1231,12 @@ export const metricsRouter = router({
             const previousAcos = previousTotals && previousTotals.sales > 0 ? (previousTotals.spend / previousTotals.sales) * 100 : 0;
 
             const calculateChange = (current: number, previous: number) => {
-                if (!shouldCompare) return 0;
-                if (previous === 0) return current > 0 ? 100 : 0;
+                if (!shouldCompare) {
+                    return 0;
+                }
+                if (previous === 0) {
+                    return current > 0 ? 100 : 0;
+                }
                 return ((current - previous) / previous) * 100;
             };
 

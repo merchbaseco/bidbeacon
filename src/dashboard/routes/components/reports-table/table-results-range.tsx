@@ -1,10 +1,4 @@
-import {
-    Select,
-    SelectItem,
-    SelectPopup,
-    SelectTrigger,
-    SelectValue,
-} from '../../../components/ui/select';
+import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '../../../components/ui/select';
 
 type TableResultsRangeProps = {
     currentPage: number;
@@ -14,13 +8,7 @@ type TableResultsRangeProps = {
     onPageChange: (page: number) => void;
 };
 
-export const TableResultsRange = ({
-    currentPage,
-    totalPages,
-    pageSize,
-    totalResults,
-    onPageChange,
-}: TableResultsRangeProps) => {
+export const TableResultsRange = ({ currentPage, totalPages, pageSize, totalResults, onPageChange }: TableResultsRangeProps) => {
     const getCurrentRange = () => {
         const start = (currentPage - 1) * pageSize + 1;
         const end = Math.min(currentPage * pageSize, totalResults);
@@ -36,10 +24,7 @@ export const TableResultsRange = ({
                 }}
                 value={String(currentPage)}
             >
-                <SelectTrigger
-                    aria-label="Select result range"
-                    className="w-fit min-w-none text-sm"
-                >
+                <SelectTrigger aria-label="Select result range" className="w-fit min-w-none text-sm">
                     <SelectValue>{getCurrentRange()}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup>

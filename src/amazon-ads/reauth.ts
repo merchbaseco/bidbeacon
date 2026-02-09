@@ -23,10 +23,8 @@ export async function refreshAccessToken(): Promise<string> {
     const clientSecret = process.env.ADS_API_CLIENT_SECRET;
     const refreshToken = process.env.ADS_API_REFRESH_TOKEN;
 
-    if (!clientId || !clientSecret || !refreshToken) {
-        throw new Error(
-            'Missing ADS_API_CLIENT_ID, ADS_API_CLIENT_SECRET, or ADS_API_REFRESH_TOKEN environment variables'
-        );
+    if (!(clientId && clientSecret && refreshToken)) {
+        throw new Error('Missing ADS_API_CLIENT_ID, ADS_API_CLIENT_SECRET, or ADS_API_REFRESH_TOKEN environment variables');
     }
 
     // Build x-www-form-urlencoded body
@@ -44,14 +42,12 @@ export async function refreshAccessToken(): Promise<string> {
                 'Content-Type': 'application/x-www-form-urlencoded',
             },
             body: body.toString(),
-            signal: AbortSignal.timeout(15000), // 15 second timeout
+            signal: AbortSignal.timeout(15_000), // 15 second timeout
         });
 
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(
-                `Failed to fetch LWA token: ${response.status} ${response.statusText}. ${errorText}`
-            );
+            throw new Error(`Failed to fetch LWA token: ${response.status} ${response.statusText}. ${errorText}`);
         }
 
         const jsonData = await response.json();

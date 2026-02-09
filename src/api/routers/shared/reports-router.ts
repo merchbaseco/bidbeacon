@@ -1,6 +1,8 @@
 import { and, count, desc, eq, gte, lte } from 'drizzle-orm';
 import { z } from 'zod';
 import { retrieveReport } from '@/amazon-ads/retrieve-report';
+import type { apiProcedure } from '@/api/trpc';
+import { router } from '@/api/trpc';
 import { db } from '@/db/index';
 import { reportDatasetMetadata } from '@/db/schema';
 import { updateReportDatasetForAccountJob } from '@/jobs/update-report-dataset-for-account';
@@ -8,8 +10,6 @@ import { updateReportStatusJob } from '@/jobs/update-report-status';
 import { createReportForDataset } from '@/lib/create-report/index';
 import { parseReport } from '@/lib/parse-report/index';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports';
-import type { apiProcedure } from '@/api/trpc';
-import { router } from '@/api/trpc';
 
 export const buildReportsRouter = (procedure: typeof apiProcedure) =>
     router({
@@ -59,13 +59,7 @@ export const buildReportsRouter = (procedure: typeof apiProcedure) =>
                 const total = totalResult?.count ?? 0;
 
                 // Get paginated data - return full records so we can populate reports.get cache
-                const data = await db
-                    .select()
-                    .from(reportDatasetMetadata)
-                    .where(whereClause)
-                    .orderBy(desc(reportDatasetMetadata.periodStart))
-                    .limit(input.limit)
-                    .offset(input.offset);
+                const data = await db.select().from(reportDatasetMetadata).where(whereClause).orderBy(desc(reportDatasetMetadata.periodStart)).limit(input.limit).offset(input.offset);
 
                 return {
                     data,
@@ -149,7 +143,7 @@ export const buildReportsRouter = (procedure: typeof apiProcedure) =>
                     },
                 });
 
-                if (!metadata || !metadata.reportId) {
+                if (!metadata?.reportId) {
                     throw new Error('Report ID not found for this metadata record');
                 }
 

@@ -1,6 +1,6 @@
 import { formatInTimeZone } from 'date-fns-tz';
-import { useDeferredValue, useMemo, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
+import { useDeferredValue, useMemo, useState } from 'react';
 import { Badge } from '@/dashboard/components/ui/badge';
 import { Button } from '@/dashboard/components/ui/button';
 import { Frame, FrameFooter } from '@/dashboard/components/ui/frame';
@@ -10,19 +10,30 @@ import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '@/d
 import { Skeleton } from '@/dashboard/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/dashboard/components/ui/table';
 import { EntityDetailsDialog } from '@/dashboard/routes/components/entity-details-dialog';
+import type { PerformanceRange } from '@/dashboard/routes/components/performance-metrics-config';
+import { usePerformanceTable } from '@/dashboard/routes/hooks/use-performance-table';
 import { useSelectedAccountId } from '@/dashboard/routes/hooks/use-selected-accountid';
 import { useSelectedCountryCode } from '@/dashboard/routes/hooks/use-selected-country-code';
-import { usePerformanceTable } from '@/dashboard/routes/hooks/use-performance-table';
 import type { PerformanceEntityFilter } from '@/dashboard/state/performance-metrics-state';
 import { customRangeAtom, entityFiltersAtom, performanceRangeAtom } from '@/dashboard/state/performance-metrics-state';
-import type { PerformanceRange } from '@/dashboard/routes/components/performance-metrics-config';
 import { getPerformanceRange } from '@/lib/performance-range';
-import { getTimezoneForCountry } from '@/utils/timezones';
 import type { PerformanceDimension, PerformanceTableOutput } from '@/types/performance-api';
+import { getTimezoneForCountry } from '@/utils/timezones';
+
+const TABLE_SKELETON_ROW_IDS = Array.from({ length: 12 }, (_, index) => `performance-table-row-${index}`);
 
 const PerformanceTable = ({ className }: { className?: string }) => {
     const accountId = useSelectedAccountId();
     const countryCode = useSelectedCountryCode();
+
+    if (!(accountId && countryCode)) {
+        return null;
+    }
+
+    return <PerformanceTableContent accountId={accountId} className={className} countryCode={countryCode} />;
+};
+
+const PerformanceTableContent = ({ accountId, className, countryCode }: { accountId: string; className?: string; countryCode: string }) => {
     const [dimension, setDimension] = useState<PerformanceDimension>('campaign');
     const [statusFilter, setStatusFilter] = useState('all');
     const [adProductFilter, setAdProductFilter] = useState('all');
@@ -30,16 +41,14 @@ const PerformanceTable = ({ className }: { className?: string }) => {
     const [detailsRow, setDetailsRow] = useState<PerformanceTableRow | null>(null);
     const deferredSearchInput = useDeferredValue(searchInput);
     const forceSkeleton = useMemo(() => {
-        if (typeof window === 'undefined') return false;
+        if (typeof window === 'undefined') {
+            return false;
+        }
         return new URLSearchParams(window.location.search).has('showSkeleton');
     }, []);
     const [, setEntityFilters] = useAtom(entityFiltersAtom);
     const range = useAtomValue(performanceRangeAtom);
     const customRange = useAtomValue(customRangeAtom);
-
-    if (!accountId || !countryCode) {
-        return null;
-    }
 
     const timezone = useMemo(() => getTimezoneForCountry(countryCode), [countryCode]);
     const tableRange = useMemo(
@@ -82,21 +91,19 @@ const PerformanceTable = ({ className }: { className?: string }) => {
 
     return (
         <div className={className ?? ''}>
-            {isFetching && !isLoading ? <div className="mb-2 text-right text-xs text-muted-foreground">Refreshing…</div> : null}
+            {isFetching && !isLoading ? <div className="mb-2 text-right text-muted-foreground text-xs">Refreshing…</div> : null}
             <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Input
                     aria-label={`Search ${getPrimaryColumnLabel(dimension)}`}
-                    type="search"
-                    placeholder={`Search ${getPrimaryColumnLabel(dimension)}`}
-                    value={searchInput}
-                    onChange={event => setSearchInput(event.target.value)}
                     className="w-[220px] text-sm"
+                    onChange={event => setSearchInput(event.target.value)}
+                    placeholder={`Search ${getPrimaryColumnLabel(dimension)}`}
+                    type="search"
+                    value={searchInput}
                 />
-                <Select aria-label="Select dimension" value={dimension} onValueChange={value => value && setDimension(value as PerformanceDimension)}>
+                <Select aria-label="Select dimension" onValueChange={value => value && setDimension(value as PerformanceDimension)} value={dimension}>
                     <SelectTrigger className="w-[150px] text-sm">
-                        <SelectValue>
-                            {value => DIMENSION_OPTIONS.find(option => option.value === value)?.label ?? 'Dimension'}
-                        </SelectValue>
+                        <SelectValue>{value => DIMENSION_OPTIONS.find(option => option.value === value)?.label ?? 'Dimension'}</SelectValue>
                     </SelectTrigger>
                     <SelectPopup>
                         {DIMENSION_OPTIONS.map(option => (
@@ -106,11 +113,9 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                         ))}
                     </SelectPopup>
                 </Select>
-                <Select aria-label="Select status" value={statusFilter} onValueChange={value => value && setStatusFilter(value)}>
+                <Select aria-label="Select status" onValueChange={value => value && setStatusFilter(value)} value={statusFilter}>
                     <SelectTrigger className="w-[140px] text-sm">
-                        <SelectValue>
-                            {value => STATUS_OPTIONS.find(option => option.value === value)?.label ?? 'Status'}
-                        </SelectValue>
+                        <SelectValue>{value => STATUS_OPTIONS.find(option => option.value === value)?.label ?? 'Status'}</SelectValue>
                     </SelectTrigger>
                     <SelectPopup>
                         {STATUS_OPTIONS.map(option => (
@@ -120,11 +125,9 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                         ))}
                     </SelectPopup>
                 </Select>
-                <Select aria-label="Select ad product" value={adProductFilter} onValueChange={value => value && setAdProductFilter(value)}>
+                <Select aria-label="Select ad product" onValueChange={value => value && setAdProductFilter(value)} value={adProductFilter}>
                     <SelectTrigger className="w-[180px] text-sm">
-                        <SelectValue>
-                            {value => AD_PRODUCT_OPTIONS.find(option => option.value === value)?.label ?? 'Ad product'}
-                        </SelectValue>
+                        <SelectValue>{value => AD_PRODUCT_OPTIONS.find(option => option.value === value)?.label ?? 'Ad product'}</SelectValue>
                     </SelectTrigger>
                     <SelectPopup>
                         {AD_PRODUCT_OPTIONS.map(option => (
@@ -140,13 +143,13 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                     <colgroup>
                         <col />
                         {COLUMN_WIDTHS.map(width => (
-                            <col key={width} className={width} />
+                            <col className={width} key={width} />
                         ))}
                     </colgroup>
                     <TableHeader>
                         <TableRow>
                             <TableHead>{getPrimaryColumnLabel(dimension)}</TableHead>
-                            <TableHead className="max-w-[80px] w-[80px]">Status</TableHead>
+                            <TableHead className="w-[80px] max-w-[80px]">Status</TableHead>
                             <TableHead className="text-right">Spend</TableHead>
                             <TableHead className="text-right">Sales</TableHead>
                             <TableHead className="text-right">Orders</TableHead>
@@ -157,50 +160,43 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                     </TableHeader>
                 </Table>
                 <div className="relative rounded-xl border border-border bg-background bg-clip-padding shadow-xs before:pointer-events-none before:absolute before:inset-0 before:rounded-[calc(var(--radius-xl)-1px)] before:shadow-[0_1px_--theme(--color-black/4%)] dark:bg-clip-border dark:before:shadow-[0_-1px_--theme(--color-white/8%)]">
-                    <ScrollArea
-                        className="h-[520px] max-h-[520px] [&_[data-slot=scroll-area-scrollbar]]:hidden"
-                        scrollFade
-                        allowScrollChaining
-                    >
+                    <ScrollArea allowScrollChaining className="h-[520px] max-h-[520px] [&_[data-slot=scroll-area-scrollbar]]:hidden" scrollFade>
                         <Table className="table-fixed">
                             <colgroup>
                                 <col />
                                 {COLUMN_WIDTHS.map(width => (
-                                    <col key={width} className={width} />
+                                    <col className={width} key={width} />
                                 ))}
                             </colgroup>
                             <TableBody className="before:hidden">
                                 {showSkeleton ? (
-                                    <TableRow className="border-0 h-[520px]">
-                                        <TableCell colSpan={8} className="h-[520px] p-0 align-top border-0">
+                                    <TableRow className="h-[520px] border-0">
+                                        <TableCell className="h-[520px] border-0 p-0 align-top" colSpan={8}>
                                             <div className="box-border grid h-full grid-rows-[repeat(12,minmax(0,1fr))] gap-0">
-                                                {Array.from({ length: 12 }).map((_, index) => (
-                                                    <div
-                                                        key={index}
-                                                        className="grid grid-cols-[minmax(0,1fr)_80px_110px_110px_110px_110px_110px_90px] items-center"
-                                                    >
+                                                {TABLE_SKELETON_ROW_IDS.map(rowId => (
+                                                    <div className="grid grid-cols-[minmax(0,1fr)_80px_110px_110px_110px_110px_110px_90px] items-center" key={rowId}>
                                                         <div className="px-2">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
                                                         <div className="px-2">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
-                                                        <div className="px-2 flex justify-end">
+                                                        <div className="flex justify-end px-2">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
-                                                        <div className="px-2 flex justify-end">
+                                                        <div className="flex justify-end px-2">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
-                                                        <div className="px-2 flex justify-end">
+                                                        <div className="flex justify-end px-2">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
-                                                        <div className="px-2 flex justify-end">
+                                                        <div className="flex justify-end px-2">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
-                                                        <div className="px-2 flex justify-end">
+                                                        <div className="flex justify-end px-2">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
-                                                        <div className="px-2 flex justify-end">
+                                                        <div className="flex justify-end px-2">
                                                             <Skeleton className="h-4 w-full" />
                                                         </div>
                                                     </div>
@@ -210,13 +206,15 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                                     </TableRow>
                                 ) : isEmpty ? (
                                     <TableRow>
-                                        <TableCell colSpan={8} className="py-10 text-center text-sm text-muted-foreground">
+                                        <TableCell className="py-10 text-center text-muted-foreground text-sm" colSpan={8}>
                                             No campaign performance data found for this range.
                                         </TableCell>
                                     </TableRow>
                                 ) : (
                                     rows.map(row => {
-                                        if (row.dimension !== dimension) return null;
+                                        if (row.dimension !== dimension) {
+                                            return null;
+                                        }
 
                                         const filter = getEntityFilterForRow(row);
 
@@ -225,29 +223,25 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                                                 <TableCell className="font-medium">
                                                     {filter ? (
                                                         <button
-                                                            type="button"
-                                                            className="group flex w-full min-w-0 flex-col text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40 cursor-pointer"
-                                                            onClick={() => addEntityFilter(filter)}
                                                             aria-label={`Filter chart by ${filter.label}`}
+                                                            className="group flex w-full min-w-0 cursor-pointer flex-col text-left transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/40"
+                                                            onClick={() => addEntityFilter(filter)}
+                                                            type="button"
                                                         >
                                                             {renderPrimaryCell(row)}
                                                         </button>
                                                     ) : (
-                                                        <div className="min-w-0 w-full">{renderPrimaryCell(row)}</div>
+                                                        <div className="w-full min-w-0">{renderPrimaryCell(row)}</div>
                                                     )}
                                                 </TableCell>
-                                                <TableCell className="max-w-[80px] w-[80px]">{renderStatus(row.state)}</TableCell>
+                                                <TableCell className="w-[80px] max-w-[80px]">{renderStatus(row.state)}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(row.metrics.spend)}</TableCell>
                                                 <TableCell className="text-right">{formatCurrency(row.metrics.sales)}</TableCell>
                                                 <TableCell className="text-right">{formatNumber(row.metrics.orders)}</TableCell>
                                                 <TableCell className="text-right">{formatPercent(row.metrics.acos)}</TableCell>
                                                 <TableCell className="text-right">{formatRatio(row.metrics.roas)}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button
-                                                        size="xs"
-                                                        variant="outline"
-                                                        onClick={() => setDetailsRow(row)}
-                                                    >
+                                                    <Button onClick={() => setDetailsRow(row)} size="xs" variant="outline">
                                                         Details
                                                     </Button>
                                                 </TableCell>
@@ -260,18 +254,20 @@ const PerformanceTable = ({ className }: { className?: string }) => {
                     </ScrollArea>
                 </div>
                 {rows.length > 0 ? (
-                    <FrameFooter className="px-3 py-2 text-xs text-muted-foreground">
+                    <FrameFooter className="px-3 py-2 text-muted-foreground text-xs">
                         Showing {rows.length} {getFooterLabel(dimension)} by spend
                     </FrameFooter>
                 ) : null}
             </Frame>
             <EntityDetailsDialog
-                open={Boolean(detailsRow)}
-                onOpenChange={open => {
-                    if (!open) setDetailsRow(null);
-                }}
-                row={detailsRow}
                 accountId={accountId}
+                onOpenChange={open => {
+                    if (!open) {
+                        setDetailsRow(null);
+                    }
+                }}
+                open={Boolean(detailsRow)}
+                row={detailsRow}
             />
         </div>
     );
@@ -279,14 +275,7 @@ const PerformanceTable = ({ className }: { className?: string }) => {
 
 const renderStatus = (state: string) => {
     const normalized = state.toLowerCase();
-    const dotClass =
-        normalized === 'enabled'
-            ? 'bg-emerald-500'
-            : normalized === 'paused'
-              ? 'bg-amber-500'
-              : normalized === 'archived'
-                ? 'bg-muted-foreground/50'
-                : 'bg-slate-400';
+    const dotClass = normalized === 'enabled' ? 'bg-emerald-500' : normalized === 'paused' ? 'bg-amber-500' : normalized === 'archived' ? 'bg-muted-foreground/50' : 'bg-slate-400';
 
     return (
         <Badge variant="outline">
@@ -327,13 +316,17 @@ const formatRatio = (value: number) => {
 };
 
 const truncateEnd = (value: string, maxLength = 48) => {
-    if (value.length <= maxLength) return value;
+    if (value.length <= maxLength) {
+        return value;
+    }
     const visibleLength = Math.max(maxLength - 3, 0);
     return `${value.slice(0, visibleLength)}...`;
 };
 
 const formatSecondaryText = (value?: string | null) => {
-    if (!value) return null;
+    if (!value) {
+        return null;
+    }
     return truncateEnd(value);
 };
 
@@ -341,9 +334,15 @@ const formatBreadcrumb = (campaignName?: string | null, adGroupName?: string | n
     const campaign = campaignName?.trim();
     const adGroup = adGroupName?.trim();
 
-    if (!campaign && !adGroup) return null;
-    if (!campaign) return truncateEnd(adGroup ?? '', maxLength);
-    if (!adGroup) return truncateEnd(campaign, maxLength);
+    if (!(campaign || adGroup)) {
+        return null;
+    }
+    if (!campaign) {
+        return truncateEnd(adGroup ?? '', maxLength);
+    }
+    if (!adGroup) {
+        return truncateEnd(campaign, maxLength);
+    }
 
     const separator = ' / ';
     if (adGroup.length + separator.length >= maxLength) {
@@ -382,9 +381,15 @@ const getFooterLabel = (dimension: PerformanceDimension) => {
 };
 
 const getRowKey = (row: { dimension: PerformanceDimension } & Record<string, unknown>) => {
-    if (row.dimension === 'campaign') return String(row.campaignId);
-    if (row.dimension === 'adGroup') return String(row.adGroupId);
-    if (row.dimension === 'ad') return String(row.adId);
+    if (row.dimension === 'campaign') {
+        return String(row.campaignId);
+    }
+    if (row.dimension === 'adGroup') {
+        return String(row.adGroupId);
+    }
+    if (row.dimension === 'ad') {
+        return String(row.adId);
+    }
     return String(row.targetId);
 };
 
@@ -422,6 +427,8 @@ const getEntityFilterForRow = (row: PerformanceTableRow): PerformanceEntityFilte
                 description,
             };
         }
+        default:
+            return null;
     }
 };
 
@@ -451,7 +458,7 @@ const renderPrimaryCell = (row: {
         return (
             <div className="flex min-w-0 flex-col">
                 <span className="truncate">{row.name ?? row.adGroupId}</span>
-                {secondaryText ? <span className="truncate text-xs text-muted-foreground tracking-tight">{secondaryText}</span> : null}
+                {secondaryText ? <span className="truncate text-muted-foreground text-xs tracking-tight">{secondaryText}</span> : null}
             </div>
         );
     }
@@ -461,7 +468,7 @@ const renderPrimaryCell = (row: {
         return (
             <div className="flex min-w-0 flex-col">
                 <span className="truncate">{row.productAsin ?? row.adId}</span>
-                {secondaryText ? <span className="truncate text-xs text-muted-foreground tracking-tight">{secondaryText}</span> : null}
+                {secondaryText ? <span className="truncate text-muted-foreground text-xs tracking-tight">{secondaryText}</span> : null}
             </div>
         );
     }
@@ -470,7 +477,7 @@ const renderPrimaryCell = (row: {
     return (
         <div className="flex min-w-0 flex-col">
             <span className="truncate">{row.targetDisplay ?? row.targetId}</span>
-            {secondaryText ? <span className="truncate text-xs text-muted-foreground tracking-tight">{secondaryText}</span> : null}
+            {secondaryText ? <span className="truncate text-muted-foreground text-xs tracking-tight">{secondaryText}</span> : null}
         </div>
     );
 };
@@ -506,15 +513,7 @@ export { PerformanceTable };
 
 const ALL_TIME_FALLBACK_START = new Date(Date.UTC(2000, 0, 1));
 
-const getTableRange = ({
-    range,
-    customRange,
-    timezone,
-}: {
-    range: PerformanceRange;
-    customRange: { start: string; end: string } | null;
-    timezone: string;
-}) => {
+const getTableRange = ({ range, customRange, timezone }: { range: PerformanceRange; customRange: { start: string; end: string } | null; timezone: string }) => {
     const hasCustomRange = Boolean(customRange?.start && customRange?.end);
     const rangeResult = getPerformanceRange({
         range,

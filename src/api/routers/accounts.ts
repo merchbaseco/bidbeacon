@@ -11,10 +11,7 @@ export const accountsRouter = router({
         if (ctx.accessibleAccountIds.length === 0) {
             return [];
         }
-        return db
-            .select()
-            .from(advertiserAccount)
-            .where(inArray(advertiserAccount.adsAccountId, ctx.accessibleAccountIds));
+        return db.select().from(advertiserAccount).where(inArray(advertiserAccount.adsAccountId, ctx.accessibleAccountIds));
     }),
 
     toggle: privateProcedure
@@ -53,7 +50,7 @@ export const accountsRouter = router({
                 const profileId = account.alternateIds.find(id => id.countryCode === countryCode && id.profileId !== undefined)?.profileId;
                 const entityId = account.alternateIds.find(id => id.countryCode === countryCode && id.entityId !== undefined)?.entityId;
 
-                if (!profileId || !entityId) {
+                if (!(profileId && entityId)) {
                     continue;
                 }
 
@@ -71,9 +68,9 @@ export const accountsRouter = router({
                     adsAccountId: account.adsAccountId,
                     accountName: account.accountName,
                     status: account.status,
-                    countryCode: countryCode,
+                    countryCode,
                     profileId: profileId.toString(),
-                    entityId: entityId,
+                    entityId,
                 });
 
                 // Auto-link the new account to the current user

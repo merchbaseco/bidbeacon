@@ -1,23 +1,24 @@
 #!/usr/bin/env node
+
 /**
  * Peek at DLQ messages without deleting them
- * 
+ *
  * Usage:
  *   tsx scripts/peek-dlq.ts [--limit N] [--dataset DATASET_ID]
  *   or: dotenv -e .env tsx scripts/peek-dlq.ts [--limit N] [--dataset DATASET_ID]
- * 
+ *
  * Options:
  *   --limit N        Number of messages to peek at (default: 10)
  *   --dataset ID      Filter by dataset_id (optional)
- * 
+ *
  * Environment variables:
  *   AMS_QUEUE_URL or AWS_QUEUE_URL - Main queue URL or ARN
  *   AWS_REGION - AWS region (default: us-east-1)
  *   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY - AWS credentials (or use ~/.aws/credentials)
  */
 
-import { readFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { GetQueueAttributesCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 
 // Load .env file if it exists
@@ -25,7 +26,7 @@ try {
     const envPath = join(process.cwd(), '.env');
     const envContent = readFileSync(envPath, 'utf-8');
     const envLines = envContent.split('\n');
-    
+
     for (const line of envLines) {
         const trimmed = line.trim();
         if (trimmed && !trimmed.startsWith('#')) {
@@ -126,10 +127,7 @@ function extractErrorInfo(payload: unknown): {
     errorType: string;
     errorDetails: string;
 } {
-    const datasetId =
-        typeof payload === 'object' && payload !== null && 'dataset_id' in payload
-            ? String(payload.dataset_id)
-            : 'unknown';
+    const datasetId = typeof payload === 'object' && payload !== null && 'dataset_id' in payload ? String(payload.dataset_id) : 'unknown';
 
     // Try to extract error information from the payload
     let errorType = 'Unknown';
@@ -195,12 +193,8 @@ async function peekDlqMessages(dlqUrl: string, limit: number, filterDataset?: st
                     messageId: message.MessageId || 'unknown',
                     datasetId,
                     payload,
-                    receivedAt: message.Attributes?.SentTimestamp
-                        ? new Date(parseInt(message.Attributes.SentTimestamp))
-                        : new Date(),
-                    approximateReceiveCount: message.Attributes?.ApproximateReceiveCount
-                        ? parseInt(message.Attributes.ApproximateReceiveCount)
-                        : undefined,
+                    receivedAt: message.Attributes?.SentTimestamp ? new Date(Number.parseInt(message.Attributes.SentTimestamp, 10)) : new Date(),
+                    approximateReceiveCount: message.Attributes?.ApproximateReceiveCount ? Number.parseInt(message.Attributes.ApproximateReceiveCount, 10) : undefined,
                 });
 
                 receivedCount++;
@@ -222,10 +216,12 @@ async function peekDlqMessages(dlqUrl: string, limit: number, filterDataset?: st
     // Group by dataset
     const byDataset = new Map<string, typeof messages>();
     for (const msg of messages) {
-        if (!byDataset.has(msg.datasetId)) {
-            byDataset.set(msg.datasetId, []);
+        const existing = byDataset.get(msg.datasetId);
+        if (existing) {
+            existing.push(msg);
+            continue;
         }
-        byDataset.get(msg.datasetId)!.push(msg);
+        byDataset.set(msg.datasetId, [msg]);
     }
 
     console.log(`📊 Found ${messages.length} message(s) in DLQ:\n`);
@@ -239,33 +235,42 @@ async function peekDlqMessages(dlqUrl: string, limit: number, filterDataset?: st
 
     // Display details
     for (const [datasetId, msgs] of byDataset.entries()) {
-        console.log(`\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━`);
+        console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
         console.log(`📦 Dataset: ${datasetId} (${msgs.length} message(s))`);
         console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
 
-        for (const msg of msgs.slice(0, 5)) { // Show max 5 per dataset
+        for (const msg of msgs.slice(0, 5)) {
+            // Show max 5 per dataset
             console.log(`Message ID: ${msg.messageId}`);
             console.log(`Received: ${msg.receivedAt.toISOString()}`);
             if (msg.approximateReceiveCount) {
                 console.log(`Receive Count: ${msg.approximateReceiveCount}`);
             }
-            
+
             // Check for missing fields
             const payload = msg.payload as Record<string, unknown>;
             const missingFields: string[] = [];
-            if (!('ad_id' in payload)) missingFields.push('ad_id');
-            if (!('ad_group_id' in payload)) missingFields.push('ad_group_id');
-            if (!('campaign_id' in payload)) missingFields.push('campaign_id');
+            if (!('ad_id' in payload)) {
+                missingFields.push('ad_id');
+            }
+            if (!('ad_group_id' in payload)) {
+                missingFields.push('ad_group_id');
+            }
+            if (!('campaign_id' in payload)) {
+                missingFields.push('campaign_id');
+            }
             if ('status' in payload && payload.status && typeof payload.status === 'object') {
                 const status = payload.status as Record<string, unknown>;
-                if (!('delivery_status' in status)) missingFields.push('status.delivery_status');
+                if (!('delivery_status' in status)) {
+                    missingFields.push('status.delivery_status');
+                }
             }
-            
+
             if (missingFields.length > 0) {
                 console.log(`⚠️  Missing fields: ${missingFields.join(', ')}`);
             }
-            
-            console.log(`Payload preview:`);
+
+            console.log('Payload preview:');
             console.log(JSON.stringify(msg.payload, null, 2).substring(0, 2000));
             if (JSON.stringify(msg.payload).length > 2000) {
                 console.log('... (truncated)');
@@ -289,8 +294,8 @@ async function main() {
     // Parse arguments
     for (let i = 0; i < args.length; i++) {
         if (args[i] === '--limit' && args[i + 1]) {
-            limit = parseInt(args[i + 1], 10);
-            if (isNaN(limit) || limit < 1) {
+            limit = Number.parseInt(args[i + 1], 10);
+            if (Number.isNaN(limit) || limit < 1) {
                 console.error('Error: --limit must be a positive number');
                 process.exit(1);
             }
@@ -326,7 +331,7 @@ Examples:
 
     // Support both AMS_QUEUE_URL and AWS_QUEUE_URL (for ARN or URL)
     let mainQueueUrl = process.env.AMS_QUEUE_URL || process.env.AWS_QUEUE_URL;
-    
+
     if (!mainQueueUrl) {
         console.error('Error: AMS_QUEUE_URL or AWS_QUEUE_URL environment variable is required');
         console.error('Please set it in .env file or as an environment variable');

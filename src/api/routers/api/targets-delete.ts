@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { apiProcedure } from '@/api/trpc';
-import { targetsDeleteInputSchema } from '@/api/schemas/cli';
 import { assertDeleteResponse, deleteTargets } from '@/amazon-ads/sp-entities';
+import { targetsDeleteInputSchema } from '@/api/schemas/cli';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, resolveAccountContext, updateTargetRow } from './shared';
 
 export const targetsDelete = apiProcedure

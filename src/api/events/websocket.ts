@@ -75,10 +75,7 @@ const getDevUserId = (override?: string | null) => {
 };
 
 const fetchAccessibleAccountIds = async (clerkUserId: string) => {
-    const accessibleAccounts = await db
-        .select({ adsAccountId: userAccountAccess.adsAccountId })
-        .from(userAccountAccess)
-        .where(eq(userAccountAccess.clerkUserId, clerkUserId));
+    const accessibleAccounts = await db.select({ adsAccountId: userAccountAccess.adsAccountId }).from(userAccountAccess).where(eq(userAccountAccess.clerkUserId, clerkUserId));
 
     return accessibleAccounts.map(account => account.adsAccountId);
 };

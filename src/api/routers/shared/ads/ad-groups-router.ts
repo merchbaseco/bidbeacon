@@ -1,18 +1,11 @@
 import { TRPCError } from '@trpc/server';
 import { and, asc, desc, eq, ilike, or } from 'drizzle-orm';
 import { updateAdGroupBid } from '@/amazon-ads/update-ad-group-bid';
-import { db } from '@/db/index';
-import { adGroup, campaign } from '@/db/schema';
-import {
-    adGroupDetailInputSchema,
-    adGroupDetailOutputSchema,
-    adGroupListInputSchema,
-    adGroupListOutputSchema,
-    updateAdGroupBidInputSchema,
-    updateAdGroupBidOutputSchema,
-} from '@/types/ads-api';
 import type { apiProcedure } from '@/api/trpc';
 import { router } from '@/api/trpc';
+import { db } from '@/db/index';
+import { adGroup, campaign } from '@/db/schema';
+import { adGroupDetailInputSchema, adGroupDetailOutputSchema, adGroupListInputSchema, adGroupListOutputSchema, updateAdGroupBidInputSchema, updateAdGroupBidOutputSchema } from '@/types/ads-api';
 import { formatDateTime, formatListResponse, getPagination, isSponsoredProducts, parseNumeric, resolveProfileId, toMoneyString } from '../../ads/shared';
 
 export const buildAdGroupsRouter = (procedure: typeof apiProcedure) =>
@@ -169,7 +162,9 @@ export const buildAdGroupsRouter = (procedure: typeof apiProcedure) =>
 
 const buildAdGroupSearchCondition = (search: string | null) => {
     const trimmed = search?.trim();
-    if (!trimmed) return null;
+    if (!trimmed) {
+        return null;
+    }
     const query = `%${trimmed}%`;
     return or(ilike(adGroup.name, query), ilike(adGroup.adGroupId, query));
 };
@@ -182,7 +177,6 @@ const getAdGroupSortExpression = (field: 'lastUpdatedDateTime' | 'name' | 'bidAm
             return adGroup.bidAmount;
         case 'state':
             return adGroup.state;
-        case 'lastUpdatedDateTime':
         default:
             return adGroup.lastUpdatedDateTime;
     }

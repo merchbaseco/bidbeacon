@@ -11,8 +11,8 @@ import { db } from '@/db/index';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceDaily } from '@/db/schema';
 import { boss } from '@/jobs/boss';
 import { zonedNow, zonedStartOfDay } from '@/utils/date';
+import { type JobMetricsRecorder, withJobMetrics } from '@/utils/job-metrics';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import { withJobMetrics, type JobMetricsRecorder } from '@/utils/job-metrics';
 
 const jobInputSchema = z.object({
     accountId: z.string(),
@@ -69,7 +69,7 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
 
     if (!entityId) {
         recorder.addEvent({
-            message: `Skipped {{badges}} summary (missing entity id).`,
+            message: 'Skipped {{badges}} summary (missing entity id).',
             badges: [datasetBadge],
             payload: {
                 cadence: 'daily',

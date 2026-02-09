@@ -23,7 +23,9 @@ export const ChartTooltipPortal = ({ active, coordinate, children }: ChartToolti
     }, []);
 
     const updatePosition = useCallback(() => {
-        if (!active || !coordinate || !tooltipRef.current || !markerRef.current) return;
+        if (!(active && coordinate && tooltipRef.current && markerRef.current)) {
+            return;
+        }
 
         // Find the recharts-wrapper by traversing up from our marker element
         let element: HTMLElement | null = markerRef.current;
@@ -31,7 +33,9 @@ export const ChartTooltipPortal = ({ active, coordinate, children }: ChartToolti
             element = element.parentElement;
         }
 
-        if (!element) return;
+        if (!element) {
+            return;
+        }
 
         const rect = element.getBoundingClientRect();
         const tooltipRect = tooltipRef.current.getBoundingClientRect();
@@ -42,7 +46,9 @@ export const ChartTooltipPortal = ({ active, coordinate, children }: ChartToolti
 
         // Ensure tooltip stays within viewport
         const padding = 8;
-        if (x < padding) x = padding;
+        if (x < padding) {
+            x = padding;
+        }
         if (x + tooltipRect.width > window.innerWidth - padding) {
             x = window.innerWidth - tooltipRect.width - padding;
         }
@@ -59,10 +65,14 @@ export const ChartTooltipPortal = ({ active, coordinate, children }: ChartToolti
     }, [updatePosition]);
 
     useEffect(() => {
-        if (!active) return;
+        if (!active) {
+            return;
+        }
         let frame = 0;
         const handleUpdate = () => {
-            if (frame) cancelAnimationFrame(frame);
+            if (frame) {
+                cancelAnimationFrame(frame);
+            }
             frame = requestAnimationFrame(() => {
                 updatePosition();
             });
@@ -74,13 +84,17 @@ export const ChartTooltipPortal = ({ active, coordinate, children }: ChartToolti
         window.addEventListener('resize', handleUpdate);
 
         return () => {
-            if (frame) cancelAnimationFrame(frame);
+            if (frame) {
+                cancelAnimationFrame(frame);
+            }
             window.removeEventListener('scroll', handleUpdate, { capture: true });
             window.removeEventListener('resize', handleUpdate);
         };
     }, [active, updatePosition]);
 
-    if (!active) return null;
+    if (!active) {
+        return null;
+    }
 
     return (
         <>
@@ -89,8 +103,8 @@ export const ChartTooltipPortal = ({ active, coordinate, children }: ChartToolti
             {mounted &&
                 createPortal(
                     <div
+                        className="pointer-events-none fixed"
                         ref={tooltipRef}
-                        className="fixed pointer-events-none"
                         style={{
                             left: position.x,
                             top: position.y,

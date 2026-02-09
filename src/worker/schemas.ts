@@ -299,9 +299,7 @@ export const adSchema = baseAmsPayloadSchema
             .object({
                 delivery_status: z.string().optional(), // enum: Delivering / Not delivering
                 delivery_reasons: z.array(z.string()).nullable().optional(), // enum[]: Delivery reasons, can be null
-                marketplace_settings: z
-                    .union([z.record(z.unknown()), z.array(z.unknown())])
-                    .optional(), // Can be object or array
+                marketplace_settings: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(), // Can be object or array
             })
             .optional(),
         // Nested creative object
@@ -373,9 +371,7 @@ export const targetSchema = baseAmsPayloadSchema
                         }),
                     ])
                     .optional(),
-                marketplace_settings: z
-                    .union([z.record(z.unknown()), z.array(z.unknown())])
-                    .optional(), // Can be object or array
+                marketplace_settings: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(), // Can be object or array
             })
             .optional(),
         // Nested target_details object (keyword_target is one type)

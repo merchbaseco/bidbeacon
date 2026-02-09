@@ -1,4 +1,4 @@
-import { z } from 'zod';
+import type { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker';
 import { type ApiRegion, getApiBaseUrl } from './config';
 import { refreshAccessToken } from './reauth';
@@ -38,7 +38,7 @@ export const spRequest = async <T>(options: SpRequestOptions<T>, region: ApiRegi
             method: 'POST',
             headers,
             body: JSON.stringify(options.body),
-            signal: AbortSignal.timeout(30000),
+            signal: AbortSignal.timeout(30_000),
         });
 
         if (!response.ok) {

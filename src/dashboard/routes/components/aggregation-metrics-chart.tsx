@@ -20,8 +20,8 @@ export const AggregationMetricsChart = () => {
     }, []);
 
     const { data, isLoading, error } = api.metrics.aggregation.useQuery(dateRange, {
-        refetchInterval: 300000, // 5 minutes
-        staleTime: 60000,
+        refetchInterval: 300_000, // 5 minutes
+        staleTime: 60_000,
     });
 
     // Generate all 5-minute intervals from `from` to `to`, filling with zeros
@@ -90,27 +90,26 @@ export const AggregationMetricsChart = () => {
     };
 
     if (isLoading) {
-        return <div className="flex items-center justify-center h-[200px] text-muted-foreground text-sm">Loading aggregation metrics...</div>;
+        return <div className="flex h-[200px] items-center justify-center text-muted-foreground text-sm">Loading aggregation metrics...</div>;
     }
 
     if (error) {
-        return <div className="flex items-center justify-center h-[200px] text-destructive text-sm">Error loading aggregation metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>;
+        return <div className="flex h-[200px] items-center justify-center text-destructive text-sm">Error loading aggregation metrics: {error instanceof Error ? error.message : 'Unknown error'}</div>;
     }
 
     return (
-        <div className="w-full h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
+        <div className="h-[200px] w-full">
+            <ResponsiveContainer height="100%" width="100%">
                 <ComposedChart data={chartData} margin={{ top: 10, right: 10, left: -10, bottom: 10 }}>
                     <CartesianGrid stroke="#E5E7EB" strokeDasharray="0" vertical={false} />
-                    <XAxis dataKey="interval" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} interval={0} />
-                    <YAxis yAxisId="left" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={40} tickFormatter={formatYAxisTick} />
-                    <YAxis yAxisId="right" orientation="right" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} width={60} />
+                    <XAxis axisLine={false} dataKey="interval" interval={0} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatXAxisTick} tickLine={false} />
+                    <YAxis axisLine={false} tick={{ fill: '#9CA3AF', fontSize: 12 }} tickFormatter={formatYAxisTick} tickLine={false} width={40} yAxisId="left" />
+                    <YAxis axisLine={false} orientation="right" tick={{ fill: '#9CA3AF', fontSize: 12 }} tickLine={false} width={60} yAxisId="right" />
                     <Tooltip content={<ChartTooltip chartData={chartData} intervalMs={5 * 60 * 1000} />} wrapperStyle={{ visibility: 'visible', pointerEvents: 'none' }} />
-                    <Bar yAxisId="left" dataKey="jobCount" fill={LEGEND_COLORS[0]} name="Jobs" radius={4} isAnimationActive={false} />
-                    <Line yAxisId="right" type="linear" dataKey="totalRowsInserted" stroke={LEGEND_COLORS[1]} strokeWidth={1.5} dot={false} name="Rows Inserted" isAnimationActive={false} />
+                    <Bar dataKey="jobCount" fill={LEGEND_COLORS[0]} isAnimationActive={false} name="Jobs" radius={4} yAxisId="left" />
+                    <Line dataKey="totalRowsInserted" dot={false} isAnimationActive={false} name="Rows Inserted" stroke={LEGEND_COLORS[1]} strokeWidth={1.5} type="linear" yAxisId="right" />
                 </ComposedChart>
             </ResponsiveContainer>
         </div>
     );
 };
-

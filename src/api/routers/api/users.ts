@@ -1,7 +1,7 @@
 import { eq } from 'drizzle-orm';
+import { apiProcedure, router } from '@/api/trpc';
 import { db } from '@/db/index';
 import { userPreferences } from '@/db/schema';
-import { apiProcedure, router } from '@/api/trpc';
 
 export const usersApiRouter = router({
     getSelectedAccount: apiProcedure.query(async ({ ctx }) => {

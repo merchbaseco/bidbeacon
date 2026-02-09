@@ -30,15 +30,7 @@ export const targetsListInputSchema = cliListInputSchema.extend({
     campaignId: z.string().optional(),
     adGroupId: z.string().optional(),
 });
-export const bidStrategySchema = z.enum([
-    'MANUAL',
-    'RULE_BASED',
-    'SALES_DOWN_ONLY',
-    'SALES_UP_AND_DOWN',
-    'SALES',
-    'NEW_TO_BRAND',
-    'NONE',
-]);
+export const bidStrategySchema = z.enum(['MANUAL', 'RULE_BASED', 'SALES_DOWN_ONLY', 'SALES_UP_AND_DOWN', 'SALES', 'NEW_TO_BRAND', 'NONE']);
 export const keywordMatchTypeSchema = z.enum(['BROAD', 'PHRASE', 'EXACT']);
 export const productMatchTypeSchema = z.enum(['PRODUCT_EXACT', 'PRODUCT_SIMILAR']);
 export const productIdTypeSchema = z.enum(['ASIN', 'SKU']);
@@ -88,17 +80,7 @@ export const targetSchema = z.object({
     productMatchType: productMatchTypeSchema.nullable().optional(),
 });
 
-export const metricsKeySchema = z.enum([
-    'impressions',
-    'clicks',
-    'spend',
-    'purchases',
-    'sales',
-    'acos',
-    'cpc',
-    'ctr',
-    'roas',
-]);
+export const metricsKeySchema = z.enum(['impressions', 'clicks', 'spend', 'purchases', 'sales', 'acos', 'cpc', 'ctr', 'roas']);
 
 export const metricsBucketSchema = z.enum(['auto', 'hour', 'day', 'week', 'month', 'year']);
 export const metricsGranularitySchema = z.enum(['hour', 'day', 'week', 'month', 'year']);
@@ -310,17 +292,7 @@ export const metricsSeriesInputSchema = cliConfigInputSchema.extend({
     bucket: metricsBucketSchema.optional(),
 });
 
-export const metricsTableSortFieldSchema = z.enum([
-    'impressions',
-    'clicks',
-    'purchases',
-    'spend',
-    'sales',
-    'acos',
-    'cpc',
-    'ctr',
-    'roas',
-]);
+export const metricsTableSortFieldSchema = z.enum(['impressions', 'clicks', 'purchases', 'spend', 'sales', 'acos', 'cpc', 'ctr', 'roas']);
 
 export const metricsTableSortSchema = z.object({
     field: metricsTableSortFieldSchema,

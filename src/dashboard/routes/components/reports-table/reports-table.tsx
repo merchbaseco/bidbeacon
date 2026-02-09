@@ -1,5 +1,6 @@
 import { useAtom, useAtomValue } from 'jotai';
 import { useMemo } from 'react';
+import { cn } from '@/dashboard/lib/utils.js';
 import { Frame, FrameFooter } from '../../../components/ui/frame.js';
 import { Spinner } from '../../../components/ui/spinner.js';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../../../components/ui/table.js';
@@ -12,7 +13,6 @@ import { ReportRow } from './report-row.js';
 import { StatusFilter } from './status-filter.js';
 import { TablePagination } from './table-pagination.js';
 import { TableResultsRange } from './table-results-range.js';
-import { cn } from '@/dashboard/lib/utils.js';
 
 export const ReportsTable = ({ className }: { className?: string }) => {
     const limit = useAtomValue(limitAtom);
@@ -51,7 +51,7 @@ export const ReportsTable = ({ className }: { className?: string }) => {
                     <TableBody className={cn(isFetching && !isLoading && 'opacity-50 transition-opacity')}>
                         {isLoading ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="py-12">
+                                <TableCell className="py-12" colSpan={7}>
                                     <div className="flex items-center justify-center">
                                         <Spinner className="size-5 text-muted-foreground" />
                                     </div>
@@ -59,8 +59,8 @@ export const ReportsTable = ({ className }: { className?: string }) => {
                             </TableRow>
                         ) : rows.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={7} className="py-12">
-                                    <p className="text-sm text-muted-foreground text-center">No datasets found for this time window</p>
+                                <TableCell className="py-12" colSpan={7}>
+                                    <p className="text-center text-muted-foreground text-sm">No datasets found for this time window</p>
                                 </TableCell>
                             </TableRow>
                         ) : (
@@ -71,8 +71,8 @@ export const ReportsTable = ({ className }: { className?: string }) => {
                 {total > 0 && (
                     <FrameFooter className="p-2">
                         <div className="flex items-center justify-between gap-2">
-                            <TableResultsRange currentPage={currentPage} totalPages={totalPages} pageSize={limit} totalResults={total} onPageChange={handlePageChange} />
-                            {totalPages > 1 && <TablePagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />}
+                            <TableResultsRange currentPage={currentPage} onPageChange={handlePageChange} pageSize={limit} totalPages={totalPages} totalResults={total} />
+                            {totalPages > 1 && <TablePagination currentPage={currentPage} onPageChange={handlePageChange} totalPages={totalPages} />}
                         </div>
                     </FrameFooter>
                 )}

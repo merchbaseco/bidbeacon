@@ -1,9 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import {
-    createCliConfig,
-    createTestCaller,
-    loadEnv,
-} from '../utils/cli-test-harness';
+import { createCliConfig, createTestCaller, loadEnv } from '../utils/cli-test-harness';
 
 const requireEnv = (key: string) => {
     const value = process.env[key];
@@ -68,7 +64,9 @@ describeIntegration('cli sp lifecycle', () => {
     });
 
     afterAll(async () => {
-        if (!caller || !config) return;
+        if (!(caller && config)) {
+            return;
+        }
         const errors: string[] = [];
 
         const attempt = async (label: string, fn: () => Promise<void>) => {
@@ -109,7 +107,7 @@ describeIntegration('cli sp lifecycle', () => {
     });
 
     it('runs a full lifecycle without excessive entity creation', async () => {
-        if (!caller || !config || !campaignId || !adGroupId || !adId || !targetId) {
+        if (!(caller && config && campaignId && adGroupId && adId && targetId)) {
             throw new Error('Missing fixture entities for lifecycle test.');
         }
 
@@ -152,5 +150,5 @@ describeIntegration('cli sp lifecycle', () => {
 
         await caller.api.cli.campaignsDelete({ config, campaignId });
         campaignId = null;
-    }, 30000);
+    }, 30_000);
 });

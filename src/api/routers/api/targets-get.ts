@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { apiProcedure } from '@/api/trpc';
 import { cliConfigInputSchema, targetsGetOutputSchema } from '@/api/schemas/cli';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, getTarget } from './shared';
 
 export const targetsGet = apiProcedure

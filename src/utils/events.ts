@@ -102,9 +102,15 @@ export type Event =
  * Extract accountId from an event if it has one
  */
 const getEventAccountId = (event: Event): string | null => {
-    if ('accountId' in event) return event.accountId;
-    if ('row' in event && event.row && 'accountId' in event.row) return event.row.accountId;
-    if ('data' in event && event.data && 'accountId' in event.data) return (event.data as { accountId?: string }).accountId ?? null;
+    if ('accountId' in event) {
+        return event.accountId;
+    }
+    if ('row' in event && event.row && 'accountId' in event.row) {
+        return event.row.accountId;
+    }
+    if ('data' in event && event.data && 'accountId' in event.data) {
+        return (event.data as { accountId?: string }).accountId ?? null;
+    }
     return null;
 };
 
@@ -112,7 +118,7 @@ const getEventAccountId = (event: Event): string | null => {
  * Singleton event emitter for WebSocket connections
  */
 class EventEmitter {
-    private connections: Map<WebSocket, AuthenticatedConnection> = new Map();
+    private readonly connections: Map<WebSocket, AuthenticatedConnection> = new Map();
 
     constructor() {
         // Clean up dead connections every 30 seconds
@@ -122,7 +128,7 @@ class EventEmitter {
                     this.connections.delete(socket);
                 }
             }
-        }, 30000);
+        }, 30_000);
     }
 
     /**
@@ -178,16 +184,18 @@ const eventEmitter = new EventEmitter();
  * Utility function to emit events easily from anywhere in the codebase
  * Uses function overloads to preserve discriminated union types
  */
-export function emitEvent(event: Omit<ErrorEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<AccountUpdatedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<ReportsRefreshedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<ApiMetricsUpdatedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<JobMetricsUpdatedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<EventsUpdatedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<ReportRefreshedEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<ReportDatasetMetadataErrorEvent, 'timestamp'>): void;
-export function emitEvent(event: Omit<Event, 'timestamp'>): void {
+type EventWithoutTimestamp =
+    | Omit<AccountUpdatedEvent, 'timestamp'>
+    | Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>
+    | Omit<ApiMetricsUpdatedEvent, 'timestamp'>
+    | Omit<ErrorEvent, 'timestamp'>
+    | Omit<EventsUpdatedEvent, 'timestamp'>
+    | Omit<JobMetricsUpdatedEvent, 'timestamp'>
+    | Omit<ReportDatasetMetadataErrorEvent, 'timestamp'>
+    | Omit<ReportRefreshedEvent, 'timestamp'>
+    | Omit<ReportsRefreshedEvent, 'timestamp'>;
+
+export function emitEvent(event: EventWithoutTimestamp): void {
     const eventWithTimestamp: Event = {
         ...event,
         timestamp: new Date().toISOString(),

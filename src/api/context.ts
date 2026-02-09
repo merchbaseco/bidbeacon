@@ -1,6 +1,6 @@
+import { createHash, timingSafeEqual } from 'node:crypto';
 import { verifyToken } from '@clerk/backend';
 import type { CreateFastifyContextOptions } from '@trpc/server/adapters/fastify';
-import { createHash, timingSafeEqual } from 'crypto';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { apiKey, apiKeyAccountAccess, userAccountAccess } from '@/db/schema';
@@ -97,10 +97,7 @@ const getApiKeyToken = (headers: CreateFastifyContextOptions['req']['headers']) 
 };
 
 const fetchAccessibleAccountIds = async (clerkUserId: string) => {
-    const accessibleAccounts = await db
-        .select({ adsAccountId: userAccountAccess.adsAccountId })
-        .from(userAccountAccess)
-        .where(eq(userAccountAccess.clerkUserId, clerkUserId));
+    const accessibleAccounts = await db.select({ adsAccountId: userAccountAccess.adsAccountId }).from(userAccountAccess).where(eq(userAccountAccess.clerkUserId, clerkUserId));
 
     return accessibleAccounts.map(account => account.adsAccountId);
 };
@@ -127,10 +124,7 @@ const getApiKeyContext = async (token: string) => {
         return null;
     }
 
-    const accessibleAccounts = await db
-        .select({ adsAccountId: apiKeyAccountAccess.adsAccountId })
-        .from(apiKeyAccountAccess)
-        .where(eq(apiKeyAccountAccess.apiKeyId, parsed.apiKeyId));
+    const accessibleAccounts = await db.select({ adsAccountId: apiKeyAccountAccess.adsAccountId }).from(apiKeyAccountAccess).where(eq(apiKeyAccountAccess.apiKeyId, parsed.apiKeyId));
 
     await db.update(apiKey).set({ lastUsedAt: new Date() }).where(eq(apiKey.id, parsed.apiKeyId));
 
@@ -154,7 +148,7 @@ const parseApiKeyToken = (token: string) => {
     }
 
     const [, apiKeyId, secret] = parts;
-    if (!apiKeyId || !secret) {
+    if (!(apiKeyId && secret)) {
         return null;
     }
 

@@ -7,7 +7,7 @@ const getDatabaseConfig = () => {
         throw new Error('BIDBEACON_DATABASE_PASSWORD is required');
     }
 
-    if (Number.isNaN(port) || port < 1 || port > 65535) {
+    if (Number.isNaN(port) || port < 1 || port > 65_535) {
         throw new Error('BIDBEACON_DATABASE_PORT must be a valid port number');
     }
 
