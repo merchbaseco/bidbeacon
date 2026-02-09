@@ -7,6 +7,6 @@ export const campaignsList = apiProcedure
     .output(campaignsListOutputSchema)
     .query(async ({ ctx, input }) => {
         assertAccountAccess(ctx, input.config);
-        const items = await listCampaigns(input.config, { state: input.state });
+        const items = await listCampaigns(input.config, { state: input.state, limit: input.limit, offset: input.offset });
         return { items };
     });

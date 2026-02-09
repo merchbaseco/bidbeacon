@@ -11,6 +11,8 @@ export const targetsList = apiProcedure
             state: input.state,
             campaignId: input.campaignId,
             adGroupId: input.adGroupId,
+            limit: input.limit,
+            offset: input.offset,
         });
         return { items };
     });
