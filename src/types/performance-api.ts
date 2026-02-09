@@ -131,12 +131,7 @@ export const targetRowSchema = z.object({
     metrics: metricsSchema,
 });
 
-export const performanceTableRowSchema = z.discriminatedUnion('dimension', [
-    campaignRowSchema,
-    adGroupRowSchema,
-    adRowSchema,
-    targetRowSchema,
-]);
+export const performanceTableRowSchema = z.discriminatedUnion('dimension', [campaignRowSchema, adGroupRowSchema, adRowSchema, targetRowSchema]);
 
 export const performanceTableOutputSchema = z.object({
     rows: z.array(performanceTableRowSchema),

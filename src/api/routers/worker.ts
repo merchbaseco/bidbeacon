@@ -2,7 +2,7 @@ import { eq } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { workerControl } from '@/db/schema';
-import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqsClient';
+import { getDlqUrlFromMainQueue, getQueueMetrics } from '@/worker/sqs-client';
 import { privateProcedure, router } from '../trpc';
 
 // Cache for worker metrics - CloudWatch API calls are slow and data is delayed anyway

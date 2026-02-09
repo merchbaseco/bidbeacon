@@ -15,7 +15,7 @@ export async function parseReport(reportUid: InferSelectModel<typeof reportDatas
     });
 
     if (!reportMetadata) {
-        throw new Error(`Report metadata not found.`);
+        throw new Error('Report metadata not found.');
     }
 
     if (!reportMetadata.reportId) {
@@ -48,7 +48,7 @@ export async function parseReport(reportUid: InferSelectModel<typeof reportDatas
             return handleHourlyProduct(input);
         case 'daily-product':
             return handleDailyProduct(input);
+        default:
+            throw new Error(`No handler found for aggregation: ${aggregation}, entityType: ${entityType}`);
     }
-
-    throw new Error(`No handler found for aggregation: ${aggregation}, entityType: ${entityType}`);
 }

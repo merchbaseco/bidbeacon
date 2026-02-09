@@ -25,7 +25,7 @@ export const ChartHoverIndicator = ({ active, coordinate, label, containerRef }:
     }, []);
 
     const updatePosition = useCallback(() => {
-        if (!active || !coordinate || !containerRef.current) {
+        if (!(active && coordinate && containerRef.current)) {
             setPosition(null);
             return;
         }
@@ -50,10 +50,14 @@ export const ChartHoverIndicator = ({ active, coordinate, label, containerRef }:
     }, [updatePosition]);
 
     useEffect(() => {
-        if (!active) return;
+        if (!active) {
+            return;
+        }
         let frame = 0;
         const handleUpdate = () => {
-            if (frame) cancelAnimationFrame(frame);
+            if (frame) {
+                cancelAnimationFrame(frame);
+            }
             frame = requestAnimationFrame(() => {
                 updatePosition();
             });
@@ -65,13 +69,17 @@ export const ChartHoverIndicator = ({ active, coordinate, label, containerRef }:
         window.addEventListener('resize', handleUpdate);
 
         return () => {
-            if (frame) cancelAnimationFrame(frame);
+            if (frame) {
+                cancelAnimationFrame(frame);
+            }
             window.removeEventListener('scroll', handleUpdate, { capture: true });
             window.removeEventListener('resize', handleUpdate);
         };
     }, [active, updatePosition]);
 
-    if (!mounted || !active || !position || !label) return null;
+    if (!(mounted && active && position && label)) {
+        return null;
+    }
 
     const inset = 6;
     const lineTop = position.top + inset;
@@ -82,7 +90,7 @@ export const ChartHoverIndicator = ({ active, coordinate, label, containerRef }:
     return createPortal(
         <>
             <div
-                className="fixed pointer-events-none"
+                className="pointer-events-none fixed"
                 style={{
                     left: position.x,
                     top: lineTop,
@@ -94,7 +102,7 @@ export const ChartHoverIndicator = ({ active, coordinate, label, containerRef }:
                 <div className="absolute inset-0 bg-muted-foreground/40" />
             </div>
             <div
-                className="fixed pointer-events-none"
+                className="pointer-events-none fixed"
                 style={{
                     left: position.x,
                     top: lineBottom - bubbleOffset,
@@ -102,7 +110,7 @@ export const ChartHoverIndicator = ({ active, coordinate, label, containerRef }:
                     zIndex: 40,
                 }}
             >
-                <div className="rounded-full bg-primary-foreground text-primary text-xs font-medium px-2.5 py-1 shadow-sm">{label}</div>
+                <div className="rounded-full bg-primary-foreground px-2.5 py-1 font-medium text-primary text-xs shadow-sm">{label}</div>
             </div>
         </>,
         document.body

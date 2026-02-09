@@ -1,15 +1,10 @@
 import { TRPCError } from '@trpc/server';
 import { and, asc, desc, eq, ilike, or } from 'drizzle-orm';
-import { db } from '@/db/index';
-import { campaign } from '@/db/schema';
-import {
-    campaignDetailInputSchema,
-    campaignDetailOutputSchema,
-    campaignListInputSchema,
-    campaignListOutputSchema,
-} from '@/types/ads-api';
 import type { apiProcedure } from '@/api/trpc';
 import { router } from '@/api/trpc';
+import { db } from '@/db/index';
+import { campaign } from '@/db/schema';
+import { campaignDetailInputSchema, campaignDetailOutputSchema, campaignListInputSchema, campaignListOutputSchema } from '@/types/ads-api';
 import { formatDate, formatDateTime, formatListResponse, getPagination, parseNumeric } from '../../ads/shared';
 
 export const buildCampaignsRouter = (procedure: typeof apiProcedure) =>
@@ -115,7 +110,9 @@ export const buildCampaignsRouter = (procedure: typeof apiProcedure) =>
 
 const buildCampaignSearchCondition = (search: string | null) => {
     const trimmed = search?.trim();
-    if (!trimmed) return null;
+    if (!trimmed) {
+        return null;
+    }
     const query = `%${trimmed}%`;
     return or(ilike(campaign.name, query), ilike(campaign.campaignId, query));
 };
@@ -130,7 +127,6 @@ const getCampaignSortExpression = (field: 'lastUpdatedDateTime' | 'name' | 'star
             return campaign.budgetAmount;
         case 'state':
             return campaign.state;
-        case 'lastUpdatedDateTime':
         default:
             return campaign.lastUpdatedDateTime;
     }

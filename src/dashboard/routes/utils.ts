@@ -4,10 +4,10 @@
  * millisecond-level timestamp differences from creating separate queries.
  */
 export function roundUpToNearestMinute(date: Date): Date {
-    return new Date(Math.ceil(date.getTime() / 60000) * 60000);
+    return new Date(Math.ceil(date.getTime() / 60_000) * 60_000);
 }
 
-export function formatDate(input: string, showTime: boolean = true) {
+export function formatDate(input: string, showTime = true) {
     return new Intl.DateTimeFormat('en', {
         dateStyle: 'medium',
         timeStyle: showTime ? 'short' : undefined,

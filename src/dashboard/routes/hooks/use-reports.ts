@@ -35,7 +35,7 @@ export const useReports = () => {
 
     const { data, isLoading, isFetching, ...rest } = api.reports.summary.useQuery(
         {
-            accountId: accountId!,
+            accountId: accountId ?? '',
             countryCode,
             aggregation,
             entityType,
@@ -47,7 +47,7 @@ export const useReports = () => {
         },
         {
             enabled: !!accountId && !!countryCode,
-            staleTime: Infinity, // Never refetch due to staleness - rely on WebSocket events for invalidation
+            staleTime: Number.POSITIVE_INFINITY, // Never refetch due to staleness - rely on WebSocket events for invalidation
             placeholderData: keepPreviousData, // Keep previous page visible while fetching new page
         }
     );
@@ -57,9 +57,9 @@ export const useReports = () => {
     // Both queries use staleTime: Infinity, so they won't refetch until invalidated via WebSocket events
     useEffect(() => {
         if (data?.data) {
-            data.data.forEach(report => {
+            for (const report of data.data) {
                 apiUtils.reports.get.setData({ uid: report.uid }, report);
-            });
+            }
         }
     }, [data?.data, apiUtils]);
 

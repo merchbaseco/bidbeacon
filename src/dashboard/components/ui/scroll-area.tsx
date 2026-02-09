@@ -25,8 +25,8 @@ function ScrollArea({
                         'mask-t-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-start)))] mask-b-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-y-end)))] mask-l-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-x-start)))] mask-r-from-[calc(100%-min(var(--fade-size),var(--scroll-area-overflow-x-end)))] [--fade-size:1.5rem]',
                     scrollbarGutter && 'data-has-overflow-y:pe-2.5 data-has-overflow-x:pb-2.5'
                 )}
-                style={{ overscrollBehavior: allowScrollChaining ? 'auto' : 'contain' }}
                 data-slot="scroll-area-viewport"
+                style={{ overscrollBehavior: allowScrollChaining ? 'auto' : 'contain' }}
             >
                 {children}
             </ScrollAreaPrimitive.Viewport>
@@ -37,11 +37,7 @@ function ScrollArea({
     );
 }
 
-function ScrollBar({
-    className,
-    orientation = 'vertical',
-    ...props
-}: ScrollAreaPrimitive.Scrollbar.Props) {
+function ScrollBar({ className, orientation = 'vertical', ...props }: ScrollAreaPrimitive.Scrollbar.Props) {
     return (
         <ScrollAreaPrimitive.Scrollbar
             className={cn(
@@ -52,10 +48,7 @@ function ScrollBar({
             orientation={orientation}
             {...props}
         >
-            <ScrollAreaPrimitive.Thumb
-                className="relative flex-1 rounded-full bg-foreground/20"
-                data-slot="scroll-area-thumb"
-            />
+            <ScrollAreaPrimitive.Thumb className="relative flex-1 rounded-full bg-foreground/20" data-slot="scroll-area-thumb" />
         </ScrollAreaPrimitive.Scrollbar>
     );
 }

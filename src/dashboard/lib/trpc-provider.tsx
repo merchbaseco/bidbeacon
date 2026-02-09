@@ -2,8 +2,8 @@ import { useAuth } from '@clerk/clerk-react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { httpLink, loggerLink } from '@trpc/client';
 import { useState } from 'react';
-import { api } from './trpc';
 import { apiBaseUrl } from '../router';
+import { api } from './trpc';
 
 const DEV_USER_ID = import.meta.env.VITE_DEV_USER_ID?.trim();
 

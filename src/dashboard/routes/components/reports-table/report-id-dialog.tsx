@@ -18,16 +18,14 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
 
     const handleOpenChange = (newOpen: boolean) => {
         setOpen(newOpen);
-        if (newOpen && !retrieveReportMutation.data && !retrieveReportMutation.isPending) {
+        if (newOpen && !retrieveReportMutation.data && !retrieveReportMutation.isPending && accountId && row.reportId) {
             // Fetch data when dialog opens
-            if (accountId && row.reportId) {
-                retrieveReportMutation.mutate({
-                    accountId,
-                    timestamp: row.periodStart,
-                    aggregation: row.aggregation as 'hourly' | 'daily',
-                    entityType: row.entityType as 'target' | 'product',
-                });
-            }
+            retrieveReportMutation.mutate({
+                accountId,
+                timestamp: row.periodStart,
+                aggregation: row.aggregation as 'hourly' | 'daily',
+                entityType: row.entityType as 'target' | 'product',
+            });
         }
     };
 
@@ -44,7 +42,7 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
     const error = retrieveReportMutation.error?.message;
 
     return (
-        <Dialog open={open} onOpenChange={handleOpenChange}>
+        <Dialog onOpenChange={handleOpenChange} open={open}>
             <DialogTrigger>
                 <Button size="sm" variant="secondary">
                     <HugeiconsIcon icon={SecondBracketSquareIcon} size={16} />
@@ -59,7 +57,7 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
                 <DialogPanel>
                     <div className="rounded-lg border bg-muted/50 p-4">
                         {retrieveReportMutation.isPending ? (
-                            <div className="text-sm text-muted-foreground">Loading...</div>
+                            <div className="text-muted-foreground text-sm">Loading...</div>
                         ) : (
                             <pre className="overflow-auto text-sm">
                                 <code>{error ? JSON.stringify({ error }, null, 2) : JSON.stringify(data, null, 2)}</code>
@@ -68,7 +66,7 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
                     </div>
                 </DialogPanel>
                 <DialogFooter>
-                    <Button variant="outline" onClick={handleCopy} disabled={retrieveReportMutation.isPending}>
+                    <Button disabled={retrieveReportMutation.isPending} onClick={handleCopy} variant="outline">
                         {copied ? 'Copied!' : 'Copy JSON'}
                     </Button>
                     <DialogClose>

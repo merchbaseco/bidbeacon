@@ -1,7 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
-import { getDatabaseConfig } from './database-config.js';
-import * as schema from './schema.js';
+import { getDatabaseConfig } from './database-config';
+import * as schema from './schema';
 
 const databaseConfig = getDatabaseConfig();
 
@@ -13,8 +13,8 @@ const queryClient = postgres({
     username: databaseConfig.user,
     password: databaseConfig.password,
     max: 5,
-    idle_timeout: 10000,
-    max_lifetime: 30000,
+    idle_timeout: 10_000,
+    max_lifetime: 30_000,
     onnotice: process.env.NODE_ENV === 'development' ? console.log : undefined,
 });
 

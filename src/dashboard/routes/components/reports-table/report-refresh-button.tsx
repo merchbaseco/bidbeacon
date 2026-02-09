@@ -14,7 +14,9 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
     const mutation = api.reports.refresh.useMutation({});
 
     const handleClick = () => {
-        if (!accountId || !row.countryCode) return;
+        if (!(accountId && row.countryCode)) {
+            return;
+        }
         mutation.mutate({
             accountId,
             countryCode: row.countryCode,
@@ -23,7 +25,9 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
             entityType: row.entityType as 'target' | 'product',
         });
         apiUtils.reports.get.setData({ uid: row.uid }, prev => {
-            if (!prev) return prev;
+            if (!prev) {
+                return prev;
+            }
             return {
                 ...prev,
                 refreshing: true,
@@ -32,7 +36,7 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
     };
 
     return (
-        <Button variant="secondary" size="icon" onClick={handleClick} disabled={row.refreshing}>
+        <Button disabled={row.refreshing} onClick={handleClick} size="icon" variant="secondary">
             <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={20} />
         </Button>
     );

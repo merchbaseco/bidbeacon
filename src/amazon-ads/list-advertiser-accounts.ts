@@ -98,7 +98,7 @@ export async function listAdvertiserAccounts(options?: ListAdsAccountsOptions, r
             method: 'POST',
             headers,
             body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(30000),
+            signal: AbortSignal.timeout(30_000),
         });
 
         // Store status code for tracking (even if error)

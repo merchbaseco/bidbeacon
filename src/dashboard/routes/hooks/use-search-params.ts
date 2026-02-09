@@ -6,9 +6,7 @@ export function useSearchParamsState() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
 
-    const updateSearch = (
-        next: Partial<{ accountId?: string; aggregation?: Aggregation; days?: number }>
-    ) => {
+    const updateSearch = (next: Partial<{ accountId?: string; aggregation?: Aggregation; days?: number }>) => {
         const newParams = new URLSearchParams(searchParams);
 
         if (next.accountId !== undefined) {

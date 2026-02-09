@@ -14,21 +14,13 @@ const Toaster = ({ ...props }: ToasterProps) => {
 
     return (
         <Sonner
-            theme={theme as ToasterProps['theme']}
             className="toaster group"
             icons={{
                 success: <HugeiconsIcon icon={CheckmarkCircle04Icon} size={16} />,
                 info: <HugeiconsIcon icon={InformationCircleIcon} size={16} />,
                 warning: <HugeiconsIcon icon={AlertCircleIcon} size={16} />,
                 error: <HugeiconsIcon icon={RemoveCircleIcon} size={16} />,
-                loading: <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} className="animate-spin" />,
-            }}
-            toastOptions={{
-                classNames: {
-                    toast: 'font-mono !py-4 !px-6 !gap-4',
-                    title: '!text-sm !font-medium',
-                    description: '!text-sm !opacity-80',
-                },
+                loading: <HugeiconsIcon className="animate-spin" icon={ArrowReloadHorizontalIcon} size={16} />,
             }}
             style={
                 {
@@ -38,6 +30,14 @@ const Toaster = ({ ...props }: ToasterProps) => {
                     '--border-radius': 'var(--radius)',
                 } as React.CSSProperties
             }
+            theme={theme as ToasterProps['theme']}
+            toastOptions={{
+                classNames: {
+                    toast: 'font-mono !py-4 !px-6 !gap-4',
+                    title: '!text-sm !font-medium',
+                    description: '!text-sm !opacity-80',
+                },
+            }}
             {...props}
         />
     );

@@ -1,16 +1,9 @@
 import { addMilliseconds, differenceInCalendarDays, endOfDay, getDaysInMonth, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from 'date-fns';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 
-type PerformanceRangeKey =
-    | 'today'
-    | 'yesterday'
-    | 'this_week'
-    | 'this_month'
-    | 'this_year'
-    | 'last_30_days'
-    | 'last_6_months'
-    | 'last_12_months'
-    | 'all_time';
+const TIMEZONE_SUFFIX_REGEX = /[zZ]|[+-]\d{2}:\d{2}$/;
+
+type PerformanceRangeKey = 'today' | 'yesterday' | 'this_week' | 'this_month' | 'this_year' | 'last_30_days' | 'last_6_months' | 'last_12_months' | 'all_time';
 
 type CustomDateRange = {
     start: string;
@@ -185,8 +178,12 @@ const isRollingRange = (range: PerformanceRangeKey) => {
 
 const getGranularityForCustomRange = (start: Date, end: Date): PerformanceGranularity => {
     const daySpan = differenceInCalendarDays(startOfDay(end), startOfDay(start)) + 1;
-    if (daySpan <= 1) return 'hour';
-    if (daySpan <= 120) return 'day';
+    if (daySpan <= 1) {
+        return 'hour';
+    }
+    if (daySpan <= 120) {
+        return 'day';
+    }
     return 'month';
 };
 
@@ -202,7 +199,7 @@ const normalizeCustomRange = (range: CustomDateRange, timezone: string) => {
 const parseCustomBoundary = (value: string, boundary: 'start' | 'end', timezone: string) => {
     const trimmed = value.trim();
     const hasTime = trimmed.includes('T');
-    const hasTimezone = /[zZ]|[+-]\d{2}:\d{2}$/.test(trimmed);
+    const hasTimezone = TIMEZONE_SUFFIX_REGEX.test(trimmed);
 
     if (!hasTime) {
         const suffix = boundary === 'start' ? 'T00:00:00.000' : 'T23:59:59.999';

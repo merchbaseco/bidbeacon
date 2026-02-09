@@ -1,5 +1,5 @@
-import { AlertCircleIcon, AlertTriangleIcon, CheckCircleIcon, FilterIcon, Loader2Icon } from 'lucide-react';
 import { useAtom, useSetAtom } from 'jotai';
+import { AlertCircleIcon, AlertTriangleIcon, CheckCircleIcon, FilterIcon, Loader2Icon } from 'lucide-react';
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { offsetAtom, statusFilterAtom } from './atoms';
 
@@ -19,19 +19,21 @@ export const StatusFilter = () => {
     return (
         <Select
             aria-label="Select status"
-            value={statusFilter}
             onValueChange={value => {
                 if (value !== null) {
                     setStatusFilter(value);
                     setOffset(0);
                 }
             }}
+            value={statusFilter}
         >
-            <SelectTrigger className="w-[140px] md:w-[180px] text-sm">
+            <SelectTrigger className="w-[140px] text-sm md:w-[180px]">
                 <SelectValue>
                     {value => {
                         const option = STATUS_OPTIONS.find(opt => opt.value === value);
-                        if (!option) return null;
+                        if (!option) {
+                            return null;
+                        }
                         return (
                             <span className="flex items-center gap-1.5">
                                 <option.icon className="size-3.5 opacity-72" />

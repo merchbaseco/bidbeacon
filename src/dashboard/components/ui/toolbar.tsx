@@ -5,22 +5,11 @@ import { Toolbar as ToolbarPrimitive } from '@base-ui-components/react/toolbar';
 import { cn } from '../../lib/utils';
 
 function Toolbar({ className, ...props }: ToolbarPrimitive.Root.Props) {
-    return (
-        <ToolbarPrimitive.Root
-            className={cn(
-                'relative flex gap-2 rounded-xl border bg-card bg-clip-padding p-1 text-card-foreground',
-                className
-            )}
-            data-slot="toolbar"
-            {...props}
-        />
-    );
+    return <ToolbarPrimitive.Root className={cn('relative flex gap-2 rounded-xl border bg-card bg-clip-padding p-1 text-card-foreground', className)} data-slot="toolbar" {...props} />;
 }
 
 function ToolbarButton({ className, ...props }: ToolbarPrimitive.Button.Props) {
-    return (
-        <ToolbarPrimitive.Button className={cn(className)} data-slot="toolbar-button" {...props} />
-    );
+    return <ToolbarPrimitive.Button className={cn(className)} data-slot="toolbar-button" {...props} />;
 }
 
 function ToolbarLink({ className, ...props }: ToolbarPrimitive.Link.Props) {
@@ -28,19 +17,11 @@ function ToolbarLink({ className, ...props }: ToolbarPrimitive.Link.Props) {
 }
 
 function ToolbarInput({ className, ...props }: ToolbarPrimitive.Input.Props) {
-    return (
-        <ToolbarPrimitive.Input className={cn(className)} data-slot="toolbar-input" {...props} />
-    );
+    return <ToolbarPrimitive.Input className={cn(className)} data-slot="toolbar-input" {...props} />;
 }
 
 function ToolbarGroup({ className, ...props }: ToolbarPrimitive.Group.Props) {
-    return (
-        <ToolbarPrimitive.Group
-            className={cn('flex items-center gap-1', className)}
-            data-slot="toolbar-group"
-            {...props}
-        />
-    );
+    return <ToolbarPrimitive.Group className={cn('flex items-center gap-1', className)} data-slot="toolbar-group" {...props} />;
 }
 
 function ToolbarSeparator({ className, ...props }: ToolbarPrimitive.Separator.Props) {

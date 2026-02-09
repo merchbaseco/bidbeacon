@@ -14,10 +14,10 @@ export const EntityAggregationFilter = () => {
 
     return (
         <ButtonGroup>
-            <Button size="sm" variant={aggregation === 'daily' ? 'default' : 'outline'} onClick={() => handleChange('daily')}>
+            <Button onClick={() => handleChange('daily')} size="sm" variant={aggregation === 'daily' ? 'default' : 'outline'}>
                 Daily
             </Button>
-            <Button size="sm" variant={aggregation === 'hourly' ? 'default' : 'outline'} onClick={() => handleChange('hourly')}>
+            <Button onClick={() => handleChange('hourly')} size="sm" variant={aggregation === 'hourly' ? 'default' : 'outline'}>
                 Hourly
             </Button>
         </ButtonGroup>

@@ -1,8 +1,8 @@
 import { useAtom } from 'jotai';
 import { useEffect, useMemo, useRef } from 'react';
 import { api } from '../../lib/trpc';
-import { useAdvertisingAccounts } from './use-advertising-accounts';
 import { selectedAccountIdAtom, selectedCountryCodeAtom, selectedProfileIdAtom } from '../components/account-selector/atoms';
+import { useAdvertisingAccounts } from './use-advertising-accounts';
 
 export const useSelectedAccount = () => {
     const { data: accounts = [], isLoading, error } = useAdvertisingAccounts();
@@ -12,7 +12,7 @@ export const useSelectedAccount = () => {
     const initializedRef = useRef(false);
 
     const { data: savedAccount, isFetched: isSavedAccountFetched } = api.users.getSelectedAccount.useQuery(undefined, {
-        staleTime: Infinity,
+        staleTime: Number.POSITIVE_INFINITY,
     });
 
     const setSelectedAccountMutation = api.users.setSelectedAccount.useMutation();
@@ -34,16 +34,14 @@ export const useSelectedAccount = () => {
     const selectedValue = accountId && profileId ? `${accountId}:${profileId}` : '';
 
     useEffect(() => {
-        if (initializedRef.current || accounts.length === 0 || accountId || !isSavedAccountFetched) return;
+        if (initializedRef.current || accounts.length === 0 || accountId || !isSavedAccountFetched) {
+            return;
+        }
 
         if (savedAccount?.adsAccountId && savedAccount?.profileId) {
-            const savedExists = accounts.some(
-                a => a.adsAccountId === savedAccount.adsAccountId && a.profileId === savedAccount.profileId
-            );
+            const savedExists = accounts.some(a => a.adsAccountId === savedAccount.adsAccountId && a.profileId === savedAccount.profileId);
             if (savedExists) {
-                const account = accounts.find(
-                    a => a.adsAccountId === savedAccount.adsAccountId && a.profileId === savedAccount.profileId
-                );
+                const account = accounts.find(a => a.adsAccountId === savedAccount.adsAccountId && a.profileId === savedAccount.profileId);
                 if (account) {
                     setAccountId(savedAccount.adsAccountId);
                     setProfileId(savedAccount.profileId);
@@ -59,8 +57,7 @@ export const useSelectedAccount = () => {
             setAccountId(firstAccount.adsAccountId);
             setProfileId(firstAccount.profileId);
             setCountryCode(firstAccount.countryCode);
-            const shouldPersistFallback =
-                savedAccount === null || Boolean(savedAccount?.adsAccountId && savedAccount?.profileId);
+            const shouldPersistFallback = savedAccount === null || Boolean(savedAccount?.adsAccountId && savedAccount?.profileId);
             if (shouldPersistFallback) {
                 setSelectedAccountMutation.mutate({
                     adsAccountId: firstAccount.adsAccountId,
@@ -69,16 +66,7 @@ export const useSelectedAccount = () => {
             }
         }
         initializedRef.current = true;
-    }, [
-        accounts,
-        accountId,
-        savedAccount,
-        isSavedAccountFetched,
-        setAccountId,
-        setProfileId,
-        setCountryCode,
-        setSelectedAccountMutation,
-    ]);
+    }, [accounts, accountId, savedAccount, isSavedAccountFetched, setAccountId, setProfileId, setCountryCode, setSelectedAccountMutation]);
 
     useEffect(() => {
         if (accountId && profileId && accounts.length > 0) {
@@ -90,7 +78,9 @@ export const useSelectedAccount = () => {
     }, [accountId, profileId, accounts, setCountryCode]);
 
     const handleValueChange = (value: string | null) => {
-        if (!value) return;
+        if (!value) {
+            return;
+        }
         const [adsAccountId, newProfileId] = value.split(':');
         if (adsAccountId && newProfileId) {
             const selectedAccount = accounts.find(a => a.adsAccountId === adsAccountId && a.profileId === newProfileId);

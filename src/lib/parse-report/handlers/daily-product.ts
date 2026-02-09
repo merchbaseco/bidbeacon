@@ -14,7 +14,7 @@ export async function handleDailyProduct(input: ParseReportInput): Promise<Parse
     const timezone = getTimezoneForCountry(input.countryCode);
 
     const response = await fetch(input.reportUrl, {
-        signal: AbortSignal.timeout(60000),
+        signal: AbortSignal.timeout(60_000),
     });
 
     if (!response.ok) {

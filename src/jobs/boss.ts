@@ -34,7 +34,7 @@ interface WorkOptions {
     batchSize?: number; // Number of jobs to fetch and process per handler invocation
 }
 
-type WorkHandlerResult = { metadata?: Record<string, unknown> } | void;
+type WorkHandlerResult = { metadata?: Record<string, unknown> } | undefined;
 type WorkHandler<T> = (jobs: Array<{ id: string; data: T }>) => WorkHandlerResult | Promise<WorkHandlerResult>;
 
 // ============================================================================
@@ -168,9 +168,15 @@ class Job<T extends JobData> {
         const options: Record<string, unknown> = {};
 
         if (this.retryOptions) {
-            if (this.retryOptions.limit !== undefined) options.retryLimit = this.retryOptions.limit;
-            if (this.retryOptions.delay !== undefined) options.retryDelay = this.retryOptions.delay;
-            if (this.retryOptions.backoff !== undefined) options.retryBackoff = this.retryOptions.backoff;
+            if (this.retryOptions.limit !== undefined) {
+                options.retryLimit = this.retryOptions.limit;
+            }
+            if (this.retryOptions.delay !== undefined) {
+                options.retryDelay = this.retryOptions.delay;
+            }
+            if (this.retryOptions.backoff !== undefined) {
+                options.retryBackoff = this.retryOptions.backoff;
+            }
         }
 
         if (this.delayOptions?.seconds) {
@@ -194,7 +200,7 @@ class Job<T extends JobData> {
 
 class BossWrapper {
     private instance: PgBoss | null = null;
-    private jobs: Job<any>[] = [];
+    private readonly jobs: Job<any>[] = [];
 
     /**
      * Create a new job with the given name.

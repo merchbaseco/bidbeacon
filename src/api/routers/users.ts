@@ -12,41 +12,32 @@ export const usersRouter = router({
         };
     }),
 
-    linkAccount: privateProcedure
-        .input(z.object({ adsAccountId: z.string() }))
-        .mutation(async ({ ctx, input }) => {
-            // Verify the account exists
-            const account = await db.query.advertiserAccount.findFirst({
-                where: eq(advertiserAccount.adsAccountId, input.adsAccountId),
-            });
+    linkAccount: privateProcedure.input(z.object({ adsAccountId: z.string() })).mutation(async ({ ctx, input }) => {
+        // Verify the account exists
+        const account = await db.query.advertiserAccount.findFirst({
+            where: eq(advertiserAccount.adsAccountId, input.adsAccountId),
+        });
 
-            if (!account) {
-                throw new Error('Account not found');
-            }
+        if (!account) {
+            throw new Error('Account not found');
+        }
 
-            await db
-                .insert(userAccountAccess)
-                .values({
-                    clerkUserId: ctx.user.sub,
-                    adsAccountId: input.adsAccountId,
-                })
-                .onConflictDoNothing();
+        await db
+            .insert(userAccountAccess)
+            .values({
+                clerkUserId: ctx.user.sub,
+                adsAccountId: input.adsAccountId,
+            })
+            .onConflictDoNothing();
 
-            return true;
-        }),
+        return true;
+    }),
 
-    unlinkAccount: privateProcedure
-        .input(z.object({ adsAccountId: z.string() }))
-        .mutation(async ({ ctx, input }) => {
-            await db.delete(userAccountAccess).where(
-                and(
-                    eq(userAccountAccess.clerkUserId, ctx.user.sub),
-                    eq(userAccountAccess.adsAccountId, input.adsAccountId)
-                )
-            );
+    unlinkAccount: privateProcedure.input(z.object({ adsAccountId: z.string() })).mutation(async ({ ctx, input }) => {
+        await db.delete(userAccountAccess).where(and(eq(userAccountAccess.clerkUserId, ctx.user.sub), eq(userAccountAccess.adsAccountId, input.adsAccountId)));
 
-            return true;
-        }),
+        return true;
+    }),
 
     getSelectedAccount: privateProcedure.query(async ({ ctx }) => {
         const prefs = await db.query.userPreferences.findFirst({

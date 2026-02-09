@@ -39,19 +39,19 @@ const Sparkline = ({ data, globalMax }: { data: number[]; globalMax?: number }) 
 
     return (
         <div className="h-6 w-18">
-            <ResponsiveContainer width="100%" height="100%" debounce={300}>
+            <ResponsiveContainer debounce={300} height="100%" width="100%">
                 <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
                     <YAxis domain={[0, maxValue]} hide />
-                        <Bar
-                            dataKey="value"
-                            radius={[2, 2, 0, 0]}
-                            isAnimationActive={false}
-                            shape={(props: any) => {
-                                const { x = 0, y = 0, width = 0, height = 0, payload } = props ?? {};
-                                const opacity = payload?.opacity ?? 0.5;
-                                return <rect x={x} y={y} width={width} height={height} fill="currentColor" opacity={opacity} rx={2} className="text-indigo-500" />;
-                            }}
-                        />
+                    <Bar
+                        dataKey="value"
+                        isAnimationActive={false}
+                        radius={[2, 2, 0, 0]}
+                        shape={(props: any) => {
+                            const { x = 0, y = 0, width = 0, height = 0, payload } = props ?? {};
+                            const opacity = payload?.opacity ?? 0.5;
+                            return <rect className="text-indigo-500" fill="currentColor" height={height} opacity={opacity} rx={2} width={width} x={x} y={y} />;
+                        }}
+                    />
                 </BarChart>
             </ResponsiveContainer>
         </div>
@@ -59,17 +59,17 @@ const Sparkline = ({ data, globalMax }: { data: number[]; globalMax?: number }) 
 };
 
 const MetricRow = ({ label, sparklineData, total, lastActivity, globalMax }: { label: string; sparklineData: number[]; total: number; lastActivity?: string; globalMax: number }) => {
-    const isRecent = lastActivity && (new Date().getTime() - new Date(lastActivity).getTime()) < 5 * 60 * 1000; // Within 5 minutes
+    const isRecent = lastActivity && Date.now() - new Date(lastActivity).getTime() < 5 * 60 * 1000; // Within 5 minutes
 
     return (
-        <div className="flex items-center justify-between h-9">
+        <div className="flex h-9 items-center justify-between">
             <div className="flex items-center gap-2">
                 <span className={`size-2 rounded-full ${isRecent ? 'bg-emerald-500' : 'bg-zinc-400'}`} />
                 <span className="text-sm">{label}</span>
             </div>
             <div className="flex items-center gap-3">
                 <Sparkline data={sparklineData} globalMax={globalMax} />
-                <span className="text-sm text-muted-foreground tabular-nums w-16 text-right">{total.toLocaleString()}</span>
+                <span className="w-16 text-right text-muted-foreground text-sm tabular-nums">{total.toLocaleString()}</span>
             </div>
         </div>
     );
@@ -77,19 +77,19 @@ const MetricRow = ({ label, sparklineData, total, lastActivity, globalMax }: { l
 
 export const AmsMetricsCard = () => {
     const { data: amsData, isLoading: isLoadingAms } = api.metrics.amsRecent.useQuery(undefined, {
-        refetchInterval: 60000, // 1 minute
-        staleTime: 30000,
+        refetchInterval: 60_000, // 1 minute
+        staleTime: 30_000,
     });
 
     const { data: workerData, isLoading: isLoadingWorker } = api.worker.metrics.useQuery(undefined, {
-        refetchInterval: 60000, // 1 minute
-        staleTime: 30000,
+        refetchInterval: 60_000, // 1 minute
+        staleTime: 30_000,
     });
 
     const isLoading = isLoadingAms || isLoadingWorker;
 
     const { metrics, globalMax } = useMemo((): { metrics: MetricRow[]; globalMax: number } => {
-        if (!amsData || !workerData) {
+        if (!(amsData && workerData)) {
             return { metrics: [], globalMax: 10 };
         }
 
@@ -142,85 +142,79 @@ export const AmsMetricsCard = () => {
         });
 
         // Calculate global max across all sparklines (minimum 10 to ensure tiny bars for zeros)
-        const allValues = [
-            ...campaignSparkline,
-            ...adGroupSparkline,
-            ...adSparkline,
-            ...targetSparkline,
-            ...trafficSparkline,
-            ...conversionSparkline,
-            ...totalIngestedSparkline,
-            ...dlqSparkline,
-        ];
+        const allValues = [...campaignSparkline, ...adGroupSparkline, ...adSparkline, ...targetSparkline, ...trafficSparkline, ...conversionSparkline, ...totalIngestedSparkline, ...dlqSparkline];
         const calculatedMax = Math.max(...allValues, 10);
 
         const lastActivity = amsData.lastActivity;
 
-        return { globalMax: calculatedMax, metrics: [
-            {
-                label: 'Campaigns',
-                entityType: 'campaign',
-                sparklineData: campaignSparkline,
-                total: campaignSparkline.reduce((sum, val) => sum + val, 0),
-                lastActivity: lastActivity?.campaign,
-            },
-            {
-                label: 'Ad Groups',
-                entityType: 'adGroup',
-                sparklineData: adGroupSparkline,
-                total: adGroupSparkline.reduce((sum, val) => sum + val, 0),
-                lastActivity: lastActivity?.adGroup,
-            },
-            {
-                label: 'Ads',
-                entityType: 'ad',
-                sparklineData: adSparkline,
-                total: adSparkline.reduce((sum, val) => sum + val, 0),
-                lastActivity: lastActivity?.ad,
-            },
-            {
-                label: 'Targets',
-                entityType: 'target',
-                sparklineData: targetSparkline,
-                total: targetSparkline.reduce((sum, val) => sum + val, 0),
-                lastActivity: lastActivity?.target,
-            },
-            {
-                label: 'Traffic',
-                entityType: 'spTraffic',
-                sparklineData: trafficSparkline,
-                total: trafficSparkline.reduce((sum, val) => sum + val, 0),
-                lastActivity: lastActivity?.spTraffic,
-            },
-            {
-                label: 'Conversions',
-                entityType: 'spConversion',
-                sparklineData: conversionSparkline,
-                total: conversionSparkline.reduce((sum, val) => sum + val, 0),
-                lastActivity: lastActivity?.spConversion,
-            },
-            {
-                label: 'Total Messages',
-                entityType: 'total' as const,
-                sparklineData: totalIngestedSparkline,
-                total: totalIngestedSparkline.reduce((sum, val) => sum + val, 0),
-            },
-            {
-                label: 'Error Messages',
-                entityType: 'dlq',
-                sparklineData: dlqSparkline,
-                total: dlqCurrent,
-            },
-        ]};
+        return {
+            globalMax: calculatedMax,
+            metrics: [
+                {
+                    label: 'Campaigns',
+                    entityType: 'campaign',
+                    sparklineData: campaignSparkline,
+                    total: campaignSparkline.reduce((sum, val) => sum + val, 0),
+                    lastActivity: lastActivity?.campaign,
+                },
+                {
+                    label: 'Ad Groups',
+                    entityType: 'adGroup',
+                    sparklineData: adGroupSparkline,
+                    total: adGroupSparkline.reduce((sum, val) => sum + val, 0),
+                    lastActivity: lastActivity?.adGroup,
+                },
+                {
+                    label: 'Ads',
+                    entityType: 'ad',
+                    sparklineData: adSparkline,
+                    total: adSparkline.reduce((sum, val) => sum + val, 0),
+                    lastActivity: lastActivity?.ad,
+                },
+                {
+                    label: 'Targets',
+                    entityType: 'target',
+                    sparklineData: targetSparkline,
+                    total: targetSparkline.reduce((sum, val) => sum + val, 0),
+                    lastActivity: lastActivity?.target,
+                },
+                {
+                    label: 'Traffic',
+                    entityType: 'spTraffic',
+                    sparklineData: trafficSparkline,
+                    total: trafficSparkline.reduce((sum, val) => sum + val, 0),
+                    lastActivity: lastActivity?.spTraffic,
+                },
+                {
+                    label: 'Conversions',
+                    entityType: 'spConversion',
+                    sparklineData: conversionSparkline,
+                    total: conversionSparkline.reduce((sum, val) => sum + val, 0),
+                    lastActivity: lastActivity?.spConversion,
+                },
+                {
+                    label: 'Total Messages',
+                    entityType: 'total' as const,
+                    sparklineData: totalIngestedSparkline,
+                    total: totalIngestedSparkline.reduce((sum, val) => sum + val, 0),
+                },
+                {
+                    label: 'Error Messages',
+                    entityType: 'dlq',
+                    sparklineData: dlqSparkline,
+                    total: dlqCurrent,
+                },
+            ],
+        };
     }, [amsData, workerData]);
 
     if (isLoading) {
         return (
-            <Card className="p-3 pb-1 space-y-0 gap-0">
-                <div className="flex items-start justify-between pl-1 pb-3">
-                    <div className="text-sm font-medium">AMS Metric Ingestion (60m)</div>
+            <Card className="gap-0 space-y-0 p-3 pb-1">
+                <div className="flex items-start justify-between pb-3 pl-1">
+                    <div className="font-medium text-sm">AMS Metric Ingestion (60m)</div>
                 </div>
-                <div className="flex items-center justify-center h-[144px]">
+                <div className="flex h-[144px] items-center justify-center">
                     <Spinner className="size-5 text-muted-foreground" />
                 </div>
             </Card>
@@ -229,31 +223,31 @@ export const AmsMetricsCard = () => {
 
     if (metrics.length === 0) {
         return (
-            <Card className="p-3 pb-1 space-y-0 gap-0">
-                <div className="flex items-start justify-between pl-1 pb-3">
-                    <div className="text-sm font-medium">AMS Metric Ingestion (60m)</div>
+            <Card className="gap-0 space-y-0 p-3 pb-1">
+                <div className="flex items-start justify-between pb-3 pl-1">
+                    <div className="font-medium text-sm">AMS Metric Ingestion (60m)</div>
                 </div>
-                <div className="flex items-center justify-center h-[144px]">
-                    <p className="text-sm text-muted-foreground">No ingestion data available</p>
+                <div className="flex h-[144px] items-center justify-center">
+                    <p className="text-muted-foreground text-sm">No ingestion data available</p>
                 </div>
             </Card>
         );
     }
 
     return (
-        <Card className="p-3 pb-1 space-y-0 gap-0">
-            <div className="flex items-start justify-between pl-1 pb-3">
-                <div className="text-sm font-medium">AMS Metric Ingestion (60m)</div>
+        <Card className="gap-0 space-y-0 p-3 pb-1">
+            <div className="flex items-start justify-between pb-3 pl-1">
+                <div className="font-medium text-sm">AMS Metric Ingestion (60m)</div>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-4 px-1">
+            <div className="grid grid-cols-1 gap-x-4 px-1 md:grid-cols-2">
                 <div className="divide-y">
                     {metrics.slice(0, 4).map(metric => (
-                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} lastActivity={metric.lastActivity} globalMax={globalMax} />
+                        <MetricRow globalMax={globalMax} key={metric.entityType} label={metric.label} lastActivity={metric.lastActivity} sparklineData={metric.sparklineData} total={metric.total} />
                     ))}
                 </div>
                 <div className="divide-y">
                     {metrics.slice(4, 8).map(metric => (
-                        <MetricRow key={metric.entityType} label={metric.label} sparklineData={metric.sparklineData} total={metric.total} lastActivity={metric.lastActivity} globalMax={globalMax} />
+                        <MetricRow globalMax={globalMax} key={metric.entityType} label={metric.label} lastActivity={metric.lastActivity} sparklineData={metric.sparklineData} total={metric.total} />
                     ))}
                 </div>
             </div>

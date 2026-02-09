@@ -1,6 +1,6 @@
-import { apiProcedure } from '@/api/trpc';
+import { extractMultiStatusEntity, updateCampaigns } from '@/amazon-ads/sp-entities';
 import { campaignsGetOutputSchema, campaignsUpdateInputSchema } from '@/api/schemas/cli';
-import { updateCampaigns, extractMultiStatusEntity } from '@/amazon-ads/sp-entities';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, mapCampaignFromApi, resolveAccountContext, updateCampaignRow } from './shared';
 
 export const campaignsUpdate = apiProcedure
@@ -14,10 +14,18 @@ export const campaignsUpdate = apiProcedure
             campaignId: input.campaignId,
         };
 
-        if (input.name) payload.name = input.name;
-        if (input.portfolioId !== undefined) payload.portfolioId = input.portfolioId;
-        if (input.startDateTime) payload.startDateTime = input.startDateTime;
-        if (input.endDateTime !== undefined) payload.endDateTime = input.endDateTime;
+        if (input.name) {
+            payload.name = input.name;
+        }
+        if (input.portfolioId !== undefined) {
+            payload.portfolioId = input.portfolioId;
+        }
+        if (input.startDateTime) {
+            payload.startDateTime = input.startDateTime;
+        }
+        if (input.endDateTime !== undefined) {
+            payload.endDateTime = input.endDateTime;
+        }
 
         const response = await updateCampaigns({
             profileId: account.profileId,

@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
-import { createTRPCProxyClient, httpLink } from '@trpc/client';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { createTRPCProxyClient, httpLink } from '@trpc/client';
 import type { AppRouter } from '../api/router';
 import { getTimezoneForCountry } from '../utils/timezones';
 
@@ -14,6 +14,7 @@ const METRICS_KEYS = ['impressions', 'clicks', 'spend', 'purchases', 'sales', 'a
 const METRICS_KEYS_SET = new Set(METRICS_KEYS);
 const METRICS_BUCKETS = ['auto', 'hour', 'day', 'week', 'month', 'year'] as const;
 const METRICS_BUCKETS_SET = new Set(METRICS_BUCKETS);
+const METRIC_FILTER_REGEX = /^\s*([^<>=!~]+)\s*(<=|>=|!=|=|<|>|~)\s*(.+)\s*$/;
 
 const main = async () => {
     const { positional, flags } = parseArgs(process.argv.slice(2));
@@ -62,14 +63,18 @@ const main = async () => {
             }
             if (subcommand === 'get') {
                 const campaignId = action;
-                if (!campaignId) throw new Error('Usage: bb campaigns get <campaign_id>');
+                if (!campaignId) {
+                    throw new Error('Usage: bb campaigns get <campaign_id>');
+                }
                 const data = await client.api.cli.campaignsGet.query({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'create') {
                 const [name, budget] = [action, rest[0]];
-                if (!name || !budget) throw new Error('Usage: bb campaigns create <name> <budget>');
+                if (!(name && budget)) {
+                    throw new Error('Usage: bb campaigns create <name> <budget>');
+                }
                 const data = await client.api.cli.campaignsCreate.mutate({
                     config: cliConfig,
                     name,
@@ -80,7 +85,9 @@ const main = async () => {
             }
             if (subcommand === 'update') {
                 const campaignId = action;
-                if (!campaignId) throw new Error('Usage: bb campaigns update <campaign_id> --name <name>');
+                if (!campaignId) {
+                    throw new Error('Usage: bb campaigns update <campaign_id> --name <name>');
+                }
                 const name = readFlag(flags, ['name']);
                 const portfolioId = readFlag(flags, ['portfolio']);
                 const startDateTime = readFlag(flags, ['start']);
@@ -98,21 +105,27 @@ const main = async () => {
             }
             if (subcommand === 'pause') {
                 const campaignId = action;
-                if (!campaignId) throw new Error('Usage: bb campaigns pause <campaign_id>');
+                if (!campaignId) {
+                    throw new Error('Usage: bb campaigns pause <campaign_id>');
+                }
                 const data = await client.api.cli.campaignsPause.mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
                 const campaignId = action;
-                if (!campaignId) throw new Error('Usage: bb campaigns resume <campaign_id>');
+                if (!campaignId) {
+                    throw new Error('Usage: bb campaigns resume <campaign_id>');
+                }
                 const data = await client.api.cli.campaignsResume.mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'delete') {
                 const campaignId = action;
-                if (!campaignId) throw new Error('Usage: bb campaigns delete <campaign_id>');
+                if (!campaignId) {
+                    throw new Error('Usage: bb campaigns delete <campaign_id>');
+                }
                 const data = await client.api.cli.campaignsDelete.mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
@@ -120,7 +133,9 @@ const main = async () => {
             if (subcommand === 'set-budget') {
                 const campaignId = action;
                 const budget = rest[0];
-                if (!campaignId || !budget) throw new Error('Usage: bb campaigns set-budget <campaign_id> <budget>');
+                if (!(campaignId && budget)) {
+                    throw new Error('Usage: bb campaigns set-budget <campaign_id> <budget>');
+                }
                 const data = await client.api.cli.campaignsSetBudget.mutate({
                     config: cliConfig,
                     campaignId,
@@ -132,7 +147,7 @@ const main = async () => {
             if (subcommand === 'set-bid-strategy') {
                 const campaignId = action;
                 const strategy = rest[0];
-                if (!campaignId || !strategy) {
+                if (!(campaignId && strategy)) {
                     throw new Error('Usage: bb campaigns set-bid-strategy <campaign_id> <strategy>');
                 }
                 const data = await client.api.cli.campaignsSetBidStrategy.mutate({
@@ -147,7 +162,7 @@ const main = async () => {
                 const campaignId = action;
                 const scope = rest[0];
                 const json = rest[1];
-                if (!campaignId || !scope || !json) {
+                if (!(campaignId && scope && json)) {
                     throw new Error('Usage: bb campaigns set-bid-adjustments <campaign_id> <placement|audience|creative> <json>');
                 }
                 const data = await client.api.cli.campaignsSetBidAdjustments.mutate({
@@ -176,14 +191,16 @@ const main = async () => {
             }
             if (subcommand === 'get') {
                 const adGroupId = action;
-                if (!adGroupId) throw new Error('Usage: bb ad-groups get <ad_group_id>');
+                if (!adGroupId) {
+                    throw new Error('Usage: bb ad-groups get <ad_group_id>');
+                }
                 const data = await client.api.cli.adGroupsGet.query({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'create') {
                 const [campaignId, name, bid] = [action, rest[0], rest[1]];
-                if (!campaignId || !name || !bid) {
+                if (!(campaignId && name && bid)) {
                     throw new Error('Usage: bb ad-groups create <campaign_id> <name> <default_bid>');
                 }
                 const data = await client.api.cli.adGroupsCreate.mutate({
@@ -198,7 +215,9 @@ const main = async () => {
             if (subcommand === 'update') {
                 const adGroupId = action;
                 const name = rest[0];
-                if (!adGroupId || !name) throw new Error('Usage: bb ad-groups update <ad_group_id> <name>');
+                if (!(adGroupId && name)) {
+                    throw new Error('Usage: bb ad-groups update <ad_group_id> <name>');
+                }
                 const data = await client.api.cli.adGroupsUpdate.mutate({ config: cliConfig, adGroupId, name });
                 printOutput(data);
                 return;
@@ -206,7 +225,7 @@ const main = async () => {
             if (subcommand === 'set-default-bid') {
                 const adGroupId = action;
                 const value = rest[0];
-                if (!adGroupId || !value) {
+                if (!(adGroupId && value)) {
                     throw new Error('Usage: bb ad-groups set-default-bid <ad_group_id> <value>');
                 }
                 const data = await client.api.cli.adGroupsSetDefaultBid.mutate({
@@ -219,21 +238,27 @@ const main = async () => {
             }
             if (subcommand === 'pause') {
                 const adGroupId = action;
-                if (!adGroupId) throw new Error('Usage: bb ad-groups pause <ad_group_id>');
+                if (!adGroupId) {
+                    throw new Error('Usage: bb ad-groups pause <ad_group_id>');
+                }
                 const data = await client.api.cli.adGroupsPause.mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
                 const adGroupId = action;
-                if (!adGroupId) throw new Error('Usage: bb ad-groups resume <ad_group_id>');
+                if (!adGroupId) {
+                    throw new Error('Usage: bb ad-groups resume <ad_group_id>');
+                }
                 const data = await client.api.cli.adGroupsResume.mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'delete') {
                 const adGroupId = action;
-                if (!adGroupId) throw new Error('Usage: bb ad-groups delete <ad_group_id>');
+                if (!adGroupId) {
+                    throw new Error('Usage: bb ad-groups delete <ad_group_id>');
+                }
                 const data = await client.api.cli.adGroupsDelete.mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
@@ -257,7 +282,9 @@ const main = async () => {
             }
             if (subcommand === 'get') {
                 const adId = action;
-                if (!adId) throw new Error('Usage: bb ads get <ad_id>');
+                if (!adId) {
+                    throw new Error('Usage: bb ads get <ad_id>');
+                }
                 const data = await client.api.cli.adsGet.query({ config: cliConfig, adId });
                 printOutput(data);
                 return;
@@ -265,7 +292,7 @@ const main = async () => {
             if (subcommand === 'create') {
                 const [adGroupId, productId] = [action, rest[0]];
                 const productIdType = rest[1] ?? 'ASIN';
-                if (!adGroupId || !productId) {
+                if (!(adGroupId && productId)) {
                     throw new Error('Usage: bb ads create <ad_group_id> <asin|sku> [ASIN|SKU]');
                 }
                 const data = await client.api.cli.adsCreate.mutate({
@@ -280,14 +307,18 @@ const main = async () => {
             if (subcommand === 'update') {
                 const adId = action;
                 const state = rest[0];
-                if (!adId || !state) throw new Error('Usage: bb ads update <ad_id> <state>');
+                if (!(adId && state)) {
+                    throw new Error('Usage: bb ads update <ad_id> <state>');
+                }
                 const data = await client.api.cli.adsUpdate.mutate({ config: cliConfig, adId, state });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'delete') {
                 const adId = action;
-                if (!adId) throw new Error('Usage: bb ads delete <ad_id>');
+                if (!adId) {
+                    throw new Error('Usage: bb ads delete <ad_id>');
+                }
                 const data = await client.api.cli.adsDelete.mutate({ config: cliConfig, adId });
                 printOutput(data);
                 return;
@@ -312,7 +343,9 @@ const main = async () => {
             if (subcommand === 'set-bid') {
                 const targetId = action;
                 const value = rest[0];
-                if (!targetId || !value) throw new Error('Usage: bb targets set-bid <target_id> <value>');
+                if (!(targetId && value)) {
+                    throw new Error('Usage: bb targets set-bid <target_id> <value>');
+                }
                 const data = await client.api.cli.bidsSet.mutate({
                     config: cliConfig,
                     targetId,
@@ -324,7 +357,9 @@ const main = async () => {
             if (subcommand === 'adjust-bid') {
                 const targetId = action;
                 const delta = rest[0];
-                if (!targetId || !delta) throw new Error('Usage: bb targets adjust-bid <target_id> <delta>');
+                if (!(targetId && delta)) {
+                    throw new Error('Usage: bb targets adjust-bid <target_id> <delta>');
+                }
                 const data = await client.api.cli.bidsAdjust.mutate({
                     config: cliConfig,
                     targetId,
@@ -335,32 +370,36 @@ const main = async () => {
             }
             if (subcommand === 'get') {
                 const targetId = action;
-                if (!targetId) throw new Error('Usage: bb targets get <target_id>');
+                if (!targetId) {
+                    throw new Error('Usage: bb targets get <target_id>');
+                }
                 const data = await client.api.cli.targetsGet.query({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'create') {
                 const targetType = action;
-                if (!targetType) throw new Error('Usage: bb targets create keyword|product ...');
+                if (!targetType) {
+                    throw new Error('Usage: bb targets create keyword|product ...');
+                }
                 if (targetType === 'keyword') {
                     const [adGroupId, keyword, matchType, bid] = rest;
-                    if (!adGroupId || !keyword || !matchType || !bid) {
+                    if (!(adGroupId && keyword && matchType && bid)) {
                         throw new Error('Usage: bb targets create keyword <ad_group_id> <keyword> <match_type> <bid>');
                     }
-                const data = await client.api.cli.targetsCreateKeyword.mutate({
-                    config: cliConfig,
-                    adGroupId,
-                    keyword,
-                    matchType,
-                    bid: parseNumberArg(bid, 'bid'),
-                });
+                    const data = await client.api.cli.targetsCreateKeyword.mutate({
+                        config: cliConfig,
+                        adGroupId,
+                        keyword,
+                        matchType,
+                        bid: parseNumberArg(bid, 'bid'),
+                    });
                     printOutput(data);
                     return;
                 }
                 if (targetType === 'product') {
                     const [adGroupId, productId, matchType, bid, productIdType] = rest;
-                    if (!adGroupId || !productId || !matchType || !bid) {
+                    if (!(adGroupId && productId && matchType && bid)) {
                         throw new Error('Usage: bb targets create product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU]');
                     }
                     const data = await client.api.cli.targetsCreateProduct.mutate({
@@ -378,21 +417,27 @@ const main = async () => {
             }
             if (subcommand === 'delete') {
                 const targetId = action;
-                if (!targetId) throw new Error('Usage: bb targets delete <target_id>');
+                if (!targetId) {
+                    throw new Error('Usage: bb targets delete <target_id>');
+                }
                 const data = await client.api.cli.targetsDelete.mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'pause') {
                 const targetId = action;
-                if (!targetId) throw new Error('Usage: bb targets pause <target_id>');
+                if (!targetId) {
+                    throw new Error('Usage: bb targets pause <target_id>');
+                }
                 const data = await client.api.cli.targetsPause.mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
                 const targetId = action;
-                if (!targetId) throw new Error('Usage: bb targets resume <target_id>');
+                if (!targetId) {
+                    throw new Error('Usage: bb targets resume <target_id>');
+                }
                 const data = await client.api.cli.targetsResume.mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
@@ -404,7 +449,9 @@ const main = async () => {
             if (subcommand === 'set') {
                 const targetId = action;
                 const value = rest[0];
-                if (!targetId || !value) throw new Error('Usage: bb bids set <target_id> <value>');
+                if (!(targetId && value)) {
+                    throw new Error('Usage: bb bids set <target_id> <value>');
+                }
                 const data = await client.api.cli.bidsSet.mutate({
                     config: cliConfig,
                     targetId,
@@ -416,7 +463,9 @@ const main = async () => {
             if (subcommand === 'adjust') {
                 const targetId = action;
                 const delta = rest[0];
-                if (!targetId || !delta) throw new Error('Usage: bb bids adjust <target_id> <delta>');
+                if (!(targetId && delta)) {
+                    throw new Error('Usage: bb bids adjust <target_id> <delta>');
+                }
                 const data = await client.api.cli.bidsAdjust.mutate({
                     config: cliConfig,
                     targetId,
@@ -429,7 +478,7 @@ const main = async () => {
         }
         case 'metrics': {
             const cliConfig = requireCliConfig(config);
-            if (!subcommand || !action) {
+            if (!(subcommand && action)) {
                 throw new Error('Usage: bb metrics <series|table> <campaigns|ad-groups|ads|targets> [filters]');
             }
 
@@ -472,9 +521,7 @@ const main = async () => {
             if (subcommand === 'series') {
                 if (action === 'campaigns') {
                     if (campaignId || adGroupId) {
-                        throw new Error(
-                            'Usage: bb metrics series campaigns [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>].'
-                        );
+                        throw new Error('Usage: bb metrics series campaigns [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>].');
                     }
                     const data = await client.api.cli.metricsSeriesCampaigns.query({
                         config: cliConfig,
@@ -489,9 +536,7 @@ const main = async () => {
                 }
                 if (action === 'ad-groups') {
                     if (adGroupId) {
-                        throw new Error(
-                            'Usage: bb metrics series ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>].'
-                        );
+                        throw new Error('Usage: bb metrics series ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>].');
                     }
                     const data = await client.api.cli.metricsSeriesAdGroups.query({
                         config: cliConfig,
@@ -542,9 +587,7 @@ const main = async () => {
 
                 if (action === 'campaigns') {
                     if (campaignId || adGroupId) {
-                        throw new Error(
-                            'Usage: bb metrics table campaigns [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>].'
-                        );
+                        throw new Error('Usage: bb metrics table campaigns [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>].');
                     }
                     const data = await client.api.cli.metricsTableCampaigns.query({
                         config: cliConfig,
@@ -792,7 +835,7 @@ const resolveApiConfig = (config: CliConfig) => {
 };
 
 const requireCliConfig = (config: CliConfig) => {
-    if (!config.accountId || !config.countryCode) {
+    if (!(config.accountId && config.countryCode)) {
         throw new Error('Missing config: account + country. Use bb config set account <adsAccountId> <countryCode>.');
     }
     return {
@@ -970,10 +1013,10 @@ const parseSortField = (value?: string) => {
         return 'spend' as const;
     }
     const normalized = value.trim().toLowerCase();
-    if (!METRICS_KEYS_SET.has(normalized as typeof METRICS_KEYS[number])) {
+    if (!METRICS_KEYS_SET.has(normalized as (typeof METRICS_KEYS)[number])) {
         throw new Error('Invalid --sort. Use impressions, clicks, purchases, spend, sales, acos, cpc, ctr, or roas.');
     }
-    return normalized as typeof METRICS_KEYS[number];
+    return normalized as (typeof METRICS_KEYS)[number];
 };
 
 const parseSortDirection = (value?: string) => {
@@ -989,7 +1032,7 @@ const parseSortDirection = (value?: string) => {
 
 const parsePositiveIntArg = (value: string, label: string) => {
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 1) {
+    if (!(Number.isFinite(parsed) && Number.isInteger(parsed)) || parsed < 1) {
         throw new Error(`Invalid ${label}. Use an integer >= 1.`);
     }
     return parsed;
@@ -997,7 +1040,7 @@ const parsePositiveIntArg = (value: string, label: string) => {
 
 const parseNonNegativeIntArg = (value: string, label: string) => {
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 0) {
+    if (!(Number.isFinite(parsed) && Number.isInteger(parsed)) || parsed < 0) {
         throw new Error(`Invalid ${label}. Use an integer >= 0.`);
     }
     return parsed;
@@ -1016,11 +1059,11 @@ const parseMetricsSelectionFlag = (flags: ParsedFlags) => {
         throw new Error('Invalid --metrics. Use a comma-separated list of metric keys.');
     }
     for (const key of entries) {
-        if (!METRICS_KEYS_SET.has(key as typeof METRICS_KEYS[number])) {
+        if (!METRICS_KEYS_SET.has(key as (typeof METRICS_KEYS)[number])) {
             throw new Error(`Invalid metric key: ${key}.`);
         }
     }
-    return entries as typeof METRICS_KEYS[number][];
+    return entries as (typeof METRICS_KEYS)[number][];
 };
 
 const parseMetricsBucketFlag = (flags: ParsedFlags) => {
@@ -1029,10 +1072,10 @@ const parseMetricsBucketFlag = (flags: ParsedFlags) => {
         return undefined;
     }
     const normalized = raw.trim().toLowerCase();
-    if (!METRICS_BUCKETS_SET.has(normalized as typeof METRICS_BUCKETS[number])) {
+    if (!METRICS_BUCKETS_SET.has(normalized as (typeof METRICS_BUCKETS)[number])) {
         throw new Error('Invalid --bucket. Use auto, hour, day, week, month, or year.');
     }
-    return normalized as typeof METRICS_BUCKETS[number];
+    return normalized as (typeof METRICS_BUCKETS)[number];
 };
 
 const parseMetricsFiltersFlag = (flags: ParsedFlags) => {
@@ -1058,7 +1101,7 @@ const parseMetricsFiltersFlag = (flags: ParsedFlags) => {
 };
 
 const parseFilterExpression = (raw: string) => {
-    const match = raw.match(/^\s*([^<>=!~]+)\s*(<=|>=|!=|=|<|>|~)\s*(.+)\s*$/);
+    const match = raw.match(METRIC_FILTER_REGEX);
     if (!match) {
         throw new Error(`Invalid --filter expression: ${raw}`);
     }
@@ -1144,9 +1187,9 @@ const resolveMetricKey = (key: string) => {
     const trimmed = key.trim().toLowerCase();
     if (trimmed.startsWith('metrics.')) {
         const candidate = trimmed.replace('metrics.', '');
-        return METRICS_KEYS_SET.has(candidate as typeof METRICS_KEYS[number]) ? candidate : null;
+        return METRICS_KEYS_SET.has(candidate as (typeof METRICS_KEYS)[number]) ? candidate : null;
     }
-    if (METRICS_KEYS_SET.has(trimmed as typeof METRICS_KEYS[number])) {
+    if (METRICS_KEYS_SET.has(trimmed as (typeof METRICS_KEYS)[number])) {
         return trimmed;
     }
     return null;
@@ -1222,7 +1265,7 @@ const buildRangeHelpMessage = async (config: CliConfig) => {
 };
 
 const resolveAccountTimezoneHint = async (config: CliConfig) => {
-    if (!config.accountId || !config.countryCode) {
+    if (!(config.accountId && config.countryCode)) {
         return 'unknown (set account + country first)';
     }
     if (!config.apiKey) {
@@ -1248,9 +1291,7 @@ const resolveAccountTimezoneHint = async (config: CliConfig) => {
             const codes = Array.from(new Set(matches.map(item => (item.countryCode ?? '').toUpperCase()).filter(Boolean))).sort();
             return `unknown (multiple country codes: ${codes.join(', ') || 'unknown'}; set config country)`;
         }
-        const account = matches.find(
-            item => !countryCode || (item.countryCode ?? '').toUpperCase() === countryCode
-        );
+        const account = matches.find(item => !countryCode || (item.countryCode ?? '').toUpperCase() === countryCode);
         if (!account) {
             return `unknown (account ${config.accountId} not found)`;
         }

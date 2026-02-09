@@ -1,5 +1,6 @@
 {
-  "$schema": "https://biomejs.dev/schemas/2.3.10/schema.json",
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "extends": ["ultracite/core", "ultracite/react", "ultracite/remix"],
   "vcs": {
     "enabled": true,
     "clientKind": "git",
@@ -22,15 +23,21 @@
       "recommended": true,
       "style": {
         "useConsistentArrayType": "error",
-        "useImportType": "error"
+        "useImportType": "error",
+        "useConsistentTypeDefinitions": "off",
+        "noNestedTernary": "off"
       },
       "suspicious": {
-        "noExplicitAny": "off"
+        "noExplicitAny": "off",
+        "useAwait": "off"
       },
       "correctness": {
         "noUnusedVariables": "off",
         "noUnusedFunctionParameters": "off",
         "noUnusedImports": "error"
+      },
+      "complexity": {
+        "noExcessiveCognitiveComplexity": "off"
       },
       "a11y": {
         "useKeyWithClickEvents": "off",
@@ -52,5 +59,48 @@
     "formatter": {
       "indentWidth": 2
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": ["drizzle/**"],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": [
+        "packages/bidbeacon-api-client/src/app-router.d.ts",
+        "packages/bidbeacon-api-client/dist/**"
+      ],
+      "formatter": {
+        "enabled": false
+      },
+      "linter": {
+        "enabled": false
+      }
+    },
+    {
+      "includes": ["**/*.test.{ts,tsx}", "**/__tests__/**/*", "tests/**"],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["src/db/index.ts"],
+      "linter": {
+        "rules": {
+          "performance": {
+            "noNamespaceImport": "off"
+          }
+        }
+      }
+    }
+  ]
 }

@@ -7,9 +7,9 @@ import { target } from '@/db/schema';
  * adGroupIds and provides fast synchronous lookups by target value and match type.
  */
 export class TargetCache {
-    private manualKeyword = new Map<string, string>();
-    private product = new Map<string, string>();
-    private auto = new Map<string, string>();
+    private readonly manualKeyword = new Map<string, string>();
+    private readonly product = new Map<string, string>();
+    private readonly auto = new Map<string, string>();
 
     private constructor() {}
 
@@ -33,7 +33,9 @@ export class TargetCache {
         });
 
         for (const t of targets) {
-            if (!t.adGroupId) continue;
+            if (!t.adGroupId) {
+                continue;
+            }
 
             // Manual keywords (PHRASE/BROAD/EXACT)
             if (t.targetKeyword && t.targetMatchType) {
@@ -58,8 +60,8 @@ export class TargetCache {
     }
 
     getTargetId(adGroupId: string, targetValue: string | null, matchType: string | null): string {
-        if (!matchType || !targetValue) {
-            throw new Error(`Row has null target.value or target.matchType`);
+        if (!(matchType && targetValue)) {
+            throw new Error('Row has null target.value or target.matchType');
         }
 
         switch (matchType) {
@@ -114,9 +116,9 @@ const PREDEFINED_MATCH_TYPE_MAP = {
     substitutes: 'PRODUCT_SUBSTITUTES',
     complements: 'PRODUCT_COMPLEMENTS',
 } as const;
+const ASIN_REGEX = /asin(?:-expanded)?="([^"]+)"/;
 
 function parseAsinFromTargetValue(targetValue: string): string | null {
-    const match = targetValue.match(/asin(?:-expanded)?="([^"]+)"/);
+    const match = targetValue.match(ASIN_REGEX);
     return match?.[1] ?? null;
 }
-

@@ -1,12 +1,12 @@
+import { useAtomValue } from 'jotai';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Area, Bar, ComposedChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { useAtomValue } from 'jotai';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { cn } from '@/dashboard/lib/utils';
+import { customRangeAtom, performanceRangeAtom } from '@/dashboard/state/performance-metrics-state';
 import { Spinner } from '../../components/ui/spinner';
-import { performanceRangeAtom, customRangeAtom } from '@/dashboard/state/performance-metrics-state';
-import { METRICS } from './performance-metrics-config';
 import { ChartHoverIndicator } from './chart-hover-indicator';
+import { METRICS } from './performance-metrics-config';
 
 type HoverState = {
     coordinate: { x: number; y: number };
@@ -98,14 +98,16 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     const resolvedRange = data?.range ?? fallbackRange;
     const resolvedGranularity = data?.granularity ?? 'hour';
     const resolvedTimezone = data?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const legacyHourlyData = (data as { hourlyData?: Array<{ hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number }> })
-        ?.hourlyData;
-    const legacyLeadingHour = (data as { leadingHour?: { hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number } })
-        ?.leadingHour;
+    const legacyHourlyData = (data as { hourlyData?: Array<{ hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number }> })?.hourlyData;
+    const legacyLeadingHour = (data as { leadingHour?: { hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number } })?.leadingHour;
 
     const resolvedPoints = useMemo(() => {
-        if (data?.points) return data.points;
-        if (!legacyHourlyData) return [];
+        if (data?.points) {
+            return data.points;
+        }
+        if (!legacyHourlyData) {
+            return [];
+        }
 
         const today = new Date();
         today.setMinutes(0, 0, 0);
@@ -124,8 +126,12 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     }, [data?.points, legacyHourlyData]);
 
     const resolvedLeadingPoint = useMemo(() => {
-        if (data?.leadingPoint) return data.leadingPoint;
-        if (!legacyLeadingHour) return null;
+        if (data?.leadingPoint) {
+            return data.leadingPoint;
+        }
+        if (!legacyLeadingHour) {
+            return null;
+        }
         const yesterday = new Date();
         yesterday.setDate(yesterday.getDate() - 1);
         yesterday.setHours(23, 0, 0, 0);
@@ -141,7 +147,9 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     const hasLeadingPoint = Boolean(resolvedLeadingPoint);
 
     const chartData = useMemo(() => {
-        if (!data) return [];
+        if (!data) {
+            return [];
+        }
         const leading = resolvedLeadingPoint ? [resolvedLeadingPoint, ...resolvedPoints] : resolvedPoints;
         const rangeStart = resolvedRange?.start ? new Date(resolvedRange.start) : null;
         const rangeEnd = resolvedRange?.end ? new Date(resolvedRange.end) : null;
@@ -200,7 +208,9 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     const isStreamingRange = isLiveRange && resolvedGranularity === 'hour';
 
     const currentHourLabel = useMemo(() => {
-        if (!isLiveRange) return null;
+        if (!isLiveRange) {
+            return null;
+        }
         const now = new Date();
         return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: resolvedTimezone }).format(now);
     }, [isLiveRange, resolvedTimezone]);
@@ -208,18 +218,28 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     // Custom tick formatter for X axis - emphasize key labels without crowding
     const formatXAxisTick = (value: string, index: number) => {
         const totalTicks = chartData.length;
-        if (hasLeadingPoint && index === 0) return '';
-
-        if (resolvedGranularity === 'hour') {
-            const highlightLabels = new Set(['00:00', '12:00', '23:00']);
-            if (highlightLabels.has(value)) return value;
-            if (range === 'today' && currentHourLabel && value === currentHourLabel) return value;
+        if (hasLeadingPoint && index === 0) {
             return '';
         }
 
-        if (totalTicks <= 6) return value;
+        if (resolvedGranularity === 'hour') {
+            const highlightLabels = new Set(['00:00', '12:00', '23:00']);
+            if (highlightLabels.has(value)) {
+                return value;
+            }
+            if (range === 'today' && currentHourLabel && value === currentHourLabel) {
+                return value;
+            }
+            return '';
+        }
+
+        if (totalTicks <= 6) {
+            return value;
+        }
         const interval = Math.ceil((totalTicks - 1) / 5);
-        if (index % interval === 0 || index === totalTicks - 1) return value;
+        if (index % interval === 0 || index === totalTicks - 1) {
+            return value;
+        }
         return '';
     };
 
@@ -227,7 +247,7 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     if (isLoading) {
         return (
             <div className={cn('w-full', className)}>
-                <div className="flex items-center justify-center h-[360px]">
+                <div className="flex h-[360px] items-center justify-center">
                     <Spinner className="size-6 text-muted-foreground" />
                 </div>
             </div>
@@ -237,10 +257,10 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     if (error) {
         return (
             <div className={cn('w-full', className)}>
-                <div className="flex items-center justify-center h-[360px]">
+                <div className="flex h-[360px] items-center justify-center">
                     <div className="text-center">
-                        <p className="text-sm text-muted-foreground">Unable to load performance data</p>
-                        <p className="text-xs text-muted-foreground/60 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
+                        <p className="text-muted-foreground text-sm">Unable to load performance data</p>
+                        <p className="mt-1 text-muted-foreground/60 text-xs">{error instanceof Error ? error.message : 'Please try again later'}</p>
                     </div>
                 </div>
             </div>
@@ -249,53 +269,49 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
 
     return (
         <div className={cn('w-full', className)}>
-            <div className="relative w-full h-[360px] overflow-hidden">
-                {hasLeadingPoint ? <div className="absolute left-0 top-0 bottom-0 w-16 bg-gradient-to-r from-background to-transparent z-10 pointer-events-none" /> : null}
+            <div className="relative h-[360px] w-full overflow-hidden">
+                {hasLeadingPoint ? <div className="pointer-events-none absolute top-0 bottom-0 left-0 z-10 w-16 bg-gradient-to-r from-background to-transparent" /> : null}
 
-                <div
-                    className="absolute inset-0"
-                    style={hasLeadingPoint ? { left: `-${leadingOffsetPercent}%`, width: `calc(100% + ${leadingOffsetPercent}%)` } : undefined}
-                    ref={chartRef}
-                >
-                    <ResponsiveContainer width="100%" height="100%">
+                <div className="absolute inset-0" ref={chartRef} style={hasLeadingPoint ? { left: `-${leadingOffsetPercent}%`, width: `calc(100% + ${leadingOffsetPercent}%)` } : undefined}>
+                    <ResponsiveContainer height="100%" width="100%">
                         <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }} onMouseLeave={handleChartLeave}>
                             <defs>
-                                <linearGradient id="clicksGradient" x1="0" y1="0" x2="0" y2="1">
+                                <linearGradient id="clicksGradient" x1="0" x2="0" y1="0" y2="1">
                                     <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
                                     <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                                 </linearGradient>
-                                <linearGradient id="ordersGradient" x1="0" y1="0" x2="0" y2="1">
+                                <linearGradient id="ordersGradient" x1="0" x2="0" y1="0" y2="1">
                                     <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
                                     <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
 
-                            <XAxis dataKey="label" axisLine={false} tickLine={false} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} interval={0} />
+                            <XAxis axisLine={false} dataKey="label" interval={0} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} tickLine={false} />
 
-                            <YAxis yAxisId="impressions" hide domain={yAxisDomains.impressions} allowDataOverflow />
-                            <YAxis yAxisId="clicks" hide domain={yAxisDomains.clicks} allowDataOverflow />
-                            <YAxis yAxisId="orders" hide domain={yAxisDomains.orders} allowDataOverflow />
+                            <YAxis allowDataOverflow domain={yAxisDomains.impressions} hide yAxisId="impressions" />
+                            <YAxis allowDataOverflow domain={yAxisDomains.clicks} hide yAxisId="clicks" />
+                            <YAxis allowDataOverflow domain={yAxisDomains.orders} hide yAxisId="orders" />
 
-                            {currentHourLabel ? <ReferenceLine x={currentHourLabel} stroke="#d1d5db" strokeDasharray="4 4" yAxisId="impressions" /> : null}
+                            {currentHourLabel ? <ReferenceLine stroke="#d1d5db" strokeDasharray="4 4" x={currentHourLabel} yAxisId="impressions" /> : null}
 
                             <Tooltip content={<CustomTooltip onHoverChange={handleHoverChange} />} cursor={{ fill: 'transparent' }} isAnimationActive={false} position={{ y: 12 }} />
 
                             <Bar
-                                yAxisId="impressions"
+                                className="text-zinc-200 dark:text-zinc-800"
                                 dataKey="impressions"
                                 fill="currentColor"
-                                className="text-zinc-200 dark:text-zinc-800"
-                                radius={[2, 2, 0, 0]}
                                 isAnimationActive={false}
+                                radius={[2, 2, 0, 0]}
+                                yAxisId="impressions"
                                 zIndex={0}
                             />
 
-                            <Area yAxisId="clicks" type="monotone" dataKey="clicks" stroke="#6366f1" strokeWidth={2} fill="url(#clicksGradient)" dot={false} isAnimationActive={false} zIndex={1} />
-                            <Area yAxisId="orders" type="monotone" dataKey="orders" stroke="#10b981" strokeWidth={2} fill="url(#ordersGradient)" dot={false} isAnimationActive={false} zIndex={2} />
+                            <Area dataKey="clicks" dot={false} fill="url(#clicksGradient)" isAnimationActive={false} stroke="#6366f1" strokeWidth={2} type="monotone" yAxisId="clicks" zIndex={1} />
+                            <Area dataKey="orders" dot={false} fill="url(#ordersGradient)" isAnimationActive={false} stroke="#10b981" strokeWidth={2} type="monotone" yAxisId="orders" zIndex={2} />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
-                <ChartHoverIndicator active={!!hoverState} coordinate={hoverState?.coordinate} label={hoverState?.label} containerRef={chartRef} />
+                <ChartHoverIndicator active={!!hoverState} containerRef={chartRef} coordinate={hoverState?.coordinate} label={hoverState?.label} />
             </div>
         </div>
     );
@@ -304,7 +320,9 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
 const normalizeLocalDateRange = (startValue: string, endValue: string) => {
     const start = parseLocalDateInput(startValue);
     const end = parseLocalDateInput(endValue);
-    if (!start || !end) return null;
+    if (!(start && end)) {
+        return null;
+    }
 
     const normalized = start.getTime() <= end.getTime() ? { start, end } : { start: end, end: start };
     normalized.start.setHours(0, 0, 0, 0);
@@ -314,7 +332,9 @@ const normalizeLocalDateRange = (startValue: string, endValue: string) => {
 
 const parseLocalDateInput = (value: string) => {
     const [year, month, day] = value.split('-').map(Number);
-    if (!year || !month || !day) return null;
+    if (!(year && month && day)) {
+        return null;
+    }
     const date = new Date(year, month - 1, day);
     return Number.isNaN(date.getTime()) ? null : date;
 };
@@ -339,7 +359,9 @@ const CustomTooltip = ({
     onHoverChange?: (state: HoverState | null) => void;
 }) => {
     useEffect(() => {
-        if (!onHoverChange) return;
+        if (!onHoverChange) {
+            return;
+        }
         if (active && coordinate && label !== undefined) {
             onHoverChange({
                 coordinate,
@@ -350,30 +372,36 @@ const CustomTooltip = ({
         }
     }, [active, coordinate, label, onHoverChange]);
 
-    if (!active || !payload || payload.length === 0) return null;
+    if (!(active && payload) || payload.length === 0) {
+        return null;
+    }
 
     const dataPoint = payload[0]?.payload;
-    if (!dataPoint) return null;
+    if (!dataPoint) {
+        return null;
+    }
     const heading = dataPoint.tooltipLabel ?? dataPoint.label ?? label;
 
     return (
-        <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[160px]">
-            <div className="text-sm font-medium text-foreground mb-2">{heading}</div>
+        <div className="min-w-[160px] rounded-lg border border-border bg-card p-3 shadow-lg">
+            <div className="mb-2 font-medium text-foreground text-sm">{heading}</div>
             <div className="space-y-1.5">
                 {CHARTED_METRICS.map(metric => {
                     const value = dataPoint[metric.key];
-                    if (typeof value !== 'number') return null;
+                    if (typeof value !== 'number') {
+                        return null;
+                    }
                     return (
-                        <div key={metric.key} className="flex items-center justify-between gap-4">
+                        <div className="flex items-center justify-between gap-4" key={metric.key}>
                             <div className="flex items-center gap-1.5">
                                 {metric.color ? (
                                     <span className="size-2 rounded-full" style={{ backgroundColor: metric.color }} />
                                 ) : (
                                     <span className="size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
                                 )}
-                                <span className="text-xs text-muted-foreground">{metric.label}</span>
+                                <span className="text-muted-foreground text-xs">{metric.label}</span>
                             </div>
-                            <span className="text-xs font-medium">{metric.formatter(value)}</span>
+                            <span className="font-medium text-xs">{metric.formatter(value)}</span>
                         </div>
                     );
                 })}

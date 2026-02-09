@@ -55,12 +55,14 @@ export class JobMetricsRecorder {
     private statusOverride?: JobMetricStatus;
     private errorMessage?: string | null;
     private errorEvent?: JobEventDraft;
-    private events: JobEventDraft[] = [];
+    private readonly events: JobEventDraft[] = [];
+    private readonly handle: JobMetricHandle;
+    private readonly defaults: JobMetricDefaults;
 
-    constructor(
-        private readonly handle: JobMetricHandle,
-        private readonly defaults: JobMetricDefaults
-    ) {}
+    constructor(handle: JobMetricHandle, defaults: JobMetricDefaults) {
+        this.handle = handle;
+        this.defaults = defaults;
+    }
 
     setFinalStatus(status: JobMetricStatus) {
         this.statusOverride = status;

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { apiProcedure } from '@/api/trpc';
 import { adGroupsGetOutputSchema, cliConfigInputSchema } from '@/api/schemas/cli';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, getAdGroup } from './shared';
 
 export const adGroupsGet = apiProcedure

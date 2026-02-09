@@ -1,6 +1,6 @@
-import { apiProcedure } from '@/api/trpc';
-import { targetsCreateKeywordInputSchema, targetsGetOutputSchema } from '@/api/schemas/cli';
 import { createTargets, extractMultiStatusEntity } from '@/amazon-ads/sp-entities';
+import { targetsCreateKeywordInputSchema, targetsGetOutputSchema } from '@/api/schemas/cli';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, buildKeywordTargetDetails, mapTargetFromApi, resolveAccountContext } from './shared';
 
 export const targetsCreateKeyword = apiProcedure

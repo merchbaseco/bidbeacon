@@ -75,7 +75,7 @@ export async function getExportStatus(options: GetExportStatusOptions, region: A
         const response = await throttledFetch(url, {
             method: 'GET',
             headers,
-            signal: AbortSignal.timeout(30000),
+            signal: AbortSignal.timeout(30_000),
         });
 
         // Store status code for tracking (even if error)

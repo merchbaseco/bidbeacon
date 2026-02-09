@@ -2,13 +2,12 @@ import { createBrowserRouter, createRoutesFromElements, Route } from 'react-rout
 import { RootRoute } from './layout';
 import { IndexRoute } from './routes/index';
 
-function resolveApiBaseUrl() {
-    const envApi =
-        typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL
-            ? import.meta.env.VITE_API_BASE_URL
-            : undefined;
+const TRAILING_SLASH_REGEX = /\/$/;
 
-    const baseUrl = (envApi ?? 'https://bidbeacon.merchbase.co').replace(/\/$/, '');
+function resolveApiBaseUrl() {
+    const envApi = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL : undefined;
+
+    const baseUrl = (envApi ?? 'https://bidbeacon.merchbase.co').replace(TRAILING_SLASH_REGEX, '');
     return baseUrl;
 }
 
@@ -16,8 +15,8 @@ export const apiBaseUrl = resolveApiBaseUrl();
 
 export const router = createBrowserRouter(
     createRoutesFromElements(
-        <Route path="/" element={<RootRoute />}>
-            <Route index element={<IndexRoute />} />
+        <Route element={<RootRoute />} path="/">
+            <Route element={<IndexRoute />} index />
         </Route>
     )
 );

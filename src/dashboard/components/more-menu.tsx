@@ -128,11 +128,11 @@ export function MoreMenu() {
                     <HugeiconsIcon icon={MoreVerticalIcon} size={24} />
                 </MenuTrigger>
                 <MenuPopup>
-                    <MenuItem onClick={handleGetApiKey} disabled={isGeneratingApiKey}>
+                    <MenuItem disabled={isGeneratingApiKey} onClick={handleGetApiKey}>
                         <HugeiconsIcon icon={Key01Icon} size={20} />
                         {isGeneratingApiKey ? 'Generating key...' : 'Get API key'}
                     </MenuItem>
-                    <MenuItem onClick={handleSyncAccounts} disabled={isSyncing}>
+                    <MenuItem disabled={isSyncing} onClick={handleSyncAccounts}>
                         <HugeiconsIcon icon={DatabaseSync01Icon} size={20} />
                         {isSyncing ? 'Syncing...' : 'Sync accounts'}
                     </MenuItem>
@@ -143,33 +143,30 @@ export function MoreMenu() {
                 </MenuPopup>
             </Menu>
 
-            <Dialog open={apiKeyOpen} onOpenChange={handleApiKeyOpenChange}>
+            <Dialog onOpenChange={handleApiKeyOpenChange} open={apiKeyOpen}>
                 <DialogPopup className="sm:max-w-xl">
                     <DialogHeader>
                         <DialogTitle>Get API key</DialogTitle>
-                        <DialogDescription>
-                            Copy this key now. You will not be able to retrieve it again once this dialog is closed. Each new key replaces the
-                            one shown here.
-                        </DialogDescription>
+                        <DialogDescription>Copy this key now. You will not be able to retrieve it again once this dialog is closed. Each new key replaces the one shown here.</DialogDescription>
                     </DialogHeader>
                     <DialogPanel>
                         <div className="rounded-lg border bg-muted/50 p-4">
                             {isGeneratingApiKey ? (
-                                <p className="text-sm text-muted-foreground">Generating API key...</p>
+                                <p className="text-muted-foreground text-sm">Generating API key...</p>
                             ) : apiKeyValue ? (
                                 <pre className="overflow-auto text-sm">
                                     <code>{apiKeyValue}</code>
                                 </pre>
                             ) : (
-                                <p className="text-sm text-muted-foreground">No key available.</p>
+                                <p className="text-muted-foreground text-sm">No key available.</p>
                             )}
                         </div>
                     </DialogPanel>
                     <DialogFooter>
-                        <Button variant="outline" onClick={handleGetApiKey} disabled={isGeneratingApiKey}>
+                        <Button disabled={isGeneratingApiKey} onClick={handleGetApiKey} variant="outline">
                             {isGeneratingApiKey ? 'Generating...' : 'Generate new key'}
                         </Button>
-                        <Button variant="outline" onClick={handleCopyApiKey} disabled={!apiKeyValue}>
+                        <Button disabled={!apiKeyValue} onClick={handleCopyApiKey} variant="outline">
                             {apiKeyCopied ? 'Copied!' : 'Copy key'}
                         </Button>
                         <Button onClick={() => handleApiKeyOpenChange(false)}>Close</Button>

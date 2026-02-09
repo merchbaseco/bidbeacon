@@ -4,6 +4,8 @@ import useWebSocketLib from 'react-use-websocket';
 import type { reportDatasetMetadata } from '@/db/schema';
 import { apiBaseUrl } from '../../router';
 
+const API_PROTOCOL_REGEX = /^https?/;
+
 type Event =
     | {
           type: 'api-metrics:updated';
@@ -47,7 +49,7 @@ export function useWebSocketEvents<T extends Event['type']>(eventType: T, handle
     handlerRef.current = handler;
 
     // Compute WebSocket URL lazily inside the hook to avoid initialization order issues
-    const wsUrl = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
+    const wsUrl = `${apiBaseUrl.replace(API_PROTOCOL_REGEX, (match: string) => (match === 'https' ? 'wss' : 'ws'))}/api/events`;
 
     useWebSocketLib(wsUrl, {
         onMessage: event => {
@@ -62,7 +64,7 @@ export function useWebSocketEvents<T extends Event['type']>(eventType: T, handle
         },
         shouldReconnect: () => true,
         reconnectAttempts: 5,
-        reconnectInterval: attemptNumber => Math.min(1000 * 2 ** attemptNumber, 30000),
+        reconnectInterval: attemptNumber => Math.min(1000 * 2 ** attemptNumber, 30_000),
         share: true, // Share connection with other hooks
     });
 }

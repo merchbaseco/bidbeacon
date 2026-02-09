@@ -1,6 +1,5 @@
 import { TRPCError } from '@trpc/server';
 import { db } from '@/db/index';
-import { advertiserAccount } from '@/db/schema';
 
 export const getPagination = (limit?: number, cursor?: string) => {
     const resolvedLimit = limit ?? 50;
@@ -27,13 +26,17 @@ export const formatListResponse = <Row, Output>(rows: Row[], offset: number, lim
 };
 
 export const parseNumeric = (value: string | number | null) => {
-    if (value === null || value === undefined) return null;
+    if (value === null || value === undefined) {
+        return null;
+    }
     const numberValue = typeof value === 'number' ? value : Number(value);
     return Number.isFinite(numberValue) ? numberValue : null;
 };
 
 export const formatDate = (value: string | Date | null) => {
-    if (!value) return '';
+    if (!value) {
+        return '';
+    }
     if (value instanceof Date) {
         return value.toISOString().slice(0, 10);
     }
@@ -41,7 +44,9 @@ export const formatDate = (value: string | Date | null) => {
 };
 
 export const formatDateTime = (value: Date | string | null) => {
-    if (!value) return '';
+    if (!value) {
+        return '';
+    }
     if (value instanceof Date) {
         return value.toISOString();
     }
@@ -51,7 +56,9 @@ export const formatDateTime = (value: Date | string | null) => {
 export const toMoneyString = (value: number) => value.toFixed(2);
 
 export const isSponsoredProducts = (adProduct: string | null) => {
-    if (!adProduct) return false;
+    if (!adProduct) {
+        return false;
+    }
     const normalized = adProduct.toUpperCase();
     return normalized === 'SPONSORED_PRODUCTS' || normalized === 'SP';
 };

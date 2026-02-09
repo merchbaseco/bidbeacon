@@ -1,5 +1,5 @@
-import { apiProcedure } from '@/api/trpc';
 import { metricsTableAdsOutputSchema, metricsTableInputSchema } from '@/api/schemas/cli';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, getMetricsTable } from './shared';
 
 export const metricsTableAds = apiProcedure

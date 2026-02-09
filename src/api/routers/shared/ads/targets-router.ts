@@ -1,18 +1,11 @@
 import { TRPCError } from '@trpc/server';
 import { and, asc, desc, eq, ilike, or } from 'drizzle-orm';
 import { updateTargetBid } from '@/amazon-ads/update-target-bid';
-import { db } from '@/db/index';
-import { campaign, target } from '@/db/schema';
-import {
-    targetDetailInputSchema,
-    targetDetailOutputSchema,
-    targetListInputSchema,
-    targetListOutputSchema,
-    updateTargetBidInputSchema,
-    updateTargetBidOutputSchema,
-} from '@/types/ads-api';
 import type { apiProcedure } from '@/api/trpc';
 import { router } from '@/api/trpc';
+import { db } from '@/db/index';
+import { campaign, target } from '@/db/schema';
+import { targetDetailInputSchema, targetDetailOutputSchema, targetListInputSchema, targetListOutputSchema, updateTargetBidInputSchema, updateTargetBidOutputSchema } from '@/types/ads-api';
 import { formatDateTime, formatListResponse, getPagination, isSponsoredProducts, parseNumeric, resolveProfileId, toMoneyString } from '../../ads/shared';
 
 export const buildTargetsRouter = (procedure: typeof apiProcedure) =>
@@ -211,7 +204,9 @@ export const buildTargetsRouter = (procedure: typeof apiProcedure) =>
 
 const buildTargetSearchCondition = (search: string | null) => {
     const trimmed = search?.trim();
-    if (!trimmed) return null;
+    if (!trimmed) {
+        return null;
+    }
     const query = `%${trimmed}%`;
     return or(ilike(target.targetKeyword, query), ilike(target.targetAsin, query), ilike(target.targetId, query));
 };
@@ -224,7 +219,6 @@ const getTargetSortExpression = (field: 'lastUpdatedDateTime' | 'bidAmount' | 's
             return target.state;
         case 'targetType':
             return target.targetType;
-        case 'lastUpdatedDateTime':
         default:
             return target.lastUpdatedDateTime;
     }

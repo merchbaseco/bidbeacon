@@ -17,19 +17,25 @@ interface ChartTooltipProps {
 }
 
 export const ChartTooltip = ({ active, payload, label, coordinate, chartData, intervalMs }: ChartTooltipProps) => {
-    if (!active || !payload || payload.length === 0) return null;
+    if (!(active && payload) || payload.length === 0) {
+        return null;
+    }
 
     const point = chartData.find(p => p.interval === label);
-    if (!point || !point.timestamp) return null;
+    if (!point?.timestamp) {
+        return null;
+    }
 
     const timestamp = new Date(point.timestamp as string);
     // Check if timestamp is valid
-    if (Number.isNaN(timestamp.getTime())) return null;
+    if (Number.isNaN(timestamp.getTime())) {
+        return null;
+    }
 
     const endTime = new Date(timestamp.getTime() + intervalMs);
 
     // Format time with or without seconds based on interval
-    const timeFormat = intervalMs < 60000 ? 'h:mm:ssaaa' : 'h:mmaaa';
+    const timeFormat = intervalMs < 60_000 ? 'h:mm:ssaaa' : 'h:mmaaa';
     const localStart = format(timestamp, timeFormat);
     const localEnd = format(endTime, timeFormat);
 
@@ -45,22 +51,22 @@ export const ChartTooltip = ({ active, payload, label, coordinate, chartData, in
 
     return (
         <ChartTooltipPortal active={active} coordinate={coordinate}>
-            <div className="bg-card border border-border rounded-lg shadow-lg p-3 min-w-[180px]">
+            <div className="min-w-[180px] rounded-lg border border-border bg-card p-3 shadow-lg">
                 {/* Series list */}
-                <div className="flex flex-col gap-1.5 mb-3">
+                <div className="mb-3 flex flex-col gap-1.5">
                     {payload.map(entry => (
-                        <div key={entry.dataKey} className="flex items-center justify-between gap-3">
+                        <div className="flex items-center justify-between gap-3" key={entry.dataKey}>
                             <div className="flex items-center gap-2">
-                                <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-                                <span className="text-sm text-foreground">{entry.name}</span>
+                                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: entry.color }} />
+                                <span className="text-foreground text-sm">{entry.name}</span>
                             </div>
-                            <span className="text-sm text-foreground font-medium">{entry.value}</span>
+                            <span className="font-medium text-foreground text-sm">{entry.value}</span>
                         </div>
                     ))}
                     {rateLimitPercentage !== null && (
-                        <div className="flex items-center justify-between gap-3 pt-1 border-t border-border">
-                            <span className="text-sm text-muted-foreground">Rate Limit %</span>
-                            <span className="text-sm text-foreground font-medium">{rateLimitPercentage}%</span>
+                        <div className="flex items-center justify-between gap-3 border-border border-t pt-1">
+                            <span className="text-muted-foreground text-sm">Rate Limit %</span>
+                            <span className="font-medium text-foreground text-sm">{rateLimitPercentage}%</span>
                         </div>
                     )}
                 </div>

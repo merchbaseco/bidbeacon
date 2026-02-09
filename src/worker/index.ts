@@ -1,10 +1,10 @@
 import Bottleneck from 'bottleneck';
 import { eq } from 'drizzle-orm';
-import { db, testConnection } from '@/db/index.js';
-import { workerControl } from '@/db/schema.js';
+import { db, testConnection } from '@/db/index';
+import { workerControl } from '@/db/schema';
 import { createContextLogger } from '@/utils/logger';
-import { routePayload } from './router.js';
-import { deleteMessage, receiveMessages, testAwsConnection } from './sqsClient.js';
+import { routePayload } from './router';
+import { deleteMessage, receiveMessages, testAwsConnection } from './sqs-client';
 
 const logger = createContextLogger({ component: 'worker' });
 
@@ -145,7 +145,7 @@ async function runWorker(): Promise<void> {
 
             if (messages.length === 0) {
                 // No messages - wait 60 seconds before polling again
-                await new Promise(resolve => setTimeout(resolve, 60000));
+                await new Promise(resolve => setTimeout(resolve, 60_000));
                 continue;
             }
 
@@ -162,12 +162,11 @@ async function runWorker(): Promise<void> {
                         .catch(() => {
                             // Error already logged in processMessage
                         });
-                } else {
-                    // No rate limiting - process immediately
-                    return processMessage(message).catch(() => {
-                        // Error already logged in processMessage
-                    });
                 }
+                // No rate limiting - process immediately
+                return processMessage(message).catch(() => {
+                    // Error already logged in processMessage
+                });
             });
 
             // Wait for all messages in the batch to be processed

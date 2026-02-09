@@ -126,7 +126,7 @@ export async function retrieveReport(options: RetrieveReportOptions, region: Api
             method: 'POST',
             headers,
             body: JSON.stringify(validatedRequestBody),
-            signal: AbortSignal.timeout(30000),
+            signal: AbortSignal.timeout(30_000),
         });
 
         // Store status code for tracking (even if error)

@@ -7,9 +7,9 @@ import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibilit
 import type { AggregationType, EntityType } from '@/types/reports';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractHours, zonedSubtractMonths, zonedTopOfHour } from '@/utils/date';
 import { emitEvent } from '@/utils/events';
+import { withJobMetrics } from '@/utils/job-metrics';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { updateReportStatusJob } from './update-report-status';
-import { withJobMetrics } from '@/utils/job-metrics';
 
 // Amazon Ads API data retention periods
 const HOURLY_RETENTION_DAYS = 14;
@@ -123,9 +123,7 @@ async function insertMissingMetadataRecords(
 ): Promise<{ insertedCount: number; totalPeriods: number; earliestPeriodStart: Date; latestPeriodStart: Date }> {
     const isHourly = aggregation === 'hourly';
     const currentPeriodStart = isHourly ? zonedTopOfHour(now, timezone) : zonedStartOfDay(now, timezone);
-    const earliestPeriodStart = isHourly
-        ? zonedSubtractHours(currentPeriodStart, HOURLY_RETENTION_DAYS * 24, timezone)
-        : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
+    const earliestPeriodStart = isHourly ? zonedSubtractHours(currentPeriodStart, HOURLY_RETENTION_DAYS * 24, timezone) : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
     let insertedCount = 0;
     let totalPeriods = 0;
 
@@ -170,9 +168,7 @@ async function cleanupOutOfBoundsMetadataRecords(
 ): Promise<{ deletedCount: number; cutoff: Date }> {
     const isHourly = aggregation === 'hourly';
     const currentPeriodStart = isHourly ? zonedTopOfHour(now, timezone) : zonedStartOfDay(now, timezone);
-    const cutoff = isHourly
-        ? zonedSubtractHours(currentPeriodStart, HOURLY_RETENTION_DAYS * 24, timezone)
-        : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
+    const cutoff = isHourly ? zonedSubtractHours(currentPeriodStart, HOURLY_RETENTION_DAYS * 24, timezone) : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
 
     const deletedRows = await db
         .delete(reportDatasetMetadata)
@@ -236,7 +232,13 @@ async function insertMetadata(args: {
  * processing), then by most recent period, then by nextRefreshAt. This ensures rows with report IDs always
  * get included before the limit is applied.
  */
-async function enqueueUpdateReportStatusJobs(accountId: string, countryCode: string, now: Date, aggregation: AggregationType, entityType: EntityType): Promise<{
+async function enqueueUpdateReportStatusJobs(
+    accountId: string,
+    countryCode: string,
+    now: Date,
+    aggregation: AggregationType,
+    entityType: EntityType
+): Promise<{
     count: number;
 }> {
     const MAX_CONCURRENT_REPORTS = 5;

@@ -11,8 +11,8 @@ import { db } from '@/db/index';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceHourly } from '@/db/schema';
 import { boss } from '@/jobs/boss';
 import { zonedTopOfHour } from '@/utils/date';
+import { type JobMetricsRecorder, withJobMetrics } from '@/utils/job-metrics';
 import { getTimezoneForCountry } from '@/utils/timezones';
-import { withJobMetrics, type JobMetricsRecorder } from '@/utils/job-metrics';
 
 const jobInputSchema = z.object({
     accountId: z.string(),
@@ -68,7 +68,7 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
 
     if (!entityId) {
         recorder.addEvent({
-            message: `Skipped {{badges}} summary (missing entity id).`,
+            message: 'Skipped {{badges}} summary (missing entity id).',
             badges: [datasetBadge],
             payload: {
                 cadence: 'hourly',
@@ -148,7 +148,7 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
 
     const insertValues = aggregatedData.map(row => {
         const rowBucketDate = formatInTimeZone(row.hourStart, timezone, 'yyyy-MM-dd');
-        const hour = parseInt(formatInTimeZone(row.hourStart, timezone, 'H'), 10);
+        const hour = Number.parseInt(formatInTimeZone(row.hourStart, timezone, 'H'), 10);
         return {
             accountId,
             bucketStart: row.hourStart,

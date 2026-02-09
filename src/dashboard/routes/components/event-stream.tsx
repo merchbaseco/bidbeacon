@@ -1,10 +1,10 @@
-import { formatInTimeZone } from 'date-fns-tz';
-import { useMemo, useState, type ReactNode } from 'react';
-import { useAtomValue } from 'jotai';
-import { Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { HugeiconsIcon } from '@hugeicons/react';
 import CircleArrowDown02Icon from '@merchbaseco/icons/core-solid-rounded/CircleArrowDown02Icon';
 import FilterResetIcon from '@merchbaseco/icons/core-solid-rounded/FilterResetIcon';
+import { formatInTimeZone } from 'date-fns-tz';
+import { useAtomValue } from 'jotai';
+import { Eye, EyeOff, RefreshCw } from 'lucide-react';
+import { type ReactNode, useMemo, useState } from 'react';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -73,7 +73,7 @@ export const EventStream = () => {
         limit: 200,
         jobName: appliedJobName ?? undefined,
         enabled: hasSelection,
-        refetchInterval: hasSelection ? 60000 : false,
+        refetchInterval: hasSelection ? 60_000 : false,
     });
 
     const timezone = data?.timezone ?? 'UTC';
@@ -133,14 +133,13 @@ export const EventStream = () => {
 
     return (
         <>
-            <Card className="font-mono pb-0 pt-4 gap-0 overflow-hidden">
+            <Card className="gap-0 overflow-hidden pt-4 pb-0 font-mono">
                 <div className="flex flex-wrap items-start justify-between gap-2 px-4">
-                    <div className="flex flex-col gap-1 -mt-1">
+                    <div className="-mt-1 flex flex-col gap-1">
                         <div className="flex min-w-0 flex-1 items-center gap-3">
-                            <span className="text-sm font-medium text-muted-foreground">Event Stream</span>
+                            <span className="font-medium text-muted-foreground text-sm">Event Stream</span>
                             <Select
                                 disabled={!hasSelection}
-                                value={appliedJobName ?? ALL_EVENTS_VALUE}
                                 onValueChange={value => {
                                     if (value === ALL_EVENTS_VALUE) {
                                         setAppliedJobName(null);
@@ -148,12 +147,13 @@ export const EventStream = () => {
                                     }
                                     setAppliedJobName(value);
                                 }}
+                                value={appliedJobName ?? ALL_EVENTS_VALUE}
                             >
-                                <SelectTrigger className="h-auto w-auto min-w-0 justify-start gap-2 border-transparent bg-transparent px-0 py-0 text-foreground shadow-none hover:bg-transparent focus-visible:ring-0 data-pressed:bg-transparent data-placeholder:text-muted-foreground sm:text-sm dark:bg-transparent dark:data-pressed:bg-transparent [&_[data-slot=select-icon]]:hidden before:hidden">
+                                <SelectTrigger className="h-auto w-auto min-w-0 justify-start gap-2 border-transparent bg-transparent px-0 py-0 text-foreground shadow-none before:hidden hover:bg-transparent focus-visible:ring-0 data-pressed:bg-transparent data-placeholder:text-muted-foreground sm:text-sm dark:bg-transparent dark:data-pressed:bg-transparent [&_[data-slot=select-icon]]:hidden">
                                     <span className="flex items-center gap-2">
-                                        <span className="text-sm font-medium">{selectedJobLabel}</span>
+                                        <span className="font-medium text-sm">{selectedJobLabel}</span>
                                         <SelectValue className="sr-only" />
-                                        <HugeiconsIcon icon={CircleArrowDown02Icon} className="shrink-0 size-5" />
+                                        <HugeiconsIcon className="size-5 shrink-0" icon={CircleArrowDown02Icon} />
                                     </span>
                                 </SelectTrigger>
                                 <SelectPopup>
@@ -175,19 +175,19 @@ export const EventStream = () => {
                             {hasActiveFilters && (
                                 <Tooltip>
                                     <TooltipTrigger
+                                        closeDelay={0}
+                                        delay={0}
                                         render={
-                                            <Button size="icon" variant="ghost" onClick={clearFilters} disabled={!hasSelection}>
-                                                <HugeiconsIcon icon={FilterResetIcon} className="size-5" />
+                                            <Button disabled={!hasSelection} onClick={clearFilters} size="icon" variant="ghost">
+                                                <HugeiconsIcon className="size-5" icon={FilterResetIcon} />
                                             </Button>
                                         }
-                                        delay={0}
-                                        closeDelay={0}
                                     />
                                     <TooltipPopup>Clear filters</TooltipPopup>
                                 </Tooltip>
                             )}
                         </div>
-                        <div className="flex flex-wrap items-center gap-2 pb-3 text-xs text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-2 pb-3 text-muted-foreground text-xs">
                             <span>{`${totalCount.toLocaleString()} events (last 12h)`}</span>
                             {selectedLabel && <span>{`• Window: ${selectedLabel}`}</span>}
                         </div>
@@ -196,135 +196,139 @@ export const EventStream = () => {
                     <div className="flex flex-wrap items-center gap-2">
                         <Tooltip>
                             <TooltipTrigger
+                                closeDelay={0}
+                                delay={0}
                                 render={
-                                    <Button variant="outline" size="icon-lg" onClick={() => setShowEmptyMessages(current => !current)} aria-pressed={showEmptyMessages}>
+                                    <Button aria-pressed={showEmptyMessages} onClick={() => setShowEmptyMessages(current => !current)} size="icon-lg" variant="outline">
                                         {showEmptyMessages ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
                                     </Button>
                                 }
-                                delay={0}
-                                closeDelay={0}
                             />
                             <TooltipPopup>{showEmptyMessages ? 'Hide empty messages' : 'Show empty messages'}</TooltipPopup>
                         </Tooltip>
 
                         <Button
-                            variant="outline"
-                            size="icon-lg"
+                            disabled={!hasSelection || isFetching}
                             onClick={() => {
                                 refetch();
                             }}
-                            disabled={!hasSelection || isFetching}
+                            size="icon-lg"
                             title={isFetching ? 'Refreshing events' : 'Refresh events'}
+                            variant="outline"
                         >
                             {isFetching ? <Spinner className="size-4 text-muted-foreground" /> : <RefreshCw className="h-5 w-5" />}
                         </Button>
                     </div>
                 </div>
 
-                {!hasSelection ? (
-                    <div className="flex items-center justify-center py-10">
-                        <p className="text-sm text-muted-foreground">Select an account to view events</p>
-                    </div>
-                ) : error ? (
-                    <div className="flex items-center justify-center py-10">
-                        <div className="text-center">
-                            <p className="text-sm text-muted-foreground">Unable to load events</p>
-                            <p className="text-xs text-muted-foreground/70 mt-1">{error instanceof Error ? error.message : 'Please try again later'}</p>
-                        </div>
-                    </div>
-                ) : isLoading && !data ? (
-                    <div className="flex items-center justify-center py-10">
-                        <Spinner className="size-5 text-muted-foreground" />
-                    </div>
-                ) : (
-                    <>
-                        <TooltipProvider delay={0} closeDelay={0}>
-                            <div className="h-16 flex items-end gap-px mb-4 px-4 mt-4">
-                                {histogram.map(bucket => {
-                                    const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * HISTOGRAM_MAX_HEIGHT)) : 2;
-                                    const isSelected = selectedBucket === bucket.interval;
-                                    const formattedBucket = formatInTimeZone(new Date(bucket.interval), timezone, 'MMM dd HH:mm');
-                                    const rangeLabel = formatBucketRange(bucket.interval, timezone);
-
-                                    return (
-                                        <Tooltip key={bucket.interval}>
-                                            <TooltipTrigger
-                                                className="group flex-1 min-w-[2px] h-full flex items-end"
-                                                onClick={() => handleBucketClick(bucket)}
-                                                aria-label={`Filter to ${formattedBucket}`}
-                                                type="button"
-                                                delay={0}
-                                                closeDelay={0}
-                                            >
-                                                <span
-                                                    className={cn(
-                                                        'block w-full group-hover:bg-foreground/70',
-                                                        bucket.count > 0 ? 'bg-muted-foreground/50' : 'bg-muted/70',
-                                                        isSelected && 'bg-foreground'
-                                                    )}
-                                                    style={{ height }}
-                                                />
-                                            </TooltipTrigger>
-                                            <TooltipPopup>
-                                                <div className="flex flex-col gap-1">
-                                                    <span className="text-foreground">{rangeLabel}</span>
-                                                    <span className="text-muted-foreground">
-                                                        {bucket.count.toLocaleString()} {bucket.count === 1 ? 'event' : 'events'}
-                                                    </span>
-                                                </div>
-                                            </TooltipPopup>
-                                        </Tooltip>
-                                    );
-                                })}
+                {hasSelection ? (
+                    error ? (
+                        <div className="flex items-center justify-center py-10">
+                            <div className="text-center">
+                                <p className="text-muted-foreground text-sm">Unable to load events</p>
+                                <p className="mt-1 text-muted-foreground/70 text-xs">{error instanceof Error ? error.message : 'Please try again later'}</p>
                             </div>
-                        </TooltipProvider>
-
-                        <div className="grid grid-cols-[140px_210px_56px_1fr] gap-4 px-4 py-2 text-xs text-muted-foreground border-b border-border">
-                            {HEADER_COLUMNS.map(column => (
-                                <div key={column}>{column}</div>
-                            ))}
                         </div>
+                    ) : isLoading && !data ? (
+                        <div className="flex items-center justify-center py-10">
+                            <Spinner className="size-5 text-muted-foreground" />
+                        </div>
+                    ) : (
+                        <>
+                            <TooltipProvider closeDelay={0} delay={0}>
+                                <div className="mt-4 mb-4 flex h-16 items-end gap-px px-4">
+                                    {histogram.map(bucket => {
+                                        const height = maxCount > 0 ? Math.max(2, Math.round((bucket.count / maxCount) * HISTOGRAM_MAX_HEIGHT)) : 2;
+                                        const isSelected = selectedBucket === bucket.interval;
+                                        const formattedBucket = formatInTimeZone(new Date(bucket.interval), timezone, 'MMM dd HH:mm');
+                                        const rangeLabel = formatBucketRange(bucket.interval, timezone);
 
-                        <ScrollArea className="h-[420px] max-h-[420px]" scrollFade scrollbarGutter>
-                            {filteredEvents.length === 0 ? (
-                                <div className="flex items-center justify-center py-8">
-                                    <p className="text-sm text-muted-foreground">{emptyStateCopy}</p>
-                                </div>
-                            ) : (
-                                <div className="divide-y divide-border/60">
-                                    {filteredEvents.map(row => {
-                                        const isError = row.event.outcome === 'error';
                                         return (
-                                            <div
-                                                key={row.event.id}
-                                                className={cn('grid grid-cols-[140px_210px_56px_1fr] gap-4 px-4 py-2 text-sm hover:bg-muted/50 cursor-pointer min-w-0', isError && 'bg-destructive/10')}
-                                                onClick={() => setSelectedEvent(row.event)}
-                                            >
-                                                <div className="flex items-center">
-                                                    <span className={cn(isError ? 'text-destructive-foreground/80' : 'text-muted-foreground')}>{row.formattedTime}</span>
-                                                </div>
-                                                <div className="flex items-center gap-2 truncate">
-                                                    <span className="truncate" title={row.event.jobName}>
-                                                        {formatJobName(row.event.jobName)}
-                                                    </span>
-                                                </div>
-                                                <div className={cn('font-mono text-xs', isError ? 'text-destructive-foreground' : 'text-success-foreground')}>
-                                                    {OUTCOME_COPY[row.event.outcome]?.label ?? row.event.outcome}
-                                                </div>
-                                                <div className="text-muted-foreground truncate whitespace-nowrap min-w-0">
-                                                    {renderMessage(row.event.message, row.event.badges)}
-                                                </div>
-                                            </div>
+                                            <Tooltip key={bucket.interval}>
+                                                <TooltipTrigger
+                                                    aria-label={`Filter to ${formattedBucket}`}
+                                                    className="group flex h-full min-w-[2px] flex-1 items-end"
+                                                    closeDelay={0}
+                                                    delay={0}
+                                                    onClick={() => handleBucketClick(bucket)}
+                                                    type="button"
+                                                >
+                                                    <span
+                                                        className={cn(
+                                                            'block w-full group-hover:bg-foreground/70',
+                                                            bucket.count > 0 ? 'bg-muted-foreground/50' : 'bg-muted/70',
+                                                            isSelected && 'bg-foreground'
+                                                        )}
+                                                        style={{ height }}
+                                                    />
+                                                </TooltipTrigger>
+                                                <TooltipPopup>
+                                                    <div className="flex flex-col gap-1">
+                                                        <span className="text-foreground">{rangeLabel}</span>
+                                                        <span className="text-muted-foreground">
+                                                            {bucket.count.toLocaleString()} {bucket.count === 1 ? 'event' : 'events'}
+                                                        </span>
+                                                    </div>
+                                                </TooltipPopup>
+                                            </Tooltip>
                                         );
                                     })}
                                 </div>
-                            )}
-                        </ScrollArea>
-                    </>
+                            </TooltipProvider>
+
+                            <div className="grid grid-cols-[140px_210px_56px_1fr] gap-4 border-border border-b px-4 py-2 text-muted-foreground text-xs">
+                                {HEADER_COLUMNS.map(column => (
+                                    <div key={column}>{column}</div>
+                                ))}
+                            </div>
+
+                            <ScrollArea className="h-[420px] max-h-[420px]" scrollbarGutter scrollFade>
+                                {filteredEvents.length === 0 ? (
+                                    <div className="flex items-center justify-center py-8">
+                                        <p className="text-muted-foreground text-sm">{emptyStateCopy}</p>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-border/60">
+                                        {filteredEvents.map(row => {
+                                            const isError = row.event.outcome === 'error';
+                                            return (
+                                                <button
+                                                    className={cn(
+                                                        'grid min-w-0 cursor-pointer grid-cols-[140px_210px_56px_1fr] gap-4 border-0 bg-transparent px-4 py-2 text-left text-sm hover:bg-muted/50',
+                                                        isError && 'bg-destructive/10'
+                                                    )}
+                                                    key={row.event.id}
+                                                    onClick={() => setSelectedEvent(row.event)}
+                                                    type="button"
+                                                >
+                                                    <div className="flex items-center">
+                                                        <span className={cn(isError ? 'text-destructive-foreground/80' : 'text-muted-foreground')}>{row.formattedTime}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2 truncate">
+                                                        <span className="truncate" title={row.event.jobName}>
+                                                            {formatJobName(row.event.jobName)}
+                                                        </span>
+                                                    </div>
+                                                    <div className={cn('font-mono text-xs', isError ? 'text-destructive-foreground' : 'text-success-foreground')}>
+                                                        {OUTCOME_COPY[row.event.outcome]?.label ?? row.event.outcome}
+                                                    </div>
+                                                    <div className="min-w-0 truncate whitespace-nowrap text-muted-foreground">{renderMessage(row.event.message, row.event.badges)}</div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </ScrollArea>
+                        </>
+                    )
+                ) : (
+                    <div className="flex items-center justify-center py-10">
+                        <p className="text-muted-foreground text-sm">Select an account to view events</p>
+                    </div>
                 )}
             </Card>
 
-            <Dialog open={Boolean(selectedEvent)} onOpenChange={(open: boolean) => !open && setSelectedEvent(null)}>
+            <Dialog onOpenChange={(open: boolean) => !open && setSelectedEvent(null)} open={Boolean(selectedEvent)}>
                 <DialogPopup className="sm:max-w-2xl">
                     <DialogHeader>
                         <DialogTitle>Event details</DialogTitle>
@@ -339,11 +343,11 @@ export const EventStream = () => {
                             <div className="flex flex-wrap gap-2">
                                 <OutcomeBadge outcome={selectedEvent.outcome} />
                                 {selectedEvent.badges?.map(badge => (
-                                    <EventBadge key={badge} badge={badge} />
+                                    <EventBadge badge={badge} key={badge} />
                                 ))}
                             </div>
                             <div className="rounded-lg border bg-muted/30 p-3">
-                                <pre className="max-h-[50vh] overflow-auto text-xs font-mono text-muted-foreground">
+                                <pre className="max-h-[50vh] overflow-auto font-mono text-muted-foreground text-xs">
                                     <code>{JSON.stringify(selectedEvent, null, 2)}</code>
                                 </pre>
                             </div>
@@ -363,7 +367,7 @@ export const EventStream = () => {
 const OutcomeBadge = ({ outcome }: { outcome: string }) => {
     const config = OUTCOME_COPY[outcome] ?? { label: outcome, variant: 'secondary' as const };
     return (
-        <Badge variant={config.variant} className="text-[11px]">
+        <Badge className="text-[11px]" variant={config.variant}>
             {config.label}
         </Badge>
     );
@@ -371,7 +375,7 @@ const OutcomeBadge = ({ outcome }: { outcome: string }) => {
 
 const EventBadge = ({ badge }: { badge: string }) => {
     return (
-        <Badge variant={getBadgeVariant(badge)} className="text-[11px]">
+        <Badge className="text-[11px]" variant={getBadgeVariant(badge)}>
             {badge}
         </Badge>
     );
@@ -385,7 +389,7 @@ const renderMessage = (message?: string | null, badges?: string[] | null): React
         return (
             <span className="inline-flex items-center gap-1 whitespace-nowrap">
                 {badges.map(badge => (
-                    <EventBadge key={badge} badge={badge} />
+                    <EventBadge badge={badge} key={badge} />
                 ))}
             </span>
         );
@@ -401,7 +405,7 @@ const renderMessage = (message?: string | null, badges?: string[] | null): React
         <span className="inline-flex items-center gap-1 whitespace-nowrap">
             {before?.trim() && <span>{before.trimEnd()}</span>}
             {badges?.map(badge => (
-                <EventBadge key={badge} badge={badge} />
+                <EventBadge badge={badge} key={badge} />
             ))}
             {after?.trim() && <span>{after.trimStart()}</span>}
         </span>

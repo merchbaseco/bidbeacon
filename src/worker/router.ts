@@ -1,5 +1,11 @@
 import { createContextLogger } from '@/utils/logger';
-import { handleAdGroups, handleAds, handleBudgetUsage, handleCampaigns, handleSpConversion, handleSpTraffic, handleTargets } from './handlers/index.js';
+import { handleAdGroups } from './handlers/ad-groups';
+import { handleAds } from './handlers/ads';
+import { handleBudgetUsage } from './handlers/budget-usage';
+import { handleCampaigns } from './handlers/campaigns';
+import { handleSpConversion } from './handlers/sp-conversion';
+import { handleSpTraffic } from './handlers/sp-traffic';
+import { handleTargets } from './handlers/targets';
 
 /**
  * Route AMS payload to the appropriate handler based on datasetId
@@ -8,8 +14,8 @@ import { handleAdGroups, handleAds, handleBudgetUsage, handleCampaigns, handleSp
 export async function routePayload(payload: unknown): Promise<void> {
     // Handle array of records
     if (Array.isArray(payload)) {
-        for (let i = 0; i < payload.length; i++) {
-            await routeSinglePayload(payload[i]);
+        for (const record of payload) {
+            await routeSinglePayload(record);
         }
         return;
     }

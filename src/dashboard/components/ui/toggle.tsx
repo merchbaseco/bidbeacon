@@ -27,19 +27,8 @@ const toggleVariants = cva(
     }
 );
 
-function Toggle({
-    className,
-    variant,
-    size,
-    ...props
-}: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
-    return (
-        <TogglePrimitive
-            className={cn(toggleVariants({ className, size, variant }))}
-            data-slot="toggle"
-            {...props}
-        />
-    );
+function Toggle({ className, variant, size, ...props }: TogglePrimitive.Props & VariantProps<typeof toggleVariants>) {
+    return <TogglePrimitive className={cn(toggleVariants({ className, size, variant }))} data-slot="toggle" {...props} />;
 }
 
 export { Toggle, toggleVariants };

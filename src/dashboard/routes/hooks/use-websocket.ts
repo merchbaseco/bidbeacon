@@ -89,7 +89,7 @@ export const useWebSocket = () => {
         };
         updateToken();
         // Refresh token periodically (Clerk tokens expire)
-        const interval = setInterval(updateToken, 50000);
+        const interval = setInterval(updateToken, 50_000);
         return () => clearInterval(interval);
     }, [getToken]);
 
@@ -138,6 +138,8 @@ export const useWebSocket = () => {
                         // This avoids re-fetching and allows selective row updates in the UI
                         utils.reports.get.setData({ uid: data.row.uid }, prev => (prev ? { ...prev, ...data.row } : undefined));
                         break;
+                    default:
+                        break;
                 }
             } catch {
                 // Ignore malformed messages
@@ -150,12 +152,12 @@ export const useWebSocket = () => {
         onMessage: handleMessage,
         shouldReconnect: () => true,
         reconnectAttempts: 5,
-        reconnectInterval: attemptNumber => Math.min(1000 * 2 ** attemptNumber, 30000),
+        reconnectInterval: attemptNumber => Math.min(1000 * 2 ** attemptNumber, 30_000),
         heartbeat: {
             message: JSON.stringify({ type: 'ping' }),
             returnMessage: JSON.stringify({ type: 'pong' }),
-            timeout: 60000,
-            interval: 30000,
+            timeout: 60_000,
+            interval: 30_000,
         },
         share: true,
     });

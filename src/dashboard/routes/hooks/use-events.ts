@@ -28,8 +28,8 @@ export const useEvents = (params: UseEventsParams) => {
 
     return api.metrics.events.useQuery(input, {
         enabled: params.enabled ?? true,
-        refetchInterval: params.refetchInterval ?? 60000,
-        staleTime: 30000,
+        refetchInterval: params.refetchInterval ?? 60_000,
+        staleTime: 30_000,
         placeholderData: keepPreviousData,
     });
 };

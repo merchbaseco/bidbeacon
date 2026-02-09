@@ -1,5 +1,5 @@
-import { db } from '@/db/index.js';
-import { amsMetrics } from '@/db/schema.js';
+import { db } from '@/db/index';
+import { amsMetrics } from '@/db/schema';
 
 /**
  * Track AMS event processing metrics
@@ -18,7 +18,7 @@ export async function trackAmsEvent<T>(entityType: string, handler: () => Promis
                 success: true,
                 durationMs,
             })
-            .catch(() => {}); // Silently fail - don't break handler
+            .catch(() => undefined); // Silently fail - don't break handler
         return result;
     } catch (error) {
         const durationMs = Math.round(performance.now() - startTime);
@@ -31,8 +31,7 @@ export async function trackAmsEvent<T>(entityType: string, handler: () => Promis
                 durationMs,
                 error: error instanceof Error ? error.message : String(error),
             })
-            .catch(() => {});
+            .catch(() => undefined);
         throw error; // Re-throw to let SQS handle retries
     }
 }
-

@@ -1,12 +1,12 @@
 import { TRPCError } from '@trpc/server';
 import { and, eq } from 'drizzle-orm';
-import { apiProcedure } from '@/api/trpc';
+import { extractMultiStatusEntity, updateTargets } from '@/amazon-ads/sp-entities';
+import { parseNumeric } from '@/api/routers/ads/shared';
 import { bidsAdjustInputSchema, targetsGetOutputSchema } from '@/api/schemas/cli';
-import { updateTargets, extractMultiStatusEntity } from '@/amazon-ads/sp-entities';
+import { apiProcedure } from '@/api/trpc';
 import { db } from '@/db/index';
 import { campaign, target } from '@/db/schema';
 import { assertAccountAccess, mapTargetFromApi, resolveAccountContext, updateTargetRow } from './shared';
-import { parseNumeric } from '@/api/routers/ads/shared';
 
 export const bidsAdjust = apiProcedure
     .input(bidsAdjustInputSchema)

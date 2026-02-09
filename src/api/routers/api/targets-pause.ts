@@ -1,6 +1,6 @@
-import { apiProcedure } from '@/api/trpc';
+import { extractMultiStatusEntity, updateTargets } from '@/amazon-ads/sp-entities';
 import { targetsGetOutputSchema, targetsStateInputSchema } from '@/api/schemas/cli';
-import { updateTargets, extractMultiStatusEntity } from '@/amazon-ads/sp-entities';
+import { apiProcedure } from '@/api/trpc';
 import { assertAccountAccess, mapTargetFromApi, resolveAccountContext, updateTargetRow } from './shared';
 
 export const targetsPause = apiProcedure

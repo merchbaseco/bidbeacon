@@ -4,8 +4,8 @@ import { Button } from '../../../components/ui/button';
 import { ButtonGroup } from '../../../components/ui/button-group';
 import { Spinner } from '../../../components/ui/spinner';
 import { useRefreshReportsTable } from '../../hooks/use-refresh-reports-table';
-import { useSelectedAccountId } from '../../hooks/use-selected-accountid';
 import { useReports } from '../../hooks/use-reports';
+import { useSelectedAccountId } from '../../hooks/use-selected-accountid';
 
 export const RefreshButton = () => {
     const accountId = useSelectedAccountId();
@@ -15,10 +15,9 @@ export const RefreshButton = () => {
 
     return (
         <ButtonGroup className="ml-auto">
-            <Button variant="ghost" onClick={refresh} disabled={isRefreshing} className="inline-flex items-center gap-2">
-                {isRefreshing ? <Spinner className="size-4" /> : <HugeiconsIcon icon={ArrowReloadHorizontalIcon} size={16} color="currentColor" />}
+            <Button className="inline-flex items-center gap-2" disabled={isRefreshing} onClick={refresh} variant="ghost">
+                {isRefreshing ? <Spinner className="size-4" /> : <HugeiconsIcon color="currentColor" icon={ArrowReloadHorizontalIcon} size={16} />}
             </Button>
         </ButtonGroup>
     );
 };
-

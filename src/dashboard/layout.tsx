@@ -1,5 +1,4 @@
 import { ClerkProvider, SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -17,15 +16,12 @@ import { Outlet } from 'react-router';
 import { MoreMenu } from './components/more-menu';
 import { Toaster } from './components/ui/toast';
 import { TRPCProvider } from './lib/trpc-provider';
-import { AccountSelector } from './routes/components/account-selector/account-selector';
 import { AccountEnabledSwitch } from './routes/components/account-selector/account-enabled-switch';
+import { AccountSelector } from './routes/components/account-selector/account-selector';
 import { useWebSocket } from './routes/hooks/use-websocket';
 
 const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
-const DEV_AUTH_ENABLED =
-    import.meta.env.VITE_DEV_AUTH === 'true' ||
-    import.meta.env.VITE_DEV_AUTH === '1' ||
-    Boolean(import.meta.env.VITE_DEV_USER_ID?.trim());
+const DEV_AUTH_ENABLED = import.meta.env.VITE_DEV_AUTH === 'true' || import.meta.env.VITE_DEV_AUTH === '1' || Boolean(import.meta.env.VITE_DEV_USER_ID?.trim());
 
 if (!CLERK_PUBLISHABLE_KEY) {
     throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY environment variable');
@@ -40,17 +36,17 @@ export function RootRoute() {
             <div aria-hidden className="background-frame" />
 
             <div className="relative z-10">
-                <header className="border-b border-border">
+                <header className="border-border border-b">
                     <div className="mx-auto max-w-background-frame-max p-4">
                         <div className="flex items-center justify-between gap-4 md:grid md:grid-cols-3">
-                            <div className="hidden md:flex items-center gap-4">
+                            <div className="hidden items-center gap-4 md:flex">
                                 <AccountSelector />
                             </div>
-                            <div className="flex gap-2 items-center md:justify-center text-neutral-950 dark:text-neutral-50">
+                            <div className="flex items-center gap-2 text-neutral-950 md:justify-center dark:text-neutral-50">
                                 <HugeiconsIcon icon={LighthouseIcon} size={28} />
-                                <p className="font-mono text-xl md:text-2xl font-bold">BidBeacon</p>
+                                <p className="font-bold font-mono text-xl md:text-2xl">BidBeacon</p>
                             </div>
-                            <div className="flex items-center gap-2 justify-end">
+                            <div className="flex items-center justify-end gap-2">
                                 <div className="md:hidden">
                                     <AccountSelector />
                                 </div>
@@ -63,7 +59,7 @@ export function RootRoute() {
                 </header>
 
                 <main>
-                    <div className="font-mono pb-24">
+                    <div className="pb-24 font-mono">
                         <Outlet />
                     </div>
                 </main>
@@ -73,7 +69,7 @@ export function RootRoute() {
 }
 
 const SignInPage = () => (
-    <div className="min-h-screen flex items-center justify-center bg-background">
+    <div className="flex min-h-screen items-center justify-center bg-background">
         <SignIn />
     </div>
 );

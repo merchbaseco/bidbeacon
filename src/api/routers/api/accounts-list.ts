@@ -1,7 +1,6 @@
+import { accountsListOutputSchema } from '@/api/schemas/cli';
 import { apiProcedure } from '@/api/trpc';
 import { db } from '@/db/index';
-import { advertiserAccount } from '@/db/schema';
-import { accountsListOutputSchema } from '@/api/schemas/cli';
 
 export const accountsList = apiProcedure.output(accountsListOutputSchema).query(async ({ ctx }) => {
     if (ctx.accessibleAccountIds.length === 0) {

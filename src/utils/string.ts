@@ -12,7 +12,9 @@
  * @returns The cleaned string with only ASCII printable characters, or undefined if input was falsy
  */
 export function keepOnlyAscii(str: string | undefined | null): string | undefined {
-    if (!str) return undefined;
+    if (!str) {
+        return undefined;
+    }
     // Keep only ASCII printable characters (0x20-0x7E)
     // This includes: space, ! " # $ % & ' ( ) * + , - . / 0-9 : ; < = > ? @ A-Z [ \ ] ^ _ ` a-z { | } ~
     // This automatically removes BOM, object replacement characters, and other Unicode junk

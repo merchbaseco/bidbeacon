@@ -1,13 +1,15 @@
 import { fromZonedTime } from 'date-fns-tz';
 
+const HOURLY_TIMESTAMP_REGEX = /^(\d{4}-\d{2}-\d{2})T(\d{2}):/;
+
 export function parseHourlyTimestamp(hourValue: string, timezone: string): { bucketStart: Date; bucketDate: string; bucketHour: number } {
-    const localDateMatch = hourValue.match(/^(\d{4}-\d{2}-\d{2})T(\d{2}):/);
+    const localDateMatch = hourValue.match(HOURLY_TIMESTAMP_REGEX);
     if (!localDateMatch) {
         throw new Error(`Invalid hour.value format: ${hourValue}`);
     }
 
     const bucketDate = localDateMatch[1];
-    const bucketHour = parseInt(localDateMatch[2], 10);
+    const bucketHour = Number.parseInt(localDateMatch[2], 10);
 
     const localDateTimeString = `${bucketDate}T${String(bucketHour).padStart(2, '0')}:00:00`;
     const bucketStart = fromZonedTime(localDateTimeString, timezone);

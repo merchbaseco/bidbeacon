@@ -1,9 +1,12 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+
 const ENV_LOADED_FLAG = 'BIDBEACON_TEST_ENV_LOADED';
 const CLEANUP_RUN_FLAG = 'BIDBEACON_TEST_CLEANUP_RAN';
 const TEST_ENTITY_PREFIX = 'bb-cli-';
 const TEST_ENTITY_MAX_AGE_HOURS = 24;
+const ENV_SPLIT_REGEX = /\r?\n/;
+const TIMESTAMP_REGEX = /(\\d{13})/;
 
 export const loadEnv = () => {
     if (process.env[ENV_LOADED_FLAG]) {
@@ -17,9 +20,11 @@ export const loadEnv = () => {
     }
 
     const contents = readFileSync(envPath, 'utf8');
-    for (const line of contents.split(/\r?\n/)) {
+    for (const line of contents.split(ENV_SPLIT_REGEX)) {
         const entry = parseEnvLine(line);
-        if (!entry) continue;
+        if (!entry) {
+            continue;
+        }
         if (process.env[entry.key] === undefined) {
             process.env[entry.key] = entry.value;
         }
@@ -72,9 +77,13 @@ const cleanupStaleTestEntities = async (caller: TestCaller, accountId: string) =
 
     const campaigns = await caller.api.cli.campaignsList({ config });
     for (const campaign of campaigns.items) {
-        if (!campaign.name.startsWith(TEST_ENTITY_PREFIX)) continue;
+        if (!campaign.name.startsWith(TEST_ENTITY_PREFIX)) {
+            continue;
+        }
         const timestamp = extractTimestamp(campaign.name);
-        if (timestamp === null || timestamp > cutoff) continue;
+        if (timestamp === null || timestamp > cutoff) {
+            continue;
+        }
 
         try {
             await caller.api.cli.campaignsDelete({
@@ -88,9 +97,13 @@ const cleanupStaleTestEntities = async (caller: TestCaller, accountId: string) =
 
     const adGroups = await caller.api.cli.adGroupsList({ config });
     for (const adGroup of adGroups.items) {
-        if (!adGroup.name.startsWith(TEST_ENTITY_PREFIX)) continue;
+        if (!adGroup.name.startsWith(TEST_ENTITY_PREFIX)) {
+            continue;
+        }
         const timestamp = extractTimestamp(adGroup.name);
-        if (timestamp === null || timestamp > cutoff) continue;
+        if (timestamp === null || timestamp > cutoff) {
+            continue;
+        }
 
         try {
             await caller.api.cli.adGroupsDelete({
@@ -129,16 +142,14 @@ const parseEnvLine = (line: string) => {
 };
 
 const stripQuotes = (value: string) => {
-    if (value.length >= 2) {
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-            return value.slice(1, -1);
-        }
+    if (value.length >= 2 && ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'")))) {
+        return value.slice(1, -1);
     }
     return value;
 };
 
 const extractTimestamp = (value: string) => {
-    const match = value.match(/(\\d{13})/);
+    const match = value.match(TIMESTAMP_REGEX);
     if (!match) {
         return null;
     }

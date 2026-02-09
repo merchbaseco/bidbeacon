@@ -742,10 +742,7 @@ export const userAccountAccess = pgTable(
         adsAccountId: text('ads_account_id').notNull(),
         createdAt: timestamp('created_at').notNull().defaultNow(),
     },
-    table => [
-        uniqueIndex('user_account_access_user_account_idx').on(table.clerkUserId, table.adsAccountId),
-        index('user_account_access_user_idx').on(table.clerkUserId),
-    ]
+    table => [uniqueIndex('user_account_access_user_account_idx').on(table.clerkUserId, table.adsAccountId), index('user_account_access_user_idx').on(table.clerkUserId)]
 );
 
 /**

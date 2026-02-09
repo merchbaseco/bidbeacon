@@ -21,16 +21,14 @@ export function IndexRoute() {
     // Show empty state when no account is selected
     if (!accountId) {
         return (
-            <div className="flex items-center justify-center min-h-[calc(100vh-120px)] px-4">
-                <Empty className="border border-border bg-card/50 max-w-lg">
+            <div className="flex min-h-[calc(100vh-120px)] items-center justify-center px-4">
+                <Empty className="max-w-lg border border-border bg-card/50">
                     <EmptyHeader>
                         <EmptyMedia variant="icon">
                             <HugeiconsIcon icon={ChartBarLineIcon} size={20} />
                         </EmptyMedia>
                         <EmptyTitle>No account selected</EmptyTitle>
-                        <EmptyDescription>
-                            Select an advertising account from the dropdown above to view your performance metrics, reports, and campaign data.
-                        </EmptyDescription>
+                        <EmptyDescription>Select an advertising account from the dropdown above to view your performance metrics, reports, and campaign data.</EmptyDescription>
                     </EmptyHeader>
                 </Empty>
             </div>
@@ -39,11 +37,11 @@ export function IndexRoute() {
 
     return (
         <DashboardLayout
-            metrics={<PerformanceMetrics className="pt-4" />}
-            performanceTable={<PerformanceTable />}
             accountDataCard={<AccountDataCard />}
             amsMetricsCard={<AmsMetricsCard />}
             eventStream={<EventStream />}
+            metrics={<PerformanceMetrics className="pt-4" />}
+            performanceTable={<PerformanceTable />}
             reportsTable={<ReportsTable />}
         />
     );

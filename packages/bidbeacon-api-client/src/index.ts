@@ -2,6 +2,8 @@ import { createTRPCProxyClient, httpBatchLink, httpLink } from '@trpc/client';
 import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { CliAppRouter } from './app-router';
 
+const TRAILING_SLASHES_REGEX = /\/+$/;
+
 export type AppRouter = CliAppRouter;
 
 export type RouterInputs = inferRouterInputs<CliAppRouter>;
@@ -20,12 +22,7 @@ type CliProxyClient = ReturnType<typeof createTRPCProxyClient<CliAppRouter>>;
 
 export type BidBeaconClient = CliProxyClient['api']['cli'];
 
-export const createBidBeaconClient = ({
-    baseUrl,
-    apiKey,
-    headers,
-    batch = true,
-}: BidBeaconClientOptions): BidBeaconClient => {
+export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }: BidBeaconClientOptions): BidBeaconClient => {
     const url = `${normalizeBaseUrl(baseUrl)}/api`;
     const resolveHeaders = () => ({
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
@@ -55,4 +52,4 @@ export const createBidBeaconClient = ({
     return client.api.cli;
 };
 
-const normalizeBaseUrl = (baseUrl: string) => baseUrl.replace(/\/+$/, '');
+const normalizeBaseUrl = (baseUrl: string) => baseUrl.replace(TRAILING_SLASHES_REGEX, '');

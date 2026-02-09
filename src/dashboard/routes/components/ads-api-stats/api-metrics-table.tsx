@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import { Table, TableBody, TableCell, TableRow } from '@/dashboard/components/ui/table';
 import { LEGEND_COLORS } from '@/dashboard/lib/chart-constants';
-import { useAdsApiMetrics } from '@/dashboard/routes/hooks/use-ads-api-metrics';
 import { cn } from '@/dashboard/lib/utils';
+import { useAdsApiMetrics } from '@/dashboard/routes/hooks/use-ads-api-metrics';
 
 /**
  * API Metrics Table - Shows totals for each API endpoint with visual bars
@@ -18,7 +18,9 @@ export function ApiMetricsTable({ className }: { className?: string }) {
 
     // Calculate totals from chart data
     const apiTotals = useMemo(() => {
-        if (!data?.data || !data?.apiNames) return [];
+        if (!(data?.data && data?.apiNames)) {
+            return [];
+        }
         return data.apiNames
             .map((apiName, index) => {
                 const total = data.data.reduce((sum, point) => sum + ((point[apiName] as number) || 0), 0);
@@ -28,55 +30,57 @@ export function ApiMetricsTable({ className }: { className?: string }) {
     }, [data]);
 
     const maxCount = useMemo(() => {
-        if (apiTotals.length === 0) return 1;
+        if (apiTotals.length === 0) {
+            return 1;
+        }
         return Math.max(...apiTotals.map(api => api.total));
     }, [apiTotals]);
 
     // Ensure exactly 5 rows
     const rowsToRender = useMemo(() => {
-        const rows: Array<{ name: string; total: number; color: string } | null> = [...apiTotals];
+        const rows = apiTotals.map(api => ({ ...api, id: api.name }));
         while (rows.length < 5) {
-            rows.push(null);
+            rows.push({ id: `api-empty-placeholder-${rows.length}`, placeholder: true as const });
         }
         return rows.slice(0, 5);
     }, [apiTotals]);
 
     return (
-        <div className={cn('overflow-visible [&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible', className)}>
+        <div className={cn('[&_[data-slot=table-container]]:!overflow-x-auto [&_[data-slot=table-container]]:!overflow-y-visible overflow-visible', className)}>
             <Table>
                 <TableBody>
-                    {rowsToRender.map((api, index) => {
-                        if (!api) {
+                    {rowsToRender.map(row => {
+                        if ('placeholder' in row) {
                             return (
-                                <TableRow key={`api-empty-placeholder-${index}`}>
+                                <TableRow key={row.id}>
                                     <TableCell>
                                         <div className="flex items-center gap-2 pl-1">
-                                            <span className="size-2.5 rounded-full shrink-0 opacity-0" />
+                                            <span className="size-2.5 shrink-0 rounded-full opacity-0" />
                                         </div>
                                     </TableCell>
                                     <TableCell>
-                                        <div className="relative w-full h-6 flex items-center">
-                                            <div className="h-full bg-transparent rounded flex items-center px-2 min-w-fit" style={{ width: '0%' }}>
-                                                <span className="text-sm text-foreground whitespace-nowrap opacity-0">0</span>
+                                        <div className="relative flex h-6 w-full items-center">
+                                            <div className="flex h-full min-w-fit items-center rounded bg-transparent px-2" style={{ width: '0%' }}>
+                                                <span className="whitespace-nowrap text-foreground text-sm opacity-0">0</span>
                                             </div>
                                         </div>
                                     </TableCell>
                                 </TableRow>
                             );
                         }
-                        const percentage = maxCount > 0 ? (api.total / maxCount) * 100 : 0;
+                        const percentage = maxCount > 0 ? (row.total / maxCount) * 100 : 0;
                         return (
-                            <TableRow key={api.name}>
+                            <TableRow key={row.id}>
                                 <TableCell>
                                     <div className="flex items-center gap-2 pl-1">
-                                        <span className="size-2.5 rounded-full shrink-0" style={{ backgroundColor: api.color }} />
-                                        {api.name}
+                                        <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: row.color }} />
+                                        {row.name}
                                     </div>
                                 </TableCell>
                                 <TableCell>
-                                    <div className="relative w-full h-6 flex items-center">
-                                        <div className="h-full bg-muted rounded flex items-center px-2 min-w-fit" style={{ width: `${Math.max(percentage, 0)}%` }}>
-                                            <span className="text-sm text-foreground whitespace-nowrap">{api.total.toLocaleString()}</span>
+                                    <div className="relative flex h-6 w-full items-center">
+                                        <div className="flex h-full min-w-fit items-center rounded bg-muted px-2" style={{ width: `${Math.max(percentage, 0)}%` }}>
+                                            <span className="whitespace-nowrap text-foreground text-sm">{row.total.toLocaleString()}</span>
                                         </div>
                                     </div>
                                 </TableCell>

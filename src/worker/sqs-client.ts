@@ -46,7 +46,7 @@ export async function testAwsConnection(): Promise<void> {
  * @param waitTimeSeconds - How long to wait for messages (default: 10)
  * @returns Array of messages, or empty array if none received
  */
-export async function receiveMessages(waitTimeSeconds: number = 10): Promise<Message[]> {
+export async function receiveMessages(waitTimeSeconds = 10): Promise<Message[]> {
     const command = new ReceiveMessageCommand({
         QueueUrl: queueUrl,
         WaitTimeSeconds: waitTimeSeconds,
@@ -77,7 +77,7 @@ export async function deleteMessage(receiptHandle: string): Promise<void> {
  */
 function extractQueueName(queueUrl: string): string {
     const parts = queueUrl.split('/');
-    return parts[parts.length - 1];
+    return parts.at(-1) ?? '';
 }
 
 /**
@@ -161,13 +161,13 @@ async function getQueueMetric(queueUrl: string, metricName: string, startTime: D
 
     for (const point of datapoints) {
         if (point.Timestamp && point.Sum !== undefined) {
-            const minute = Math.floor(point.Timestamp.getTime() / 60000);
+            const minute = Math.floor(point.Timestamp.getTime() / 60_000);
             minuteMap.set(minute, point.Sum);
         }
     }
 
     // Generate array of 60 values (one per minute)
-    const startMinute = Math.floor(startTime.getTime() / 60000);
+    const startMinute = Math.floor(startTime.getTime() / 60_000);
     for (let i = 0; i < 60; i++) {
         const minute = startMinute + i;
         values.push(minuteMap.get(minute) || 0);
@@ -187,7 +187,7 @@ async function getApproximateVisibleMessages(queueUrl: string): Promise<number> 
 
     const response = await sqsClient.send(command);
     const attr = response.Attributes?.ApproximateNumberOfMessages;
-    return attr ? parseInt(attr, 10) : 0;
+    return attr ? Number.parseInt(attr, 10) : 0;
 }
 
 /**

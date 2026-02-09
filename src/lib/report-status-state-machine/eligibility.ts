@@ -86,13 +86,7 @@ export function isEligibleForReport(timestamp: Date, aggregation: AggregationTyp
  *
  * Can be called with a full row object or an object containing just the required fields.
  */
-export function getNextRefreshTime(row: {
-    reportId: string | null;
-    periodStart: Date;
-    aggregation: AggregationType | string;
-    lastReportCreatedAt: Date | null;
-    countryCode: string;
-}): Date | null {
+export function getNextRefreshTime(row: { reportId: string | null; periodStart: Date; aggregation: AggregationType | string; lastReportCreatedAt: Date | null; countryCode: string }): Date | null {
     const { reportId, periodStart, aggregation, lastReportCreatedAt, countryCode } = row;
     const now = new Date();
 
