@@ -57,6 +57,30 @@ Postgres is bound to `127.0.0.1` for local-only access.
 - `bun run dev:dashboard` – run dashboard dev server (proxies /api to production)
 - `./test-api.sh` – smoke test the health endpoint
 
+## API Client (npm)
+
+The typed client package lives in `packages/bidbeacon-api-client` and is published manually to npm.
+
+Build the package:
+
+```bash
+bun run api-client:build
+```
+
+Publish (public scope):
+
+```bash
+cd packages/bidbeacon-api-client
+npm login
+npm publish --access public
+```
+
+Version bump before each publish:
+
+```bash
+cat packages/bidbeacon-api-client/package.json | rg '\"version\"'
+```
+
 ## Docker Services
 
 - `postgres` – PostgreSQL 16 database

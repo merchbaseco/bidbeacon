@@ -5,11 +5,6 @@ import { eq } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { apiKey, apiKeyAccountAccess, userAccountAccess } from '@/db/schema';
 
-interface ClerkUser {
-    sub: string;
-    email?: string;
-}
-
 const API_KEY_PREFIX = 'bbk';
 const API_KEY_TOKEN_PREFIX = `${API_KEY_PREFIX}_`;
 
@@ -21,41 +16,41 @@ export async function createContext({ req }: CreateFastifyContextOptions) {
     const devUserId = getDevUserId(getHeaderValue(req.headers['x-bidbeacon-dev-user-id']));
     if (devUserId) {
         const accessibleAccountIds = await fetchAccessibleAccountIds(devUserId);
-        return { user: { sub: devUserId }, accessibleAccountIds, authType: 'dev', request: req };
+        return { user: { sub: devUserId }, accessibleAccountIds, authType: 'dev', request: req as unknown };
     }
 
     const apiKeyToken = getApiKeyToken(req.headers);
     if (apiKeyToken) {
         const apiKeyContext = await getApiKeyContext(apiKeyToken);
         if (apiKeyContext) {
-            return { ...apiKeyContext, request: req };
+            return { ...apiKeyContext, request: req as unknown };
         }
-        return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req };
+        return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req as unknown };
     }
 
     const token = getBearerToken(req.headers);
     if (!token) {
-        return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req };
+        return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req as unknown };
     }
 
     try {
         const secretKey = process.env.CLERK_SECRET_KEY;
         if (!secretKey) {
             console.warn('CLERK_SECRET_KEY not configured');
-            return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req };
+            return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req as unknown };
         }
 
         const payload = await verifyToken(token, { secretKey });
-        const user: ClerkUser = {
+        const user: { sub: string; email?: string } = {
             sub: payload.sub,
             email: payload.email as string | undefined,
         };
 
         const accessibleAccountIds = await fetchAccessibleAccountIds(payload.sub);
 
-        return { user, accessibleAccountIds, authType: 'clerk', request: req };
+        return { user, accessibleAccountIds, authType: 'clerk', request: req as unknown };
     } catch {
-        return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req };
+        return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req as unknown };
     }
 }
 
