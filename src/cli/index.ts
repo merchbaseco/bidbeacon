@@ -57,7 +57,14 @@ const main = async () => {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
-                const data = await client.api.cli.campaignsList.query({ config: cliConfig, state });
+                const limitRaw = readFlag(flags, ['limit']);
+                const offsetRaw = readFlag(flags, ['offset']);
+                const data = await client.api.cli.campaignsList.query({
+                    config: cliConfig,
+                    state,
+                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
+                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
+                });
                 printOutput(data);
                 return;
             }
@@ -181,10 +188,14 @@ const main = async () => {
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
                 const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
+                const limitRaw = readFlag(flags, ['limit']);
+                const offsetRaw = readFlag(flags, ['offset']);
                 const data = await client.api.cli.adGroupsList.query({
                     config: cliConfig,
                     state,
                     campaignId: campaignId ?? undefined,
+                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
+                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
                 });
                 printOutput(data);
                 return;
@@ -271,11 +282,15 @@ const main = async () => {
                 const state = resolveListStateFlag(flags);
                 const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
                 const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+                const limitRaw = readFlag(flags, ['limit']);
+                const offsetRaw = readFlag(flags, ['offset']);
                 const data = await client.api.cli.adsList.query({
                     config: cliConfig,
                     state,
                     campaignId: campaignId ?? undefined,
                     adGroupId: adGroupId ?? undefined,
+                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
+                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
                 });
                 printOutput(data);
                 return;
@@ -331,11 +346,15 @@ const main = async () => {
                 const state = resolveListStateFlag(flags);
                 const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
                 const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+                const limitRaw = readFlag(flags, ['limit']);
+                const offsetRaw = readFlag(flags, ['offset']);
                 const data = await client.api.cli.targetsList.query({
                     config: cliConfig,
                     state,
                     campaignId: campaignId ?? undefined,
                     adGroupId: adGroupId ?? undefined,
+                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
+                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
                 });
                 printOutput(data);
                 return;
@@ -750,7 +769,7 @@ Usage:
 
   bb accounts list
 
-  bb campaigns list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all]
+  bb campaigns list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--limit <n>] [--offset <n>]
   bb campaigns get <campaign_id>
   bb campaigns create <name> <budget>
   bb campaigns update <campaign_id> --name <name> [--portfolio <id>] [--start <iso>] [--end <iso>]
@@ -761,7 +780,7 @@ Usage:
   bb campaigns set-bid-strategy <campaign_id> <strategy>
   bb campaigns set-bid-adjustments <campaign_id> <placement|audience|creative> <json>
 
-  bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>]
+  bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--limit <n>] [--offset <n>]
   bb ad-groups get <ad_group_id>
   bb ad-groups create <campaign_id> <name> <default_bid>
   bb ad-groups update <ad_group_id> <name>
@@ -770,13 +789,13 @@ Usage:
   bb ad-groups resume <ad_group_id>
   bb ad-groups delete <ad_group_id>
 
-  bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>]
+  bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]
   bb ads get <ad_id>
   bb ads create <ad_group_id> <asin|sku> [ASIN|SKU]
   bb ads update <ad_id> <state>
   bb ads delete <ad_id>
 
-  bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>]
+  bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]
   bb targets get <target_id>
   bb targets create keyword <ad_group_id> <keyword> <match_type> <bid>
   bb targets create product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU]

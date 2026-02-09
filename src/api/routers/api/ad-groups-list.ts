@@ -7,6 +7,11 @@ export const adGroupsList = apiProcedure
     .output(adGroupsListOutputSchema)
     .query(async ({ ctx, input }) => {
         assertAccountAccess(ctx, input.config);
-        const items = await listAdGroups(input.config, { state: input.state, campaignId: input.campaignId });
+        const items = await listAdGroups(input.config, {
+            state: input.state,
+            campaignId: input.campaignId,
+            limit: input.limit,
+            offset: input.offset,
+        });
         return { items };
     });

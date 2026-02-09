@@ -44,6 +44,8 @@ type ListOptions = {
     state?: ListState;
     campaignId?: string;
     adGroupId?: string;
+    limit?: number;
+    offset?: number;
 };
 
 export type AccountContext = {
@@ -80,6 +82,7 @@ type MetricsFilters = {
 };
 
 const DAYS_RANGE_REGEX = /^(\d+)d$/;
+const DEFAULT_LIST_LIMIT = 20;
 type MetricsTableOptions = MetricsFilters & {
     sort: MetricsTableSort;
     limit: number;
@@ -138,6 +141,8 @@ export const resolveAccountContext = async (config: CliConfig): Promise<AccountC
 export const listCampaigns = async (config: CliConfig, options?: ListOptions): Promise<CampaignShape[]> => {
     const countryCode = normalizeCountryCode(config.countryCode);
     const stateFilter = resolveListState(options?.state);
+    const limit = options?.limit ?? DEFAULT_LIST_LIMIT;
+    const offset = options?.offset ?? 0;
     const rows = await db
         .select({
             campaignId: campaign.campaignId,
@@ -151,7 +156,9 @@ export const listCampaigns = async (config: CliConfig, options?: ListOptions): P
         })
         .from(campaign)
         .where(and(eq(campaign.accountId, config.accountId), ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []), ...(stateFilter ? [eq(campaign.state, stateFilter)] : [])))
-        .orderBy(desc(campaign.lastUpdatedDateTime), campaign.campaignId);
+        .orderBy(desc(campaign.lastUpdatedDateTime), campaign.campaignId)
+        .limit(limit)
+        .offset(offset);
 
     return rows.map(row => mapCampaignRow(row));
 };
@@ -183,6 +190,8 @@ export const getCampaign = async (config: CliConfig, campaignId: string): Promis
 export const listAdGroups = async (config: CliConfig, options?: ListOptions): Promise<AdGroupShape[]> => {
     const countryCode = normalizeCountryCode(config.countryCode);
     const stateFilter = resolveListState(options?.state);
+    const limit = options?.limit ?? DEFAULT_LIST_LIMIT;
+    const offset = options?.offset ?? 0;
     const rows = await db
         .select({
             adGroupId: adGroup.adGroupId,
@@ -201,7 +210,9 @@ export const listAdGroups = async (config: CliConfig, options?: ListOptions): Pr
                 ...(stateFilter ? [eq(adGroup.state, stateFilter)] : [])
             )
         )
-        .orderBy(desc(adGroup.lastUpdatedDateTime), adGroup.adGroupId);
+        .orderBy(desc(adGroup.lastUpdatedDateTime), adGroup.adGroupId)
+        .limit(limit)
+        .offset(offset);
 
     return rows.map(row => mapAdGroupRow(row));
 };
@@ -231,6 +242,8 @@ export const getAdGroup = async (config: CliConfig, adGroupId: string): Promise<
 export const listAds = async (config: CliConfig, options?: ListOptions): Promise<AdShape[]> => {
     const countryCode = normalizeCountryCode(config.countryCode);
     const stateFilter = resolveListState(options?.state);
+    const limit = options?.limit ?? DEFAULT_LIST_LIMIT;
+    const offset = options?.offset ?? 0;
     const rows = await db
         .select({
             adId: ad.adId,
@@ -250,7 +263,9 @@ export const listAds = async (config: CliConfig, options?: ListOptions): Promise
                 ...(stateFilter ? [eq(ad.state, stateFilter)] : [])
             )
         )
-        .orderBy(desc(ad.lastUpdatedDateTime), ad.adId);
+        .orderBy(desc(ad.lastUpdatedDateTime), ad.adId)
+        .limit(limit)
+        .offset(offset);
 
     return rows.map(row => mapAdRow(row));
 };
@@ -280,6 +295,8 @@ export const getAd = async (config: CliConfig, adId: string): Promise<AdShape> =
 export const listTargets = async (config: CliConfig, options?: ListOptions): Promise<TargetShape[]> => {
     const countryCode = normalizeCountryCode(config.countryCode);
     const stateFilter = resolveListState(options?.state);
+    const limit = options?.limit ?? DEFAULT_LIST_LIMIT;
+    const offset = options?.offset ?? 0;
     const rows = await db
         .select({
             targetId: target.targetId,
@@ -304,7 +321,9 @@ export const listTargets = async (config: CliConfig, options?: ListOptions): Pro
                 ...(stateFilter ? [eq(target.state, stateFilter)] : [])
             )
         )
-        .orderBy(desc(target.lastUpdatedDateTime), target.targetId);
+        .orderBy(desc(target.lastUpdatedDateTime), target.targetId)
+        .limit(limit)
+        .offset(offset);
 
     return rows.map(row => mapTargetRow(row));
 };

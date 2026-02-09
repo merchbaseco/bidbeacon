@@ -15,6 +15,8 @@ export const listStateSchema = z.enum(['ENABLED', 'PAUSED', 'ARCHIVED', 'OTHER',
 
 export const cliListInputSchema = cliConfigInputSchema.extend({
     state: listStateSchema.optional(),
+    limit: z.number().min(1).max(200).optional(),
+    offset: z.number().min(0).optional(),
 });
 
 export const adGroupsListInputSchema = cliListInputSchema.extend({

@@ -31,13 +31,14 @@ Config is stored locally at `~/.bidbeacon/config.json`.
 **Common Concepts**
 - States: `ENABLED`, `PAUSED`, `ARCHIVED`, `OTHER`, `ALL`
 - Metrics keys: `impressions`, `clicks`, `spend`, `purchases`, `sales`, `acos`, `cpc`, `ctr`, `roas`
-- Pagination: `--limit <n>` and `--offset <n>`
+- Pagination: `--limit <n>` and `--offset <n>` (list + metrics table)
 - Sorting: `--sort <field>` and `--direction <asc|desc>`
 
 **List Filters**
 List commands accept `--state` or `--all`.
 - Default is `ENABLED` when omitted.
 - `--all` is shorthand for `--state ALL`.
+- List commands return up to 20 items per request by default (override with `--limit`/`--offset`).
 
 **Hierarchy Filters**
 Drill down by passing parent IDs as flags.
@@ -51,7 +52,7 @@ Drill down by passing parent IDs as flags.
 - `bb accounts list`
 
 **Campaigns**
-- `bb campaigns list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all]`
+- `bb campaigns list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--limit <n>] [--offset <n>]`
 - `bb campaigns get <campaign_id>`
 - `bb campaigns create <name> <budget>`
 - `bb campaigns update <campaign_id> --name <name> [--portfolio <id>] [--start <iso>] [--end <iso>]`
@@ -63,7 +64,7 @@ Drill down by passing parent IDs as flags.
 - `bb campaigns set-bid-adjustments <campaign_id> <placement|audience|creative> <json>`
 
 **Ad Groups**
-- `bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>]`
+- `bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--limit <n>] [--offset <n>]`
 - `bb ad-groups get <ad_group_id>`
 - `bb ad-groups create <campaign_id> <name> <default_bid>`
 - `bb ad-groups update <ad_group_id> <name>`
@@ -73,14 +74,14 @@ Drill down by passing parent IDs as flags.
 - `bb ad-groups delete <ad_group_id>`
 
 **Ads**
-- `bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>]`
+- `bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]`
 - `bb ads get <ad_id>`
 - `bb ads create <ad_group_id> <asin|sku> [ASIN|SKU]`
 - `bb ads update <ad_id> <state>`
 - `bb ads delete <ad_id>`
 
 **Targets**
-- `bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>]`
+- `bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]`
 - `bb targets get <target_id>`
 - `bb targets create keyword <ad_group_id> <keyword> <match_type> <bid>`
 - `bb targets create product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU]`
