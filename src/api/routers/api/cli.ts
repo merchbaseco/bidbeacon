@@ -29,14 +29,14 @@ import { enumsBidStrategy } from './enums-bid-strategy';
 import { enumsMatchType } from './enums-match-type';
 import { enumsPlacement } from './enums-placement';
 import { enumsState } from './enums-state';
-import { metricsAd } from './metrics-ad';
-import { metricsAdGroup } from './metrics-ad-group';
-import { metricsAdGroups } from './metrics-ad-groups';
-import { metricsAds } from './metrics-ads';
-import { metricsCampaign } from './metrics-campaign';
-import { metricsCampaigns } from './metrics-campaigns';
-import { metricsTarget } from './metrics-target';
-import { metricsTargets } from './metrics-targets';
+import { metricsSeriesAdGroups } from './metrics-series-ad-groups';
+import { metricsSeriesAds } from './metrics-series-ads';
+import { metricsSeriesCampaigns } from './metrics-series-campaigns';
+import { metricsSeriesTargets } from './metrics-series-targets';
+import { metricsTableAdGroups } from './metrics-table-ad-groups';
+import { metricsTableAds } from './metrics-table-ads';
+import { metricsTableCampaigns } from './metrics-table-campaigns';
+import { metricsTableTargets } from './metrics-table-targets';
 import { targetsCreateKeyword } from './targets-create-keyword';
 import { targetsCreateProduct } from './targets-create-product';
 import { targetsDelete } from './targets-delete';
@@ -79,14 +79,14 @@ export const cliApiRouter = router({
     targetsResume,
     bidsSet,
     bidsAdjust,
-    metricsCampaigns,
-    metricsAdGroups,
-    metricsAds,
-    metricsTargets,
-    metricsCampaign,
-    metricsAdGroup,
-    metricsAd,
-    metricsTarget,
+    metricsSeriesCampaigns,
+    metricsSeriesAdGroups,
+    metricsSeriesAds,
+    metricsSeriesTargets,
+    metricsTableCampaigns,
+    metricsTableAdGroups,
+    metricsTableAds,
+    metricsTableTargets,
     enumsBidStrategy,
     enumsMatchType,
     enumsPlacement,

@@ -1,5 +1,5 @@
 import { TRPCError } from '@trpc/server';
-import { and, asc, desc, eq, gte, inArray, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, lt, lte, ne, or, sql, type SQL } from 'drizzle-orm';
 import { addDays, addHours, format, startOfDay } from 'date-fns';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
@@ -18,6 +18,12 @@ import {
     listStateSchema,
     metricsTotalsSchema,
     metricsPointSchema,
+    metricsFiltersSchema,
+    metricsKeySchema,
+    metricsSelectionSchema,
+    metricsTableSortFieldSchema,
+    metricsBucketSchema,
+    metricsGranularitySchema,
 } from '@/api/schemas/cli';
 
 export type CliConfig = {
@@ -48,9 +54,38 @@ export type MetricsTotals = z.infer<typeof metricsTotalsSchema>;
 export type MetricsPoint = z.infer<typeof metricsPointSchema>;
 export type BidStrategy = z.infer<typeof bidStrategySchema>;
 export type ListState = z.infer<typeof listStateSchema>;
+export type MetricsTableSortField = z.infer<typeof metricsTableSortFieldSchema>;
+export type MetricsKey = z.infer<typeof metricsKeySchema>;
+export type MetricsGranularity = z.infer<typeof metricsGranularitySchema>;
+type MetricsSelection = z.infer<typeof metricsSelectionSchema>;
+type MetricsBucket = z.infer<typeof metricsBucketSchema>;
+type MetricsFilterInput = z.infer<typeof metricsFiltersSchema>;
+export type MetricsTableSort = {
+    field: MetricsTableSortField;
+    direction: 'asc' | 'desc';
+};
+type MetricsDimension = 'campaign' | 'adGroup' | 'ad' | 'target';
 type MetricsFilters = {
     campaignId?: string;
     adGroupId?: string;
+    ids?: string[];
+};
+type MetricsTableOptions = MetricsFilters & {
+    sort: MetricsTableSort;
+    limit: number;
+    offset: number;
+};
+type MetricsSeriesOptions = {
+    scope: MetricsFilters;
+    filters?: MetricsFilterInput;
+    metrics?: MetricsSelection;
+    range?: string;
+    bucket?: MetricsBucket;
+};
+type MetricsTableRequest = MetricsTableOptions & {
+    filters?: MetricsFilterInput;
+    metrics?: MetricsSelection;
+    range?: string;
 };
 
 export const assertAccountAccess = (ctx: Context, config: CliConfig) => {
@@ -365,12 +400,7 @@ export const updateTargetRow = async (targetId: string, updates: Partial<{ state
     await db.update(target).set(values).where(eq(target.targetId, targetId));
 };
 
-export const getMetrics = async (
-    config: CliConfig,
-    entityType: 'campaign' | 'adGroup' | 'ad' | 'target',
-    entityId?: string,
-    filters?: MetricsFilters
-) => {
+export const getMetricsSeries = async (config: CliConfig, dimension: MetricsDimension, options: MetricsSeriesOptions) => {
     const account = await resolveAdvertiserAccount(config);
 
     if (!account) {
@@ -378,13 +408,117 @@ export const getMetrics = async (
     }
 
     const timezone = getTimezoneForCountry(account.countryCode);
-    const range = parseConfigRange(config.range, timezone);
+    const rangeValue = resolveRangeOverride(config.range, options.range);
+    const range = parseConfigRange(rangeValue, timezone);
+    const granularity = resolveMetricsGranularity(options.bucket, range);
+    const scopedIds = await resolveFilteredIds(config, dimension, range, options);
 
-    if (range.useHourly) {
-        return getHourlyMetrics(config.accountId, entityType, entityId, range.startUtc, range.endExclusiveUtc, filters);
+    if (scopedIds && scopedIds.length === 0) {
+        const empty = buildEmptyMetrics();
+        return {
+            totals: selectMetrics(empty, options.metrics),
+            series: buildEmptySeries(range, timezone, options.metrics, granularity),
+            granularity,
+            timezone,
+            range: { startDate: range.startDate, endDate: range.endDate },
+        };
     }
 
-    return getDailyMetrics(config.accountId, entityType, entityId, range.startDate, range.endDate, timezone, filters);
+    const scope: MetricsFilters = {
+        ...options.scope,
+        ids: mergeIds(options.scope.ids, scopedIds),
+    };
+
+    if (granularity === 'hour') {
+        const output = await getHourlyMetrics(config.accountId, dimension, range.startUtc, range.endExclusiveUtc, scope);
+        return {
+            totals: selectMetrics(output.totals, options.metrics),
+            series: output.series.map(point => ({
+                ...point,
+                metrics: selectMetrics(point.metrics, options.metrics),
+            })),
+            granularity,
+            timezone,
+            range: { startDate: range.startDate, endDate: range.endDate },
+        };
+    }
+
+    const output = await getDailyMetrics(
+        config.accountId,
+        dimension,
+        range.startDate,
+        range.endDate,
+        timezone,
+        scope,
+        granularity
+    );
+    return {
+        totals: selectMetrics(output.totals, options.metrics),
+        series: output.series.map(point => ({
+            ...point,
+            metrics: selectMetrics(point.metrics, options.metrics),
+        })),
+        granularity,
+        timezone,
+        range: { startDate: range.startDate, endDate: range.endDate },
+    };
+};
+
+export const getMetricsTable = async (config: CliConfig, dimension: MetricsDimension, options: MetricsTableRequest) => {
+    const account = await resolveAdvertiserAccount(config);
+
+    if (!account) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Account not found.' });
+    }
+
+    const timezone = getTimezoneForCountry(account.countryCode);
+    const rangeValue = resolveRangeOverride(config.range, options.range);
+    const range = parseConfigRange(rangeValue, timezone);
+    const scopedIds = await resolveFilteredIds(config, dimension, range, {
+        scope: options,
+        filters: options.filters,
+        metrics: options.metrics,
+    });
+
+    if (scopedIds && scopedIds.length === 0) {
+        const empty = buildEmptyMetrics();
+        return {
+            totals: selectMetrics(empty, options.metrics),
+            items: [],
+            sort: options.sort,
+        };
+    }
+
+    const scope: MetricsTableOptions = {
+        campaignId: options.campaignId,
+        adGroupId: options.adGroupId,
+        ids: mergeIds(options.ids, scopedIds),
+        sort: options.sort,
+        limit: options.limit,
+        offset: options.offset,
+    };
+
+    if (range.useHourly) {
+        const output = await getHourlyMetricsTable(config.accountId, dimension, range.startUtc, range.endExclusiveUtc, scope);
+        return {
+            totals: selectMetrics(output.totals, options.metrics),
+            items: output.items.map(item => ({
+                ...item,
+                metrics: selectMetrics(item.metrics, options.metrics),
+            })),
+            sort: output.sort,
+        };
+    }
+
+    const output = await getDailyMetricsTable(config.accountId, dimension, range.startDate, range.endDate, scope);
+    return {
+        totals: selectMetrics(output.totals, options.metrics),
+        items: output.items.map(item => ({
+            ...item,
+            metrics: selectMetrics(item.metrics, options.metrics),
+        })),
+        sort: output.sort,
+    };
 };
 
 export const resolveProductIdType = (value: string | null) => {
@@ -742,6 +876,29 @@ const parseConfigRange = (range: string, timezone: string) => {
     return buildRange(startDate, endDate, timezone);
 };
 
+const resolveRangeOverride = (defaultRange: string, override?: string) => {
+    const normalized = override?.trim();
+    return normalized ? normalized : defaultRange;
+};
+
+const resolveMetricsGranularity = (
+    bucket: MetricsBucket | undefined,
+    range: { startDate: string; endDate: string; startUtc: Date; endExclusiveUtc: Date; useHourly: boolean }
+): MetricsGranularity => {
+    if (!bucket || bucket === 'auto') {
+        return range.useHourly ? 'hour' : 'day';
+    }
+
+    if (bucket === 'hour') {
+        if (!range.useHourly) {
+            throw new TRPCError({ code: 'BAD_REQUEST', message: 'Hourly buckets require a single-day range.' });
+        }
+        return 'hour';
+    }
+
+    return bucket;
+};
+
 const buildRange = (startDate: string, endDate: string, timezone: string) => {
     const startUtc = fromZonedTime(parseDate(startDate), timezone);
     const endExclusiveUtc = fromZonedTime(addDays(parseDate(endDate), 1), timezone);
@@ -773,12 +930,12 @@ const parseDate = (value: string) => {
 
 const getDailyMetrics = async (
     accountId: string,
-    entityType: 'campaign' | 'adGroup' | 'ad' | 'target',
-    entityId: string | undefined,
+    dimension: MetricsDimension,
     startDate: string,
     endDate: string,
     timezone: string,
-    filters?: MetricsFilters
+    filters: MetricsFilters | undefined,
+    granularity: MetricsGranularity
 ): Promise<{ totals: MetricsTotals; series: MetricsPoint[] }> => {
     const conditions = [
         eq(performanceDaily.accountId, accountId),
@@ -794,22 +951,22 @@ const getDailyMetrics = async (
         conditions.push(eq(performanceDaily.adGroupId, filters.adGroupId));
     }
 
-    if (entityType === 'campaign' && entityId) {
-        conditions.push(eq(performanceDaily.campaignId, entityId));
+    if (dimension === 'campaign' && filters?.ids?.length) {
+        conditions.push(inArray(performanceDaily.campaignId, filters.ids));
     }
 
-    if (entityType === 'adGroup' && entityId) {
-        conditions.push(eq(performanceDaily.adGroupId, entityId));
+    if (dimension === 'adGroup' && filters?.ids?.length) {
+        conditions.push(inArray(performanceDaily.adGroupId, filters.ids));
     }
 
-    if (entityType === 'ad' && entityId) {
-        conditions.push(eq(performanceDaily.adId, entityId));
+    if (dimension === 'ad' && filters?.ids?.length) {
+        conditions.push(inArray(performanceDaily.adId, filters.ids));
     }
 
-    if (entityType === 'target') {
+    if (dimension === 'target') {
         conditions.push(eq(performanceDaily.entityType, 'target'));
-        if (entityId) {
-            conditions.push(eq(performanceDaily.entityId, entityId));
+        if (filters?.ids?.length) {
+            conditions.push(inArray(performanceDaily.entityId, filters.ids));
         }
     }
 
@@ -839,16 +996,20 @@ const getDailyMetrics = async (
         .groupBy(performanceDaily.bucketDate)
         .orderBy(asc(performanceDaily.bucketDate));
 
+    const series =
+        granularity === 'day'
+            ? buildDailySeries(startDate, endDate, timezone, rows)
+            : buildBucketedSeries(startDate, endDate, timezone, granularity, rows);
+
     return {
         totals: formatTotals(totalsRow),
-        series: rows.map(row => formatDailyPoint(row, timezone)),
+        series,
     };
 };
 
 const getHourlyMetrics = async (
     accountId: string,
-    entityType: 'campaign' | 'adGroup' | 'ad' | 'target',
-    entityId: string | undefined,
+    dimension: MetricsDimension,
     startUtc: Date,
     endExclusiveUtc: Date,
     filters?: MetricsFilters
@@ -867,22 +1028,22 @@ const getHourlyMetrics = async (
         conditions.push(eq(performanceHourly.adGroupId, filters.adGroupId));
     }
 
-    if (entityType === 'campaign' && entityId) {
-        conditions.push(eq(performanceHourly.campaignId, entityId));
+    if (dimension === 'campaign' && filters?.ids?.length) {
+        conditions.push(inArray(performanceHourly.campaignId, filters.ids));
     }
 
-    if (entityType === 'adGroup' && entityId) {
-        conditions.push(eq(performanceHourly.adGroupId, entityId));
+    if (dimension === 'adGroup' && filters?.ids?.length) {
+        conditions.push(inArray(performanceHourly.adGroupId, filters.ids));
     }
 
-    if (entityType === 'ad' && entityId) {
-        conditions.push(eq(performanceHourly.adId, entityId));
+    if (dimension === 'ad' && filters?.ids?.length) {
+        conditions.push(inArray(performanceHourly.adId, filters.ids));
     }
 
-    if (entityType === 'target') {
+    if (dimension === 'target') {
         conditions.push(eq(performanceHourly.entityType, 'target'));
-        if (entityId) {
-            conditions.push(eq(performanceHourly.entityId, entityId));
+        if (filters?.ids?.length) {
+            conditions.push(inArray(performanceHourly.entityId, filters.ids));
         }
     }
 
@@ -914,7 +1075,7 @@ const getHourlyMetrics = async (
 
     return {
         totals: formatTotals(totalsRow),
-        series: rows.map(formatHourlyPoint),
+        series: buildHourlySeries(startUtc, endExclusiveUtc, rows),
     };
 };
 
@@ -925,22 +1086,322 @@ const formatTotals = (row?: {
     sales: number | null;
     orders: number | null;
 }): MetricsTotals => {
-    const impressions = Number(row?.impressions ?? 0);
-    const clicks = Number(row?.clicks ?? 0);
-    const spend = Number(row?.spend ?? 0);
-    const sales = Number(row?.sales ?? 0);
-    const purchases = Number(row?.orders ?? 0);
+    return buildMetricsValues({
+        impressions: Number(row?.impressions ?? 0),
+        clicks: Number(row?.clicks ?? 0),
+        spend: Number(row?.spend ?? 0),
+        sales: Number(row?.sales ?? 0),
+        purchases: Number(row?.orders ?? 0),
+    });
+};
+
+const getDailyMetricsTable = async (
+    accountId: string,
+    dimension: MetricsDimension,
+    startDate: string,
+    endDate: string,
+    options: MetricsTableOptions
+) => {
+    const table = performanceDaily as MetricsTable;
+    const conditions = [
+        eq(table.accountId, accountId),
+        gte(table.bucketDate, startDate),
+        lte(table.bucketDate, endDate),
+    ];
+    applyMetricsFilters(conditions, table, dimension, options);
+
+    const totals = await getMetricsTotals(table, conditions);
+    const items = await getMetricsTableItems(table, dimension, conditions, options);
 
     return {
-        impressions,
-        clicks,
-        spend,
-        purchases,
-        sales,
-        acos: sales > 0 ? spend / sales : null,
-        cpc: clicks > 0 ? spend / clicks : null,
-        ctr: impressions > 0 ? clicks / impressions : null,
+        totals,
+        items,
+        sort: options.sort,
     };
+};
+
+const getHourlyMetricsTable = async (
+    accountId: string,
+    dimension: MetricsDimension,
+    startUtc: Date,
+    endExclusiveUtc: Date,
+    options: MetricsTableOptions
+) => {
+    const table = performanceHourly as MetricsTable;
+    const conditions = [
+        eq(table.accountId, accountId),
+        gte(table.bucketStart, startUtc),
+        lt(table.bucketStart, endExclusiveUtc),
+    ];
+    applyMetricsFilters(conditions, table, dimension, options);
+
+    const totals = await getMetricsTotals(table, conditions);
+    const items = await getMetricsTableItems(table, dimension, conditions, options);
+
+    return {
+        totals,
+        items,
+        sort: options.sort,
+    };
+};
+
+type MetricsTable = typeof performanceDaily;
+
+const applyMetricsFilters = (
+    conditions: SQL[],
+    table: MetricsTable,
+    dimension: MetricsDimension,
+    filters: MetricsFilters
+) => {
+    if (filters.campaignId) {
+        conditions.push(eq(table.campaignId, filters.campaignId));
+    }
+
+    if (filters.adGroupId) {
+        conditions.push(eq(table.adGroupId, filters.adGroupId));
+    }
+
+    if (dimension === 'campaign' && filters.ids?.length) {
+        conditions.push(inArray(table.campaignId, filters.ids));
+    }
+
+    if (dimension === 'adGroup' && filters.ids?.length) {
+        conditions.push(inArray(table.adGroupId, filters.ids));
+    }
+
+    if (dimension === 'ad' && filters.ids?.length) {
+        conditions.push(inArray(table.adId, filters.ids));
+    }
+
+    if (dimension === 'target') {
+        conditions.push(eq(table.entityType, 'target'));
+        if (filters.ids?.length) {
+            conditions.push(inArray(table.entityId, filters.ids));
+        }
+    }
+};
+
+const getMetricsTotals = async (table: MetricsTable, conditions: SQL[]) => {
+    const [row] = await db
+        .select({
+            impressions: sql<number>`sum(${table.impressions})`.as('impressions'),
+            clicks: sql<number>`sum(${table.clicks})`.as('clicks'),
+            spend: sql<number>`sum(${table.spend})`.as('spend'),
+            sales: sql<number>`sum(${table.sales})`.as('sales'),
+            orders: sql<number>`sum(${table.orders})`.as('orders'),
+        })
+        .from(table)
+        .where(and(...conditions));
+
+    return formatTotals(row);
+};
+
+const getMetricsTableItems = async (
+    table: MetricsTable,
+    dimension: MetricsDimension,
+    conditions: SQL[],
+    options: MetricsTableOptions
+) => {
+    const metrics = buildMetricExpressions(table);
+    const orderExpression = buildSortExpression(options.sort.field, metrics);
+    const orderDirection = options.sort.direction === 'asc' ? asc(orderExpression) : desc(orderExpression);
+
+    if (dimension === 'campaign') {
+        const rows = await db
+            .select({
+                campaignId: table.campaignId,
+                name: campaign.name,
+                state: campaign.state,
+                impressions: metrics.impressions.as('impressions'),
+                clicks: metrics.clicks.as('clicks'),
+                spend: metrics.spend.as('spend'),
+                sales: metrics.sales.as('sales'),
+                orders: metrics.orders.as('orders'),
+            })
+            .from(table)
+            .leftJoin(campaign, eq(table.campaignId, campaign.campaignId))
+            .where(and(...conditions))
+            .groupBy(table.campaignId, campaign.name, campaign.state)
+            .orderBy(orderDirection, table.campaignId)
+            .limit(options.limit)
+            .offset(options.offset);
+
+        return rows.map(row => ({
+            campaignId: row.campaignId,
+            name: row.name ?? null,
+            state: row.state ? (String(row.state) as CampaignShape['state']) : null,
+            metrics: formatTotals(row),
+        }));
+    }
+
+    if (dimension === 'adGroup') {
+        const rows = await db
+            .select({
+                adGroupId: table.adGroupId,
+                campaignId: table.campaignId,
+                campaignName: campaign.name,
+                name: adGroup.name,
+                state: adGroup.state,
+                impressions: metrics.impressions.as('impressions'),
+                clicks: metrics.clicks.as('clicks'),
+                spend: metrics.spend.as('spend'),
+                sales: metrics.sales.as('sales'),
+                orders: metrics.orders.as('orders'),
+            })
+            .from(table)
+            .leftJoin(adGroup, eq(table.adGroupId, adGroup.adGroupId))
+            .leftJoin(campaign, eq(table.campaignId, campaign.campaignId))
+            .where(and(...conditions))
+            .groupBy(table.adGroupId, table.campaignId, campaign.name, adGroup.name, adGroup.state)
+            .orderBy(orderDirection, table.adGroupId)
+            .limit(options.limit)
+            .offset(options.offset);
+
+        return rows.map(row => ({
+            adGroupId: row.adGroupId,
+            campaignId: row.campaignId,
+            campaignName: row.campaignName ?? null,
+            name: row.name ?? null,
+            state: row.state ? (String(row.state) as AdGroupShape['state']) : null,
+            metrics: formatTotals(row),
+        }));
+    }
+
+    if (dimension === 'ad') {
+        const rows = await db
+            .select({
+                adId: table.adId,
+                campaignId: table.campaignId,
+                campaignName: campaign.name,
+                adGroupId: table.adGroupId,
+                adGroupName: adGroup.name,
+                state: ad.state,
+                productId: ad.productAsin,
+                impressions: metrics.impressions.as('impressions'),
+                clicks: metrics.clicks.as('clicks'),
+                spend: metrics.spend.as('spend'),
+                sales: metrics.sales.as('sales'),
+                orders: metrics.orders.as('orders'),
+            })
+            .from(table)
+            .leftJoin(ad, eq(table.adId, ad.adId))
+            .leftJoin(adGroup, eq(table.adGroupId, adGroup.adGroupId))
+            .leftJoin(campaign, eq(table.campaignId, campaign.campaignId))
+            .where(and(...conditions))
+            .groupBy(table.adId, table.campaignId, table.adGroupId, campaign.name, adGroup.name, ad.state, ad.productAsin)
+            .orderBy(orderDirection, table.adId)
+            .limit(options.limit)
+            .offset(options.offset);
+
+        return rows.map(row => ({
+            adId: row.adId,
+            campaignId: row.campaignId,
+            campaignName: row.campaignName ?? null,
+            adGroupId: row.adGroupId,
+            adGroupName: row.adGroupName ?? null,
+            state: row.state ? (String(row.state) as AdShape['state']) : null,
+            productId: row.productId ?? null,
+            metrics: formatTotals(row),
+        }));
+    }
+
+    const rows = await db
+        .select({
+            targetId: table.entityId,
+            campaignId: table.campaignId,
+            campaignName: campaign.name,
+            adGroupId: table.adGroupId,
+            adGroupName: adGroup.name,
+            state: target.state,
+            targetType: target.targetType,
+            targetKeyword: target.targetKeyword,
+            targetMatchType: target.targetMatchType,
+            targetAsin: target.targetAsin,
+            impressions: metrics.impressions.as('impressions'),
+            clicks: metrics.clicks.as('clicks'),
+            spend: metrics.spend.as('spend'),
+            sales: metrics.sales.as('sales'),
+            orders: metrics.orders.as('orders'),
+        })
+        .from(table)
+        .leftJoin(target, eq(table.entityId, target.targetId))
+        .leftJoin(adGroup, eq(table.adGroupId, adGroup.adGroupId))
+        .leftJoin(campaign, eq(table.campaignId, campaign.campaignId))
+        .where(and(...conditions, eq(table.entityType, 'target')))
+        .groupBy(
+            table.entityId,
+            table.campaignId,
+            table.adGroupId,
+            campaign.name,
+            adGroup.name,
+            target.state,
+            target.targetType,
+            target.targetKeyword,
+            target.targetMatchType,
+            target.targetAsin
+        )
+        .orderBy(orderDirection, table.entityId)
+        .limit(options.limit)
+        .offset(options.offset);
+
+    return rows.map(row => {
+        const resolvedType = resolveTargetType(row.targetType, row.targetKeyword);
+        return {
+            targetId: row.targetId,
+            campaignId: row.campaignId,
+            campaignName: row.campaignName ?? null,
+            adGroupId: row.adGroupId ?? null,
+            adGroupName: row.adGroupName ?? null,
+            state: row.state ? (String(row.state) as TargetShape['state']) : null,
+            type: resolvedType,
+            keyword: resolvedType === 'KEYWORD' ? (row.targetKeyword ?? null) : null,
+            keywordMatchType: resolvedType === 'KEYWORD' ? (row.targetMatchType ? String(row.targetMatchType) : null) : null,
+            productId: resolvedType === 'PRODUCT' ? (row.targetAsin ?? null) : null,
+            productMatchType: resolvedType === 'PRODUCT' ? (row.targetMatchType ? String(row.targetMatchType) : null) : null,
+            metrics: formatTotals(row),
+        };
+    });
+};
+
+const buildMetricExpressions = (table: MetricsTable) => {
+    return {
+        impressions: sql<number>`sum(${table.impressions})`,
+        clicks: sql<number>`sum(${table.clicks})`,
+        orders: sql<number>`sum(${table.orders})`,
+        spend: sql<number>`sum(${table.spend})`,
+        sales: sql<number>`sum(${table.sales})`,
+    };
+};
+
+const buildSortExpression = (field: MetricsTableSortField, metrics: ReturnType<typeof buildMetricExpressions>) => {
+    switch (field) {
+        case 'impressions':
+            return metrics.impressions;
+        case 'clicks':
+            return metrics.clicks;
+        case 'purchases':
+            return metrics.orders;
+        case 'sales':
+            return metrics.sales;
+        case 'ctr':
+            return sql<number>`coalesce(${metrics.clicks}::float / nullif(${metrics.impressions}::float, 0), 0)`;
+        case 'cpc':
+            return sql<number>`coalesce(${metrics.spend}::float / nullif(${metrics.clicks}::float, 0), 0)`;
+        case 'acos':
+            return sql<number>`coalesce(${metrics.spend}::float / nullif(${metrics.sales}::float, 0), 0)`;
+        case 'roas':
+            return sql<number>`coalesce(${metrics.sales}::float / nullif(${metrics.spend}::float, 0), 0)`;
+        case 'spend':
+        default:
+            return metrics.spend;
+    }
+};
+
+const resolveTargetType = (value: string | null, keyword: string | null) => {
+    if (value === 'KEYWORD' || value === 'PRODUCT') {
+        return value;
+    }
+    return keyword ? 'KEYWORD' : 'PRODUCT';
 };
 
 const formatDailyPoint = (
@@ -961,11 +1422,13 @@ const formatDailyPoint = (
     return {
         start: startUtc.toISOString(),
         end: endUtc.toISOString(),
-        impressions: Number(row.impressions ?? 0),
-        clicks: Number(row.clicks ?? 0),
-        spend: Number(row.spend ?? 0),
-        purchases: Number(row.orders ?? 0),
-        sales: Number(row.sales ?? 0),
+        metrics: buildMetricsValues({
+            impressions: Number(row.impressions ?? 0),
+            clicks: Number(row.clicks ?? 0),
+            spend: Number(row.spend ?? 0),
+            purchases: Number(row.orders ?? 0),
+            sales: Number(row.sales ?? 0),
+        }),
     };
 };
 
@@ -983,12 +1446,677 @@ const formatHourlyPoint = (row: {
     return {
         start,
         end,
-        impressions: Number(row.impressions ?? 0),
-        clicks: Number(row.clicks ?? 0),
-        spend: Number(row.spend ?? 0),
-        purchases: Number(row.orders ?? 0),
-        sales: Number(row.sales ?? 0),
+        metrics: buildMetricsValues({
+            impressions: Number(row.impressions ?? 0),
+            clicks: Number(row.clicks ?? 0),
+            spend: Number(row.spend ?? 0),
+            purchases: Number(row.orders ?? 0),
+            sales: Number(row.sales ?? 0),
+        }),
     };
+};
+
+const buildDailySeries = (
+    startDate: string,
+    endDate: string,
+    timezone: string,
+    rows: Array<{
+        bucketDate: string | Date;
+        impressions: number | null;
+        clicks: number | null;
+        spend: number | null;
+        sales: number | null;
+        orders: number | null;
+    }>
+) => {
+    const byDate = new Map<string, typeof rows[number]>();
+    for (const row of rows) {
+        const key = typeof row.bucketDate === 'string' ? row.bucketDate : toIsoDate(row.bucketDate);
+        byDate.set(key, { ...row, bucketDate: key });
+    }
+
+    const series: MetricsPoint[] = [];
+    let cursor = parseDate(startDate);
+    const end = parseDate(endDate);
+
+    while (cursor <= end) {
+        const key = toIsoDate(cursor);
+        const row = byDate.get(key) ?? {
+            bucketDate: key,
+            impressions: 0,
+            clicks: 0,
+            spend: 0,
+            sales: 0,
+            orders: 0,
+        };
+        series.push(formatDailyPoint(row, timezone));
+        cursor = addDays(cursor, 1);
+    }
+
+    return series;
+};
+
+const buildHourlySeries = (
+    startUtc: Date,
+    endExclusiveUtc: Date,
+    rows: Array<{
+        bucketStart: Date;
+        impressions: number | null;
+        clicks: number | null;
+        spend: number | null;
+        sales: number | null;
+        orders: number | null;
+    }>
+) => {
+    const byStart = new Map<number, typeof rows[number]>();
+    for (const row of rows) {
+        byStart.set(row.bucketStart.getTime(), row);
+    }
+
+    const series: MetricsPoint[] = [];
+    let cursor = new Date(startUtc);
+    const end = endExclusiveUtc.getTime();
+
+    while (cursor.getTime() < end) {
+        const key = cursor.getTime();
+        const row = byStart.get(key) ?? {
+            bucketStart: new Date(key),
+            impressions: 0,
+            clicks: 0,
+            spend: 0,
+            sales: 0,
+            orders: 0,
+        };
+        series.push(formatHourlyPoint(row));
+        cursor = addHours(cursor, 1);
+    }
+
+    return series;
+};
+
+const addDaysUtc = (value: Date, days: number) => {
+    const next = new Date(value.getTime());
+    next.setUTCDate(next.getUTCDate() + days);
+    return next;
+};
+
+const addWeeksUtc = (value: Date, weeks: number) => addDaysUtc(value, weeks * 7);
+
+const addMonthsUtc = (value: Date, months: number) => {
+    const next = new Date(value.getTime());
+    next.setUTCMonth(next.getUTCMonth() + months);
+    return next;
+};
+
+const addYearsUtc = (value: Date, years: number) => {
+    const next = new Date(value.getTime());
+    next.setUTCFullYear(next.getUTCFullYear() + years);
+    return next;
+};
+
+const startOfWeekUtc = (value: Date) => {
+    const day = value.getUTCDay();
+    const diff = (day + 6) % 7;
+    return addDaysUtc(value, -diff);
+};
+
+const startOfMonthUtc = (value: Date) => new Date(Date.UTC(value.getUTCFullYear(), value.getUTCMonth(), 1));
+
+const startOfYearUtc = (value: Date) => new Date(Date.UTC(value.getUTCFullYear(), 0, 1));
+
+const getBucketStartUtc = (value: Date, granularity: MetricsGranularity) => {
+    switch (granularity) {
+        case 'week':
+            return startOfWeekUtc(value);
+        case 'month':
+            return startOfMonthUtc(value);
+        case 'year':
+            return startOfYearUtc(value);
+        case 'day':
+        default:
+            return value;
+    }
+};
+
+const getBucketEndUtc = (value: Date, granularity: MetricsGranularity) => {
+    switch (granularity) {
+        case 'week':
+            return addWeeksUtc(value, 1);
+        case 'month':
+            return addMonthsUtc(value, 1);
+        case 'year':
+            return addYearsUtc(value, 1);
+        case 'day':
+        default:
+            return addDaysUtc(value, 1);
+    }
+};
+
+const formatBucketPoint = (
+    bucketStart: Date,
+    granularity: MetricsGranularity,
+    timezone: string,
+    row: {
+        impressions: number;
+        clicks: number;
+        spend: number;
+        sales: number;
+        orders: number;
+    }
+): MetricsPoint => {
+    const startDate = toIsoDate(bucketStart);
+    const endDate = toIsoDate(getBucketEndUtc(bucketStart, granularity));
+    const startUtc = fromZonedTime(parseDate(startDate), timezone);
+    const endUtc = fromZonedTime(parseDate(endDate), timezone);
+
+    return {
+        start: startUtc.toISOString(),
+        end: endUtc.toISOString(),
+        metrics: buildMetricsValues({
+            impressions: row.impressions,
+            clicks: row.clicks,
+            spend: row.spend,
+            purchases: row.orders,
+            sales: row.sales,
+        }),
+    };
+};
+
+const buildBucketedSeries = (
+    startDate: string,
+    endDate: string,
+    timezone: string,
+    granularity: MetricsGranularity,
+    rows: Array<{
+        bucketDate: string | Date;
+        impressions: number | null;
+        clicks: number | null;
+        spend: number | null;
+        sales: number | null;
+        orders: number | null;
+    }>
+) => {
+    if (granularity === 'day') {
+        return buildDailySeries(startDate, endDate, timezone, rows);
+    }
+
+    const byBucket = new Map<
+        string,
+        { impressions: number; clicks: number; spend: number; sales: number; orders: number }
+    >();
+
+    for (const row of rows) {
+        const dateValue = typeof row.bucketDate === 'string' ? row.bucketDate : toIsoDate(row.bucketDate);
+        const bucketStart = getBucketStartUtc(parseDate(dateValue), granularity);
+        const key = toIsoDate(bucketStart);
+        const current = byBucket.get(key) ?? { impressions: 0, clicks: 0, spend: 0, sales: 0, orders: 0 };
+        byBucket.set(key, {
+            impressions: current.impressions + Number(row.impressions ?? 0),
+            clicks: current.clicks + Number(row.clicks ?? 0),
+            spend: current.spend + Number(row.spend ?? 0),
+            sales: current.sales + Number(row.sales ?? 0),
+            orders: current.orders + Number(row.orders ?? 0),
+        });
+    }
+
+    const series: MetricsPoint[] = [];
+    let cursor = getBucketStartUtc(parseDate(startDate), granularity);
+    const end = parseDate(endDate);
+
+    while (cursor <= end) {
+        const key = toIsoDate(cursor);
+        const row = byBucket.get(key) ?? {
+            impressions: 0,
+            clicks: 0,
+            spend: 0,
+            sales: 0,
+            orders: 0,
+        };
+        series.push(formatBucketPoint(cursor, granularity, timezone, row));
+        cursor = getBucketEndUtc(cursor, granularity);
+    }
+
+    return series;
+};
+
+const buildMetricsValues = (value: {
+    impressions: number;
+    clicks: number;
+    spend: number;
+    purchases: number;
+    sales: number;
+}): MetricsTotals => {
+    const { impressions, clicks, spend, purchases, sales } = value;
+    return {
+        impressions,
+        clicks,
+        spend,
+        purchases,
+        sales,
+        acos: sales > 0 ? spend / sales : null,
+        cpc: clicks > 0 ? spend / clicks : null,
+        ctr: impressions > 0 ? clicks / impressions : null,
+        roas: spend > 0 ? sales / spend : null,
+    };
+};
+
+const buildEmptyMetrics = () =>
+    buildMetricsValues({
+        impressions: 0,
+        clicks: 0,
+        spend: 0,
+        purchases: 0,
+        sales: 0,
+    });
+
+const selectMetrics = (metrics: MetricsTotals, selection?: MetricsSelection) => {
+    if (!selection || selection.length === 0) {
+        return metrics;
+    }
+
+    const picked: Partial<MetricsTotals> = {};
+    for (const key of selection) {
+        picked[key] = metrics[key] ?? null;
+    }
+    return picked as MetricsTotals;
+};
+
+const buildEmptySeries = (
+    range: { startDate: string; endDate: string; startUtc: Date; endExclusiveUtc: Date; useHourly: boolean },
+    timezone: string,
+    selection: MetricsSelection | undefined,
+    granularity: MetricsGranularity
+) => {
+    const series =
+        granularity === 'hour'
+            ? buildHourlySeries(range.startUtc, range.endExclusiveUtc, [])
+            : granularity === 'day'
+              ? buildDailySeries(range.startDate, range.endDate, timezone, [])
+              : buildBucketedSeries(range.startDate, range.endDate, timezone, granularity, []);
+    return series.map(point => ({
+        ...point,
+        metrics: selectMetrics(point.metrics, selection),
+    }));
+};
+
+const mergeIds = (primary?: string[], secondary?: string[]) => {
+    if (primary && secondary) {
+        const secondarySet = new Set(secondary);
+        return primary.filter(id => secondarySet.has(id));
+    }
+    return primary ?? secondary;
+};
+
+const resolveFilteredIds = async (
+    config: CliConfig,
+    dimension: MetricsDimension,
+    range: { startDate: string; endDate: string; startUtc: Date; endExclusiveUtc: Date; useHourly: boolean },
+    options: MetricsSeriesOptions
+) => {
+    const filters = options.filters;
+    if (!filters) {
+        return undefined;
+    }
+
+    const entityIds = hasEntityFilters(filters)
+        ? await resolveEntityFilterIds(config, dimension, options.scope, filters)
+        : undefined;
+    const metricIds = hasMetricFilters(filters)
+        ? await resolveMetricFilterIds(config.accountId, dimension, range, options.scope, filters)
+        : undefined;
+
+    return mergeIds(entityIds, metricIds);
+};
+
+const hasEntityFilters = (filters: MetricsFilterInput) => {
+    return Boolean(
+        filters.search ||
+            (filters.state && filters.state !== 'ALL') ||
+            filters.targeting ||
+            filters.targetType ||
+            filters.targetMatchType ||
+            filters.budget ||
+            filters.endDate ||
+            filters.outOfBudget
+    );
+};
+
+const hasMetricFilters = (filters: MetricsFilterInput) => {
+    if (!filters.metrics) {
+        return false;
+    }
+    return Object.values(filters.metrics).some(value => value?.min !== undefined || value?.max !== undefined);
+};
+
+const resolveEntityFilterIds = async (
+    config: CliConfig,
+    dimension: MetricsDimension,
+    scope: MetricsFilters,
+    filters: MetricsFilterInput
+) => {
+    const countryCode = normalizeCountryCode(config.countryCode);
+    const search = filters.search?.trim();
+    const stateFilter = filters.state ? (filters.state === 'ALL' ? null : filters.state) : null;
+    const targeting = filters.targeting;
+    const targetType = filters.targetType;
+    const targetMatchType = filters.targetMatchType;
+    const budget = filters.budget;
+    const endDate = filters.endDate;
+    const outOfBudget = filters.outOfBudget;
+
+    if (dimension === 'campaign') {
+        const conditions: SQL[] = [eq(campaign.accountId, config.accountId)];
+
+        if (countryCode) {
+            conditions.push(eq(campaign.countryCode, countryCode));
+        }
+        if (scope.campaignId) {
+            conditions.push(eq(campaign.campaignId, scope.campaignId));
+        }
+        if (stateFilter) {
+            conditions.push(eq(campaign.state, stateFilter));
+        }
+        if (targeting) {
+            conditions.push(eq(campaign.targetingSettings, targeting));
+        }
+        if (budget?.min !== undefined) {
+            conditions.push(gte(campaign.budgetAmount, budget.min));
+        }
+        if (budget?.max !== undefined) {
+            conditions.push(lte(campaign.budgetAmount, budget.max));
+        }
+        if (endDate?.after) {
+            conditions.push(gte(campaign.endDate, endDate.after));
+        }
+        if (endDate?.before) {
+            conditions.push(lte(campaign.endDate, endDate.before));
+        }
+        if (outOfBudget !== undefined) {
+            if (outOfBudget) {
+                conditions.push(eq(campaign.deliveryStatus, 'OUT_OF_BUDGET'));
+            } else {
+                conditions.push(ne(campaign.deliveryStatus, 'OUT_OF_BUDGET'));
+            }
+        }
+        if (search) {
+            const pattern = `%${search}%`;
+            conditions.push(or(ilike(campaign.name, pattern), ilike(campaign.campaignId, pattern)));
+        }
+
+        const rows = await db.select({ id: campaign.campaignId }).from(campaign).where(and(...conditions));
+        return rows.map(row => row.id);
+    }
+
+    if (dimension === 'adGroup') {
+        const conditions: SQL[] = [eq(campaign.accountId, config.accountId)];
+        if (countryCode) {
+            conditions.push(eq(campaign.countryCode, countryCode));
+        }
+        if (scope.campaignId) {
+            conditions.push(eq(adGroup.campaignId, scope.campaignId));
+        }
+        if (scope.adGroupId) {
+            conditions.push(eq(adGroup.adGroupId, scope.adGroupId));
+        }
+        if (stateFilter) {
+            conditions.push(eq(adGroup.state, stateFilter));
+        }
+        if (targeting) {
+            conditions.push(eq(campaign.targetingSettings, targeting));
+        }
+        if (budget?.min !== undefined) {
+            conditions.push(gte(campaign.budgetAmount, budget.min));
+        }
+        if (budget?.max !== undefined) {
+            conditions.push(lte(campaign.budgetAmount, budget.max));
+        }
+        if (endDate?.after) {
+            conditions.push(gte(campaign.endDate, endDate.after));
+        }
+        if (endDate?.before) {
+            conditions.push(lte(campaign.endDate, endDate.before));
+        }
+        if (outOfBudget !== undefined) {
+            if (outOfBudget) {
+                conditions.push(eq(campaign.deliveryStatus, 'OUT_OF_BUDGET'));
+            } else {
+                conditions.push(ne(campaign.deliveryStatus, 'OUT_OF_BUDGET'));
+            }
+        }
+        if (search) {
+            const pattern = `%${search}%`;
+            conditions.push(
+                or(ilike(adGroup.name, pattern), ilike(adGroup.adGroupId, pattern), ilike(campaign.name, pattern))
+            );
+        }
+
+        const rows = await db
+            .select({ id: adGroup.adGroupId })
+            .from(adGroup)
+            .innerJoin(campaign, eq(adGroup.campaignId, campaign.campaignId))
+            .where(and(...conditions));
+        return rows.map(row => row.id);
+    }
+
+    if (dimension === 'ad') {
+        const conditions: SQL[] = [eq(campaign.accountId, config.accountId)];
+        if (countryCode) {
+            conditions.push(eq(campaign.countryCode, countryCode));
+        }
+        if (scope.campaignId) {
+            conditions.push(eq(ad.campaignId, scope.campaignId));
+        }
+        if (scope.adGroupId) {
+            conditions.push(eq(ad.adGroupId, scope.adGroupId));
+        }
+        if (stateFilter) {
+            conditions.push(eq(ad.state, stateFilter));
+        }
+        if (targeting) {
+            conditions.push(eq(campaign.targetingSettings, targeting));
+        }
+        if (budget?.min !== undefined) {
+            conditions.push(gte(campaign.budgetAmount, budget.min));
+        }
+        if (budget?.max !== undefined) {
+            conditions.push(lte(campaign.budgetAmount, budget.max));
+        }
+        if (endDate?.after) {
+            conditions.push(gte(campaign.endDate, endDate.after));
+        }
+        if (endDate?.before) {
+            conditions.push(lte(campaign.endDate, endDate.before));
+        }
+        if (outOfBudget !== undefined) {
+            if (outOfBudget) {
+                conditions.push(eq(campaign.deliveryStatus, 'OUT_OF_BUDGET'));
+            } else {
+                conditions.push(ne(campaign.deliveryStatus, 'OUT_OF_BUDGET'));
+            }
+        }
+        if (search) {
+            const pattern = `%${search}%`;
+            conditions.push(
+                or(
+                    ilike(ad.adId, pattern),
+                    ilike(ad.productAsin, pattern),
+                    ilike(campaign.name, pattern),
+                    ilike(adGroup.name, pattern)
+                )
+            );
+        }
+
+        const rows = await db
+            .select({ id: ad.adId })
+            .from(ad)
+            .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
+            .innerJoin(adGroup, eq(ad.adGroupId, adGroup.adGroupId))
+            .where(and(...conditions));
+        return rows.map(row => row.id);
+    }
+
+    const conditions: SQL[] = [eq(campaign.accountId, config.accountId)];
+    if (countryCode) {
+        conditions.push(eq(campaign.countryCode, countryCode));
+    }
+    if (scope.campaignId) {
+        conditions.push(eq(target.campaignId, scope.campaignId));
+    }
+    if (scope.adGroupId) {
+        conditions.push(eq(target.adGroupId, scope.adGroupId));
+    }
+    if (stateFilter) {
+        conditions.push(eq(target.state, stateFilter));
+    }
+    if (targetType) {
+        conditions.push(eq(target.targetType, targetType));
+    }
+    if (targetMatchType) {
+        conditions.push(eq(target.targetMatchType, targetMatchType));
+    }
+    if (targeting) {
+        conditions.push(eq(campaign.targetingSettings, targeting));
+    }
+    if (budget?.min !== undefined) {
+        conditions.push(gte(campaign.budgetAmount, budget.min));
+    }
+    if (budget?.max !== undefined) {
+        conditions.push(lte(campaign.budgetAmount, budget.max));
+    }
+    if (endDate?.after) {
+        conditions.push(gte(campaign.endDate, endDate.after));
+    }
+    if (endDate?.before) {
+        conditions.push(lte(campaign.endDate, endDate.before));
+    }
+    if (outOfBudget !== undefined) {
+        if (outOfBudget) {
+            conditions.push(eq(campaign.deliveryStatus, 'OUT_OF_BUDGET'));
+        } else {
+            conditions.push(ne(campaign.deliveryStatus, 'OUT_OF_BUDGET'));
+        }
+    }
+    if (search) {
+        const pattern = `%${search}%`;
+        conditions.push(
+            or(
+                ilike(target.targetId, pattern),
+                ilike(target.targetKeyword, pattern),
+                ilike(target.targetAsin, pattern),
+                ilike(campaign.name, pattern),
+                ilike(adGroup.name, pattern)
+            )
+        );
+    }
+
+    const rows = await db
+        .select({ id: target.targetId })
+        .from(target)
+        .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
+        .leftJoin(adGroup, eq(target.adGroupId, adGroup.adGroupId))
+        .where(and(...conditions));
+    return rows.map(row => row.id);
+};
+
+const resolveMetricFilterIds = async (
+    accountId: string,
+    dimension: MetricsDimension,
+    range: { startDate: string; endDate: string; startUtc: Date; endExclusiveUtc: Date; useHourly: boolean },
+    scope: MetricsFilters,
+    filters: MetricsFilterInput
+) => {
+    const metricFilters = filters.metrics;
+    if (!metricFilters) {
+        return undefined;
+    }
+
+    const table = range.useHourly ? (performanceHourly as MetricsTable) : (performanceDaily as MetricsTable);
+    const conditions: SQL[] = [eq(table.accountId, accountId)];
+
+    if (range.useHourly) {
+        conditions.push(gte(table.bucketStart, range.startUtc), lt(table.bucketStart, range.endExclusiveUtc));
+    } else {
+        conditions.push(gte(table.bucketDate, range.startDate), lte(table.bucketDate, range.endDate));
+    }
+
+    if (scope.campaignId) {
+        conditions.push(eq(table.campaignId, scope.campaignId));
+    }
+    if (scope.adGroupId) {
+        conditions.push(eq(table.adGroupId, scope.adGroupId));
+    }
+    if (scope.ids?.length) {
+        const column = resolveDimensionColumn(table, dimension);
+        conditions.push(inArray(column, scope.ids));
+    }
+    if (dimension === 'target') {
+        conditions.push(eq(table.entityType, 'target'));
+    }
+
+    const metrics = buildMetricExpressions(table);
+    const having: SQL[] = [];
+
+    for (const [key, rangeFilter] of Object.entries(metricFilters)) {
+        if (!rangeFilter) continue;
+        const expr = buildMetricValueExpression(key as MetricsKey, metrics);
+        if (rangeFilter.min !== undefined) {
+            having.push(gte(expr, rangeFilter.min));
+        }
+        if (rangeFilter.max !== undefined) {
+            having.push(lte(expr, rangeFilter.max));
+        }
+    }
+
+    if (having.length === 0) {
+        return undefined;
+    }
+
+    const idColumn = resolveDimensionColumn(table, dimension);
+    const rows = await db
+        .select({ id: idColumn })
+        .from(table)
+        .where(and(...conditions))
+        .groupBy(idColumn)
+        .having(and(...having));
+
+    return rows.map(row => row.id);
+};
+
+const resolveDimensionColumn = (table: MetricsTable, dimension: MetricsDimension) => {
+    switch (dimension) {
+        case 'campaign':
+            return table.campaignId;
+        case 'adGroup':
+            return table.adGroupId;
+        case 'ad':
+            return table.adId;
+        case 'target':
+            return table.entityId;
+    }
+};
+
+const buildMetricValueExpression = (key: MetricsKey, metrics: ReturnType<typeof buildMetricExpressions>) => {
+    switch (key) {
+        case 'impressions':
+            return metrics.impressions;
+        case 'clicks':
+            return metrics.clicks;
+        case 'purchases':
+            return metrics.orders;
+        case 'sales':
+            return metrics.sales;
+        case 'ctr':
+            return sql<number>`coalesce(${metrics.clicks}::float / nullif(${metrics.impressions}::float, 0), 0)`;
+        case 'cpc':
+            return sql<number>`coalesce(${metrics.spend}::float / nullif(${metrics.clicks}::float, 0), 0)`;
+        case 'acos':
+            return sql<number>`coalesce(${metrics.spend}::float / nullif(${metrics.sales}::float, 0), 0)`;
+        case 'roas':
+            return sql<number>`coalesce(${metrics.sales}::float / nullif(${metrics.spend}::float, 0), 0)`;
+        case 'spend':
+        default:
+            return metrics.spend;
+    }
 };
 
 const extractBudgetValue = (budget: Record<string, unknown> | null) => {

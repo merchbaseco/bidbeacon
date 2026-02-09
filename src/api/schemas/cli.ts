@@ -88,25 +88,42 @@ export const targetSchema = z.object({
     productMatchType: productMatchTypeSchema.nullable().optional(),
 });
 
-export const metricsTotalsSchema = z.object({
-    impressions: z.number(),
-    clicks: z.number(),
-    spend: z.number(),
-    purchases: z.number(),
-    sales: z.number(),
-    acos: z.number().nullable(),
-    cpc: z.number().nullable(),
-    ctr: z.number().nullable(),
-});
+export const metricsKeySchema = z.enum([
+    'impressions',
+    'clicks',
+    'spend',
+    'purchases',
+    'sales',
+    'acos',
+    'cpc',
+    'ctr',
+    'roas',
+]);
+
+export const metricsBucketSchema = z.enum(['auto', 'hour', 'day', 'week', 'month', 'year']);
+export const metricsGranularitySchema = z.enum(['hour', 'day', 'week', 'month', 'year']);
+
+export const metricsValueSchema = z.record(metricsKeySchema, z.number().nullable());
+
+export const metricsTotalsSchema = metricsValueSchema;
 
 export const metricsPointSchema = z.object({
     start: z.string(),
     end: z.string(),
-    impressions: z.number(),
-    clicks: z.number(),
-    spend: z.number(),
-    purchases: z.number(),
-    sales: z.number(),
+    metrics: metricsValueSchema,
+});
+
+export const metricsSeriesRangeSchema = z.object({
+    startDate: z.string(),
+    endDate: z.string(),
+});
+
+export const metricsSeriesOutputSchema = z.object({
+    totals: metricsTotalsSchema,
+    series: z.array(metricsPointSchema),
+    granularity: metricsGranularitySchema,
+    timezone: z.string(),
+    range: metricsSeriesRangeSchema,
 });
 
 export const accountsListOutputSchema = z.object({
@@ -260,23 +277,132 @@ export const bidsAdjustInputSchema = cliConfigInputSchema.extend({
     delta: z.number(),
 });
 
-export const metricsOutputSchema = z.object({
-    totals: metricsTotalsSchema,
-    series: z.array(metricsPointSchema),
+export const metricsRangeSchema = z.object({
+    min: z.number().optional(),
+    max: z.number().optional(),
 });
 
-export const metricsListInputSchema = cliConfigInputSchema.extend({
+export const metricsRangeFiltersSchema = z.record(metricsKeySchema, metricsRangeSchema).optional();
+
+export const metricsFiltersSchema = z
+    .object({
+        search: z.string().optional(),
+        state: listStateSchema.optional(),
+        targeting: z.enum(['AUTO', 'MANUAL']).optional(),
+        targetType: z.enum(['KEYWORD', 'PRODUCT']).optional(),
+        targetMatchType: z.union([keywordMatchTypeSchema, productMatchTypeSchema]).optional(),
+        budget: z.object({ min: z.number().optional(), max: z.number().optional() }).optional(),
+        endDate: z.object({ before: z.string().optional(), after: z.string().optional() }).optional(),
+        outOfBudget: z.boolean().optional(),
+        metrics: metricsRangeFiltersSchema,
+    })
+    .optional();
+
+export const metricsSelectionSchema = z.array(metricsKeySchema).optional();
+
+export const metricsSeriesInputSchema = cliConfigInputSchema.extend({
     campaignId: z.string().optional(),
     adGroupId: z.string().optional(),
+    ids: z.array(z.string()).optional(),
+    metrics: metricsSelectionSchema,
+    filters: metricsFiltersSchema,
+    range: z.string().optional(),
+    bucket: metricsBucketSchema.optional(),
 });
 
-export const metricsEntityInputSchema = cliConfigInputSchema.extend({
-    entityId: z.string().optional(),
-    entityType: z.enum(['campaign', 'adGroup', 'ad', 'target']),
+export const metricsTableSortFieldSchema = z.enum([
+    'impressions',
+    'clicks',
+    'purchases',
+    'spend',
+    'sales',
+    'acos',
+    'cpc',
+    'ctr',
+    'roas',
+]);
+
+export const metricsTableSortSchema = z.object({
+    field: metricsTableSortFieldSchema,
+    direction: z.enum(['asc', 'desc']),
 });
 
-export const metricsByIdInputSchema = cliConfigInputSchema.extend({
-    id: z.string(),
+export const metricsTableInputSchema = cliConfigInputSchema.extend({
+    campaignId: z.string().optional(),
+    adGroupId: z.string().optional(),
+    ids: z.array(z.string()).optional(),
+    metrics: metricsSelectionSchema,
+    filters: metricsFiltersSchema,
+    sort: metricsTableSortSchema.optional(),
+    limit: z.number().min(1).max(200).optional(),
+    offset: z.number().min(0).optional(),
+    range: z.string().optional(),
+});
+
+export const metricsTableCampaignItemSchema = z.object({
+    campaignId: z.string(),
+    name: z.string().nullable(),
+    state: stateSchema.nullable(),
+    metrics: metricsTotalsSchema,
+});
+
+export const metricsTableAdGroupItemSchema = z.object({
+    adGroupId: z.string(),
+    campaignId: z.string(),
+    campaignName: z.string().nullable(),
+    name: z.string().nullable(),
+    state: stateSchema.nullable(),
+    metrics: metricsTotalsSchema,
+});
+
+export const metricsTableAdItemSchema = z.object({
+    adId: z.string(),
+    campaignId: z.string(),
+    campaignName: z.string().nullable(),
+    adGroupId: z.string(),
+    adGroupName: z.string().nullable(),
+    state: stateSchema.nullable(),
+    productId: z.string().nullable(),
+    metrics: metricsTotalsSchema,
+});
+
+export const metricsTableTargetItemSchema = z.object({
+    targetId: z.string(),
+    campaignId: z.string(),
+    campaignName: z.string().nullable(),
+    adGroupId: z.string().nullable(),
+    adGroupName: z.string().nullable(),
+    state: stateSchema.nullable(),
+    type: z.enum(['KEYWORD', 'PRODUCT']),
+    keyword: z.string().nullable(),
+    keywordMatchType: keywordMatchTypeSchema.nullable(),
+    productId: z.string().nullable(),
+    productMatchType: productMatchTypeSchema.nullable(),
+    metrics: metricsTotalsSchema,
+});
+
+export const metricsTableCampaignsOutputSchema = z.object({
+    totals: metricsTotalsSchema,
+    items: z.array(metricsTableCampaignItemSchema),
+    sort: metricsTableSortSchema,
+});
+
+export const metricsTableAdGroupsOutputSchema = z.object({
+    totals: metricsTotalsSchema,
+    items: z.array(metricsTableAdGroupItemSchema),
+    sort: metricsTableSortSchema,
+});
+
+export const metricsTableAdsOutputSchema = z.object({
+    totals: metricsTotalsSchema,
+    items: z.array(metricsTableAdItemSchema),
+    sort: metricsTableSortSchema,
+});
+
+export const metricsTableTargetsOutputSchema = z.object({
+    totals: metricsTotalsSchema,
+    items: z.array(metricsTableTargetItemSchema),
+    sort: metricsTableSortSchema,
 });
 
 export const enumsBidStrategyOutputSchema = z.object({

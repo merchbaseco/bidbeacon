@@ -10,6 +10,10 @@ const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_RANGE = 'today';
 const CONFIG_DIR = join(homedir(), '.bidbeacon');
 const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
+const METRICS_KEYS = ['impressions', 'clicks', 'spend', 'purchases', 'sales', 'acos', 'cpc', 'ctr', 'roas'] as const;
+const METRICS_KEYS_SET = new Set(METRICS_KEYS);
+const METRICS_BUCKETS = ['auto', 'hour', 'day', 'week', 'month', 'year'] as const;
+const METRICS_BUCKETS_SET = new Set(METRICS_BUCKETS);
 
 const main = async () => {
     const { positional, flags } = parseArgs(process.argv.slice(2));
@@ -425,76 +429,190 @@ const main = async () => {
         }
         case 'metrics': {
             const cliConfig = requireCliConfig(config);
-            if (subcommand === 'campaigns') {
-                if (readFlag(flags, ['campaign', 'campaign-id']) || readFlag(flags, ['ad-group', 'ad-group-id'])) {
-                    throw new Error('Usage: bb metrics campaigns (use bb metrics campaign <campaign_id> for a single campaign).');
+            if (!subcommand || !action) {
+                throw new Error('Usage: bb metrics <series|table> <campaigns|ad-groups|ads|targets> [filters]');
+            }
+
+            if (subcommand !== 'series' && subcommand !== 'table') {
+                throw new Error('Usage: bb metrics <series|table> <campaigns|ad-groups|ads|targets> [filters]');
+            }
+
+            const ids = parseIdsFlag(flags);
+            const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
+            const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+            const metrics = parseMetricsSelectionFlag(flags);
+            const filters = parseMetricsFiltersFlag(flags);
+            const rangeOverride = readFlag(flags, ['range']);
+            const bucket = parseMetricsBucketFlag(flags);
+
+            const sortField = readFlag(flags, ['sort']);
+            const sortDirection = readFlag(flags, ['direction']);
+            const limitRaw = readFlag(flags, ['limit']);
+            const offsetRaw = readFlag(flags, ['offset']);
+
+            if (subcommand === 'series' && (sortField || sortDirection || limitRaw || offsetRaw)) {
+                throw new Error('Series metrics do not support --sort, --direction, --limit, or --offset.');
+            }
+            if (subcommand === 'table' && bucket) {
+                throw new Error('Table metrics do not support --bucket.');
+            }
+
+            const tableOptions =
+                subcommand === 'table'
+                    ? {
+                          sort: {
+                              field: parseSortField(sortField),
+                              direction: parseSortDirection(sortDirection),
+                          },
+                          limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
+                          offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
+                      }
+                    : null;
+
+            if (subcommand === 'series') {
+                if (action === 'campaigns') {
+                    if (campaignId || adGroupId) {
+                        throw new Error(
+                            'Usage: bb metrics series campaigns [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>].'
+                        );
+                    }
+                    const data = await client.api.cli.metricsSeriesCampaigns.query({
+                        config: cliConfig,
+                        ids,
+                        metrics,
+                        filters,
+                        range: rangeOverride ?? undefined,
+                        bucket: bucket ?? undefined,
+                    });
+                    printOutput(data);
+                    return;
                 }
-                const data = await client.api.cli.metricsCampaigns.query({ config: cliConfig });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'ad-groups') {
-                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
-                if (readFlag(flags, ['ad-group', 'ad-group-id'])) {
-                    throw new Error('Usage: bb metrics ad-groups [--campaign <campaign_id>].');
+                if (action === 'ad-groups') {
+                    if (adGroupId) {
+                        throw new Error(
+                            'Usage: bb metrics series ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>].'
+                        );
+                    }
+                    const data = await client.api.cli.metricsSeriesAdGroups.query({
+                        config: cliConfig,
+                        campaignId: campaignId ?? undefined,
+                        ids,
+                        metrics,
+                        filters,
+                        range: rangeOverride ?? undefined,
+                        bucket: bucket ?? undefined,
+                    });
+                    printOutput(data);
+                    return;
                 }
-                const data = await client.api.cli.metricsAdGroups.query({
-                    config: cliConfig,
-                    campaignId: campaignId ?? undefined,
-                });
-                printOutput(data);
-                return;
+                if (action === 'ads') {
+                    const data = await client.api.cli.metricsSeriesAds.query({
+                        config: cliConfig,
+                        campaignId: campaignId ?? undefined,
+                        adGroupId: adGroupId ?? undefined,
+                        ids,
+                        metrics,
+                        filters,
+                        range: rangeOverride ?? undefined,
+                        bucket: bucket ?? undefined,
+                    });
+                    printOutput(data);
+                    return;
+                }
+                if (action === 'targets') {
+                    const data = await client.api.cli.metricsSeriesTargets.query({
+                        config: cliConfig,
+                        campaignId: campaignId ?? undefined,
+                        adGroupId: adGroupId ?? undefined,
+                        ids,
+                        metrics,
+                        filters,
+                        range: rangeOverride ?? undefined,
+                        bucket: bucket ?? undefined,
+                    });
+                    printOutput(data);
+                    return;
+                }
             }
-            if (subcommand === 'ads') {
-                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
-                const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
-                const data = await client.api.cli.metricsAds.query({
-                    config: cliConfig,
-                    campaignId: campaignId ?? undefined,
-                    adGroupId: adGroupId ?? undefined,
-                });
-                printOutput(data);
-                return;
+
+            if (subcommand === 'table') {
+                if (!tableOptions) {
+                    throw new Error('Missing table options.');
+                }
+
+                if (action === 'campaigns') {
+                    if (campaignId || adGroupId) {
+                        throw new Error(
+                            'Usage: bb metrics table campaigns [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>].'
+                        );
+                    }
+                    const data = await client.api.cli.metricsTableCampaigns.query({
+                        config: cliConfig,
+                        ids,
+                        metrics,
+                        filters,
+                        range: rangeOverride ?? undefined,
+                        sort: tableOptions.sort,
+                        limit: tableOptions.limit,
+                        offset: tableOptions.offset,
+                    });
+                    printOutput(data);
+                    return;
+                }
+                if (action === 'ad-groups') {
+                    if (adGroupId) {
+                        throw new Error(
+                            'Usage: bb metrics table ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>].'
+                        );
+                    }
+                    const data = await client.api.cli.metricsTableAdGroups.query({
+                        config: cliConfig,
+                        campaignId: campaignId ?? undefined,
+                        ids,
+                        metrics,
+                        filters,
+                        range: rangeOverride ?? undefined,
+                        sort: tableOptions.sort,
+                        limit: tableOptions.limit,
+                        offset: tableOptions.offset,
+                    });
+                    printOutput(data);
+                    return;
+                }
+                if (action === 'ads') {
+                    const data = await client.api.cli.metricsTableAds.query({
+                        config: cliConfig,
+                        campaignId: campaignId ?? undefined,
+                        adGroupId: adGroupId ?? undefined,
+                        ids,
+                        metrics,
+                        filters,
+                        range: rangeOverride ?? undefined,
+                        sort: tableOptions.sort,
+                        limit: tableOptions.limit,
+                        offset: tableOptions.offset,
+                    });
+                    printOutput(data);
+                    return;
+                }
+                if (action === 'targets') {
+                    const data = await client.api.cli.metricsTableTargets.query({
+                        config: cliConfig,
+                        campaignId: campaignId ?? undefined,
+                        adGroupId: adGroupId ?? undefined,
+                        ids,
+                        metrics,
+                        filters,
+                        range: rangeOverride ?? undefined,
+                        sort: tableOptions.sort,
+                        limit: tableOptions.limit,
+                        offset: tableOptions.offset,
+                    });
+                    printOutput(data);
+                    return;
+                }
             }
-            if (subcommand === 'targets') {
-                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
-                const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
-                const data = await client.api.cli.metricsTargets.query({
-                    config: cliConfig,
-                    campaignId: campaignId ?? undefined,
-                    adGroupId: adGroupId ?? undefined,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'campaign') {
-                const campaignId = action;
-                if (!campaignId) throw new Error('Usage: bb metrics campaign <campaign_id>');
-                const data = await client.api.cli.metricsCampaign.query({ config: cliConfig, campaignId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'ad-group') {
-                const adGroupId = action;
-                if (!adGroupId) throw new Error('Usage: bb metrics ad-group <ad_group_id>');
-                const data = await client.api.cli.metricsAdGroup.query({ config: cliConfig, adGroupId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'ad') {
-                const adId = action;
-                if (!adId) throw new Error('Usage: bb metrics ad <ad_id>');
-                const data = await client.api.cli.metricsAd.query({ config: cliConfig, adId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'target') {
-                const targetId = action;
-                if (!targetId) throw new Error('Usage: bb metrics target <target_id>');
-                const data = await client.api.cli.metricsTarget.query({ config: cliConfig, targetId });
-                printOutput(data);
-                return;
-            }
+
             throw new Error('Unknown metrics command.');
         }
         case 'enums': {
@@ -628,14 +746,19 @@ Usage:
   bb bids set <target_id> <value>
   bb bids adjust <target_id> <delta>
 
-  bb metrics campaigns
-  bb metrics ad-groups [--campaign <campaign_id>]
-  bb metrics ads [--campaign <campaign_id>] [--ad-group <ad_group_id>]
-  bb metrics targets [--campaign <campaign_id>] [--ad-group <ad_group_id>]
-  bb metrics campaign <campaign_id>
-  bb metrics ad-group <ad_group_id>
-  bb metrics ad <ad_id>
-  bb metrics target <target_id>
+  bb metrics series campaigns [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]
+  bb metrics series ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]
+  bb metrics series ads [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]
+  bb metrics series targets [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]
+
+  bb metrics table campaigns [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]
+  bb metrics table ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]
+  bb metrics table ads [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]
+  bb metrics table targets [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]
+  Metrics table sort fields: impressions|clicks|purchases|spend|sales|acos|cpc|ctr|roas
+  Metrics common flags: --metrics <keys> --range <range> --filter <key><op><value> (repeatable) --search <text> --state <ENABLED|PAUSED|ARCHIVED|OTHER|ALL>
+  Metrics series-only flags: --bucket <auto|hour|day|week|month|year>
+  Filter keys: search|state|status|targeting|type|target-type|target-match-type|budget|end-date|out-of-budget|metrics.<key>
 
   bb enums bid-strategy
   bb enums match-type
@@ -704,7 +827,13 @@ const parseArgs = (args: string[]) => {
         }
 
         if (inlineValue !== undefined) {
-            flags[key] = inlineValue;
+            if (flags[key] === undefined) {
+                flags[key] = inlineValue;
+            } else if (Array.isArray(flags[key])) {
+                flags[key] = [...flags[key], inlineValue];
+            } else {
+                flags[key] = [flags[key] as string, inlineValue];
+            }
             index += 1;
             continue;
         }
@@ -716,7 +845,13 @@ const parseArgs = (args: string[]) => {
             continue;
         }
 
-        flags[key] = next;
+        if (flags[key] === undefined) {
+            flags[key] = next;
+        } else if (Array.isArray(flags[key])) {
+            flags[key] = [...flags[key], next];
+        } else {
+            flags[key] = [flags[key] as string, next];
+        }
         index += 2;
     }
 
@@ -726,6 +861,9 @@ const parseArgs = (args: string[]) => {
 const readFlag = (flags: ParsedFlags, keys: string[]) => {
     for (const key of keys) {
         const value = flags[key];
+        if (Array.isArray(value)) {
+            return value.find(entry => typeof entry === 'string') ?? null;
+        }
         if (typeof value === 'string') {
             return value;
         }
@@ -739,6 +877,18 @@ const readBooleanFlag = (flags: ParsedFlags, keys: string[]) => {
         if (value === true) {
             return true;
         }
+        if (Array.isArray(value)) {
+            return value.some(entry => {
+                if (entry === true) {
+                    return true;
+                }
+                if (typeof entry !== 'string') {
+                    return false;
+                }
+                const normalized = entry.trim().toLowerCase();
+                return ['true', '1', 'yes', 'y'].includes(normalized);
+            });
+        }
         if (typeof value === 'string') {
             const normalized = value.trim().toLowerCase();
             if (['true', '1', 'yes', 'y'].includes(normalized)) {
@@ -750,6 +900,19 @@ const readBooleanFlag = (flags: ParsedFlags, keys: string[]) => {
         }
     }
     return false;
+};
+
+const readFlagValues = (flags: ParsedFlags, keys: string[]) => {
+    const values: string[] = [];
+    for (const key of keys) {
+        const value = flags[key];
+        if (Array.isArray(value)) {
+            values.push(...value.filter(entry => typeof entry === 'string'));
+        } else if (typeof value === 'string') {
+            values.push(value);
+        }
+    }
+    return values;
 };
 
 const resolveListStateFlag = (flags: ParsedFlags) => {
@@ -785,6 +948,272 @@ const parseJsonArg = (value: string) => {
     } catch {
         throw new Error('Invalid JSON payload.');
     }
+};
+
+const parseIdsFlag = (flags: ParsedFlags) => {
+    const raw = readFlag(flags, ['ids']);
+    if (!raw) {
+        return undefined;
+    }
+    const ids = raw
+        .split(',')
+        .map(value => value.trim())
+        .filter(Boolean);
+    if (ids.length === 0) {
+        throw new Error('Invalid --ids. Use comma-separated values.');
+    }
+    return ids;
+};
+
+const parseSortField = (value?: string) => {
+    if (!value) {
+        return 'spend' as const;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (!METRICS_KEYS_SET.has(normalized as typeof METRICS_KEYS[number])) {
+        throw new Error('Invalid --sort. Use impressions, clicks, purchases, spend, sales, acos, cpc, ctr, or roas.');
+    }
+    return normalized as typeof METRICS_KEYS[number];
+};
+
+const parseSortDirection = (value?: string) => {
+    if (!value) {
+        return 'desc' as const;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (normalized !== 'asc' && normalized !== 'desc') {
+        throw new Error('Invalid --direction. Use asc or desc.');
+    }
+    return normalized as 'asc' | 'desc';
+};
+
+const parsePositiveIntArg = (value: string, label: string) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 1) {
+        throw new Error(`Invalid ${label}. Use an integer >= 1.`);
+    }
+    return parsed;
+};
+
+const parseNonNegativeIntArg = (value: string, label: string) => {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed) || !Number.isInteger(parsed) || parsed < 0) {
+        throw new Error(`Invalid ${label}. Use an integer >= 0.`);
+    }
+    return parsed;
+};
+
+const parseMetricsSelectionFlag = (flags: ParsedFlags) => {
+    const raw = readFlag(flags, ['metrics']);
+    if (!raw) {
+        return undefined;
+    }
+    const entries = raw
+        .split(',')
+        .map(value => value.trim().toLowerCase())
+        .filter(Boolean);
+    if (entries.length === 0) {
+        throw new Error('Invalid --metrics. Use a comma-separated list of metric keys.');
+    }
+    for (const key of entries) {
+        if (!METRICS_KEYS_SET.has(key as typeof METRICS_KEYS[number])) {
+            throw new Error(`Invalid metric key: ${key}.`);
+        }
+    }
+    return entries as typeof METRICS_KEYS[number][];
+};
+
+const parseMetricsBucketFlag = (flags: ParsedFlags) => {
+    const raw = readFlag(flags, ['bucket']);
+    if (!raw) {
+        return undefined;
+    }
+    const normalized = raw.trim().toLowerCase();
+    if (!METRICS_BUCKETS_SET.has(normalized as typeof METRICS_BUCKETS[number])) {
+        throw new Error('Invalid --bucket. Use auto, hour, day, week, month, or year.');
+    }
+    return normalized as typeof METRICS_BUCKETS[number];
+};
+
+const parseMetricsFiltersFlag = (flags: ParsedFlags) => {
+    const entries = readFlagValues(flags, ['filter']);
+    const filters: Record<string, unknown> = {};
+
+    for (const entry of entries) {
+        const parsed = parseFilterExpression(entry);
+        applyFilterExpression(filters, parsed);
+    }
+
+    const search = readFlag(flags, ['search']);
+    if (search) {
+        filters.search = search;
+    }
+
+    const state = resolveListStateFlag(flags);
+    if (state) {
+        filters.state = state;
+    }
+
+    return Object.keys(filters).length > 0 ? filters : undefined;
+};
+
+const parseFilterExpression = (raw: string) => {
+    const match = raw.match(/^\s*([^<>=!~]+)\s*(<=|>=|!=|=|<|>|~)\s*(.+)\s*$/);
+    if (!match) {
+        throw new Error(`Invalid --filter expression: ${raw}`);
+    }
+    const [, key, operator, value] = match;
+    return { key: key.trim(), operator, value: value.trim() };
+};
+
+const applyFilterExpression = (filters: Record<string, unknown>, expression: { key: string; operator: string; value: string }) => {
+    const key = expression.key;
+    const operator = expression.operator;
+    const value = expression.value;
+
+    const normalizedKey = key.trim();
+    const metricKey = resolveMetricKey(normalizedKey);
+
+    if (metricKey) {
+        applyMetricRangeFilter(filters, metricKey, operator, value);
+        return;
+    }
+
+    switch (normalizedKey) {
+        case 'search':
+        case 'name': {
+            if (operator !== '=' && operator !== '~') {
+                throw new Error(`Invalid operator for ${normalizedKey}. Use = or ~.`);
+            }
+            filters.search = value;
+            return;
+        }
+        case 'state':
+        case 'status':
+        case 'active-status': {
+            if (operator !== '=') {
+                throw new Error(`Invalid operator for ${normalizedKey}. Use =.`);
+            }
+            filters.state = value.trim().toUpperCase();
+            return;
+        }
+        case 'targeting':
+        case 'type': {
+            if (operator !== '=') {
+                throw new Error(`Invalid operator for ${normalizedKey}. Use =.`);
+            }
+            filters.targeting = value.trim().toUpperCase();
+            return;
+        }
+        case 'target-type': {
+            if (operator !== '=') {
+                throw new Error(`Invalid operator for ${normalizedKey}. Use =.`);
+            }
+            filters.targetType = value.trim().toUpperCase();
+            return;
+        }
+        case 'target-match-type': {
+            if (operator !== '=') {
+                throw new Error(`Invalid operator for ${normalizedKey}. Use =.`);
+            }
+            filters.targetMatchType = value.trim().toUpperCase();
+            return;
+        }
+        case 'budget': {
+            applyRangeFilter(filters, 'budget', operator, value);
+            return;
+        }
+        case 'end-date': {
+            applyDateFilter(filters, operator, value);
+            return;
+        }
+        case 'out-of-budget': {
+            if (operator !== '=' && operator !== '!=') {
+                throw new Error('Invalid operator for out-of-budget. Use = or !=.');
+            }
+            const parsed = parseBooleanValue(value);
+            filters.outOfBudget = operator === '!=' ? !parsed : parsed;
+            return;
+        }
+        default:
+            throw new Error(`Unknown filter key: ${normalizedKey}`);
+    }
+};
+
+const resolveMetricKey = (key: string) => {
+    const trimmed = key.trim().toLowerCase();
+    if (trimmed.startsWith('metrics.')) {
+        const candidate = trimmed.replace('metrics.', '');
+        return METRICS_KEYS_SET.has(candidate as typeof METRICS_KEYS[number]) ? candidate : null;
+    }
+    if (METRICS_KEYS_SET.has(trimmed as typeof METRICS_KEYS[number])) {
+        return trimmed;
+    }
+    return null;
+};
+
+const applyMetricRangeFilter = (filters: Record<string, unknown>, metric: string, operator: string, rawValue: string) => {
+    const numeric = parseNumberArg(rawValue, `metrics.${metric}`);
+    const metricsFilters = (filters.metrics as Record<string, { min?: number; max?: number }> | undefined) ?? {};
+    const existing = metricsFilters[metric] ?? {};
+
+    const next = applyRangeOperator(existing, operator, numeric, `metrics.${metric}`);
+    metricsFilters[metric] = next;
+    filters.metrics = metricsFilters;
+};
+
+const applyRangeFilter = (filters: Record<string, unknown>, key: string, operator: string, rawValue: string) => {
+    const numeric = parseNumberArg(rawValue, key);
+    const range = (filters[key] as { min?: number; max?: number } | undefined) ?? {};
+    const next = applyRangeOperator(range, operator, numeric, key);
+    filters[key] = next;
+};
+
+const applyRangeOperator = (range: { min?: number; max?: number }, operator: string, value: number, label: string) => {
+    const next = { ...range };
+    switch (operator) {
+        case '>':
+        case '>=':
+            next.min = value;
+            break;
+        case '<':
+        case '<=':
+            next.max = value;
+            break;
+        case '=':
+            next.min = value;
+            next.max = value;
+            break;
+        default:
+            throw new Error(`Invalid operator for ${label}. Use =, >=, <=, >, or <.`);
+    }
+    return next;
+};
+
+const applyDateFilter = (filters: Record<string, unknown>, operator: string, value: string) => {
+    const endDate = (filters.endDate as { before?: string; after?: string } | undefined) ?? {};
+    if (operator === '>' || operator === '>=') {
+        endDate.after = value;
+    } else if (operator === '<' || operator === '<=') {
+        endDate.before = value;
+    } else if (operator === '=') {
+        endDate.after = value;
+        endDate.before = value;
+    } else {
+        throw new Error('Invalid operator for end-date. Use =, >=, <=, >, or <.');
+    }
+    filters.endDate = endDate;
+};
+
+const parseBooleanValue = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    if (['true', '1', 'yes', 'y'].includes(normalized)) {
+        return true;
+    }
+    if (['false', '0', 'no', 'n'].includes(normalized)) {
+        return false;
+    }
+    throw new Error(`Invalid boolean value: ${value}.`);
 };
 
 const buildRangeHelpMessage = async (config: CliConfig) => {
@@ -843,7 +1272,7 @@ type CliConfig = {
     range?: string;
 };
 
-type ParsedFlags = Record<string, string | boolean> & {
+type ParsedFlags = Record<string, string | boolean | string[]> & {
     help?: boolean;
 };
 
