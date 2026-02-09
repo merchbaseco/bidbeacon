@@ -2,6 +2,7 @@ import { apiProcedure } from '@/api/trpc';
 import { campaignsDeleteInputSchema, campaignsGetOutputSchema } from '@/api/schemas/cli';
 import { assertDeleteResponse, deleteCampaigns } from '@/amazon-ads/sp-entities';
 import { assertAccountAccess, resolveAccountContext } from './shared';
+import type { CampaignShape } from './shared';
 
 export const campaignsDelete = apiProcedure
     .input(campaignsDeleteInputSchema)
@@ -24,15 +25,13 @@ export const campaignsDelete = apiProcedure
         return { item: buildDeletedCampaign(input.campaignId) };
     });
 
-const buildDeletedCampaign = (campaignId: string) => {
-    return {
-        campaignId,
-        name: '[deleted]',
-        state: 'ARCHIVED',
-        budget: 0,
-        bidStrategy: null,
-        startDateTime: null,
-        endDateTime: null,
-        portfolioId: null,
-    };
-};
+const buildDeletedCampaign = (campaignId: string): CampaignShape => ({
+    campaignId,
+    name: '[deleted]',
+    state: 'ARCHIVED',
+    budget: 0,
+    bidStrategy: null,
+    startDateTime: null,
+    endDateTime: null,
+    portfolioId: null,
+});

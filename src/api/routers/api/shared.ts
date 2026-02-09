@@ -21,6 +21,10 @@ import {
     metricsFiltersSchema,
     metricsKeySchema,
     metricsSelectionSchema,
+    metricsTableCampaignsOutputSchema,
+    metricsTableAdGroupsOutputSchema,
+    metricsTableAdsOutputSchema,
+    metricsTableTargetsOutputSchema,
     metricsTableSortFieldSchema,
     metricsBucketSchema,
     metricsGranularitySchema,
@@ -30,6 +34,10 @@ export type CliConfig = {
     accountId: string;
     countryCode?: string;
     range: string;
+};
+
+type ApiContext = Context & {
+    assertAccountAccess: (accountId: string) => void;
 };
 
 type ListOptions = {
@@ -59,7 +67,7 @@ export type MetricsKey = z.infer<typeof metricsKeySchema>;
 export type MetricsGranularity = z.infer<typeof metricsGranularitySchema>;
 type MetricsSelection = z.infer<typeof metricsSelectionSchema>;
 type MetricsBucket = z.infer<typeof metricsBucketSchema>;
-type MetricsFilterInput = z.infer<typeof metricsFiltersSchema>;
+type MetricsFilterInput = NonNullable<z.infer<typeof metricsFiltersSchema>>;
 export type MetricsTableSort = {
     field: MetricsTableSortField;
     direction: 'asc' | 'desc';
@@ -87,8 +95,14 @@ type MetricsTableRequest = MetricsTableOptions & {
     metrics?: MetricsSelection;
     range?: string;
 };
+type MetricsTableResult = {
+    campaign: z.infer<typeof metricsTableCampaignsOutputSchema>;
+    adGroup: z.infer<typeof metricsTableAdGroupsOutputSchema>;
+    ad: z.infer<typeof metricsTableAdsOutputSchema>;
+    target: z.infer<typeof metricsTableTargetsOutputSchema>;
+};
 
-export const assertAccountAccess = (ctx: Context, config: CliConfig) => {
+export const assertAccountAccess = (ctx: ApiContext, config: CliConfig) => {
     ctx.assertAccountAccess(config.accountId);
 };
 
@@ -464,7 +478,31 @@ export const getMetricsSeries = async (config: CliConfig, dimension: MetricsDime
     };
 };
 
-export const getMetricsTable = async (config: CliConfig, dimension: MetricsDimension, options: MetricsTableRequest) => {
+export async function getMetricsTable(
+    config: CliConfig,
+    dimension: 'campaign',
+    options: MetricsTableRequest
+): Promise<MetricsTableResult['campaign']>;
+export async function getMetricsTable(
+    config: CliConfig,
+    dimension: 'adGroup',
+    options: MetricsTableRequest
+): Promise<MetricsTableResult['adGroup']>;
+export async function getMetricsTable(
+    config: CliConfig,
+    dimension: 'ad',
+    options: MetricsTableRequest
+): Promise<MetricsTableResult['ad']>;
+export async function getMetricsTable(
+    config: CliConfig,
+    dimension: 'target',
+    options: MetricsTableRequest
+): Promise<MetricsTableResult['target']>;
+export async function getMetricsTable(
+    config: CliConfig,
+    dimension: MetricsDimension,
+    options: MetricsTableRequest
+): Promise<MetricsTableResult[MetricsDimension]> {
     const account = await resolveAdvertiserAccount(config);
 
     if (!account) {
@@ -507,7 +545,7 @@ export const getMetricsTable = async (config: CliConfig, dimension: MetricsDimen
                 metrics: selectMetrics(item.metrics, options.metrics),
             })),
             sort: output.sort,
-        };
+        } as MetricsTableResult[MetricsDimension];
     }
 
     const output = await getDailyMetricsTable(config.accountId, dimension, range.startDate, range.endDate, scope);
@@ -518,8 +556,8 @@ export const getMetricsTable = async (config: CliConfig, dimension: MetricsDimen
             metrics: selectMetrics(item.metrics, options.metrics),
         })),
         sort: output.sort,
-    };
-};
+    } as MetricsTableResult[MetricsDimension];
+}
 
 export const resolveProductIdType = (value: string | null) => {
     if (!value) return 'ASIN' as const;
@@ -1145,7 +1183,7 @@ const getHourlyMetricsTable = async (
     };
 };
 
-type MetricsTable = typeof performanceDaily;
+type MetricsTable = typeof performanceDaily | typeof performanceHourly;
 
 const applyMetricsFilters = (
     conditions: SQL[],
@@ -1820,10 +1858,10 @@ const resolveEntityFilterIds = async (
             conditions.push(eq(campaign.targetingSettings, targeting));
         }
         if (budget?.min !== undefined) {
-            conditions.push(gte(campaign.budgetAmount, budget.min));
+            conditions.push(gte(campaign.budgetAmount, String(budget.min)));
         }
         if (budget?.max !== undefined) {
-            conditions.push(lte(campaign.budgetAmount, budget.max));
+            conditions.push(lte(campaign.budgetAmount, String(budget.max)));
         }
         if (endDate?.after) {
             conditions.push(gte(campaign.endDate, endDate.after));
@@ -1840,7 +1878,10 @@ const resolveEntityFilterIds = async (
         }
         if (search) {
             const pattern = `%${search}%`;
-            conditions.push(or(ilike(campaign.name, pattern), ilike(campaign.campaignId, pattern)));
+            const searchCondition = or(ilike(campaign.name, pattern), ilike(campaign.campaignId, pattern));
+            if (searchCondition) {
+                conditions.push(searchCondition);
+            }
         }
 
         const rows = await db.select({ id: campaign.campaignId }).from(campaign).where(and(...conditions));
@@ -1865,10 +1906,10 @@ const resolveEntityFilterIds = async (
             conditions.push(eq(campaign.targetingSettings, targeting));
         }
         if (budget?.min !== undefined) {
-            conditions.push(gte(campaign.budgetAmount, budget.min));
+            conditions.push(gte(campaign.budgetAmount, String(budget.min)));
         }
         if (budget?.max !== undefined) {
-            conditions.push(lte(campaign.budgetAmount, budget.max));
+            conditions.push(lte(campaign.budgetAmount, String(budget.max)));
         }
         if (endDate?.after) {
             conditions.push(gte(campaign.endDate, endDate.after));
@@ -1885,9 +1926,14 @@ const resolveEntityFilterIds = async (
         }
         if (search) {
             const pattern = `%${search}%`;
-            conditions.push(
-                or(ilike(adGroup.name, pattern), ilike(adGroup.adGroupId, pattern), ilike(campaign.name, pattern))
+            const searchCondition = or(
+                ilike(adGroup.name, pattern),
+                ilike(adGroup.adGroupId, pattern),
+                ilike(campaign.name, pattern)
             );
+            if (searchCondition) {
+                conditions.push(searchCondition);
+            }
         }
 
         const rows = await db
@@ -1916,10 +1962,10 @@ const resolveEntityFilterIds = async (
             conditions.push(eq(campaign.targetingSettings, targeting));
         }
         if (budget?.min !== undefined) {
-            conditions.push(gte(campaign.budgetAmount, budget.min));
+            conditions.push(gte(campaign.budgetAmount, String(budget.min)));
         }
         if (budget?.max !== undefined) {
-            conditions.push(lte(campaign.budgetAmount, budget.max));
+            conditions.push(lte(campaign.budgetAmount, String(budget.max)));
         }
         if (endDate?.after) {
             conditions.push(gte(campaign.endDate, endDate.after));
@@ -1936,14 +1982,15 @@ const resolveEntityFilterIds = async (
         }
         if (search) {
             const pattern = `%${search}%`;
-            conditions.push(
-                or(
-                    ilike(ad.adId, pattern),
-                    ilike(ad.productAsin, pattern),
-                    ilike(campaign.name, pattern),
-                    ilike(adGroup.name, pattern)
-                )
+            const searchCondition = or(
+                ilike(ad.adId, pattern),
+                ilike(ad.productAsin, pattern),
+                ilike(campaign.name, pattern),
+                ilike(adGroup.name, pattern)
             );
+            if (searchCondition) {
+                conditions.push(searchCondition);
+            }
         }
 
         const rows = await db
@@ -1978,10 +2025,10 @@ const resolveEntityFilterIds = async (
         conditions.push(eq(campaign.targetingSettings, targeting));
     }
     if (budget?.min !== undefined) {
-        conditions.push(gte(campaign.budgetAmount, budget.min));
+        conditions.push(gte(campaign.budgetAmount, String(budget.min)));
     }
     if (budget?.max !== undefined) {
-        conditions.push(lte(campaign.budgetAmount, budget.max));
+        conditions.push(lte(campaign.budgetAmount, String(budget.max)));
     }
     if (endDate?.after) {
         conditions.push(gte(campaign.endDate, endDate.after));
@@ -1998,15 +2045,16 @@ const resolveEntityFilterIds = async (
     }
     if (search) {
         const pattern = `%${search}%`;
-        conditions.push(
-            or(
-                ilike(target.targetId, pattern),
-                ilike(target.targetKeyword, pattern),
-                ilike(target.targetAsin, pattern),
-                ilike(campaign.name, pattern),
-                ilike(adGroup.name, pattern)
-            )
+        const searchCondition = or(
+            ilike(target.targetId, pattern),
+            ilike(target.targetKeyword, pattern),
+            ilike(target.targetAsin, pattern),
+            ilike(campaign.name, pattern),
+            ilike(adGroup.name, pattern)
         );
+        if (searchCondition) {
+            conditions.push(searchCondition);
+        }
     }
 
     const rows = await db

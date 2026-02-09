@@ -2,6 +2,7 @@ import { apiProcedure } from '@/api/trpc';
 import { adGroupsDeleteInputSchema, adGroupsGetOutputSchema } from '@/api/schemas/cli';
 import { assertDeleteResponse, deleteAdGroups } from '@/amazon-ads/sp-entities';
 import { assertAccountAccess, resolveAccountContext } from './shared';
+import type { AdGroupShape } from './shared';
 
 export const adGroupsDelete = apiProcedure
     .input(adGroupsDeleteInputSchema)
@@ -24,12 +25,10 @@ export const adGroupsDelete = apiProcedure
         return { item: buildDeletedAdGroup(input.adGroupId) };
     });
 
-const buildDeletedAdGroup = (adGroupId: string) => {
-    return {
-        adGroupId,
-        campaignId: '',
-        name: '[deleted]',
-        defaultBid: 0,
-        state: 'ARCHIVED',
-    };
-};
+const buildDeletedAdGroup = (adGroupId: string): AdGroupShape => ({
+    adGroupId,
+    campaignId: '',
+    name: '[deleted]',
+    defaultBid: 0,
+    state: 'ARCHIVED',
+});

@@ -324,6 +324,46 @@ docker logs bidbeacon-worker --tail 50
 
 ---
 
+## API Client Publishing (npm)
+
+Typed client package: `packages/bidbeacon-api-client`.
+
+Spec doc: `docs/api-client-spec.md`.
+
+Build:
+
+```bash
+bun run api-client:build
+```
+
+Publish (public):
+
+```bash
+cd packages/bidbeacon-api-client
+npm login
+npm publish --access public
+```
+
+Update `packages/bidbeacon-api-client/package.json` version before each publish.
+
+### Update Policy (CLI/Router Changes)
+
+Any change to the CLI surface (for example files under `src/api/routers/api/`, `src/api/routers/api/cli.ts`, or schemas in `src/api/schemas/cli.ts`) requires updating the API client package in **all** of these places:
+
+1. Regenerate types and build the package:
+   ```bash
+   bun run api-client:build
+   ```
+   This updates `packages/bidbeacon-api-client/src/app-router.d.ts` and `packages/bidbeacon-api-client/dist/`.
+2. Bump the version in `packages/bidbeacon-api-client/package.json`.
+3. Publish the new version to npm:
+   ```bash
+   cd packages/bidbeacon-api-client
+   npm publish --access public
+   ```
+
+---
+
 ## Production Database Access
 
 This machine has a configured `.pgpass` for the production database, so you can run read-only queries for debugging. Do **not** take any write actions (inserts/updates/deletes/migrations) without explicit user confirmation first.
