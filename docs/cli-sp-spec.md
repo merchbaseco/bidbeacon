@@ -4,10 +4,20 @@ This spec defines the minimal Sponsored Products (SP) CLI surface. It excludes t
 
 ## Principles
 - Config-only state. No per-command overrides.
-- One way to do each thing.
+- Prefer one way to do each thing; a small set of documented aliases exist for resource-first consistency (e.g. bid updates under `targets`).
 - JSON output only.
-- One CLI command maps to one API router file.
+- One CLI command maps to one API router file; documented aliases are explicit exceptions.
 - Delete mirrors Amazon Ads SP v3 delete endpoints (soft-delete/archive semantics).
+
+## CLI Shape & Tenets
+- Resource-first, verb-second. Commands are grouped by resource (`campaigns`, `ad-groups`, `ads`, `targets`, `metrics`, `enums`), then use verbs like `list`, `get`, `create`, `update`, `pause`, `resume`, `delete`.
+- Non-interactive, agent-friendly. No prompts or selection menus. All inputs are explicit args/flags so agents can script flows deterministically.
+- JSON-only output via the response envelope.
+- Flat, not nested. Avoid nested subcommands like `campaigns <id> ad-groups list` in favor of filters.
+- Drill-down via filters:
+  - `bb ad-groups list --campaign <campaign_id>`
+  - `bb ads list --campaign <campaign_id>` or `bb ads list --ad-group <ad_group_id>`
+  - `bb targets list --campaign <campaign_id>` or `bb targets list --ad-group <ad_group_id>`
 
 ## Response Envelope
 ```json
@@ -41,6 +51,11 @@ List commands accept an optional `state` filter.
 Default is `ENABLED` when omitted.
 Use `ALL` to return everything.
 CLI flags: `--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL`, `--all` (alias for `--state ALL`).
+
+Hierarchy filters (drill-down):
+- `bb ad-groups list --campaign <campaign_id>`
+- `bb ads list --campaign <campaign_id>` or `bb ads list --ad-group <ad_group_id>`
+- `bb targets list --campaign <campaign_id>` or `bb targets list --ad-group <ad_group_id>`
 
 ## Entity Shapes
 ```ts
@@ -225,7 +240,8 @@ const Output = z.object({ item: CampaignSchema });
 Router: `src/api/routers/api/ad-groups-list.ts`
 ```ts
 const Input = z.object({
-  state: ListStateSchema.optional()
+  state: ListStateSchema.optional(),
+  campaignId: z.string().optional()
 });
 const Output = z.object({ items: z.array(AdGroupSchema) });
 ```
@@ -295,7 +311,9 @@ const Output = z.object({ item: AdGroupSchema });
 Router: `src/api/routers/api/ads-list.ts`
 ```ts
 const Input = z.object({
-  state: ListStateSchema.optional()
+  state: ListStateSchema.optional(),
+  campaignId: z.string().optional(),
+  adGroupId: z.string().optional()
 });
 const Output = z.object({ items: z.array(AdSchema) });
 ```
@@ -343,7 +361,9 @@ const Output = z.object({ deleted: z.literal(true), adId: z.string() });
 Router: `src/api/routers/api/targets-list.ts`
 ```ts
 const Input = z.object({
-  state: ListStateSchema.optional()
+  state: ListStateSchema.optional(),
+  campaignId: z.string().optional(),
+  adGroupId: z.string().optional()
 });
 const Output = z.object({ items: z.array(TargetSchema) });
 ```
@@ -427,6 +447,10 @@ const Input = z.object({ targetId: z.string(), delta: z.number() });
 const Output = z.object({ item: TargetSchema });
 ```
 
+Aliases (same router + behavior):
+- `bb targets set-bid <target_id> <value>`
+- `bb targets adjust-bid <target_id> <delta>`
+
 ## Metrics Commands
 
 ### bb metrics campaigns
@@ -439,21 +463,30 @@ const Output = z.object({ totals: MetricsTotalsSchema, series: z.array(MetricsPo
 ### bb metrics ad-groups
 Router: `src/api/routers/api/metrics-ad-groups.ts`
 ```ts
-const Input = z.object({});
+const Input = z.object({
+  campaignId: z.string().optional(),
+  adGroupId: z.string().optional()
+});
 const Output = z.object({ totals: MetricsTotalsSchema, series: z.array(MetricsPointSchema) });
 ```
 
 ### bb metrics ads
 Router: `src/api/routers/api/metrics-ads.ts`
 ```ts
-const Input = z.object({});
+const Input = z.object({
+  campaignId: z.string().optional(),
+  adGroupId: z.string().optional()
+});
 const Output = z.object({ totals: MetricsTotalsSchema, series: z.array(MetricsPointSchema) });
 ```
 
 ### bb metrics targets
 Router: `src/api/routers/api/metrics-targets.ts`
 ```ts
-const Input = z.object({});
+const Input = z.object({
+  campaignId: z.string().optional(),
+  adGroupId: z.string().optional()
+});
 const Output = z.object({ totals: MetricsTotalsSchema, series: z.array(MetricsPointSchema) });
 ```
 

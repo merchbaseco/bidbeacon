@@ -28,6 +28,8 @@ export type CliConfig = {
 
 type ListOptions = {
     state?: ListState;
+    campaignId?: string;
+    adGroupId?: string;
 };
 
 export type AccountContext = {
@@ -46,6 +48,10 @@ export type MetricsTotals = z.infer<typeof metricsTotalsSchema>;
 export type MetricsPoint = z.infer<typeof metricsPointSchema>;
 export type BidStrategy = z.infer<typeof bidStrategySchema>;
 export type ListState = z.infer<typeof listStateSchema>;
+type MetricsFilters = {
+    campaignId?: string;
+    adGroupId?: string;
+};
 
 export const assertAccountAccess = (ctx: Context, config: CliConfig) => {
     ctx.assertAccountAccess(config.accountId);
@@ -152,6 +158,7 @@ export const listAdGroups = async (config: CliConfig, options?: ListOptions): Pr
             and(
                 eq(campaign.accountId, config.accountId),
                 ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
+                ...(options?.campaignId ? [eq(adGroup.campaignId, options.campaignId)] : []),
                 ...(stateFilter ? [eq(adGroup.state, stateFilter)] : [])
             )
         )
@@ -205,6 +212,8 @@ export const listAds = async (config: CliConfig, options?: ListOptions): Promise
             and(
                 eq(campaign.accountId, config.accountId),
                 ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
+                ...(options?.campaignId ? [eq(ad.campaignId, options.campaignId)] : []),
+                ...(options?.adGroupId ? [eq(ad.adGroupId, options.adGroupId)] : []),
                 ...(stateFilter ? [eq(ad.state, stateFilter)] : [])
             )
         )
@@ -263,6 +272,8 @@ export const listTargets = async (config: CliConfig, options?: ListOptions): Pro
                 eq(campaign.accountId, config.accountId),
                 ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
                 inArray(target.targetType, ['KEYWORD', 'PRODUCT']),
+                ...(options?.campaignId ? [eq(target.campaignId, options.campaignId)] : []),
+                ...(options?.adGroupId ? [eq(target.adGroupId, options.adGroupId)] : []),
                 ...(stateFilter ? [eq(target.state, stateFilter)] : [])
             )
         )
@@ -354,7 +365,12 @@ export const updateTargetRow = async (targetId: string, updates: Partial<{ state
     await db.update(target).set(values).where(eq(target.targetId, targetId));
 };
 
-export const getMetrics = async (config: CliConfig, entityType: 'campaign' | 'adGroup' | 'ad' | 'target', entityId?: string) => {
+export const getMetrics = async (
+    config: CliConfig,
+    entityType: 'campaign' | 'adGroup' | 'ad' | 'target',
+    entityId?: string,
+    filters?: MetricsFilters
+) => {
     const account = await resolveAdvertiserAccount(config);
 
     if (!account) {
@@ -365,10 +381,10 @@ export const getMetrics = async (config: CliConfig, entityType: 'campaign' | 'ad
     const range = parseConfigRange(config.range, timezone);
 
     if (range.useHourly) {
-        return getHourlyMetrics(config.accountId, entityType, entityId, range.startUtc, range.endExclusiveUtc);
+        return getHourlyMetrics(config.accountId, entityType, entityId, range.startUtc, range.endExclusiveUtc, filters);
     }
 
-    return getDailyMetrics(config.accountId, entityType, entityId, range.startDate, range.endDate, timezone);
+    return getDailyMetrics(config.accountId, entityType, entityId, range.startDate, range.endDate, timezone, filters);
 };
 
 export const resolveProductIdType = (value: string | null) => {
@@ -761,13 +777,22 @@ const getDailyMetrics = async (
     entityId: string | undefined,
     startDate: string,
     endDate: string,
-    timezone: string
+    timezone: string,
+    filters?: MetricsFilters
 ): Promise<{ totals: MetricsTotals; series: MetricsPoint[] }> => {
     const conditions = [
         eq(performanceDaily.accountId, accountId),
         gte(performanceDaily.bucketDate, startDate),
         lte(performanceDaily.bucketDate, endDate),
     ];
+
+    if (filters?.campaignId) {
+        conditions.push(eq(performanceDaily.campaignId, filters.campaignId));
+    }
+
+    if (filters?.adGroupId) {
+        conditions.push(eq(performanceDaily.adGroupId, filters.adGroupId));
+    }
 
     if (entityType === 'campaign' && entityId) {
         conditions.push(eq(performanceDaily.campaignId, entityId));
@@ -825,13 +850,22 @@ const getHourlyMetrics = async (
     entityType: 'campaign' | 'adGroup' | 'ad' | 'target',
     entityId: string | undefined,
     startUtc: Date,
-    endExclusiveUtc: Date
+    endExclusiveUtc: Date,
+    filters?: MetricsFilters
 ): Promise<{ totals: MetricsTotals; series: MetricsPoint[] }> => {
     const conditions = [
         eq(performanceHourly.accountId, accountId),
         gte(performanceHourly.bucketStart, startUtc),
         lt(performanceHourly.bucketStart, endExclusiveUtc),
     ];
+
+    if (filters?.campaignId) {
+        conditions.push(eq(performanceHourly.campaignId, filters.campaignId));
+    }
+
+    if (filters?.adGroupId) {
+        conditions.push(eq(performanceHourly.adGroupId, filters.adGroupId));
+    }
 
     if (entityType === 'campaign' && entityId) {
         conditions.push(eq(performanceHourly.campaignId, entityId));

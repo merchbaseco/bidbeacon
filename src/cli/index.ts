@@ -161,7 +161,12 @@ const main = async () => {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
-                const data = await client.api.cli.adGroupsList.query({ config: cliConfig, state });
+                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
+                const data = await client.api.cli.adGroupsList.query({
+                    config: cliConfig,
+                    state,
+                    campaignId: campaignId ?? undefined,
+                });
                 printOutput(data);
                 return;
             }
@@ -235,7 +240,14 @@ const main = async () => {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
-                const data = await client.api.cli.adsList.query({ config: cliConfig, state });
+                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
+                const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+                const data = await client.api.cli.adsList.query({
+                    config: cliConfig,
+                    state,
+                    campaignId: campaignId ?? undefined,
+                    adGroupId: adGroupId ?? undefined,
+                });
                 printOutput(data);
                 return;
             }
@@ -282,7 +294,38 @@ const main = async () => {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
-                const data = await client.api.cli.targetsList.query({ config: cliConfig, state });
+                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
+                const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+                const data = await client.api.cli.targetsList.query({
+                    config: cliConfig,
+                    state,
+                    campaignId: campaignId ?? undefined,
+                    adGroupId: adGroupId ?? undefined,
+                });
+                printOutput(data);
+                return;
+            }
+            if (subcommand === 'set-bid') {
+                const targetId = action;
+                const value = rest[0];
+                if (!targetId || !value) throw new Error('Usage: bb targets set-bid <target_id> <value>');
+                const data = await client.api.cli.bidsSet.mutate({
+                    config: cliConfig,
+                    targetId,
+                    value: parseNumberArg(value, 'value'),
+                });
+                printOutput(data);
+                return;
+            }
+            if (subcommand === 'adjust-bid') {
+                const targetId = action;
+                const delta = rest[0];
+                if (!targetId || !delta) throw new Error('Usage: bb targets adjust-bid <target_id> <delta>');
+                const data = await client.api.cli.bidsAdjust.mutate({
+                    config: cliConfig,
+                    targetId,
+                    delta: parseNumberArg(delta, 'delta'),
+                });
                 printOutput(data);
                 return;
             }
@@ -383,22 +426,44 @@ const main = async () => {
         case 'metrics': {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'campaigns') {
+                if (readFlag(flags, ['campaign', 'campaign-id']) || readFlag(flags, ['ad-group', 'ad-group-id'])) {
+                    throw new Error('Usage: bb metrics campaigns (use bb metrics campaign <campaign_id> for a single campaign).');
+                }
                 const data = await client.api.cli.metricsCampaigns.query({ config: cliConfig });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'ad-groups') {
-                const data = await client.api.cli.metricsAdGroups.query({ config: cliConfig });
+                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
+                if (readFlag(flags, ['ad-group', 'ad-group-id'])) {
+                    throw new Error('Usage: bb metrics ad-groups [--campaign <campaign_id>].');
+                }
+                const data = await client.api.cli.metricsAdGroups.query({
+                    config: cliConfig,
+                    campaignId: campaignId ?? undefined,
+                });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'ads') {
-                const data = await client.api.cli.metricsAds.query({ config: cliConfig });
+                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
+                const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+                const data = await client.api.cli.metricsAds.query({
+                    config: cliConfig,
+                    campaignId: campaignId ?? undefined,
+                    adGroupId: adGroupId ?? undefined,
+                });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'targets') {
-                const data = await client.api.cli.metricsTargets.query({ config: cliConfig });
+                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
+                const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+                const data = await client.api.cli.metricsTargets.query({
+                    config: cliConfig,
+                    campaignId: campaignId ?? undefined,
+                    adGroupId: adGroupId ?? undefined,
+                });
                 printOutput(data);
                 return;
             }
@@ -535,7 +600,7 @@ Usage:
   bb campaigns set-bid-strategy <campaign_id> <strategy>
   bb campaigns set-bid-adjustments <campaign_id> <placement|audience|creative> <json>
 
-  bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all]
+  bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>]
   bb ad-groups get <ad_group_id>
   bb ad-groups create <campaign_id> <name> <default_bid>
   bb ad-groups update <ad_group_id> <name>
@@ -544,16 +609,18 @@ Usage:
   bb ad-groups resume <ad_group_id>
   bb ad-groups delete <ad_group_id>
 
-  bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all]
+  bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>]
   bb ads get <ad_id>
   bb ads create <ad_group_id> <asin|sku> [ASIN|SKU]
   bb ads update <ad_id> <state>
   bb ads delete <ad_id>
 
-  bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all]
+  bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>]
   bb targets get <target_id>
   bb targets create keyword <ad_group_id> <keyword> <match_type> <bid>
   bb targets create product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU]
+  bb targets set-bid <target_id> <value>
+  bb targets adjust-bid <target_id> <delta>
   bb targets delete <target_id>
   bb targets pause <target_id>
   bb targets resume <target_id>
@@ -562,9 +629,9 @@ Usage:
   bb bids adjust <target_id> <delta>
 
   bb metrics campaigns
-  bb metrics ad-groups
-  bb metrics ads
-  bb metrics targets
+  bb metrics ad-groups [--campaign <campaign_id>]
+  bb metrics ads [--campaign <campaign_id>] [--ad-group <ad_group_id>]
+  bb metrics targets [--campaign <campaign_id>] [--ad-group <ad_group_id>]
   bb metrics campaign <campaign_id>
   bb metrics ad-group <ad_group_id>
   bb metrics ad <ad_id>
