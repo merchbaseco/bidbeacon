@@ -35,7 +35,7 @@ jobs:
           fi
 
           export BIDBEACON_API_BASE_URL="${BIDBEACON_API_BASE_URL:-http://localhost:8091}"
-          exec bun /Users/zknicker/srv/bidbeacon/src/cli/index.ts "$@"
+          exec bun /Users/zknicker/srv/bidbeacon/packages/bidbeacon-cli/src/index.ts "$@"
           EOF
           chmod +x "${BB_BIN_DIR}/bb"
 
