@@ -6,7 +6,7 @@ import { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker.js';
 import { type ApiRegion, getApiBaseUrl } from './config.js';
 import { refreshAccessToken } from './reauth.js';
-import { throttledFetch } from './throttled-fetch.js';
+import { AMAZON_ADS_API_RETRY, throttledFetch } from './throttled-fetch.js';
 
 const updateTargetBidRequestSchema = z.array(
     z.object({
@@ -81,6 +81,7 @@ export async function updateTargetBid(options: UpdateTargetBidOptions, region: A
             headers,
             body: JSON.stringify(requestBody),
             signal: AbortSignal.timeout(30_000),
+            retry: AMAZON_ADS_API_RETRY,
         });
 
         const statusCode = response.status;

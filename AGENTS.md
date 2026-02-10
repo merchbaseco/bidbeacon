@@ -11,6 +11,7 @@
 - Rebase changes before publishing a PR.
 - Timezone reference doc: `docs/timezones.md` (critical for Amazon Ads parity and future changes).
 - Performance data reference doc: `docs/performance-data.md` (hourly vs daily reconciliation).
+- Amazon Ads retry policy doc: `docs/amazon-ads-retry-policy.md`.
 - Tests: run `bun run test` (Vitest). Avoid `bun test` (missing Vitest helpers).
 
 ## Architecture
@@ -100,6 +101,10 @@ API keys are scoped to advertiser accounts and are used by the `bb` CLI and any 
 1. **Database-driven UI state** - Components derive state from database tables. Use `{table}:updated` events for invalidation.
 2. **Sync APIs** - Caller awaits response, then invalidates React Query. No WebSocket events.
 3. **Async Jobs** - Emit WebSocket events on completion for background changes the caller didn't initiate.
+
+## Amazon Ads API Guidelines
+
+- For Amazon Ads API calls, wait for the Amazon response (including throttling and retries) before responding. Follow `docs/amazon-ads-retry-policy.md`.
 
 ### Charts & Real-time Data
 

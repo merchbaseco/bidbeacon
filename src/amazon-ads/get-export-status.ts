@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker.js';
 import { type ApiRegion, getApiBaseUrl } from './config.js';
 import { refreshAccessToken } from './reauth.js';
-import { throttledFetch } from './throttled-fetch.js';
+import { AMAZON_ADS_API_RETRY, throttledFetch } from './throttled-fetch.js';
 
 // ============================================================================
 // Schemas
@@ -76,6 +76,7 @@ export async function getExportStatus(options: GetExportStatusOptions, region: A
             method: 'GET',
             headers,
             signal: AbortSignal.timeout(30_000),
+            retry: AMAZON_ADS_API_RETRY,
         });
 
         // Store status code for tracking (even if error)

@@ -2,7 +2,7 @@ import type { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker';
 import { type ApiRegion, getApiBaseUrl } from './config';
 import { refreshAccessToken } from './reauth';
-import { throttledFetch } from './throttled-fetch';
+import { AMAZON_ADS_API_RETRY, throttledFetch } from './throttled-fetch';
 
 type SpRequestOptions<T> = {
     apiName: string;
@@ -39,6 +39,7 @@ export const spRequest = async <T>(options: SpRequestOptions<T>, region: ApiRegi
             headers,
             body: JSON.stringify(options.body),
             signal: AbortSignal.timeout(30_000),
+            retry: AMAZON_ADS_API_RETRY,
         });
 
         if (!response.ok) {

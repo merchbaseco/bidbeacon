@@ -7,6 +7,32 @@
 
 import Bottleneck from 'bottleneck';
 
+type RetryOptions = {
+    attempts: number;
+    baseDelayMs: number;
+    backoffMultiplier?: number;
+    maxDelayMs?: number;
+    retryableStatusCodes?: number[];
+    retryOnNetworkError?: boolean;
+};
+
+type ThrottledFetchOptions = RequestInit & {
+    retry?: RetryOptions;
+};
+
+const DEFAULT_RETRYABLE_STATUS_CODES = [408, 409, 429, 500, 502, 503, 504];
+const DEFAULT_BACKOFF_MULTIPLIER = 2;
+const DEFAULT_RETRY_AFTER_BUFFER_MS = 100;
+
+export const AMAZON_ADS_API_RETRY: RetryOptions = {
+    attempts: 3,
+    baseDelayMs: 1000,
+    backoffMultiplier: DEFAULT_BACKOFF_MULTIPLIER,
+    maxDelayMs: 10_000,
+    retryableStatusCodes: DEFAULT_RETRYABLE_STATUS_CODES,
+    retryOnNetworkError: true,
+};
+
 // Singleton bottleneck instance shared across all API calls
 const limiter = new Bottleneck({
     maxConcurrent: 2, // Allow 2 concurrent requests
@@ -16,6 +42,139 @@ const limiter = new Bottleneck({
 // Track the last Retry-After value to gradually reduce back to default
 let lastRetryAfter: number | null = null;
 const DEFAULT_MIN_TIME = 500;
+
+/**
+ * Throttled fetch wrapper that respects rate limits and Retry-After headers.
+ * Compatible with native fetch API.
+ * @param url - Request URL
+ * @param options - Fetch options (same as native fetch)
+ * @returns Promise resolving to Response
+ */
+export async function throttledFetch(url: string | URL | Request, options?: ThrottledFetchOptions): Promise<Response> {
+    const { retry, ...fetchOptions } = options ?? {};
+    const resolvedRetry = retry ? normalizeRetryOptions(retry) : null;
+    const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
+    const method = fetchOptions.method || 'GET';
+
+    let attempt = 1;
+    let lastNetworkError: Error | null = null;
+
+    while (attempt <= (resolvedRetry?.attempts ?? 1)) {
+        try {
+            const response = await limiter.schedule(() => fetch(url, fetchOptions));
+
+            if (response.status === 429) {
+                const retryAfter = response.headers.get('Retry-After');
+                const retryAfterMs = parseRetryAfter(retryAfter);
+
+                if (retryAfterMs !== null) {
+                    handleRetryAfter(retryAfterMs);
+                } else {
+                    const backoffMs = lastRetryAfter ? lastRetryAfter * 2 : 5000;
+                    handleRetryAfter(backoffMs);
+                }
+            }
+
+            if (!(resolvedRetry && shouldRetryResponse(response.status, resolvedRetry, attempt))) {
+                return response;
+            }
+
+            await drainResponseBody(response);
+            const retryDelayMs = getRetryDelayMs(response.headers, resolvedRetry, attempt);
+            if (retryDelayMs > 0) {
+                await sleep(retryDelayMs);
+            }
+        } catch (error) {
+            const wrappedError = wrapNetworkError(error, method, urlString);
+            lastNetworkError = wrappedError;
+
+            if (!(resolvedRetry && shouldRetryNetworkError(resolvedRetry, attempt))) {
+                throw wrappedError;
+            }
+
+            const retryDelayMs = getRetryDelayMs(null, resolvedRetry, attempt);
+            if (retryDelayMs > 0) {
+                await sleep(retryDelayMs);
+            }
+        }
+
+        attempt += 1;
+    }
+
+    if (lastNetworkError) {
+        throw lastNetworkError;
+    }
+
+    throw new Error(`Amazon Ads request failed after ${resolvedRetry?.attempts ?? 1} attempts without a response.`);
+}
+
+function normalizeRetryOptions(options: RetryOptions): RetryOptions {
+    return {
+        attempts: Math.max(1, options.attempts),
+        baseDelayMs: Math.max(0, options.baseDelayMs),
+        backoffMultiplier: options.backoffMultiplier ?? DEFAULT_BACKOFF_MULTIPLIER,
+        maxDelayMs: options.maxDelayMs,
+        retryableStatusCodes: options.retryableStatusCodes ?? DEFAULT_RETRYABLE_STATUS_CODES,
+        retryOnNetworkError: options.retryOnNetworkError ?? true,
+    };
+}
+
+function shouldRetryResponse(status: number, options: RetryOptions, attempt: number): boolean {
+    if (attempt >= options.attempts) {
+        return false;
+    }
+
+    return (options.retryableStatusCodes ?? DEFAULT_RETRYABLE_STATUS_CODES).includes(status);
+}
+
+function shouldRetryNetworkError(options: RetryOptions, attempt: number): boolean {
+    if (attempt >= options.attempts) {
+        return false;
+    }
+
+    return options.retryOnNetworkError ?? true;
+}
+
+function getRetryDelayMs(headers: Headers | null, options: RetryOptions, attempt: number): number {
+    const retryAfterMs = parseRetryAfter(headers?.get('Retry-After') ?? null);
+    const exponentialDelay = computeBackoffMs(options.baseDelayMs, options.backoffMultiplier ?? DEFAULT_BACKOFF_MULTIPLIER, attempt, options.maxDelayMs);
+
+    if (retryAfterMs !== null) {
+        return Math.max(retryAfterMs + DEFAULT_RETRY_AFTER_BUFFER_MS, exponentialDelay);
+    }
+
+    return exponentialDelay;
+}
+
+function computeBackoffMs(baseDelayMs: number, multiplier: number, attempt: number, maxDelayMs?: number): number {
+    const delay = baseDelayMs * multiplier ** Math.max(0, attempt - 1);
+    if (maxDelayMs === undefined) {
+        return delay;
+    }
+    return Math.min(delay, maxDelayMs);
+}
+
+function wrapNetworkError(error: unknown, method: string, urlString: string): Error {
+    if (error instanceof Error) {
+        const enhancedError = new Error(`Network error during ${method} ${urlString}: ${error.message}`);
+        (enhancedError as Error & { cause?: Error }).cause = error;
+        return enhancedError;
+    }
+
+    return new Error(`Network error during ${method} ${urlString}: ${String(error)}`);
+}
+
+async function drainResponseBody(response: Response): Promise<void> {
+    try {
+        await response.arrayBuffer();
+    } catch {
+        // Ignore body read errors when retrying.
+    }
+}
+
+function sleep(ms: number): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
 
 /**
  * Parse Retry-After header value.
@@ -54,7 +213,7 @@ function handleRetryAfter(retryAfterMs: number): void {
 
     // Update bottleneck to respect the retry-after period
     // Add a small buffer to ensure we don't retry too early
-    const minTime = retryAfterMs + 100;
+    const minTime = retryAfterMs + DEFAULT_RETRY_AFTER_BUFFER_MS;
 
     limiter.updateSettings({ minTime });
 
@@ -64,46 +223,4 @@ function handleRetryAfter(retryAfterMs: number): void {
         limiter.updateSettings({ minTime: DEFAULT_MIN_TIME });
         lastRetryAfter = null;
     }, retryAfterMs);
-}
-
-/**
- * Throttled fetch wrapper that respects rate limits and Retry-After headers.
- * Compatible with native fetch API.
- * @param url - Request URL
- * @param options - Fetch options (same as native fetch)
- * @returns Promise resolving to Response
- */
-export async function throttledFetch(url: string | URL | Request, options?: RequestInit): Promise<Response> {
-    return limiter.schedule(async () => {
-        const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
-        const method = options?.method || 'GET';
-
-        try {
-            const response = await fetch(url, options);
-
-            // Check for rate limit response (429 Too Many Requests)
-            if (response.status === 429) {
-                const retryAfter = response.headers.get('Retry-After');
-                const retryAfterMs = parseRetryAfter(retryAfter);
-
-                if (retryAfterMs !== null) {
-                    handleRetryAfter(retryAfterMs);
-                } else {
-                    // If Retry-After is missing or invalid, use exponential backoff
-                    const backoffMs = lastRetryAfter ? lastRetryAfter * 2 : 5000;
-                    handleRetryAfter(backoffMs);
-                }
-            }
-
-            return response;
-        } catch (error) {
-            // Wrap network errors with context
-            if (error instanceof Error) {
-                const enhancedError = new Error(`Network error during ${method} ${urlString}: ${error.message}`);
-                (enhancedError as Error & { cause?: Error }).cause = error;
-                throw enhancedError;
-            }
-            throw error;
-        }
-    });
 }
