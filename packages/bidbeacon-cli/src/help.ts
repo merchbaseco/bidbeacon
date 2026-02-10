@@ -42,10 +42,6 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'metrics', right: 'Fetch chart/table metrics' },
             { left: 'enums', right: 'Print enum values accepted by the API' },
         ],
-        notes: [
-            'Most commands require `api-key` and (for entity-level calls) a default `account`.',
-            'Try `bb <command> --help` for a focused command menu.',
-        ],
     },
     config: {
         key: 'config',

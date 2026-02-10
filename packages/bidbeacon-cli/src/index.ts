@@ -1382,11 +1382,20 @@ const tryGetGitSha = () => {
 };
 
 const formatConfigSummary = (config: CliConfig) => {
-    const apiKeyStatus = config.apiKey ? 'set' : 'missing';
-    const accountStatus =
-        config.accountId && config.countryCode ? `${config.accountId} (${config.countryCode.toUpperCase()})` : 'missing';
     const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
-    return `config: api-key ${apiKeyStatus}, account ${accountStatus}, base-url ${baseUrl}`;
+    const accountId = config.accountId;
+    const accountCountry = config.countryCode?.toUpperCase();
+    const accountSummary = accountId
+        ? `account ${truncateAccountId(accountId)}${accountCountry ? ` (${accountCountry})` : ''}`
+        : 'account not set';
+    return `${accountSummary}, base-url ${baseUrl}`;
+};
+
+const truncateAccountId = (accountId: string) => {
+    if (accountId.length <= 20) {
+        return accountId;
+    }
+    return `${accountId.slice(0, 16)}...${accountId.slice(-4)}`;
 };
 
 await main().catch(async error => {
