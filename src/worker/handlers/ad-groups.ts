@@ -1,7 +1,9 @@
+import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { db } from '@/db/index';
-import { amsCmAdgroups } from '@/db/schema';
+import { adGroup, amsCmAdgroups } from '@/db/schema';
 import { trackAmsEvent } from '@/utils/ams-metrics';
 import { createContextLogger } from '@/utils/logger';
+import { resolveAmsDeliveryStatus, resolveAmsState } from './ams-state';
 import { adGroupSchema } from '../schemas';
 
 /**
@@ -58,5 +60,39 @@ export async function handleAdGroups(payload: unknown): Promise<void> {
                 target: [amsCmAdgroups.adGroupId, amsCmAdgroups.campaignId],
                 set: record,
             });
+
+        await updateAdGroupFromAms(data);
     });
 }
+
+const updateAdGroupFromAms = async (data: { ad_group_id: string; last_updated_date_time?: string; state?: unknown; status?: unknown }) => {
+    const lastUpdated = data.last_updated_date_time ? new Date(data.last_updated_date_time) : null;
+    if (!lastUpdated) {
+        return;
+    }
+
+    const updates: Record<string, unknown> = {
+        lastUpdatedDateTime: lastUpdated,
+    };
+
+    const state = resolveAmsState(data.state);
+    if (state) {
+        updates.state = state;
+    }
+
+    const deliveryStatus = resolveAmsDeliveryStatus(data.status);
+    if (deliveryStatus) {
+        updates.deliveryStatus = deliveryStatus;
+    }
+
+    if (Object.keys(updates).length === 1) {
+        return;
+    }
+
+    await db
+        .update(adGroup)
+        .set(updates)
+        .where(
+            and(eq(adGroup.adGroupId, data.ad_group_id), or(isNull(adGroup.lastUpdatedDateTime), lte(adGroup.lastUpdatedDateTime, lastUpdated)))
+        );
+};

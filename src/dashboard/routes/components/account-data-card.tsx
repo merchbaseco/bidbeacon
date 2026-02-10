@@ -5,12 +5,15 @@ import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';
 import { Spinner } from '../../components/ui/spinner';
 import { useAccountDatasetMetadata } from '../hooks/use-account-dataset-metadata';
+import { formatDate } from '../utils';
 import { selectedAccountIdAtom, selectedCountryCodeAtom } from './account-selector/atoms';
 
 export const AccountDataCard = () => {
     const [accountId] = useAtom(selectedAccountIdAtom);
     const [countryCode] = useAtom(selectedCountryCodeAtom);
     const { data: metadata, isLoading, isSyncing, sync } = useAccountDatasetMetadata(accountId, countryCode);
+    const lastSync = metadata?.lastSyncCompleted ?? metadata?.lastSyncStarted ?? null;
+    const syncLabel = lastSync ? `Last synced ${formatDate(lastSync)}` : 'Auto syncs daily';
 
     if (!(accountId && countryCode)) {
         return null;
@@ -25,7 +28,10 @@ export const AccountDataCard = () => {
     return (
         <Card className="gap-0 space-y-0 p-3 pb-1">
             <div className="flex items-start justify-between pb-1 pl-1">
-                <div className="font-medium text-sm">Account Data</div>
+                <div className="space-y-0.5">
+                    <div className="font-medium text-sm">Account Data</div>
+                    <div className="text-muted-foreground text-xs">{syncLabel}</div>
+                </div>
                 <Button disabled={isLoading || isSyncing} onClick={handleSync} size="sm" variant="outline">
                     {isLoading || isSyncing ? <Spinner className="size-3.5" /> : <HugeiconsIcon color="currentColor" icon={ArrowReloadHorizontalIcon} size={14} />}
                 </Button>

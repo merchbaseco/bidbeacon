@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { apiProcedure, router } from '@/api/trpc';
 import { db } from '@/db/index';
 import { advertiserAccount } from '@/db/schema';
-import { syncAdEntitiesJob } from '@/jobs/sync-ad-entities';
+import { syncAdEntitiesForAccountJob } from '@/jobs/sync-ad-entities-for-account';
 
 export const accountsApiRouter = router({
     list: apiProcedure.query(async ({ ctx }) => {
@@ -40,7 +40,7 @@ export const accountsApiRouter = router({
         .mutation(async ({ ctx, input }) => {
             ctx.assertAccountAccess(input.accountId);
 
-            await syncAdEntitiesJob.emit({
+            await syncAdEntitiesForAccountJob.emit({
                 accountId: input.accountId,
                 countryCode: input.countryCode,
             });

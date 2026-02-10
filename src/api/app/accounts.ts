@@ -2,7 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { advertiserAccount, userAccountAccess } from '@/db/schema';
-import { syncAdEntitiesJob } from '@/jobs/sync-ad-entities';
+import { syncAdEntitiesForAccountJob } from '@/jobs/sync-ad-entities-for-account';
 import { privateProcedure, router } from '../trpc';
 
 export const accountsRouter = router({
@@ -114,7 +114,7 @@ export const accountsRouter = router({
         .mutation(async ({ ctx, input }) => {
             ctx.assertAccountAccess(input.accountId);
 
-            await syncAdEntitiesJob.emit({
+            await syncAdEntitiesForAccountJob.emit({
                 accountId: input.accountId,
                 countryCode: input.countryCode,
             });
