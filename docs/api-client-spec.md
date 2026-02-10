@@ -16,8 +16,8 @@ This spec defines the public npm client package that exposes typed access to the
 
 ## Philosophy
 
-- The client mirrors the CLI API surface.
-- The client hides the `api.cli` router path from consumers.
+- The client mirrors the public API surface shared by the CLI.
+- The client hides the `api.client` router path (aliased as `api.cli` for compatibility) from consumers.
 - Typed inputs and outputs are derived from the server router, not duplicated.
 - Publish manually to npm for now.
 

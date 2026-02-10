@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { bidStrategySchema, placementSchema, stateSchema } from '../../src/api/schemas/cli';
+import { bidStrategySchema, placementSchema, stateSchema } from '../../src/api/public/schemas';
 
 describe('cli enums', () => {
     it('accepts bid strategy values from export enums', () => {
