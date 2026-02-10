@@ -1385,9 +1385,7 @@ const formatConfigSummary = (config: CliConfig) => {
     const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
     const accountId = config.accountId;
     const accountCountry = config.countryCode?.toUpperCase();
-    const accountSummary = accountId
-        ? `account ${truncateAccountId(accountId)}${accountCountry ? ` (${accountCountry})` : ''}`
-        : 'account not set';
+    const accountSummary = accountId ? `account ${truncateAccountId(accountId)}${accountCountry ? ` (${accountCountry})` : ''}` : 'account not set';
     return `${accountSummary}, base-url ${baseUrl}`;
 };
 

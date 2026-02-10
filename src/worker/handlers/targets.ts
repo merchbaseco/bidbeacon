@@ -3,8 +3,8 @@ import { db } from '@/db/index.js';
 import { amsCmTargets, target } from '@/db/schema.js';
 import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { createContextLogger } from '@/utils/logger';
-import { resolveAmsDeliveryStatus, resolveAmsState } from './ams-state';
 import { targetSchema } from '../schemas.js';
+import { resolveAmsDeliveryStatus, resolveAmsState } from './ams-state';
 
 /**
  * Handle Campaign Management Target events
@@ -84,7 +84,5 @@ const updateTargetFromAms = async (data: { target_id: string; last_updated_date_
     await db
         .update(target)
         .set(updates)
-        .where(
-            and(eq(target.targetId, data.target_id), or(isNull(target.lastUpdatedDateTime), lte(target.lastUpdatedDateTime, lastUpdated)))
-        );
+        .where(and(eq(target.targetId, data.target_id), or(isNull(target.lastUpdatedDateTime), lte(target.lastUpdatedDateTime, lastUpdated))));
 };
