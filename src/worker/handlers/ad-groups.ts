@@ -3,8 +3,8 @@ import { db } from '@/db/index';
 import { adGroup, amsCmAdgroups } from '@/db/schema';
 import { trackAmsEvent } from '@/utils/ams-metrics';
 import { createContextLogger } from '@/utils/logger';
-import { resolveAmsDeliveryStatus, resolveAmsState } from './ams-state';
 import { adGroupSchema } from '../schemas';
+import { resolveAmsDeliveryStatus, resolveAmsState } from './ams-state';
 
 /**
  * Handle Campaign Management AdGroup events
@@ -92,7 +92,5 @@ const updateAdGroupFromAms = async (data: { ad_group_id: string; last_updated_da
     await db
         .update(adGroup)
         .set(updates)
-        .where(
-            and(eq(adGroup.adGroupId, data.ad_group_id), or(isNull(adGroup.lastUpdatedDateTime), lte(adGroup.lastUpdatedDateTime, lastUpdated)))
-        );
+        .where(and(eq(adGroup.adGroupId, data.ad_group_id), or(isNull(adGroup.lastUpdatedDateTime), lte(adGroup.lastUpdatedDateTime, lastUpdated))));
 };

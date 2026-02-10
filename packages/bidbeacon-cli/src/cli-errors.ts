@@ -14,4 +14,3 @@ export class CliUsageError extends Error {
 export const isCliUsageError = (error: unknown): error is CliUsageError => {
     return error instanceof CliUsageError;
 };
-

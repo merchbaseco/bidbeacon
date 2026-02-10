@@ -46,6 +46,7 @@
     }
   },
   "javascript": {
+    "globals": ["Bun"],
     "formatter": {
       "semicolons": "always",
       "trailingCommas": "es5",

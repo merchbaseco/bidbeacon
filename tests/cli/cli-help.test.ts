@@ -17,4 +17,3 @@ describe('bb help topics', () => {
         expect(output).not.toContain('—');
     });
 });
-

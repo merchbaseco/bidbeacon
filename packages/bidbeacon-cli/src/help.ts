@@ -3,19 +3,7 @@ type HelpRow = {
     right: string;
 };
 
-export type HelpTopicKey =
-    | 'global'
-    | 'config'
-    | 'accounts'
-    | 'campaigns'
-    | 'ad-groups'
-    | 'ads'
-    | 'targets'
-    | 'bids'
-    | 'metrics'
-    | 'metrics series'
-    | 'metrics table'
-    | 'enums';
+export type HelpTopicKey = 'global' | 'config' | 'accounts' | 'campaigns' | 'ad-groups' | 'ads' | 'targets' | 'bids' | 'metrics' | 'metrics series' | 'metrics table' | 'enums';
 
 type HelpTopic = {
     key: HelpTopicKey;
@@ -239,9 +227,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
 };
 
 export const resolveHelpTopicKey = (pathSegments: string[]): HelpTopicKey => {
-    const normalized = pathSegments
-        .map(segment => segment.trim())
-        .filter(Boolean);
+    const normalized = pathSegments.map(segment => segment.trim()).filter(Boolean);
 
     if (normalized.length === 0) {
         return 'global';
@@ -255,16 +241,37 @@ export const resolveHelpTopicKey = (pathSegments: string[]): HelpTopicKey => {
         return 'metrics table';
     }
 
-    const first = normalized[0]!.toLowerCase();
-    if (first === 'config') return 'config';
-    if (first === 'accounts') return 'accounts';
-    if (first === 'campaigns') return 'campaigns';
-    if (first === 'ad-groups') return 'ad-groups';
-    if (first === 'ads') return 'ads';
-    if (first === 'targets') return 'targets';
-    if (first === 'bids') return 'bids';
-    if (first === 'metrics') return 'metrics';
-    if (first === 'enums') return 'enums';
+    const first = normalized[0]?.toLowerCase();
+    if (!first) {
+        return 'global';
+    }
+    if (first === 'config') {
+        return 'config';
+    }
+    if (first === 'accounts') {
+        return 'accounts';
+    }
+    if (first === 'campaigns') {
+        return 'campaigns';
+    }
+    if (first === 'ad-groups') {
+        return 'ad-groups';
+    }
+    if (first === 'ads') {
+        return 'ads';
+    }
+    if (first === 'targets') {
+        return 'targets';
+    }
+    if (first === 'bids') {
+        return 'bids';
+    }
+    if (first === 'metrics') {
+        return 'metrics';
+    }
+    if (first === 'enums') {
+        return 'enums';
+    }
     return 'global';
 };
 
