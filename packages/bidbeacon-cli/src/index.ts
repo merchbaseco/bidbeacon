@@ -3,8 +3,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createTRPCProxyClient, httpLink } from '@trpc/client';
-import type { AppRouter } from '../../src/api/router';
-import { getTimezoneForCountry } from '../../src/utils/timezones';
+import type { AppRouter } from '../../../src/api/router';
+import { getTimezoneForCountry } from '../../../src/utils/timezones';
+import { CliUsageError, isCliUsageError } from './cli-errors';
+import { renderHelp, resolveHelpTopicKey } from './help';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_RANGE = 'today';
@@ -18,42 +20,47 @@ const METRIC_FILTER_REGEX = /^\s*([^<>=!~]+)\s*(<=|>=|!=|=|<|>|~)\s*(.+)\s*$/;
 
 const main = async () => {
     const { positional, flags } = parseArgs(process.argv.slice(2));
+    const helpContext = await buildHelpContext();
 
-    if (flags.help || positional.length === 0) {
-        printHelp();
+    if (positional.length === 0 || flags.help) {
+        const topicKey = resolveHelpTopicKey(positional);
+        process.stdout.write(renderHelp(topicKey, helpContext));
         return;
     }
 
     const [command, subcommand, action, ...rest] = positional;
 
     if (command === 'config') {
+        if (!subcommand) {
+            process.stdout.write(renderHelp('config', helpContext));
+            return;
+        }
         await handleConfigCommand(subcommand, action, rest);
         return;
     }
 
-    const config = await loadConfig();
-    const apiConfig = resolveApiConfig(config);
-    const client = createTRPCProxyClient<AppRouter>({
-        links: [
-            httpLink({
-                url: `${apiConfig.baseUrl}/api`,
-                headers() {
-                    return { Authorization: `Bearer ${apiConfig.apiKey}` };
-                },
-            }),
-        ],
-    });
-
     switch (command) {
         case 'accounts': {
-            if (subcommand !== 'list') {
-                throw new Error('Usage: bb accounts list');
+            if (!subcommand) {
+                process.stdout.write(renderHelp('accounts', helpContext));
+                return;
             }
+            if (subcommand !== 'list') {
+                throw new CliUsageError({ topicKey: 'accounts', message: `Unknown subcommand: ${subcommand}` });
+            }
+            const config = await loadConfig();
+            const client = createApiClient(config);
             const data = await client.api.client.accountsList.query();
             printOutput(data);
             return;
         }
         case 'campaigns': {
+            if (!subcommand) {
+                process.stdout.write(renderHelp('campaigns', helpContext));
+                return;
+            }
+            const config = await loadConfig();
+            const client = createApiClient(config);
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
@@ -71,7 +78,7 @@ const main = async () => {
             if (subcommand === 'get') {
                 const campaignId = action;
                 if (!campaignId) {
-                    throw new Error('Usage: bb campaigns get <campaign_id>');
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
                 }
                 const data = await client.api.client.campaignsGet.query({ config: cliConfig, campaignId });
                 printOutput(data);
@@ -80,7 +87,7 @@ const main = async () => {
             if (subcommand === 'create') {
                 const [name, budget] = [action, rest[0]];
                 if (!(name && budget)) {
-                    throw new Error('Usage: bb campaigns create <name> <budget>');
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <name> <budget>.' });
                 }
                 const data = await client.api.client.campaignsCreate.mutate({
                     config: cliConfig,
@@ -93,7 +100,7 @@ const main = async () => {
             if (subcommand === 'update') {
                 const campaignId = action;
                 if (!campaignId) {
-                    throw new Error('Usage: bb campaigns update <campaign_id> --name <name>');
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
                 }
                 const name = readFlag(flags, ['name']);
                 const portfolioId = readFlag(flags, ['portfolio']);
@@ -113,7 +120,7 @@ const main = async () => {
             if (subcommand === 'pause') {
                 const campaignId = action;
                 if (!campaignId) {
-                    throw new Error('Usage: bb campaigns pause <campaign_id>');
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
                 }
                 const data = await client.api.client.campaignsPause.mutate({ config: cliConfig, campaignId });
                 printOutput(data);
@@ -122,7 +129,7 @@ const main = async () => {
             if (subcommand === 'resume') {
                 const campaignId = action;
                 if (!campaignId) {
-                    throw new Error('Usage: bb campaigns resume <campaign_id>');
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
                 }
                 const data = await client.api.client.campaignsResume.mutate({ config: cliConfig, campaignId });
                 printOutput(data);
@@ -131,7 +138,7 @@ const main = async () => {
             if (subcommand === 'delete') {
                 const campaignId = action;
                 if (!campaignId) {
-                    throw new Error('Usage: bb campaigns delete <campaign_id>');
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
                 }
                 const data = await client.api.client.campaignsDelete.mutate({ config: cliConfig, campaignId });
                 printOutput(data);
@@ -141,7 +148,7 @@ const main = async () => {
                 const campaignId = action;
                 const budget = rest[0];
                 if (!(campaignId && budget)) {
-                    throw new Error('Usage: bb campaigns set-budget <campaign_id> <budget>');
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <budget>.' });
                 }
                 const data = await client.api.client.campaignsSetBudget.mutate({
                     config: cliConfig,
@@ -155,7 +162,7 @@ const main = async () => {
                 const campaignId = action;
                 const strategy = rest[0];
                 if (!(campaignId && strategy)) {
-                    throw new Error('Usage: bb campaigns set-bid-strategy <campaign_id> <strategy>');
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <strategy>.' });
                 }
                 const data = await client.api.client.campaignsSetBidStrategy.mutate({
                     config: cliConfig,
@@ -170,7 +177,7 @@ const main = async () => {
                 const scope = rest[0];
                 const json = rest[1];
                 if (!(campaignId && scope && json)) {
-                    throw new Error('Usage: bb campaigns set-bid-adjustments <campaign_id> <placement|audience|creative> <json>');
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <scope> <json>.' });
                 }
                 const data = await client.api.client.campaignsSetBidAdjustments.mutate({
                     config: cliConfig,
@@ -181,9 +188,15 @@ const main = async () => {
                 printOutput(data);
                 return;
             }
-            throw new Error('Unknown campaigns command.');
+            throw new CliUsageError({ topicKey: 'campaigns', message: `Unknown subcommand: ${subcommand}` });
         }
         case 'ad-groups': {
+            if (!subcommand) {
+                process.stdout.write(renderHelp('ad-groups', helpContext));
+                return;
+            }
+            const config = await loadConfig();
+            const client = createApiClient(config);
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
@@ -203,7 +216,7 @@ const main = async () => {
             if (subcommand === 'get') {
                 const adGroupId = action;
                 if (!adGroupId) {
-                    throw new Error('Usage: bb ad-groups get <ad_group_id>');
+                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing <ad_group_id>.' });
                 }
                 const data = await client.api.client.adGroupsGet.query({ config: cliConfig, adGroupId });
                 printOutput(data);
@@ -212,7 +225,7 @@ const main = async () => {
             if (subcommand === 'create') {
                 const [campaignId, name, bid] = [action, rest[0], rest[1]];
                 if (!(campaignId && name && bid)) {
-                    throw new Error('Usage: bb ad-groups create <campaign_id> <name> <default_bid>');
+                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <campaign_id> <name> <default_bid>.' });
                 }
                 const data = await client.api.client.adGroupsCreate.mutate({
                     config: cliConfig,
@@ -227,7 +240,7 @@ const main = async () => {
                 const adGroupId = action;
                 const name = rest[0];
                 if (!(adGroupId && name)) {
-                    throw new Error('Usage: bb ad-groups update <ad_group_id> <name>');
+                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <ad_group_id> <name>.' });
                 }
                 const data = await client.api.client.adGroupsUpdate.mutate({ config: cliConfig, adGroupId, name });
                 printOutput(data);
@@ -237,7 +250,7 @@ const main = async () => {
                 const adGroupId = action;
                 const value = rest[0];
                 if (!(adGroupId && value)) {
-                    throw new Error('Usage: bb ad-groups set-default-bid <ad_group_id> <value>');
+                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <ad_group_id> <value>.' });
                 }
                 const data = await client.api.client.adGroupsSetDefaultBid.mutate({
                     config: cliConfig,
@@ -250,7 +263,7 @@ const main = async () => {
             if (subcommand === 'pause') {
                 const adGroupId = action;
                 if (!adGroupId) {
-                    throw new Error('Usage: bb ad-groups pause <ad_group_id>');
+                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing <ad_group_id>.' });
                 }
                 const data = await client.api.client.adGroupsPause.mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
@@ -259,7 +272,7 @@ const main = async () => {
             if (subcommand === 'resume') {
                 const adGroupId = action;
                 if (!adGroupId) {
-                    throw new Error('Usage: bb ad-groups resume <ad_group_id>');
+                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing <ad_group_id>.' });
                 }
                 const data = await client.api.client.adGroupsResume.mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
@@ -268,15 +281,21 @@ const main = async () => {
             if (subcommand === 'delete') {
                 const adGroupId = action;
                 if (!adGroupId) {
-                    throw new Error('Usage: bb ad-groups delete <ad_group_id>');
+                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing <ad_group_id>.' });
                 }
                 const data = await client.api.client.adGroupsDelete.mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
-            throw new Error('Unknown ad-groups command.');
+            throw new CliUsageError({ topicKey: 'ad-groups', message: `Unknown subcommand: ${subcommand}` });
         }
         case 'ads': {
+            if (!subcommand) {
+                process.stdout.write(renderHelp('ads', helpContext));
+                return;
+            }
+            const config = await loadConfig();
+            const client = createApiClient(config);
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
@@ -298,7 +317,7 @@ const main = async () => {
             if (subcommand === 'get') {
                 const adId = action;
                 if (!adId) {
-                    throw new Error('Usage: bb ads get <ad_id>');
+                    throw new CliUsageError({ topicKey: 'ads', message: 'Missing <ad_id>.' });
                 }
                 const data = await client.api.client.adsGet.query({ config: cliConfig, adId });
                 printOutput(data);
@@ -308,7 +327,7 @@ const main = async () => {
                 const [adGroupId, productId] = [action, rest[0]];
                 const productIdType = rest[1] ?? 'ASIN';
                 if (!(adGroupId && productId)) {
-                    throw new Error('Usage: bb ads create <ad_group_id> <asin|sku> [ASIN|SKU]');
+                    throw new CliUsageError({ topicKey: 'ads', message: 'Missing required args: <ad_group_id> <asin|sku>.' });
                 }
                 const data = await client.api.client.adsCreate.mutate({
                     config: cliConfig,
@@ -323,7 +342,7 @@ const main = async () => {
                 const adId = action;
                 const state = rest[0];
                 if (!(adId && state)) {
-                    throw new Error('Usage: bb ads update <ad_id> <state>');
+                    throw new CliUsageError({ topicKey: 'ads', message: 'Missing required args: <ad_id> <state>.' });
                 }
                 const data = await client.api.client.adsUpdate.mutate({ config: cliConfig, adId, state });
                 printOutput(data);
@@ -332,15 +351,21 @@ const main = async () => {
             if (subcommand === 'delete') {
                 const adId = action;
                 if (!adId) {
-                    throw new Error('Usage: bb ads delete <ad_id>');
+                    throw new CliUsageError({ topicKey: 'ads', message: 'Missing <ad_id>.' });
                 }
                 const data = await client.api.client.adsDelete.mutate({ config: cliConfig, adId });
                 printOutput(data);
                 return;
             }
-            throw new Error('Unknown ads command.');
+            throw new CliUsageError({ topicKey: 'ads', message: `Unknown subcommand: ${subcommand}` });
         }
         case 'targets': {
+            if (!subcommand) {
+                process.stdout.write(renderHelp('targets', helpContext));
+                return;
+            }
+            const config = await loadConfig();
+            const client = createApiClient(config);
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
@@ -363,7 +388,7 @@ const main = async () => {
                 const targetId = action;
                 const value = rest[0];
                 if (!(targetId && value)) {
-                    throw new Error('Usage: bb targets set-bid <target_id> <value>');
+                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing required args: <target_id> <value>.' });
                 }
                 const data = await client.api.client.bidsSet.mutate({
                     config: cliConfig,
@@ -377,7 +402,7 @@ const main = async () => {
                 const targetId = action;
                 const delta = rest[0];
                 if (!(targetId && delta)) {
-                    throw new Error('Usage: bb targets adjust-bid <target_id> <delta>');
+                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing required args: <target_id> <delta>.' });
                 }
                 const data = await client.api.client.bidsAdjust.mutate({
                     config: cliConfig,
@@ -390,7 +415,7 @@ const main = async () => {
             if (subcommand === 'get') {
                 const targetId = action;
                 if (!targetId) {
-                    throw new Error('Usage: bb targets get <target_id>');
+                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing <target_id>.' });
                 }
                 const data = await client.api.client.targetsGet.query({ config: cliConfig, targetId });
                 printOutput(data);
@@ -399,12 +424,16 @@ const main = async () => {
             if (subcommand === 'create') {
                 const targetType = action;
                 if (!targetType) {
-                    throw new Error('Usage: bb targets create keyword|product ...');
+                    process.stdout.write(renderHelp('targets', helpContext));
+                    return;
                 }
                 if (targetType === 'keyword') {
                     const [adGroupId, keyword, matchType, bid] = rest;
                     if (!(adGroupId && keyword && matchType && bid)) {
-                        throw new Error('Usage: bb targets create keyword <ad_group_id> <keyword> <match_type> <bid>');
+                        throw new CliUsageError({
+                            topicKey: 'targets',
+                            message: 'Missing required args: keyword <ad_group_id> <keyword> <match_type> <bid>.',
+                        });
                     }
                     const data = await client.api.client.targetsCreateKeyword.mutate({
                         config: cliConfig,
@@ -419,7 +448,10 @@ const main = async () => {
                 if (targetType === 'product') {
                     const [adGroupId, productId, matchType, bid, productIdType] = rest;
                     if (!(adGroupId && productId && matchType && bid)) {
-                        throw new Error('Usage: bb targets create product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU]');
+                        throw new CliUsageError({
+                            topicKey: 'targets',
+                            message: 'Missing required args: product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU].',
+                        });
                     }
                     const data = await client.api.client.targetsCreateProduct.mutate({
                         config: cliConfig,
@@ -432,12 +464,12 @@ const main = async () => {
                     printOutput(data);
                     return;
                 }
-                throw new Error('Unknown targets create type.');
+                throw new CliUsageError({ topicKey: 'targets', message: `Unknown create type: ${targetType}` });
             }
             if (subcommand === 'delete') {
                 const targetId = action;
                 if (!targetId) {
-                    throw new Error('Usage: bb targets delete <target_id>');
+                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing <target_id>.' });
                 }
                 const data = await client.api.client.targetsDelete.mutate({ config: cliConfig, targetId });
                 printOutput(data);
@@ -446,7 +478,7 @@ const main = async () => {
             if (subcommand === 'pause') {
                 const targetId = action;
                 if (!targetId) {
-                    throw new Error('Usage: bb targets pause <target_id>');
+                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing <target_id>.' });
                 }
                 const data = await client.api.client.targetsPause.mutate({ config: cliConfig, targetId });
                 printOutput(data);
@@ -455,21 +487,27 @@ const main = async () => {
             if (subcommand === 'resume') {
                 const targetId = action;
                 if (!targetId) {
-                    throw new Error('Usage: bb targets resume <target_id>');
+                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing <target_id>.' });
                 }
                 const data = await client.api.client.targetsResume.mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
-            throw new Error('Unknown targets command.');
+            throw new CliUsageError({ topicKey: 'targets', message: `Unknown subcommand: ${subcommand}` });
         }
         case 'bids': {
+            if (!subcommand) {
+                process.stdout.write(renderHelp('bids', helpContext));
+                return;
+            }
+            const config = await loadConfig();
+            const client = createApiClient(config);
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'set') {
                 const targetId = action;
                 const value = rest[0];
                 if (!(targetId && value)) {
-                    throw new Error('Usage: bb bids set <target_id> <value>');
+                    throw new CliUsageError({ topicKey: 'bids', message: 'Missing required args: <target_id> <value>.' });
                 }
                 const data = await client.api.client.bidsSet.mutate({
                     config: cliConfig,
@@ -483,7 +521,7 @@ const main = async () => {
                 const targetId = action;
                 const delta = rest[0];
                 if (!(targetId && delta)) {
-                    throw new Error('Usage: bb bids adjust <target_id> <delta>');
+                    throw new CliUsageError({ topicKey: 'bids', message: 'Missing required args: <target_id> <delta>.' });
                 }
                 const data = await client.api.client.bidsAdjust.mutate({
                     config: cliConfig,
@@ -493,16 +531,22 @@ const main = async () => {
                 printOutput(data);
                 return;
             }
-            throw new Error('Unknown bids command.');
+            throw new CliUsageError({ topicKey: 'bids', message: `Unknown subcommand: ${subcommand}` });
         }
         case 'metrics': {
-            const cliConfig = requireCliConfig(config);
-            if (!(subcommand && action)) {
-                throw new Error('Usage: bb metrics <series|table> <campaigns|ad-groups|ads|targets> [filters]');
+            if (!subcommand) {
+                process.stdout.write(renderHelp('metrics', helpContext));
+                return;
             }
-
+            if ((subcommand === 'series' || subcommand === 'table') && !action) {
+                process.stdout.write(renderHelp(subcommand === 'series' ? 'metrics series' : 'metrics table', helpContext));
+                return;
+            }
+            const config = await loadConfig();
+            const client = createApiClient(config);
+            const cliConfig = requireCliConfig(config);
             if (subcommand !== 'series' && subcommand !== 'table') {
-                throw new Error('Usage: bb metrics <series|table> <campaigns|ad-groups|ads|targets> [filters]');
+                throw new CliUsageError({ topicKey: 'metrics', message: `Unknown subcommand: ${subcommand}` });
             }
 
             const ids = parseIdsFlag(flags);
@@ -519,10 +563,13 @@ const main = async () => {
             const offsetRaw = readFlag(flags, ['offset']);
 
             if (subcommand === 'series' && (sortField || sortDirection || limitRaw || offsetRaw)) {
-                throw new Error('Series metrics do not support --sort, --direction, --limit, or --offset.');
+                throw new CliUsageError({
+                    topicKey: 'metrics series',
+                    message: 'Series metrics do not support --sort, --direction, --limit, or --offset.',
+                });
             }
             if (subcommand === 'table' && bucket) {
-                throw new Error('Table metrics do not support --bucket.');
+                throw new CliUsageError({ topicKey: 'metrics table', message: 'Table metrics do not support --bucket.' });
             }
 
             const tableOptions =
@@ -540,7 +587,10 @@ const main = async () => {
             if (subcommand === 'series') {
                 if (action === 'campaigns') {
                     if (campaignId || adGroupId) {
-                        throw new Error('Usage: bb metrics series campaigns [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>].');
+                        throw new CliUsageError({
+                            topicKey: 'metrics series',
+                            message: 'Series campaigns does not accept --campaign or --ad-group.',
+                        });
                     }
                     const data = await client.api.client.metricsSeriesCampaigns.query({
                         config: cliConfig,
@@ -555,7 +605,10 @@ const main = async () => {
                 }
                 if (action === 'ad-groups') {
                     if (adGroupId) {
-                        throw new Error('Usage: bb metrics series ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>].');
+                        throw new CliUsageError({
+                            topicKey: 'metrics series',
+                            message: 'Series ad-groups does not accept --ad-group (use --campaign to scope).',
+                        });
                     }
                     const data = await client.api.client.metricsSeriesAdGroups.query({
                         config: cliConfig,
@@ -606,7 +659,10 @@ const main = async () => {
 
                 if (action === 'campaigns') {
                     if (campaignId || adGroupId) {
-                        throw new Error('Usage: bb metrics table campaigns [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>].');
+                        throw new CliUsageError({
+                            topicKey: 'metrics table',
+                            message: 'Table campaigns does not accept --campaign or --ad-group.',
+                        });
                     }
                     const data = await client.api.client.metricsTableCampaigns.query({
                         config: cliConfig,
@@ -623,9 +679,10 @@ const main = async () => {
                 }
                 if (action === 'ad-groups') {
                     if (adGroupId) {
-                        throw new Error(
-                            'Usage: bb metrics table ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>].'
-                        );
+                        throw new CliUsageError({
+                            topicKey: 'metrics table',
+                            message: 'Table ad-groups does not accept --ad-group (use --campaign to scope).',
+                        });
                     }
                     const data = await client.api.client.metricsTableAdGroups.query({
                         config: cliConfig,
@@ -675,9 +732,15 @@ const main = async () => {
                 }
             }
 
-            throw new Error('Unknown metrics command.');
+            throw new CliUsageError({ topicKey: subcommand === 'series' ? 'metrics series' : 'metrics table', message: `Unknown entity: ${action}` });
         }
         case 'enums': {
+            if (!subcommand) {
+                process.stdout.write(renderHelp('enums', helpContext));
+                return;
+            }
+            const config = await loadConfig();
+            const client = createApiClient(config);
             if (subcommand === 'bid-strategy') {
                 const data = await client.api.client.enumsBidStrategy.query();
                 printOutput(data);
@@ -698,10 +761,10 @@ const main = async () => {
                 printOutput(data);
                 return;
             }
-            throw new Error('Unknown enums command.');
+            throw new CliUsageError({ topicKey: 'enums', message: `Unknown subcommand: ${subcommand}` });
         }
         default:
-            throw new Error(`Unknown command: ${command}`);
+            throw new CliUsageError({ topicKey: 'global', message: `Unknown command: ${command}` });
     }
 };
 
@@ -719,16 +782,16 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
     }
 
     if (subcommand !== 'set' || !action) {
-        throw new Error('Usage: bb config set <api-key|base-url|account|range> <value>');
+        throw new CliUsageError({ topicKey: 'config', message: 'Missing config subcommand. Use: bb config set <key> <value>.' });
     }
 
     const config = await loadConfig();
     const value = rest[0];
     if (!value) {
         if (action === 'range') {
-            throw new Error(await buildRangeHelpMessage(config));
+            throw new CliUsageError({ topicKey: 'config', message: await buildRangeHelpMessage(config) });
         }
-        throw new Error('Missing value for config set');
+        throw new CliUsageError({ topicKey: 'config', message: 'Missing value for config set.' });
     }
 
     switch (action) {
@@ -740,7 +803,7 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
             break;
         case 'account':
             if (!rest[1]) {
-                throw new Error('Usage: bb config set account <adsAccountId> <countryCode>');
+                throw new CliUsageError({ topicKey: 'config', message: 'Missing required args: account <adsAccountId> <countryCode>.' });
             }
             config.accountId = value;
             config.countryCode = rest[1];
@@ -749,84 +812,11 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
             config.range = value;
             break;
         default:
-            throw new Error('Unknown config key. Use api-key, base-url, account, or range.');
+            throw new CliUsageError({ topicKey: 'config', message: `Unknown config key: ${action}.` });
     }
 
     await saveConfig(config);
     printOutput({ saved: true });
-};
-
-const printHelp = () => {
-    console.log(`BidBeacon CLI
-
-Usage:
-  bb config show
-  bb config clear
-  bb config set api-key <value>
-  bb config set base-url <value>
-  bb config set account <adsAccountId> <countryCode>
-  bb config set range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD> (default: today)
-
-  bb accounts list
-
-  bb campaigns list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--limit <n>] [--offset <n>]
-  bb campaigns get <campaign_id>
-  bb campaigns create <name> <budget>
-  bb campaigns update <campaign_id> --name <name> [--portfolio <id>] [--start <iso>] [--end <iso>]
-  bb campaigns pause <campaign_id>
-  bb campaigns resume <campaign_id>
-  bb campaigns delete <campaign_id>
-  bb campaigns set-budget <campaign_id> <budget>
-  bb campaigns set-bid-strategy <campaign_id> <strategy>
-  bb campaigns set-bid-adjustments <campaign_id> <placement|audience|creative> <json>
-
-  bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--limit <n>] [--offset <n>]
-  bb ad-groups get <ad_group_id>
-  bb ad-groups create <campaign_id> <name> <default_bid>
-  bb ad-groups update <ad_group_id> <name>
-  bb ad-groups set-default-bid <ad_group_id> <value>
-  bb ad-groups pause <ad_group_id>
-  bb ad-groups resume <ad_group_id>
-  bb ad-groups delete <ad_group_id>
-
-  bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]
-  bb ads get <ad_id>
-  bb ads create <ad_group_id> <asin|sku> [ASIN|SKU]
-  bb ads update <ad_id> <state>
-  bb ads delete <ad_id>
-
-  bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]
-  bb targets get <target_id>
-  bb targets create keyword <ad_group_id> <keyword> <match_type> <bid>
-  bb targets create product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU]
-  bb targets set-bid <target_id> <value>
-  bb targets adjust-bid <target_id> <delta>
-  bb targets delete <target_id>
-  bb targets pause <target_id>
-  bb targets resume <target_id>
-
-  bb bids set <target_id> <value>
-  bb bids adjust <target_id> <delta>
-
-  bb metrics series campaigns [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]
-  bb metrics series ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]
-  bb metrics series ads [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]
-  bb metrics series targets [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]
-
-  bb metrics table campaigns [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]
-  bb metrics table ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]
-  bb metrics table ads [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]
-  bb metrics table targets [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]
-  Metrics table sort fields: impressions|clicks|purchases|spend|sales|acos|cpc|ctr|roas
-  Metrics common flags: --metrics <keys> --range <range> --filter <key><op><value> (repeatable) --search <text> --state <ENABLED|PAUSED|ARCHIVED|OTHER|ALL>
-  Metrics series-only flags: --bucket <auto|hour|day|week|month|year>
-  Filter keys: search|state|status|targeting|type|target-type|target-match-type|budget|end-date|out-of-budget|metrics.<key>
-
-  bb enums bid-strategy
-  bb enums match-type
-  bb enums placement
-  bb enums state
-`);
 };
 
 const loadConfig = async (): Promise<CliConfig> => {
@@ -847,15 +837,32 @@ const resolveApiConfig = (config: CliConfig) => {
     const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
     const apiKey = config.apiKey;
     if (!apiKey) {
-        throw new Error('Missing API key. Run: bb config set api-key <value>');
+        throw new CliUsageError({ topicKey: 'config', message: 'Missing API key. Run: bb config set api-key <value>.' });
     }
 
     return { baseUrl, apiKey };
 };
 
+const createApiClient = (config: CliConfig) => {
+    const apiConfig = resolveApiConfig(config);
+    return createTRPCProxyClient<AppRouter>({
+        links: [
+            httpLink({
+                url: `${apiConfig.baseUrl}/api`,
+                headers() {
+                    return { Authorization: `Bearer ${apiConfig.apiKey}` };
+                },
+            }),
+        ],
+    });
+};
+
 const requireCliConfig = (config: CliConfig) => {
     if (!(config.accountId && config.countryCode)) {
-        throw new Error('Missing config: account + country. Use bb config set account <adsAccountId> <countryCode>.');
+        throw new CliUsageError({
+            topicKey: 'config',
+            message: 'Missing config: account + country. Use: bb config set account <adsAccountId> <countryCode>.',
+        });
     }
     return {
         accountId: config.accountId,
@@ -875,6 +882,11 @@ const parseArgs = (args: string[]) => {
     let index = 0;
     while (index < args.length) {
         const value = args[index];
+        if (value === '-h') {
+            flags.help = true;
+            index += 1;
+            continue;
+        }
         if (!value.startsWith('--')) {
             positional.push(value);
             index += 1;
@@ -1292,17 +1304,7 @@ const resolveAccountTimezoneHint = async (config: CliConfig) => {
     }
 
     try {
-        const apiConfig = resolveApiConfig(config);
-        const client = createTRPCProxyClient<AppRouter>({
-            links: [
-                httpLink({
-                    url: `${apiConfig.baseUrl}/api`,
-                    headers() {
-                        return { Authorization: `Bearer ${apiConfig.apiKey}` };
-                    },
-                }),
-            ],
-        });
+        const client = createApiClient(config);
         const data = await client.api.client.accountsList.query();
         const countryCode = config.countryCode?.toUpperCase();
         const matches = data.items.filter(item => item.accountId === config.accountId);
@@ -1336,7 +1338,65 @@ type ParsedFlags = Record<string, string | boolean | string[]> & {
     help?: boolean;
 };
 
-await main().catch(error => {
+const buildHelpContext = async () => {
+    const version = await resolveCliVersion();
+    const sha = resolveCliSha();
+    const config = await loadConfig();
+    const configSummary = formatConfigSummary(config);
+    return { version, sha, configSummary };
+};
+
+const resolveCliVersion = async () => {
+    try {
+        const pkgUrl = new URL('../package.json', import.meta.url);
+        const raw = await readFile(pkgUrl, 'utf8');
+        const parsed = JSON.parse(raw) as { version?: string };
+        return parsed.version ?? 'dev';
+    } catch {
+        return 'dev';
+    }
+};
+
+const resolveCliSha = () => {
+    const envSha = process.env.BB_CLI_SHA ?? process.env.GIT_SHA ?? process.env.COMMIT_SHA;
+    if (envSha) {
+        return envSha.slice(0, 12);
+    }
+    return tryGetGitSha();
+};
+
+const tryGetGitSha = () => {
+    try {
+        // Best-effort only; `bb` may be running outside a git checkout.
+        const result = Bun.spawnSync(['git', 'rev-parse', '--short', 'HEAD'], {
+            stdout: 'pipe',
+            stderr: 'pipe',
+        });
+        if (result.exitCode !== 0) {
+            return undefined;
+        }
+        return new TextDecoder().decode(result.stdout).trim() || undefined;
+    } catch {
+        return undefined;
+    }
+};
+
+const formatConfigSummary = (config: CliConfig) => {
+    const apiKeyStatus = config.apiKey ? 'set' : 'missing';
+    const accountStatus =
+        config.accountId && config.countryCode ? `${config.accountId} (${config.countryCode.toUpperCase()})` : 'missing';
+    const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
+    return `config: api-key ${apiKeyStatus}, account ${accountStatus}, base-url ${baseUrl}`;
+};
+
+await main().catch(async error => {
+    if (isCliUsageError(error)) {
+        const helpContext = await buildHelpContext();
+        process.stderr.write(`Error: ${error.message}\n\n`);
+        process.stderr.write(renderHelp(error.topicKey, helpContext));
+        process.exit(error.exitCode);
+    }
+
     console.error(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : error }, null, 2));
     process.exit(1);
 });
