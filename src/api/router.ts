@@ -1,19 +1,19 @@
-import { accountsRouter } from './routers/accounts';
-import { adsRouter } from './routers/ads';
-import { apiRouter } from './routers/api';
-import { apiKeysRouter } from './routers/api-keys';
-import { metricsRouter } from './routers/metrics';
-import { performanceRouter } from './routers/performance';
-import { reportsRouter } from './routers/reports';
-import { usersRouter } from './routers/users';
-import { workerRouter } from './routers/worker';
+import { accountsRouter } from './app/accounts';
+import { adsRouter } from './app/ads';
+import { apiKeysRouter } from './app/api-keys';
+import { metricsRouter } from './app/metrics';
+import { performanceRouter } from './app/performance';
+import { reportsRouter } from './app/reports';
+import { usersRouter } from './app/users';
+import { workerRouter } from './app/worker';
+import { publicApiRouter } from './public/router';
 import { router } from './trpc';
 
 export const appRouter = router({
     reports: reportsRouter,
     accounts: accountsRouter,
     ads: adsRouter,
-    api: apiRouter,
+    api: publicApiRouter,
     apiKeys: apiKeysRouter,
     metrics: metricsRouter,
     performance: performanceRouter,

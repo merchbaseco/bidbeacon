@@ -10,6 +10,8 @@ export type RouterInputs = inferRouterInputs<CliAppRouter>;
 export type RouterOutputs = inferRouterOutputs<CliAppRouter>;
 export type CliRouterInputs = RouterInputs['api']['cli'];
 export type CliRouterOutputs = RouterOutputs['api']['cli'];
+export type PublicRouterInputs = RouterInputs['api']['client'];
+export type PublicRouterOutputs = RouterOutputs['api']['client'];
 
 export type BidBeaconClientOptions = {
     baseUrl: string;
@@ -20,7 +22,7 @@ export type BidBeaconClientOptions = {
 
 type CliProxyClient = ReturnType<typeof createTRPCProxyClient<CliAppRouter>>;
 
-export type BidBeaconClient = CliProxyClient['api']['cli'];
+export type BidBeaconClient = CliProxyClient['api']['client'];
 
 export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }: BidBeaconClientOptions): BidBeaconClient => {
     const url = `${normalizeBaseUrl(baseUrl)}/api`;
@@ -38,7 +40,7 @@ export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }
                 }),
             ],
         });
-        return client.api.cli;
+        return client.api.client;
     }
 
     const client = createTRPCProxyClient<CliAppRouter>({
@@ -49,7 +51,7 @@ export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }
             }),
         ],
     });
-    return client.api.cli;
+    return client.api.client;
 };
 
 const normalizeBaseUrl = (baseUrl: string) => baseUrl.replace(TRAILING_SLASHES_REGEX, '');

@@ -4,7 +4,7 @@
     "noEmit": true,
     "types": []
   },
-  "files": ["src/api/router-cli.ts"],
+  "files": ["src/api/router-public.ts"],
   "include": [],
   "exclude": ["node_modules", "dist"]
 }

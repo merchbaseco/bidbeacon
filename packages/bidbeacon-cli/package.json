@@ -1,0 +1,13 @@
+{
+  "name": "@bidbeacon/cli",
+  "version": "0.1.0",
+  "description": "BidBeacon CLI",
+  "type": "module",
+  "private": true,
+  "bin": {
+    "bb": "./src/index.ts"
+  },
+  "files": [
+    "src"
+  ]
+}
