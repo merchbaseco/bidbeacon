@@ -4,15 +4,16 @@
 import { boss } from './boss.js';
 
 // Import all job definitions (this registers them with the boss singleton)
-import './update-report-status.js';
-import './update-report-dataset-for-account.js';
-import './update-report-datasets.js';
-import './sync-ad-entities.js';
-import './summarize-daily-target-stream-for-account.js';
-import './summarize-daily-target-stream.js';
-import './summarize-hourly-target-stream-for-account.js';
-import './summarize-hourly-target-stream.js';
-import './cleanup-ams-metrics.js';
+import './update-report-status';
+import './update-report-dataset-for-account';
+import './update-report-datasets';
+import './sync-ad-entities';
+import './sync-ad-entities-for-account';
+import './summarize-daily-target-stream-for-account';
+import './summarize-daily-target-stream';
+import './summarize-hourly-target-stream-for-account';
+import './summarize-hourly-target-stream';
+import './cleanup-ams-metrics';
 
 export async function startJobs(): Promise<void> {
     if (boss.isStarted) {

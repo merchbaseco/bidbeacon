@@ -37,6 +37,7 @@ const SUPPORTED_JOBS = [
     'update-report-datasets',
     'update-report-dataset-for-account',
     'sync-ad-entities',
+    'sync-ad-entities-for-account',
     'update-report-status',
     'summarize-daily-target-stream',
     'summarize-daily-target-stream-for-account',

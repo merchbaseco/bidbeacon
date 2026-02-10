@@ -1,7 +1,9 @@
+import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { db } from '@/db/index.js';
-import { amsCmAds } from '@/db/schema.js';
+import { ad, amsCmAds } from '@/db/schema.js';
 import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { createContextLogger } from '@/utils/logger';
+import { resolveAmsDeliveryStatus, resolveAmsState } from './ams-state';
 import { adSchema } from '../schemas.js';
 
 /**
@@ -48,5 +50,37 @@ export async function handleAds(payload: unknown): Promise<void> {
                 target: [amsCmAds.adId],
                 set: record,
             });
+
+        await updateAdFromAms(data);
     });
 }
+
+const updateAdFromAms = async (data: { ad_id: string; last_updated_date_time?: string; state?: unknown; status?: unknown }) => {
+    const lastUpdated = data.last_updated_date_time ? new Date(data.last_updated_date_time) : null;
+    if (!lastUpdated) {
+        return;
+    }
+
+    const updates: Record<string, unknown> = {
+        lastUpdatedDateTime: lastUpdated,
+    };
+
+    const state = resolveAmsState(data.state);
+    if (state) {
+        updates.state = state;
+    }
+
+    const deliveryStatus = resolveAmsDeliveryStatus(data.status);
+    if (deliveryStatus) {
+        updates.deliveryStatus = deliveryStatus;
+    }
+
+    if (Object.keys(updates).length === 1) {
+        return;
+    }
+
+    await db
+        .update(ad)
+        .set(updates)
+        .where(and(eq(ad.adId, data.ad_id), or(isNull(ad.lastUpdatedDateTime), lte(ad.lastUpdatedDateTime, lastUpdated))));
+};
