@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.3 - 2026-02-11
+
+### Added
+
+- Public API now supports AUTO target types (Close/Loose/Substitutes/Complements) and exposes auto subtypes in target responses.
+
+### Changed
+
+- Bumped `packages/bidbeacon-api-client` to `0.1.6`.
+
 ## v0.2 - 2026-02-10
 
 ### Added
