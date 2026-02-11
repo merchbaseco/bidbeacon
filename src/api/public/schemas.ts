@@ -225,17 +225,16 @@ export const asinsGetInputSchema = publicConfigInputSchema.extend({
     asin: z.string().trim().min(1),
 });
 
-export const asinTreeAdGroupSchema = z.object({
-    adGroupId: z.string(),
-    targets: z.array(z.string()),
-    adIds: z.array(z.string()).optional(),
+export const asinTreeAdGroupSchema = adGroupSchema.extend({
+    targets: z.array(targetSchema),
+    ads: z.array(adSchema),
 });
 
 export const asinTreeCampaignSchema = z.object({
     campaignId: z.string(),
-    name: z.string(),
+    campaignName: z.string(),
     creationDateTime: z.string().nullable(),
-    targets: z.array(z.string()),
+    targets: z.array(targetSchema),
     adGroups: z.array(asinTreeAdGroupSchema),
 });
 

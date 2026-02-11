@@ -83,6 +83,24 @@ Drill down by passing parent IDs as flags.
 **ASINs**
 - `bb asins get <ASIN>`
 
+`bb asins get <ASIN>` response shape:
+- Top-level `campaigns[]` items include:
+  - `campaignId`
+  - `campaignName`
+  - `creationDateTime`
+  - `targets` (hydrated target objects, not target IDs)
+  - `adGroups` (hydrated ad group objects)
+- Each `adGroups[]` item includes:
+  - `adGroupId`
+  - `campaignId`
+  - `name`
+  - `state`
+  - `defaultBid`
+  - `targets` (hydrated target objects, not target IDs)
+  - `ads` (hydrated ad objects, not ad IDs)
+
+This command returns entity objects for `targets` and `ads` to avoid follow-up lookups.
+
 **Targets**
 - `bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]`
 - `bb targets get <target_id>`

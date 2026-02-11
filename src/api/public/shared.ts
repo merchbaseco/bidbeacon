@@ -305,6 +305,8 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
             adId: ad.adId,
             adGroupId: ad.adGroupId,
             campaignId: ad.campaignId,
+            adState: ad.state,
+            adProductId: ad.productAsin,
             campaignName: campaign.name,
             campaignCreationDateTime: campaign.creationDateTime,
         })
@@ -320,11 +322,30 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
     const campaignIds = Array.from(new Set(matchedAdRows.map(row => row.campaignId)));
     const adGroupIds = Array.from(new Set(matchedAdRows.map(row => row.adGroupId)));
 
-    const [campaignTargetRows, adGroupTargetRows, adGroupAsinCountRows] = await Promise.all([
+    const [adGroupRows, campaignTargetRows, adGroupTargetRows] = await Promise.all([
+        db
+            .select({
+                adGroupId: adGroup.adGroupId,
+                campaignId: adGroup.campaignId,
+                name: adGroup.name,
+                state: adGroup.state,
+                bidAmount: adGroup.bidAmount,
+            })
+            .from(adGroup)
+            .innerJoin(campaign, eq(adGroup.campaignId, campaign.campaignId))
+            .where(and(eq(campaign.accountId, config.accountId), ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []), inArray(adGroup.adGroupId, adGroupIds)))
+            .orderBy(adGroup.campaignId, adGroup.adGroupId),
         db
             .select({
                 campaignId: target.campaignId,
                 targetId: target.targetId,
+                adGroupId: target.adGroupId,
+                state: target.state,
+                bidAmount: target.bidAmount,
+                targetType: target.targetType,
+                targetKeyword: target.targetKeyword,
+                targetMatchType: target.targetMatchType,
+                targetAsin: target.targetAsin,
             })
             .from(target)
             .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
@@ -342,6 +363,13 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
             .select({
                 adGroupId: target.adGroupId,
                 targetId: target.targetId,
+                campaignId: target.campaignId,
+                state: target.state,
+                bidAmount: target.bidAmount,
+                targetType: target.targetType,
+                targetKeyword: target.targetKeyword,
+                targetMatchType: target.targetMatchType,
+                targetAsin: target.targetAsin,
             })
             .from(target)
             .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
@@ -354,76 +382,85 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
                 )
             )
             .orderBy(target.adGroupId, target.targetId),
-        db
-            .select({
-                adGroupId: ad.adGroupId,
-                asinCount: sql<number>`count(distinct ${ad.productAsin})`.as('asinCount'),
-            })
-            .from(ad)
-            .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
-            .where(and(eq(campaign.accountId, config.accountId), ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []), inArray(ad.adGroupId, adGroupIds)))
-            .groupBy(ad.adGroupId),
     ]);
 
-    const campaignInfoById = new Map<string, { name: string; creationDateTime: string | null }>();
+    const campaignInfoById = new Map<string, { campaignName: string; creationDateTime: string | null }>();
     const campaignOrder: string[] = [];
     const adGroupIdsByCampaignId = new Map<string, string[]>();
+    const adGroupById = new Map<string, AdGroupShape>();
     const matchedAdIdsByAdGroupId = new Map<string, string[]>();
+    const matchedAdById = new Map<string, AdShape>();
+    const targetById = new Map<string, TargetShape>();
 
     for (const row of matchedAdRows) {
         if (!campaignInfoById.has(row.campaignId)) {
             campaignOrder.push(row.campaignId);
             campaignInfoById.set(row.campaignId, {
-                name: row.campaignName ?? '',
+                campaignName: row.campaignName ?? '',
                 creationDateTime: toIsoDateTime(row.campaignCreationDateTime),
             });
         }
         appendUniqueId(adGroupIdsByCampaignId, row.campaignId, row.adGroupId);
         appendUniqueId(matchedAdIdsByAdGroupId, row.adGroupId, row.adId);
+        matchedAdById.set(
+            row.adId,
+            mapAdRow({
+                adId: row.adId,
+                campaignId: row.campaignId,
+                adGroupId: row.adGroupId,
+                state: row.adState,
+                productId: row.adProductId,
+            })
+        );
     }
 
-    const campaignTargetsByCampaignId = new Map<string, string[]>();
+    for (const row of adGroupRows) {
+        adGroupById.set(row.adGroupId, mapAdGroupRow(row));
+    }
+
+    const campaignTargetIdsByCampaignId = new Map<string, string[]>();
     for (const row of campaignTargetRows) {
-        appendUniqueId(campaignTargetsByCampaignId, row.campaignId, row.targetId);
+        appendUniqueId(campaignTargetIdsByCampaignId, row.campaignId, row.targetId);
+        targetById.set(row.targetId, mapTargetRow(row));
     }
 
-    const adGroupTargetsByAdGroupId = new Map<string, string[]>();
+    const adGroupTargetIdsByAdGroupId = new Map<string, string[]>();
     for (const row of adGroupTargetRows) {
         if (!row.adGroupId) {
             continue;
         }
-        appendUniqueId(adGroupTargetsByAdGroupId, row.adGroupId, row.targetId);
-    }
-
-    const adGroupAsinCountByAdGroupId = new Map<string, number>();
-    for (const row of adGroupAsinCountRows) {
-        adGroupAsinCountByAdGroupId.set(row.adGroupId, Number(row.asinCount ?? 0));
+        appendUniqueId(adGroupTargetIdsByAdGroupId, row.adGroupId, row.targetId);
+        targetById.set(row.targetId, mapTargetRow(row));
     }
 
     return {
         campaigns: campaignOrder.map(campaignId => {
             const adGroups = (adGroupIdsByCampaignId.get(campaignId) ?? []).map(adGroupId => {
-                const base = {
-                    adGroupId,
-                    targets: adGroupTargetsByAdGroupId.get(adGroupId) ?? [],
+                const hydratedAdGroup =
+                    adGroupById.get(adGroupId) ??
+                    ({
+                        adGroupId,
+                        campaignId,
+                        name: '',
+                        defaultBid: 0,
+                        state: 'PAUSED',
+                    } satisfies AdGroupShape);
+                const targets = hydrateItems(adGroupTargetIdsByAdGroupId.get(adGroupId) ?? [], targetById);
+                const ads = hydrateItems(matchedAdIdsByAdGroupId.get(adGroupId) ?? [], matchedAdById);
+
+                return {
+                    ...hydratedAdGroup,
+                    targets,
+                    ads,
                 };
-
-                if ((adGroupAsinCountByAdGroupId.get(adGroupId) ?? 0) > 1) {
-                    return {
-                        ...base,
-                        adIds: matchedAdIdsByAdGroupId.get(adGroupId) ?? [],
-                    };
-                }
-
-                return base;
             });
 
             const campaignInfo = campaignInfoById.get(campaignId);
             return {
                 campaignId,
-                name: campaignInfo?.name ?? '',
+                campaignName: campaignInfo?.campaignName ?? '',
                 creationDateTime: campaignInfo?.creationDateTime ?? null,
-                targets: campaignTargetsByCampaignId.get(campaignId) ?? [],
+                targets: hydrateItems(campaignTargetIdsByCampaignId.get(campaignId) ?? [], targetById),
                 adGroups,
             };
         }),
@@ -2211,6 +2248,12 @@ const appendUniqueId = (map: Map<string, string[]>, key: string, value: string) 
     }
     current.push(value);
 };
+
+const hydrateItems = <T>(ids: string[], itemById: Map<string, T>) =>
+    ids.flatMap(id => {
+        const item = itemById.get(id);
+        return item ? [item] : [];
+    });
 
 const toIsoDateTime = (value: Date | string | null) => {
     if (!value) {

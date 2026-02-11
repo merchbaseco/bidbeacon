@@ -619,13 +619,48 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					campaigns: {
 						campaignId: string;
-						name: string;
 						creationDateTime: string | null;
-						targets: string[];
+						targets: {
+							campaignId: string;
+							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+							adGroupId: string | null;
+							targetId: string;
+							bid: number | null;
+							type: "KEYWORD" | "PRODUCT";
+							productIdType?: "ASIN" | "SKU" | null | undefined;
+							productId?: string | null | undefined;
+							keyword?: string | null | undefined;
+							keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
+							productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
+						}[];
+						campaignName: string;
 						adGroups: {
+							campaignId: string;
+							name: string;
+							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 							adGroupId: string;
-							targets: string[];
-							adIds?: string[] | undefined;
+							defaultBid: number;
+							targets: {
+								campaignId: string;
+								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+								adGroupId: string | null;
+								targetId: string;
+								bid: number | null;
+								type: "KEYWORD" | "PRODUCT";
+								productIdType?: "ASIN" | "SKU" | null | undefined;
+								productId?: string | null | undefined;
+								keyword?: string | null | undefined;
+								keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
+								productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
+							}[];
+							ads: {
+								campaignId: string;
+								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+								adGroupId: string;
+								adId: string;
+								productIdType: "ASIN" | "SKU";
+								productId: string;
+							}[];
 						}[];
 					}[];
 				};
@@ -1892,13 +1927,48 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					campaigns: {
 						campaignId: string;
-						name: string;
 						creationDateTime: string | null;
-						targets: string[];
+						targets: {
+							campaignId: string;
+							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+							adGroupId: string | null;
+							targetId: string;
+							bid: number | null;
+							type: "KEYWORD" | "PRODUCT";
+							productIdType?: "ASIN" | "SKU" | null | undefined;
+							productId?: string | null | undefined;
+							keyword?: string | null | undefined;
+							keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
+							productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
+						}[];
+						campaignName: string;
 						adGroups: {
+							campaignId: string;
+							name: string;
+							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 							adGroupId: string;
-							targets: string[];
-							adIds?: string[] | undefined;
+							defaultBid: number;
+							targets: {
+								campaignId: string;
+								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+								adGroupId: string | null;
+								targetId: string;
+								bid: number | null;
+								type: "KEYWORD" | "PRODUCT";
+								productIdType?: "ASIN" | "SKU" | null | undefined;
+								productId?: string | null | undefined;
+								keyword?: string | null | undefined;
+								keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
+								productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
+							}[];
+							ads: {
+								campaignId: string;
+								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+								adGroupId: string;
+								adId: string;
+								productIdType: "ASIN" | "SKU";
+								productId: string;
+							}[];
 						}[];
 					}[];
 				};
@@ -3221,13 +3291,48 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					campaigns: {
 						campaignId: string;
-						name: string;
 						creationDateTime: string | null;
-						targets: string[];
+						targets: {
+							campaignId: string;
+							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+							adGroupId: string | null;
+							targetId: string;
+							bid: number | null;
+							type: "KEYWORD" | "PRODUCT";
+							productIdType?: "ASIN" | "SKU" | null | undefined;
+							productId?: string | null | undefined;
+							keyword?: string | null | undefined;
+							keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
+							productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
+						}[];
+						campaignName: string;
 						adGroups: {
+							campaignId: string;
+							name: string;
+							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 							adGroupId: string;
-							targets: string[];
-							adIds?: string[] | undefined;
+							defaultBid: number;
+							targets: {
+								campaignId: string;
+								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+								adGroupId: string | null;
+								targetId: string;
+								bid: number | null;
+								type: "KEYWORD" | "PRODUCT";
+								productIdType?: "ASIN" | "SKU" | null | undefined;
+								productId?: string | null | undefined;
+								keyword?: string | null | undefined;
+								keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
+								productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
+							}[];
+							ads: {
+								campaignId: string;
+								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+								adGroupId: string;
+								adId: string;
+								productIdType: "ASIN" | "SKU";
+								productId: string;
+							}[];
 						}[];
 					}[];
 				};
@@ -4494,13 +4599,48 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					campaigns: {
 						campaignId: string;
-						name: string;
 						creationDateTime: string | null;
-						targets: string[];
+						targets: {
+							campaignId: string;
+							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+							adGroupId: string | null;
+							targetId: string;
+							bid: number | null;
+							type: "KEYWORD" | "PRODUCT";
+							productIdType?: "ASIN" | "SKU" | null | undefined;
+							productId?: string | null | undefined;
+							keyword?: string | null | undefined;
+							keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
+							productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
+						}[];
+						campaignName: string;
 						adGroups: {
+							campaignId: string;
+							name: string;
+							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 							adGroupId: string;
-							targets: string[];
-							adIds?: string[] | undefined;
+							defaultBid: number;
+							targets: {
+								campaignId: string;
+								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+								adGroupId: string | null;
+								targetId: string;
+								bid: number | null;
+								type: "KEYWORD" | "PRODUCT";
+								productIdType?: "ASIN" | "SKU" | null | undefined;
+								productId?: string | null | undefined;
+								keyword?: string | null | undefined;
+								keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
+								productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
+							}[];
+							ads: {
+								campaignId: string;
+								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+								adGroupId: string;
+								adId: string;
+								productIdType: "ASIN" | "SKU";
+								productId: string;
+							}[];
 						}[];
 					}[];
 				};
