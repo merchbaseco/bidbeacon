@@ -1,6 +1,6 @@
 {
   "name": "@bidbeacon/api-client",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Typed tRPC client for BidBeacon",
   "type": "module",
   "main": "./dist/index.js",

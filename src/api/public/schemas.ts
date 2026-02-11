@@ -32,6 +32,7 @@ export const adsListInputSchema = publicListInputSchema.extend({
 export const targetsListInputSchema = publicListInputSchema.extend({
     campaignId: z.string().optional(),
     adGroupId: z.string().optional(),
+    negative: z.boolean().optional(),
 });
 export const bidStrategySchema = z.enum(['MANUAL', 'RULE_BASED', 'SALES_DOWN_ONLY', 'SALES_UP_AND_DOWN', 'SALES', 'NEW_TO_BRAND', 'NONE']);
 export const keywordMatchTypeSchema = z.enum(['BROAD', 'PHRASE', 'EXACT']);
@@ -75,6 +76,7 @@ export const targetSchema = z.object({
     targetId: z.string(),
     campaignId: z.string(),
     adGroupId: z.string().nullable(),
+    negative: z.boolean(),
     state: stateSchema,
     bid: moneySchema.nullable(),
     type: z.enum(['KEYWORD', 'PRODUCT']),
