@@ -36,6 +36,7 @@ const accounts = await client.accountsList.query();
 - `CliRouterInputs` and `CliRouterOutputs` are exported for type-safe integration.
 - These types are generated from the server router and bundled into the package.
 - For shape-sensitive endpoints (for example `asinsGet`), use `CliRouterOutputs[...]` directly instead of hardcoding local interfaces.
+- Metrics naming: conversion count is exposed as `purchases`.
 
 ## Build + Publish
 

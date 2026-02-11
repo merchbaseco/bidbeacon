@@ -50,7 +50,7 @@ export async function handleDailyProduct(input: ParseReportInput): Promise<Parse
                 clicks: row['metric.clicks'],
                 spend: String(row['metric.totalCost']),
                 sales: String(row['metric.sales']),
-                orders: row['metric.purchases'],
+                purchases: row['metric.purchases'],
             })
             .onConflictDoUpdate({
                 target: [performanceDaily.accountId, performanceDaily.bucketDate, performanceDaily.adId, performanceDaily.entityType, performanceDaily.entityId],
@@ -62,7 +62,7 @@ export async function handleDailyProduct(input: ParseReportInput): Promise<Parse
                     clicks: row['metric.clicks'],
                     spend: String(row['metric.totalCost']),
                     sales: String(row['metric.sales']),
-                    orders: row['metric.purchases'],
+                    purchases: row['metric.purchases'],
                 },
             });
 

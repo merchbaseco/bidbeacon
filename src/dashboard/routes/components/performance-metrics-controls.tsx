@@ -16,14 +16,14 @@ type PerformanceMetricsControlsProps = {
     totals?: {
         impressions: number;
         clicks: number;
-        orders: number;
+        purchases: number;
         spend: number;
         acos: number;
     } | null;
     changes?: {
         impressions: number;
         clicks: number;
-        orders: number;
+        purchases: number;
         spend: number;
         acos: number;
     } | null;

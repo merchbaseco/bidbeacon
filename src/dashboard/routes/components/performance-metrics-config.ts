@@ -1,5 +1,5 @@
 export type MetricConfig = {
-    key: 'impressions' | 'clicks' | 'orders' | 'spend' | 'acos';
+    key: 'impressions' | 'clicks' | 'purchases' | 'spend' | 'acos';
     label: string;
     formatter: (value: number) => string;
     color?: string;
@@ -15,8 +15,8 @@ const METRICS: MetricConfig[] = [
         isGood: 'up',
     },
     {
-        key: 'orders',
-        label: 'Orders',
+        key: 'purchases',
+        label: 'Purchases',
         formatter: value => value.toLocaleString(),
         color: '#10b981',
         isGood: 'up',

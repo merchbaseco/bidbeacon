@@ -49,7 +49,7 @@ type HourlyRow = {
     clicks: number;
     spend: number;
     sales: number;
-    orders: number;
+    purchases: number;
 };
 
 async function summarizeHourlyForAccount(accountId: string, countryCode: string, recorder: JobMetricsRecorder) {
@@ -105,25 +105,25 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
             keywordId: amsSpConversion.keywordId,
             hourStart: sql<Date>`date_trunc('hour', ${amsSpConversion.timeWindowStart})`.as('hour_start'),
             sales: sql<number>`COALESCE(SUM(${amsSpConversion.attributedSales14d}), 0)`,
-            orders: sql<number>`COALESCE(SUM(${amsSpConversion.attributedConversions14d}), 0)::int`,
+            purchases: sql<number>`COALESCE(SUM(${amsSpConversion.attributedConversions14d}), 0)::int`,
         })
         .from(amsSpConversion)
         .where(and(eq(amsSpConversion.advertiserId, entityId), gte(amsSpConversion.timeWindowStart, windowStart), lte(amsSpConversion.timeWindowStart, windowEnd)))
         .groupBy(amsSpConversion.campaignId, amsSpConversion.adGroupId, amsSpConversion.adId, amsSpConversion.keywordId, sql`date_trunc('hour', ${amsSpConversion.timeWindowStart})`);
 
-    const conversionMap = new Map<string, { sales: number; orders: number }>();
+    const conversionMap = new Map<string, { sales: number; purchases: number }>();
     for (const conv of conversionAggregates) {
-        conversionMap.set(`${conv.campaignId}|${conv.adGroupId}|${conv.adId}|${conv.keywordId}|${new Date(conv.hourStart).toISOString()}`, { sales: conv.sales, orders: conv.orders });
+        conversionMap.set(`${conv.campaignId}|${conv.adGroupId}|${conv.adId}|${conv.keywordId}|${new Date(conv.hourStart).toISOString()}`, { sales: conv.sales, purchases: conv.purchases });
     }
 
     const aggregatedData: HourlyRow[] = trafficAggregates.map(traffic => {
         const key = `${traffic.campaignId}|${traffic.adGroupId}|${traffic.adId}|${traffic.keywordId}|${new Date(traffic.hourStart).toISOString()}`;
-        const conversion = conversionMap.get(key) ?? { sales: 0, orders: 0 };
+        const conversion = conversionMap.get(key) ?? { sales: 0, purchases: 0 };
         return {
             ...traffic,
             hourStart: new Date(traffic.hourStart),
             sales: conversion.sales,
-            orders: conversion.orders,
+            purchases: conversion.purchases,
         };
     });
 
@@ -141,7 +141,7 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
                 clicks: 0,
                 spend: 0,
                 sales: conv.sales,
-                orders: conv.orders,
+                purchases: conv.purchases,
             });
         }
     }
@@ -163,7 +163,7 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
             clicks: row.clicks,
             spend: String(row.spend),
             sales: String(row.sales),
-            orders: row.orders,
+            purchases: row.purchases,
         };
     });
 
@@ -185,7 +185,7 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
                     clicks: sql`excluded.clicks`,
                     spend: sql`excluded.spend`,
                     sales: sql`excluded.sales`,
-                    orders: sql`excluded.orders`,
+                    purchases: sql`excluded.purchases`,
                 },
             });
     }

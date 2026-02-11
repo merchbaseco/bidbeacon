@@ -552,7 +552,7 @@ export const metricsRouter = router({
                     bucketDate: performanceDaily.bucketDate,
                     impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
                     clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
-                    orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                    purchases: sql<number>`sum(${performanceDaily.purchases})`.as('purchases'),
                     spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
                     sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
                 })
@@ -562,13 +562,13 @@ export const metricsRouter = router({
                 .orderBy(performanceDaily.bucketDate);
 
             // Build a map of bucketDate -> metrics
-            const dataMap = new Map<string, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
+            const dataMap = new Map<string, { impressions: number; clicks: number; purchases: number; spend: number; sales: number }>();
             for (const row of data) {
                 const dateStr = typeof row.bucketDate === 'string' ? row.bucketDate : (row.bucketDate as Date).toISOString().split('T')[0];
                 dataMap.set(dateStr, {
                     impressions: Number(row.impressions),
                     clicks: Number(row.clicks),
-                    orders: Number(row.orders),
+                    purchases: Number(row.purchases),
                     spend: Number(row.spend),
                     sales: Number(row.sales),
                 });
@@ -579,7 +579,7 @@ export const metricsRouter = router({
                 bucketDate: string;
                 impressions: number;
                 clicks: number;
-                orders: number;
+                purchases: number;
                 spend: number;
                 acos: number;
                 ctr: number;
@@ -594,7 +594,7 @@ export const metricsRouter = router({
                 const dayData = dataMap.get(dateStr) ?? {
                     impressions: 0,
                     clicks: 0,
-                    orders: 0,
+                    purchases: 0,
                     spend: 0,
                     sales: 0,
                 };
@@ -608,7 +608,7 @@ export const metricsRouter = router({
                     bucketDate: dateStr,
                     impressions: dayData.impressions,
                     clicks: dayData.clicks,
-                    orders: dayData.orders,
+                    purchases: dayData.purchases,
                     spend: dayData.spend,
                     acos,
                     ctr,
@@ -869,7 +869,7 @@ export const metricsRouter = router({
                 compareStartUtc,
                 compareEndExclusiveUtc,
             } = rangeResult;
-            let previousTotals: { impressions: number; clicks: number; orders: number; spend: number; sales: number } | null = null;
+            let previousTotals: { impressions: number; clicks: number; purchases: number; spend: number; sales: number } | null = null;
 
             if (shouldCompare && compareStartUtc && compareEndExclusiveUtc) {
                 const [previousTotalsRow] =
@@ -878,7 +878,7 @@ export const metricsRouter = router({
                               .select({
                                   impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
                                   clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                                  orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                                  purchases: sql<number>`sum(${performanceHourly.purchases})`.as('purchases'),
                                   spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
                                   sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                               })
@@ -895,7 +895,7 @@ export const metricsRouter = router({
                               .select({
                                   impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
                                   clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
-                                  orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                                  purchases: sql<number>`sum(${performanceDaily.purchases})`.as('purchases'),
                                   spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
                                   sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
                               })
@@ -912,7 +912,7 @@ export const metricsRouter = router({
                 previousTotals = {
                     impressions: Number(previousTotalsRow?.impressions ?? 0),
                     clicks: Number(previousTotalsRow?.clicks ?? 0),
-                    orders: Number(previousTotalsRow?.orders ?? 0),
+                    purchases: Number(previousTotalsRow?.purchases ?? 0),
                     spend: Number(previousTotalsRow?.spend ?? 0),
                     sales: Number(previousTotalsRow?.sales ?? 0),
                 };
@@ -922,7 +922,7 @@ export const metricsRouter = router({
                 intervalStart: string;
                 impressions: number;
                 clicks: number;
-                orders: number;
+                purchases: number;
                 spend: number;
                 acos: number;
             }> = [];
@@ -930,7 +930,7 @@ export const metricsRouter = router({
             const totals = {
                 impressions: 0,
                 clicks: 0,
-                orders: 0,
+                purchases: 0,
                 spend: 0,
                 sales: 0,
             };
@@ -939,7 +939,7 @@ export const metricsRouter = router({
                 intervalStart: string;
                 impressions: number;
                 clicks: number;
-                orders: number;
+                purchases: number;
                 spend: number;
                 acos: number;
             } | null = null;
@@ -950,7 +950,7 @@ export const metricsRouter = router({
                         bucketHour: performanceHourly.bucketHour,
                         impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
                         clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                        orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                        purchases: sql<number>`sum(${performanceHourly.purchases})`.as('purchases'),
                         spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
                         sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                     })
@@ -966,12 +966,12 @@ export const metricsRouter = router({
                     .groupBy(performanceHourly.bucketHour)
                     .orderBy(performanceHourly.bucketHour);
 
-                const hourlyMap = new Map<number, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
+                const hourlyMap = new Map<number, { impressions: number; clicks: number; purchases: number; spend: number; sales: number }>();
                 for (const row of hourlyData) {
                     hourlyMap.set(row.bucketHour, {
                         impressions: Number(row.impressions),
                         clicks: Number(row.clicks),
-                        orders: Number(row.orders),
+                        purchases: Number(row.purchases),
                         spend: Number(row.spend),
                         sales: Number(row.sales),
                     });
@@ -982,14 +982,14 @@ export const metricsRouter = router({
                     const hourData = hourlyMap.get(hour) ?? {
                         impressions: 0,
                         clicks: 0,
-                        orders: 0,
+                        purchases: 0,
                         spend: 0,
                         sales: 0,
                     };
 
                     totals.impressions += hourData.impressions;
                     totals.clicks += hourData.clicks;
-                    totals.orders += hourData.orders;
+                    totals.purchases += hourData.purchases;
                     totals.spend += hourData.spend;
                     totals.sales += hourData.sales;
 
@@ -1001,7 +1001,7 @@ export const metricsRouter = router({
                         intervalStart: intervalStartUtc.toISOString(),
                         impressions: hourData.impressions,
                         clicks: hourData.clicks,
-                        orders: hourData.orders,
+                        purchases: hourData.purchases,
                         spend: hourData.spend,
                         acos,
                     });
@@ -1017,7 +1017,7 @@ export const metricsRouter = router({
                     .select({
                         impressions: sql<number>`sum(${performanceHourly.impressions})`.as('impressions'),
                         clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
-                        orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+                        purchases: sql<number>`sum(${performanceHourly.purchases})`.as('purchases'),
                         spend: sql<string>`sum(${performanceHourly.spend})`.as('spend'),
                         sales: sql<string>`sum(${performanceHourly.sales})`.as('sales'),
                     })
@@ -1034,7 +1034,7 @@ export const metricsRouter = router({
                 const previousHourData = {
                     impressions: Number(previousHourRow?.impressions ?? 0),
                     clicks: Number(previousHourRow?.clicks ?? 0),
-                    orders: Number(previousHourRow?.orders ?? 0),
+                    purchases: Number(previousHourRow?.purchases ?? 0),
                     spend: Number(previousHourRow?.spend ?? 0),
                     sales: Number(previousHourRow?.sales ?? 0),
                 };
@@ -1045,7 +1045,7 @@ export const metricsRouter = router({
                     intervalStart: previousHourStartUtc.toISOString(),
                     impressions: previousHourData.impressions,
                     clicks: previousHourData.clicks,
-                    orders: previousHourData.orders,
+                    purchases: previousHourData.purchases,
                     spend: previousHourData.spend,
                     acos: previousHourAcos,
                 };
@@ -1063,7 +1063,7 @@ export const metricsRouter = router({
                         interval: intervalLabel,
                         impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
                         clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
-                        orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                        purchases: sql<number>`sum(${performanceDaily.purchases})`.as('purchases'),
                         spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
                         sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
                     })
@@ -1079,12 +1079,12 @@ export const metricsRouter = router({
                     .groupBy(intervalExpr)
                     .orderBy(intervalExpr);
 
-                const groupedMap = new Map<string, { impressions: number; clicks: number; orders: number; spend: number; sales: number }>();
+                const groupedMap = new Map<string, { impressions: number; clicks: number; purchases: number; spend: number; sales: number }>();
                 for (const row of groupedData) {
                     groupedMap.set(row.interval, {
                         impressions: Number(row.impressions),
                         clicks: Number(row.clicks),
-                        orders: Number(row.orders),
+                        purchases: Number(row.purchases),
                         spend: Number(row.spend),
                         sales: Number(row.sales),
                     });
@@ -1096,11 +1096,11 @@ export const metricsRouter = router({
 
                     for (let cursor = startDay; cursor <= endDay; cursor = addDays(cursor, 1)) {
                         const key = format(cursor, 'yyyy-MM-dd');
-                        const dayData = groupedMap.get(key) ?? { impressions: 0, clicks: 0, orders: 0, spend: 0, sales: 0 };
+                        const dayData = groupedMap.get(key) ?? { impressions: 0, clicks: 0, purchases: 0, spend: 0, sales: 0 };
 
                         totals.impressions += dayData.impressions;
                         totals.clicks += dayData.clicks;
-                        totals.orders += dayData.orders;
+                        totals.purchases += dayData.purchases;
                         totals.spend += dayData.spend;
                         totals.sales += dayData.sales;
 
@@ -1111,7 +1111,7 @@ export const metricsRouter = router({
                             intervalStart: intervalStartUtc.toISOString(),
                             impressions: dayData.impressions,
                             clicks: dayData.clicks,
-                            orders: dayData.orders,
+                            purchases: dayData.purchases,
                             spend: dayData.spend,
                             acos,
                         });
@@ -1124,11 +1124,11 @@ export const metricsRouter = router({
 
                     for (let cursor = startMonth; cursor <= endMonth; cursor = addMonths(cursor, 1)) {
                         const key = format(cursor, 'yyyy-MM-01');
-                        const monthData = groupedMap.get(key) ?? { impressions: 0, clicks: 0, orders: 0, spend: 0, sales: 0 };
+                        const monthData = groupedMap.get(key) ?? { impressions: 0, clicks: 0, purchases: 0, spend: 0, sales: 0 };
 
                         totals.impressions += monthData.impressions;
                         totals.clicks += monthData.clicks;
-                        totals.orders += monthData.orders;
+                        totals.purchases += monthData.purchases;
                         totals.spend += monthData.spend;
                         totals.sales += monthData.sales;
 
@@ -1139,7 +1139,7 @@ export const metricsRouter = router({
                             intervalStart: intervalStartUtc.toISOString(),
                             impressions: monthData.impressions,
                             clicks: monthData.clicks,
-                            orders: monthData.orders,
+                            purchases: monthData.purchases,
                             spend: monthData.spend,
                             acos,
                         });
@@ -1154,7 +1154,7 @@ export const metricsRouter = router({
                         .select({
                             impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
                             clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
-                            orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                            purchases: sql<number>`sum(${performanceDaily.purchases})`.as('purchases'),
                             spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
                             sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
                         })
@@ -1166,7 +1166,7 @@ export const metricsRouter = router({
                     const leadingDayData = {
                         impressions: Number(leadingDayRow?.impressions ?? 0),
                         clicks: Number(leadingDayRow?.clicks ?? 0),
-                        orders: Number(leadingDayRow?.orders ?? 0),
+                        purchases: Number(leadingDayRow?.purchases ?? 0),
                         spend: Number(leadingDayRow?.spend ?? 0),
                         sales: Number(leadingDayRow?.sales ?? 0),
                     };
@@ -1177,7 +1177,7 @@ export const metricsRouter = router({
                         intervalStart: fromZonedTime(leadingDayStartZoned, accountTimezone).toISOString(),
                         impressions: leadingDayData.impressions,
                         clicks: leadingDayData.clicks,
-                        orders: leadingDayData.orders,
+                        purchases: leadingDayData.purchases,
                         spend: leadingDayData.spend,
                         acos: leadingDayAcos,
                     };
@@ -1193,7 +1193,7 @@ export const metricsRouter = router({
                         .select({
                             impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
                             clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
-                            orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+                            purchases: sql<number>`sum(${performanceDaily.purchases})`.as('purchases'),
                             spend: sql<string>`sum(${performanceDaily.spend})`.as('spend'),
                             sales: sql<string>`sum(${performanceDaily.sales})`.as('sales'),
                         })
@@ -1210,7 +1210,7 @@ export const metricsRouter = router({
                     const leadingMonthData = {
                         impressions: Number(leadingMonthRow?.impressions ?? 0),
                         clicks: Number(leadingMonthRow?.clicks ?? 0),
-                        orders: Number(leadingMonthRow?.orders ?? 0),
+                        purchases: Number(leadingMonthRow?.purchases ?? 0),
                         spend: Number(leadingMonthRow?.spend ?? 0),
                         sales: Number(leadingMonthRow?.sales ?? 0),
                     };
@@ -1221,7 +1221,7 @@ export const metricsRouter = router({
                         intervalStart: fromZonedTime(leadingMonthStartZoned, accountTimezone).toISOString(),
                         impressions: leadingMonthData.impressions,
                         clicks: leadingMonthData.clicks,
-                        orders: leadingMonthData.orders,
+                        purchases: leadingMonthData.purchases,
                         spend: leadingMonthData.spend,
                         acos: leadingMonthAcos,
                     };
@@ -1253,14 +1253,14 @@ export const metricsRouter = router({
                 totals: {
                     impressions: totals.impressions,
                     clicks: totals.clicks,
-                    orders: totals.orders,
+                    purchases: totals.purchases,
                     spend: totals.spend,
                     acos: totalAcos,
                 },
                 changes: {
                     impressions: calculateChange(totals.impressions, previousTotals?.impressions ?? 0),
                     clicks: calculateChange(totals.clicks, previousTotals?.clicks ?? 0),
-                    orders: calculateChange(totals.orders, previousTotals?.orders ?? 0),
+                    purchases: calculateChange(totals.purchases, previousTotals?.purchases ?? 0),
                     spend: calculateChange(totals.spend, previousTotals?.spend ?? 0),
                     acos: calculateChange(totalAcos, previousAcos),
                 },

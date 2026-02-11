@@ -22,7 +22,7 @@ type PerformanceMetricsChartProps = {
     className?: string;
 };
 
-const CHARTED_METRICS = METRICS.filter(metric => metric.key === 'impressions' || metric.key === 'clicks' || metric.key === 'orders');
+const CHARTED_METRICS = METRICS.filter(metric => metric.key === 'impressions' || metric.key === 'clicks' || metric.key === 'purchases');
 
 const PerformanceMetricsChart = ({ data, isLoading, error, className }: PerformanceMetricsChartProps) => {
     const range = useAtomValue(performanceRangeAtom);
@@ -98,8 +98,8 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     const resolvedRange = data?.range ?? fallbackRange;
     const resolvedGranularity = data?.granularity ?? 'hour';
     const resolvedTimezone = data?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const legacyHourlyData = (data as { hourlyData?: Array<{ hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number }> })?.hourlyData;
-    const legacyLeadingHour = (data as { leadingHour?: { hour: number; hourLabel: string; impressions: number; clicks: number; orders: number; spend: number; acos: number } })?.leadingHour;
+    const legacyHourlyData = (data as { hourlyData?: Array<{ hour: number; hourLabel: string; impressions: number; clicks: number; purchases: number; spend: number; acos: number }> })?.hourlyData;
+    const legacyLeadingHour = (data as { leadingHour?: { hour: number; hourLabel: string; impressions: number; clicks: number; purchases: number; spend: number; acos: number } })?.leadingHour;
 
     const resolvedPoints = useMemo(() => {
         if (data?.points) {
@@ -118,7 +118,7 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                 intervalStart: date.toISOString(),
                 impressions: point.impressions,
                 clicks: point.clicks,
-                orders: point.orders,
+                purchases: point.purchases,
                 spend: Number(point.spend),
                 acos: point.acos,
             };
@@ -139,7 +139,7 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
             intervalStart: yesterday.toISOString(),
             impressions: legacyLeadingHour.impressions,
             clicks: legacyLeadingHour.clicks,
-            orders: legacyLeadingHour.orders,
+            purchases: legacyLeadingHour.purchases,
             spend: Number(legacyLeadingHour.spend),
             acos: legacyLeadingHour.acos,
         };
@@ -195,11 +195,11 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
         const points = resolvedPoints;
         const maxImpressions = Math.max(1, ...points.map(point => point.impressions));
         const maxClicks = Math.max(1, ...points.map(point => point.clicks));
-        const maxOrders = Math.max(1, ...points.map(point => point.orders));
+        const maxPurchases = Math.max(1, ...points.map(point => point.purchases));
         return {
             impressions: [0, maxImpressions * 1.1] as [number, number],
             clicks: [0, maxClicks * 1.1] as [number, number],
-            orders: [0, maxOrders * 1.1] as [number, number],
+            purchases: [0, maxPurchases * 1.1] as [number, number],
         };
     }, [resolvedPoints]);
 
@@ -280,7 +280,7 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                                     <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
                                     <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
                                 </linearGradient>
-                                <linearGradient id="ordersGradient" x1="0" x2="0" y1="0" y2="1">
+                                <linearGradient id="purchasesGradient" x1="0" x2="0" y1="0" y2="1">
                                     <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
                                     <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
                                 </linearGradient>
@@ -290,7 +290,7 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
 
                             <YAxis allowDataOverflow domain={yAxisDomains.impressions} hide yAxisId="impressions" />
                             <YAxis allowDataOverflow domain={yAxisDomains.clicks} hide yAxisId="clicks" />
-                            <YAxis allowDataOverflow domain={yAxisDomains.orders} hide yAxisId="orders" />
+                            <YAxis allowDataOverflow domain={yAxisDomains.purchases} hide yAxisId="purchases" />
 
                             {currentHourLabel ? <ReferenceLine stroke="#d1d5db" strokeDasharray="4 4" x={currentHourLabel} yAxisId="impressions" /> : null}
 
@@ -307,7 +307,17 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                             />
 
                             <Area dataKey="clicks" dot={false} fill="url(#clicksGradient)" isAnimationActive={false} stroke="#6366f1" strokeWidth={2} type="monotone" yAxisId="clicks" zIndex={1} />
-                            <Area dataKey="orders" dot={false} fill="url(#ordersGradient)" isAnimationActive={false} stroke="#10b981" strokeWidth={2} type="monotone" yAxisId="orders" zIndex={2} />
+                            <Area
+                                dataKey="purchases"
+                                dot={false}
+                                fill="url(#purchasesGradient)"
+                                isAnimationActive={false}
+                                stroke="#10b981"
+                                strokeWidth={2}
+                                type="monotone"
+                                yAxisId="purchases"
+                                zIndex={2}
+                            />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
