@@ -13,6 +13,7 @@ import { adsDelete } from './ads-delete';
 import { adsGet } from './ads-get';
 import { adsList } from './ads-list';
 import { adsUpdate } from './ads-update';
+import { asinsGet } from './asins-get';
 import { bidsAdjust } from './bids-adjust';
 import { bidsSet } from './bids-set';
 import { campaignsCreate } from './campaigns-create';
@@ -70,6 +71,7 @@ export const clientApiRouter = router({
     adsCreate,
     adsUpdate,
     adsDelete,
+    asinsGet,
     targetsList,
     targetsGet,
     targetsCreateKeyword,

@@ -80,6 +80,9 @@ Drill down by passing parent IDs as flags.
 - `bb ads update <ad_id> <state>`
 - `bb ads delete <ad_id>`
 
+**ASINs**
+- `bb asins get <ASIN>`
+
 **Targets**
 - `bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]`
 - `bb targets get <target_id>`

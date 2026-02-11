@@ -1,13 +1,14 @@
 import { TRPCError } from '@trpc/server';
 import { addDays, addHours, format, startOfDay } from 'date-fns';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
-import { and, asc, desc, eq, gte, ilike, inArray, lt, lte, ne, or, type SQL, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, lte, ne, or, type SQL, sql } from 'drizzle-orm';
 import type { z } from 'zod';
 import type { ApiRegion } from '@/amazon-ads/config';
 import type { Context } from '@/api/context';
 import type {
     adGroupSchema,
     adSchema,
+    asinsGetOutputSchema,
     bidStrategySchema,
     campaignSchema,
     listStateSchema,
@@ -61,6 +62,7 @@ export type CampaignShape = z.infer<typeof campaignSchema>;
 export type AdGroupShape = z.infer<typeof adGroupSchema>;
 export type AdShape = z.infer<typeof adSchema>;
 export type TargetShape = z.infer<typeof targetSchema>;
+export type AsinCampaignTreeShape = z.infer<typeof asinsGetOutputSchema>;
 export type MetricsTotals = z.infer<typeof metricsTotalsSchema>;
 export type MetricsPoint = z.infer<typeof metricsPointSchema>;
 export type BidStrategy = z.infer<typeof bidStrategySchema>;
@@ -292,6 +294,140 @@ export const getAd = async (config: PublicConfig, adId: string): Promise<AdShape
     }
 
     return mapAdRow(row);
+};
+
+export const getAsinCampaignTree = async (config: PublicConfig, asin: string): Promise<AsinCampaignTreeShape> => {
+    const countryCode = normalizeCountryCode(config.countryCode);
+    const normalizedAsin = asin.trim().toUpperCase();
+
+    const matchedAdRows = await db
+        .select({
+            adId: ad.adId,
+            adGroupId: ad.adGroupId,
+            campaignId: ad.campaignId,
+            campaignName: campaign.name,
+            campaignCreationDateTime: campaign.creationDateTime,
+        })
+        .from(ad)
+        .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
+        .where(and(eq(campaign.accountId, config.accountId), ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []), eq(ad.productAsin, normalizedAsin)))
+        .orderBy(desc(campaign.lastUpdatedDateTime), campaign.campaignId, ad.adGroupId, ad.adId);
+
+    if (matchedAdRows.length === 0) {
+        return { campaigns: [] };
+    }
+
+    const campaignIds = Array.from(new Set(matchedAdRows.map(row => row.campaignId)));
+    const adGroupIds = Array.from(new Set(matchedAdRows.map(row => row.adGroupId)));
+
+    const [campaignTargetRows, adGroupTargetRows, adGroupAsinCountRows] = await Promise.all([
+        db
+            .select({
+                campaignId: target.campaignId,
+                targetId: target.targetId,
+            })
+            .from(target)
+            .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
+            .where(
+                and(
+                    eq(campaign.accountId, config.accountId),
+                    ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
+                    inArray(target.campaignId, campaignIds),
+                    isNull(target.adGroupId),
+                    inArray(target.targetType, ['KEYWORD', 'PRODUCT'])
+                )
+            )
+            .orderBy(target.campaignId, target.targetId),
+        db
+            .select({
+                adGroupId: target.adGroupId,
+                targetId: target.targetId,
+            })
+            .from(target)
+            .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
+            .where(
+                and(
+                    eq(campaign.accountId, config.accountId),
+                    ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
+                    inArray(target.adGroupId, adGroupIds),
+                    inArray(target.targetType, ['KEYWORD', 'PRODUCT'])
+                )
+            )
+            .orderBy(target.adGroupId, target.targetId),
+        db
+            .select({
+                adGroupId: ad.adGroupId,
+                asinCount: sql<number>`count(distinct ${ad.productAsin})`.as('asinCount'),
+            })
+            .from(ad)
+            .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
+            .where(and(eq(campaign.accountId, config.accountId), ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []), inArray(ad.adGroupId, adGroupIds)))
+            .groupBy(ad.adGroupId),
+    ]);
+
+    const campaignInfoById = new Map<string, { name: string; creationDateTime: string | null }>();
+    const campaignOrder: string[] = [];
+    const adGroupIdsByCampaignId = new Map<string, string[]>();
+    const matchedAdIdsByAdGroupId = new Map<string, string[]>();
+
+    for (const row of matchedAdRows) {
+        if (!campaignInfoById.has(row.campaignId)) {
+            campaignOrder.push(row.campaignId);
+            campaignInfoById.set(row.campaignId, {
+                name: row.campaignName ?? '',
+                creationDateTime: toIsoDateTime(row.campaignCreationDateTime),
+            });
+        }
+        appendUniqueId(adGroupIdsByCampaignId, row.campaignId, row.adGroupId);
+        appendUniqueId(matchedAdIdsByAdGroupId, row.adGroupId, row.adId);
+    }
+
+    const campaignTargetsByCampaignId = new Map<string, string[]>();
+    for (const row of campaignTargetRows) {
+        appendUniqueId(campaignTargetsByCampaignId, row.campaignId, row.targetId);
+    }
+
+    const adGroupTargetsByAdGroupId = new Map<string, string[]>();
+    for (const row of adGroupTargetRows) {
+        if (!row.adGroupId) {
+            continue;
+        }
+        appendUniqueId(adGroupTargetsByAdGroupId, row.adGroupId, row.targetId);
+    }
+
+    const adGroupAsinCountByAdGroupId = new Map<string, number>();
+    for (const row of adGroupAsinCountRows) {
+        adGroupAsinCountByAdGroupId.set(row.adGroupId, Number(row.asinCount ?? 0));
+    }
+
+    return {
+        campaigns: campaignOrder.map(campaignId => {
+            const adGroups = (adGroupIdsByCampaignId.get(campaignId) ?? []).map(adGroupId => {
+                const base = {
+                    adGroupId,
+                    targets: adGroupTargetsByAdGroupId.get(adGroupId) ?? [],
+                };
+
+                if ((adGroupAsinCountByAdGroupId.get(adGroupId) ?? 0) > 1) {
+                    return {
+                        ...base,
+                        adIds: matchedAdIdsByAdGroupId.get(adGroupId) ?? [],
+                    };
+                }
+
+                return base;
+            });
+
+            const campaignInfo = campaignInfoById.get(campaignId);
+            return {
+                campaignId,
+                name: campaignInfo?.name ?? '',
+                creationDateTime: campaignInfo?.creationDateTime ?? null,
+                targets: campaignTargetsByCampaignId.get(campaignId) ?? [],
+                adGroups,
+            };
+        }),
+    };
 };
 
 export const listTargets = async (config: PublicConfig, options?: ListOptions): Promise<TargetShape[]> => {
@@ -2062,6 +2198,28 @@ const extractBudgetValue = (budget: Record<string, unknown> | null) => {
         return Number.isFinite(parsed) ? parsed : null;
     }
     return null;
+};
+
+const appendUniqueId = (map: Map<string, string[]>, key: string, value: string) => {
+    const current = map.get(key);
+    if (!current) {
+        map.set(key, [value]);
+        return;
+    }
+    if (current.includes(value)) {
+        return;
+    }
+    current.push(value);
+};
+
+const toIsoDateTime = (value: Date | string | null) => {
+    if (!value) {
+        return null;
+    }
+    if (value instanceof Date) {
+        return value.toISOString();
+    }
+    return value;
 };
 
 const toIsoDate = (value: Date | string) => {

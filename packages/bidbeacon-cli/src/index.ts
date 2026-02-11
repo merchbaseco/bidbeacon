@@ -336,6 +336,22 @@ const main = async () => {
             }
             throw new CliUsageError({ topicKey: 'ads', message: `Unknown subcommand: ${subcommand}` });
         }
+        case 'asins': {
+            if (!subcommand) {
+                process.stdout.write(renderHelp('asins', helpContext));
+                return;
+            }
+            const config = await loadConfig();
+            const client = createApiClient(config);
+            const cliConfig = requireCliConfig(config);
+            if (subcommand === 'get') {
+                const asin = requireAsinArg(action, { topicKey: 'asins', label: '<asin>' });
+                const data = await client.api.client.asinsGet.query({ config: cliConfig, asin });
+                printOutput(data);
+                return;
+            }
+            throw new CliUsageError({ topicKey: 'asins', message: `Unknown subcommand: ${subcommand}` });
+        }
         case 'targets': {
             if (!subcommand) {
                 process.stdout.write(renderHelp('targets', helpContext));
@@ -1032,6 +1048,24 @@ const parseOptionalNumericIdFlag = (value: string | null, input: { topicKey: Hel
         return undefined;
     }
     return parseNumericId(value, input);
+};
+
+const parseAsin = (value: string, input: { topicKey: HelpTopicKey; label: string }) => {
+    const trimmed = value.trim().toUpperCase();
+    if (ASIN_REGEX.test(trimmed)) {
+        return trimmed;
+    }
+    throw new CliUsageError({
+        topicKey: input.topicKey,
+        message: `Invalid ${input.label}: expected an ASIN (10 alphanumeric chars), received ${JSON.stringify(value.trim())}.`,
+    });
+};
+
+const requireAsinArg = (value: string | undefined, input: { topicKey: HelpTopicKey; label: string }) => {
+    if (!value) {
+        throw new CliUsageError({ topicKey: input.topicKey, message: `Missing ${input.label}.` });
+    }
+    return parseAsin(value, input);
 };
 
 const parseIdsFlag = (flags: ParsedFlags) => {

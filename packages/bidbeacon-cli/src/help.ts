@@ -3,7 +3,7 @@ type HelpRow = {
     right: string;
 };
 
-export type HelpTopicKey = 'global' | 'config' | 'accounts' | 'campaigns' | 'ad-groups' | 'ads' | 'targets' | 'bids' | 'metrics' | 'metrics series' | 'metrics table' | 'enums';
+export type HelpTopicKey = 'global' | 'config' | 'accounts' | 'campaigns' | 'ad-groups' | 'ads' | 'asins' | 'targets' | 'bids' | 'metrics' | 'metrics series' | 'metrics table' | 'enums';
 
 type HelpTopic = {
     key: HelpTopicKey;
@@ -25,6 +25,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'campaigns', right: 'Manage campaigns (list/get/create/update/pause/resume/delete)' },
             { left: 'ad-groups', right: 'Manage ad groups' },
             { left: 'ads', right: 'Manage ads' },
+            { left: 'asins', right: 'Inspect ASIN-scoped campaign trees' },
             { left: 'targets', right: 'Manage targeting (keywords/product targets)' },
             { left: 'bids', right: 'Set or adjust bids for a target' },
             { left: 'metrics', right: 'Fetch chart/table metrics' },
@@ -120,6 +121,12 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'update <ad_id> <state>', right: 'Update ad state' },
             { left: 'delete <ad_id>', right: 'Delete an ad' },
         ],
+    },
+    asins: {
+        key: 'asins',
+        usage: 'bb asins [options] [command]',
+        summary: 'Inspect ASIN-scoped campaign trees',
+        commands: [{ left: 'get <asin>', right: 'Fetch campaigns/ad groups/targets relevant to an ASIN' }],
     },
     targets: {
         key: 'targets',
@@ -260,6 +267,9 @@ export const resolveHelpTopicKey = (pathSegments: string[]): HelpTopicKey => {
     }
     if (first === 'ads') {
         return 'ads';
+    }
+    if (first === 'asins') {
+        return 'asins';
     }
     if (first === 'targets') {
         return 'targets';
