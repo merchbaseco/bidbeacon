@@ -63,6 +63,18 @@ Drill down by passing parent IDs as flags.
 - `bb campaigns set-bid-strategy <campaign_id> <strategy>`
 - `bb campaigns set-bid-adjustments <campaign_id> <placement|audience|creative> <json>`
 
+Campaign objects returned by campaign commands include:
+- `campaignId`
+- `name`
+- `state`
+- `budget`
+- `bidStrategy`
+- `startDateTime`
+- `endDateTime`
+- `portfolioId`
+- `creationDateTime`
+- `lastUpdatedDateTime`
+
 **Ad Groups**
 - `bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--limit <n>] [--offset <n>]`
 - `bb ad-groups get <ad_group_id>`

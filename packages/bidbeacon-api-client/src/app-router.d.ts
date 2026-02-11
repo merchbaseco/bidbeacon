@@ -108,6 +108,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -131,6 +133,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -155,6 +159,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -182,6 +188,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -205,6 +213,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -228,6 +238,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -251,6 +263,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -275,6 +289,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -299,6 +315,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -324,6 +342,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1417,6 +1437,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1440,6 +1462,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1464,6 +1488,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1491,6 +1517,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1514,6 +1542,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1537,6 +1567,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1560,6 +1592,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1584,6 +1618,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1608,6 +1644,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -1633,6 +1671,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2782,6 +2822,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2805,6 +2847,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2829,6 +2873,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2856,6 +2902,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2879,6 +2927,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2902,6 +2952,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2925,6 +2977,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2949,6 +3003,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2973,6 +3029,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -2998,6 +3056,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4091,6 +4151,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4114,6 +4176,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4138,6 +4202,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4165,6 +4231,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4188,6 +4256,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4211,6 +4281,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4234,6 +4306,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4258,6 +4332,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4282,6 +4358,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;
@@ -4307,6 +4385,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						campaignId: string;
 						name: string;
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
+						creationDateTime: string | null;
+						lastUpdatedDateTime: string | null;
 						budget: number;
 						bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
 						portfolioId?: string | null | undefined;

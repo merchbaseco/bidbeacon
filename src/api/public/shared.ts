@@ -156,6 +156,8 @@ export const listCampaigns = async (config: PublicConfig, options?: ListOptions)
             startDate: campaign.startDate,
             endDate: campaign.endDate,
             portfolioId: sql<string | null>`NULL`.as('portfolioId'),
+            creationDateTime: campaign.creationDateTime,
+            lastUpdatedDateTime: campaign.lastUpdatedDateTime,
         })
         .from(campaign)
         .where(and(eq(campaign.accountId, config.accountId), ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []), ...(stateFilter ? [eq(campaign.state, stateFilter)] : [])))
@@ -178,6 +180,8 @@ export const getCampaign = async (config: PublicConfig, campaignId: string): Pro
             startDate: campaign.startDate,
             endDate: campaign.endDate,
             portfolioId: sql<string | null>`NULL`.as('portfolioId'),
+            creationDateTime: campaign.creationDateTime,
+            lastUpdatedDateTime: campaign.lastUpdatedDateTime,
         })
         .from(campaign)
         .where(and(eq(campaign.accountId, config.accountId), eq(campaign.campaignId, campaignId), ...(countryCode ? [eq(campaign.countryCode, countryCode)] : [])))
@@ -754,6 +758,8 @@ export const mapCampaignFromApi = (campaignData: Record<string, unknown>): Campa
         startDateTime: campaignData.startDateTime ? String(campaignData.startDateTime) : null,
         endDateTime: campaignData.endDateTime ? String(campaignData.endDateTime) : null,
         portfolioId: campaignData.portfolioId ? String(campaignData.portfolioId) : null,
+        creationDateTime: campaignData.creationDateTime ? String(campaignData.creationDateTime) : null,
+        lastUpdatedDateTime: campaignData.lastUpdatedDateTime ? String(campaignData.lastUpdatedDateTime) : null,
     };
 };
 
@@ -924,6 +930,8 @@ const mapCampaignRow = (row: {
     startDate: Date | string | null;
     endDate: Date | string | null;
     portfolioId: string | null;
+    creationDateTime: Date | string | null;
+    lastUpdatedDateTime: Date | string | null;
 }): CampaignShape => ({
     campaignId: String(row.campaignId ?? ''),
     name: String(row.name ?? ''),
@@ -933,6 +941,8 @@ const mapCampaignRow = (row: {
     startDateTime: row.startDate ? toIsoDate(row.startDate) : null,
     endDateTime: row.endDate ? toIsoDate(row.endDate) : null,
     portfolioId: row.portfolioId,
+    creationDateTime: toIsoDateTime(row.creationDateTime),
+    lastUpdatedDateTime: toIsoDateTime(row.lastUpdatedDateTime),
 });
 
 const mapAdGroupRow = (row: { adGroupId: string | null; campaignId: string | null; name: string | null; state: string | null; bidAmount: string | number | null }): AdGroupShape => ({
