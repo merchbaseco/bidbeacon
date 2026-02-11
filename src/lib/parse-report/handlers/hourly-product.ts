@@ -51,7 +51,7 @@ export async function handleHourlyProduct(input: ParseReportInput): Promise<Pars
                 clicks: row['metric.clicks'],
                 spend: String(row['metric.totalCost']),
                 sales: String(row['metric.sales']),
-                orders: row['metric.purchases'],
+                purchases: row['metric.purchases'],
             })
             .onConflictDoUpdate({
                 target: [performanceHourly.accountId, performanceHourly.bucketStart, performanceHourly.adId, performanceHourly.entityType, performanceHourly.entityId],
@@ -63,7 +63,7 @@ export async function handleHourlyProduct(input: ParseReportInput): Promise<Pars
                     clicks: row['metric.clicks'],
                     spend: String(row['metric.totalCost']),
                     sales: String(row['metric.sales']),
-                    orders: row['metric.purchases'],
+                    purchases: row['metric.purchases'],
                 },
             });
 

@@ -48,7 +48,7 @@ type AggregatedRow = {
     clicks: number;
     spend: number;
     sales: number;
-    orders: number;
+    purchases: number;
 };
 
 async function summarizeDailyForAccount(accountId: string, countryCode: string, recorder: JobMetricsRecorder) {
@@ -103,24 +103,24 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
             adId: amsSpConversion.adId,
             keywordId: amsSpConversion.keywordId,
             sales: sql<number>`COALESCE(SUM(${amsSpConversion.attributedSales14d}), 0)`,
-            orders: sql<number>`COALESCE(SUM(${amsSpConversion.attributedConversions14d}), 0)::int`,
+            purchases: sql<number>`COALESCE(SUM(${amsSpConversion.attributedConversions14d}), 0)::int`,
         })
         .from(amsSpConversion)
         .where(and(eq(amsSpConversion.advertiserId, entityId), gte(amsSpConversion.timeWindowStart, todayStart), lte(amsSpConversion.timeWindowStart, todayEnd)))
         .groupBy(amsSpConversion.campaignId, amsSpConversion.adGroupId, amsSpConversion.adId, amsSpConversion.keywordId);
 
-    const conversionMap = new Map<string, { sales: number; orders: number }>();
+    const conversionMap = new Map<string, { sales: number; purchases: number }>();
     for (const conv of conversionAggregates) {
-        conversionMap.set(`${conv.campaignId}|${conv.adGroupId}|${conv.adId}|${conv.keywordId}`, { sales: conv.sales, orders: conv.orders });
+        conversionMap.set(`${conv.campaignId}|${conv.adGroupId}|${conv.adId}|${conv.keywordId}`, { sales: conv.sales, purchases: conv.purchases });
     }
 
     const aggregatedData: AggregatedRow[] = trafficAggregates.map(traffic => {
         const key = `${traffic.campaignId}|${traffic.adGroupId}|${traffic.adId}|${traffic.keywordId}`;
-        const conversion = conversionMap.get(key) ?? { sales: 0, orders: 0 };
+        const conversion = conversionMap.get(key) ?? { sales: 0, purchases: 0 };
         return {
             ...traffic,
             sales: conversion.sales,
-            orders: conversion.orders,
+            purchases: conversion.purchases,
         };
     });
 
@@ -137,7 +137,7 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
                 clicks: 0,
                 spend: 0,
                 sales: conv.sales,
-                orders: conv.orders,
+                purchases: conv.purchases,
             });
         }
     }
@@ -155,7 +155,7 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
         clicks: row.clicks,
         spend: String(row.spend),
         sales: String(row.sales),
-        orders: row.orders,
+        purchases: row.purchases,
     }));
 
     const batchSize = 1000;
@@ -174,7 +174,7 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
                     clicks: sql`excluded.clicks`,
                     spend: sql`excluded.spend`,
                     sales: sql`excluded.sales`,
-                    orders: sql`excluded.orders`,
+                    purchases: sql`excluded.purchases`,
                 },
             });
     }

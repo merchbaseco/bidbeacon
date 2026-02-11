@@ -74,7 +74,7 @@ export async function handleHourlyTarget(input: ParseReportInput): Promise<Parse
                 clicks: row['metric.clicks'],
                 spend: String(row['metric.totalCost']),
                 sales: String(row['metric.sales']),
-                orders: row['metric.purchases'],
+                purchases: row['metric.purchases'],
             });
         } catch (error) {
             errors.push({
@@ -108,7 +108,7 @@ export async function handleHourlyTarget(input: ParseReportInput): Promise<Parse
                     clicks: sql`excluded.clicks`,
                     spend: sql`excluded.spend`,
                     sales: sql`excluded.sales`,
-                    orders: sql`excluded.orders`,
+                    purchases: sql`excluded.purchases`,
                 },
             });
         const batchInsertTime = performance.now() - batchInsertStart;

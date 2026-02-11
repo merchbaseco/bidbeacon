@@ -14,7 +14,7 @@ export const SORT_DIRECTIONS = ['asc', 'desc'] as const;
 export const sortDirectionEnum = z.enum(SORT_DIRECTIONS);
 export type SortDirection = z.infer<typeof sortDirectionEnum>;
 
-export const SORT_FIELDS = ['impressions', 'clicks', 'orders', 'spend', 'sales', 'ctr', 'cpc', 'roas', 'acos'] as const;
+export const SORT_FIELDS = ['impressions', 'clicks', 'purchases', 'spend', 'sales', 'ctr', 'cpc', 'roas', 'acos'] as const;
 export const sortFieldEnum = z.enum(SORT_FIELDS);
 export type SortField = z.infer<typeof sortFieldEnum>;
 
@@ -69,7 +69,7 @@ export const performanceTableInputSchema = z
 export const metricsSchema = z.object({
     impressions: z.number(),
     clicks: z.number(),
-    orders: z.number(),
+    purchases: z.number(),
     spend: z.number(),
     sales: z.number(),
     ctr: z.number(),

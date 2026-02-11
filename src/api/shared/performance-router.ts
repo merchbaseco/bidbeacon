@@ -55,7 +55,7 @@ export const buildPerformanceRouter = (procedure: typeof apiProcedure) =>
                                 endDate: campaign.endDate,
                                 impressions: metricsExpressions.impressions.as('impressions'),
                                 clicks: metricsExpressions.clicks.as('clicks'),
-                                orders: metricsExpressions.orders.as('orders'),
+                                purchases: metricsExpressions.purchases.as('purchases'),
                                 spend: metricsExpressions.spend.as('spend'),
                                 sales: metricsExpressions.sales.as('sales'),
                             })
@@ -84,7 +84,7 @@ export const buildPerformanceRouter = (procedure: typeof apiProcedure) =>
                                 adProduct: adGroup.adProduct,
                                 impressions: metricsExpressions.impressions.as('impressions'),
                                 clicks: metricsExpressions.clicks.as('clicks'),
-                                orders: metricsExpressions.orders.as('orders'),
+                                purchases: metricsExpressions.purchases.as('purchases'),
                                 spend: metricsExpressions.spend.as('spend'),
                                 sales: metricsExpressions.sales.as('sales'),
                             })
@@ -117,7 +117,7 @@ export const buildPerformanceRouter = (procedure: typeof apiProcedure) =>
                                 productAsin: ad.productAsin,
                                 impressions: metricsExpressions.impressions.as('impressions'),
                                 clicks: metricsExpressions.clicks.as('clicks'),
-                                orders: metricsExpressions.orders.as('orders'),
+                                purchases: metricsExpressions.purchases.as('purchases'),
                                 spend: metricsExpressions.spend.as('spend'),
                                 sales: metricsExpressions.sales.as('sales'),
                             })
@@ -153,7 +153,7 @@ export const buildPerformanceRouter = (procedure: typeof apiProcedure) =>
                                 targetAsin: target.targetAsin,
                                 impressions: metricsExpressions.impressions.as('impressions'),
                                 clicks: metricsExpressions.clicks.as('clicks'),
-                                orders: metricsExpressions.orders.as('orders'),
+                                purchases: metricsExpressions.purchases.as('purchases'),
                                 spend: metricsExpressions.spend.as('spend'),
                                 sales: metricsExpressions.sales.as('sales'),
                             })
@@ -258,20 +258,20 @@ const buildMetricExpressions = () => {
     return {
         impressions: sql<number>`sum(${performanceDaily.impressions})`,
         clicks: sql<number>`sum(${performanceDaily.clicks})`,
-        orders: sql<number>`sum(${performanceDaily.orders})`,
+        purchases: sql<number>`sum(${performanceDaily.purchases})`,
         spend: sql<number>`sum(${performanceDaily.spend})`,
         sales: sql<number>`sum(${performanceDaily.sales})`,
     };
 };
 
-const buildSortExpression = (sortField: 'impressions' | 'clicks' | 'orders' | 'spend' | 'sales' | 'ctr' | 'cpc' | 'roas' | 'acos', metrics: ReturnType<typeof buildMetricExpressions>) => {
+const buildSortExpression = (sortField: 'impressions' | 'clicks' | 'purchases' | 'spend' | 'sales' | 'ctr' | 'cpc' | 'roas' | 'acos', metrics: ReturnType<typeof buildMetricExpressions>) => {
     switch (sortField) {
         case 'impressions':
             return metrics.impressions;
         case 'clicks':
             return metrics.clicks;
-        case 'orders':
-            return metrics.orders;
+        case 'purchases':
+            return metrics.purchases;
         case 'sales':
             return metrics.sales;
         case 'ctr':
@@ -415,14 +415,14 @@ const formatResponse = (rows: Record<string, unknown>[], offset: number, limit: 
     const formattedRows = sliced.map(row => {
         const impressions = Number(row.impressions ?? 0);
         const clicks = Number(row.clicks ?? 0);
-        const orders = Number(row.orders ?? 0);
+        const purchases = Number(row.purchases ?? 0);
         const spend = Number(row.spend ?? 0);
         const sales = Number(row.sales ?? 0);
 
         const metrics = {
             impressions,
             clicks,
-            orders,
+            purchases,
             spend,
             sales,
             ctr: impressions === 0 ? 0 : clicks / impressions,

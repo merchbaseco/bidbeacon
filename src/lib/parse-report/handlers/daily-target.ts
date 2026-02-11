@@ -54,7 +54,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
                 clicks: row['metric.clicks'],
                 spend: String(row['metric.totalCost']),
                 sales: String(row['metric.sales']),
-                orders: row['metric.purchases'],
+                purchases: row['metric.purchases'],
             });
         } catch (error) {
             errors.push({
@@ -84,7 +84,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
                     clicks: sql`excluded.clicks`,
                     spend: sql`excluded.spend`,
                     sales: sql`excluded.sales`,
-                    orders: sql`excluded.orders`,
+                    purchases: sql`excluded.purchases`,
                 },
             });
 

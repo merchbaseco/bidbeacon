@@ -1182,7 +1182,7 @@ const getDailyMetrics = async (
             clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
             spend: sql<number>`sum(${performanceDaily.spend})`.as('spend'),
             sales: sql<number>`sum(${performanceDaily.sales})`.as('sales'),
-            orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+            purchases: sql<number>`sum(${performanceDaily.purchases})`.as('purchases'),
         })
         .from(performanceDaily)
         .where(and(...conditions))
@@ -1195,7 +1195,7 @@ const getDailyMetrics = async (
             clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
             spend: sql<number>`sum(${performanceDaily.spend})`.as('spend'),
             sales: sql<number>`sum(${performanceDaily.sales})`.as('sales'),
-            orders: sql<number>`sum(${performanceDaily.orders})`.as('orders'),
+            purchases: sql<number>`sum(${performanceDaily.purchases})`.as('purchases'),
         })
         .from(performanceDaily)
         .where(and(...conditions))
@@ -1252,7 +1252,7 @@ const getHourlyMetrics = async (
             clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
             spend: sql<number>`sum(${performanceHourly.spend})`.as('spend'),
             sales: sql<number>`sum(${performanceHourly.sales})`.as('sales'),
-            orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+            purchases: sql<number>`sum(${performanceHourly.purchases})`.as('purchases'),
         })
         .from(performanceHourly)
         .where(and(...conditions))
@@ -1265,7 +1265,7 @@ const getHourlyMetrics = async (
             clicks: sql<number>`sum(${performanceHourly.clicks})`.as('clicks'),
             spend: sql<number>`sum(${performanceHourly.spend})`.as('spend'),
             sales: sql<number>`sum(${performanceHourly.sales})`.as('sales'),
-            orders: sql<number>`sum(${performanceHourly.orders})`.as('orders'),
+            purchases: sql<number>`sum(${performanceHourly.purchases})`.as('purchases'),
         })
         .from(performanceHourly)
         .where(and(...conditions))
@@ -1278,13 +1278,13 @@ const getHourlyMetrics = async (
     };
 };
 
-const formatTotals = (row?: { impressions: number | null; clicks: number | null; spend: number | null; sales: number | null; orders: number | null }): MetricsTotals => {
+const formatTotals = (row?: { impressions: number | null; clicks: number | null; spend: number | null; sales: number | null; purchases: number | null }): MetricsTotals => {
     return buildMetricsValues({
         impressions: Number(row?.impressions ?? 0),
         clicks: Number(row?.clicks ?? 0),
         spend: Number(row?.spend ?? 0),
         sales: Number(row?.sales ?? 0),
-        purchases: Number(row?.orders ?? 0),
+        purchases: Number(row?.purchases ?? 0),
     });
 };
 
@@ -1356,7 +1356,7 @@ const getMetricsTotals = async (table: MetricsTable, conditions: SQL[]) => {
             clicks: sql<number>`sum(${table.clicks})`.as('clicks'),
             spend: sql<number>`sum(${table.spend})`.as('spend'),
             sales: sql<number>`sum(${table.sales})`.as('sales'),
-            orders: sql<number>`sum(${table.orders})`.as('orders'),
+            purchases: sql<number>`sum(${table.purchases})`.as('purchases'),
         })
         .from(table)
         .where(and(...conditions));
@@ -1379,7 +1379,7 @@ const getMetricsTableItems = async (table: MetricsTable, dimension: MetricsDimen
                 clicks: metrics.clicks.as('clicks'),
                 spend: metrics.spend.as('spend'),
                 sales: metrics.sales.as('sales'),
-                orders: metrics.orders.as('orders'),
+                purchases: metrics.purchases.as('purchases'),
             })
             .from(table)
             .leftJoin(campaign, eq(table.campaignId, campaign.campaignId))
@@ -1409,7 +1409,7 @@ const getMetricsTableItems = async (table: MetricsTable, dimension: MetricsDimen
                 clicks: metrics.clicks.as('clicks'),
                 spend: metrics.spend.as('spend'),
                 sales: metrics.sales.as('sales'),
-                orders: metrics.orders.as('orders'),
+                purchases: metrics.purchases.as('purchases'),
             })
             .from(table)
             .leftJoin(adGroup, eq(table.adGroupId, adGroup.adGroupId))
@@ -1444,7 +1444,7 @@ const getMetricsTableItems = async (table: MetricsTable, dimension: MetricsDimen
                 clicks: metrics.clicks.as('clicks'),
                 spend: metrics.spend.as('spend'),
                 sales: metrics.sales.as('sales'),
-                orders: metrics.orders.as('orders'),
+                purchases: metrics.purchases.as('purchases'),
             })
             .from(table)
             .leftJoin(ad, eq(table.adId, ad.adId))
@@ -1484,7 +1484,7 @@ const getMetricsTableItems = async (table: MetricsTable, dimension: MetricsDimen
             clicks: metrics.clicks.as('clicks'),
             spend: metrics.spend.as('spend'),
             sales: metrics.sales.as('sales'),
-            orders: metrics.orders.as('orders'),
+            purchases: metrics.purchases.as('purchases'),
         })
         .from(table)
         .leftJoin(target, eq(table.entityId, target.targetId))
@@ -1519,7 +1519,7 @@ const buildMetricExpressions = (table: MetricsTable) => {
     return {
         impressions: sql<number>`sum(${table.impressions})`,
         clicks: sql<number>`sum(${table.clicks})`,
-        orders: sql<number>`sum(${table.orders})`,
+        purchases: sql<number>`sum(${table.purchases})`,
         spend: sql<number>`sum(${table.spend})`,
         sales: sql<number>`sum(${table.sales})`,
     };
@@ -1532,7 +1532,7 @@ const buildSortExpression = (field: MetricsTableSortField, metrics: ReturnType<t
         case 'clicks':
             return metrics.clicks;
         case 'purchases':
-            return metrics.orders;
+            return metrics.purchases;
         case 'sales':
             return metrics.sales;
         case 'ctr':
@@ -1562,7 +1562,7 @@ const formatDailyPoint = (
         clicks: number | null;
         spend: number | null;
         sales: number | null;
-        orders: number | null;
+        purchases: number | null;
     },
     timezone: string
 ): MetricsPoint => {
@@ -1577,13 +1577,13 @@ const formatDailyPoint = (
             impressions: Number(row.impressions ?? 0),
             clicks: Number(row.clicks ?? 0),
             spend: Number(row.spend ?? 0),
-            purchases: Number(row.orders ?? 0),
+            purchases: Number(row.purchases ?? 0),
             sales: Number(row.sales ?? 0),
         }),
     };
 };
 
-const formatHourlyPoint = (row: { bucketStart: Date; impressions: number | null; clicks: number | null; spend: number | null; sales: number | null; orders: number | null }): MetricsPoint => {
+const formatHourlyPoint = (row: { bucketStart: Date; impressions: number | null; clicks: number | null; spend: number | null; sales: number | null; purchases: number | null }): MetricsPoint => {
     const start = row.bucketStart.toISOString();
     const end = addHours(row.bucketStart, 1).toISOString();
 
@@ -1594,7 +1594,7 @@ const formatHourlyPoint = (row: { bucketStart: Date; impressions: number | null;
             impressions: Number(row.impressions ?? 0),
             clicks: Number(row.clicks ?? 0),
             spend: Number(row.spend ?? 0),
-            purchases: Number(row.orders ?? 0),
+            purchases: Number(row.purchases ?? 0),
             sales: Number(row.sales ?? 0),
         }),
     };
@@ -1610,7 +1610,7 @@ const buildDailySeries = (
         clicks: number | null;
         spend: number | null;
         sales: number | null;
-        orders: number | null;
+        purchases: number | null;
     }>
 ) => {
     const byDate = new Map<string, (typeof rows)[number]>();
@@ -1631,7 +1631,7 @@ const buildDailySeries = (
             clicks: 0,
             spend: 0,
             sales: 0,
-            orders: 0,
+            purchases: 0,
         };
         series.push(formatDailyPoint(row, timezone));
         cursor = addDays(cursor, 1);
@@ -1649,7 +1649,7 @@ const buildHourlySeries = (
         clicks: number | null;
         spend: number | null;
         sales: number | null;
-        orders: number | null;
+        purchases: number | null;
     }>
 ) => {
     const byStart = new Map<number, (typeof rows)[number]>();
@@ -1669,7 +1669,7 @@ const buildHourlySeries = (
             clicks: 0,
             spend: 0,
             sales: 0,
-            orders: 0,
+            purchases: 0,
         };
         series.push(formatHourlyPoint(row));
         cursor = addHours(cursor, 1);
@@ -1743,7 +1743,7 @@ const formatBucketPoint = (
         clicks: number;
         spend: number;
         sales: number;
-        orders: number;
+        purchases: number;
     }
 ): MetricsPoint => {
     const startDate = toIsoDate(bucketStart);
@@ -1758,7 +1758,7 @@ const formatBucketPoint = (
             impressions: row.impressions,
             clicks: row.clicks,
             spend: row.spend,
-            purchases: row.orders,
+            purchases: row.purchases,
             sales: row.sales,
         }),
     };
@@ -1775,26 +1775,26 @@ const buildBucketedSeries = (
         clicks: number | null;
         spend: number | null;
         sales: number | null;
-        orders: number | null;
+        purchases: number | null;
     }>
 ) => {
     if (granularity === 'day') {
         return buildDailySeries(startDate, endDate, timezone, rows);
     }
 
-    const byBucket = new Map<string, { impressions: number; clicks: number; spend: number; sales: number; orders: number }>();
+    const byBucket = new Map<string, { impressions: number; clicks: number; spend: number; sales: number; purchases: number }>();
 
     for (const row of rows) {
         const dateValue = typeof row.bucketDate === 'string' ? row.bucketDate : toIsoDate(row.bucketDate);
         const bucketStart = getBucketStartUtc(parseDate(dateValue), granularity);
         const key = toIsoDate(bucketStart);
-        const current = byBucket.get(key) ?? { impressions: 0, clicks: 0, spend: 0, sales: 0, orders: 0 };
+        const current = byBucket.get(key) ?? { impressions: 0, clicks: 0, spend: 0, sales: 0, purchases: 0 };
         byBucket.set(key, {
             impressions: current.impressions + Number(row.impressions ?? 0),
             clicks: current.clicks + Number(row.clicks ?? 0),
             spend: current.spend + Number(row.spend ?? 0),
             sales: current.sales + Number(row.sales ?? 0),
-            orders: current.orders + Number(row.orders ?? 0),
+            purchases: current.purchases + Number(row.purchases ?? 0),
         });
     }
 
@@ -1809,7 +1809,7 @@ const buildBucketedSeries = (
             clicks: 0,
             spend: 0,
             sales: 0,
-            orders: 0,
+            purchases: 0,
         };
         series.push(formatBucketPoint(cursor, granularity, timezone, row));
         cursor = getBucketEndUtc(cursor, granularity);
@@ -2227,7 +2227,7 @@ const buildMetricValueExpression = (key: MetricsKey, metrics: ReturnType<typeof 
         case 'clicks':
             return metrics.clicks;
         case 'purchases':
-            return metrics.orders;
+            return metrics.purchases;
         case 'sales':
             return metrics.sales;
         case 'ctr':
