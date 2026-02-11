@@ -74,7 +74,7 @@ Drill down by passing parent IDs as flags.
 - `bb ad-groups delete <ad_group_id>`
 
 **Ads**
-- `bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]`
+- `bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--asin <ASIN>] [--limit <n>] [--offset <n>]`
 - `bb ads get <ad_id>`
 - `bb ads create <ad_group_id> <asin|sku> [ASIN|SKU]`
 - `bb ads update <ad_id> <state>`

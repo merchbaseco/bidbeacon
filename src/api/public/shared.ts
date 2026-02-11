@@ -44,6 +44,7 @@ type ListOptions = {
     state?: ListState;
     campaignId?: string;
     adGroupId?: string;
+    productAsin?: string;
     limit?: number;
     offset?: number;
 };
@@ -260,6 +261,7 @@ export const listAds = async (config: PublicConfig, options?: ListOptions): Prom
                 ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
                 ...(options?.campaignId ? [eq(ad.campaignId, options.campaignId)] : []),
                 ...(options?.adGroupId ? [eq(ad.adGroupId, options.adGroupId)] : []),
+                ...(options?.productAsin ? [eq(ad.productAsin, options.productAsin)] : []),
                 ...(stateFilter ? [eq(ad.state, stateFilter)] : [])
             )
         )
