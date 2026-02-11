@@ -34,4 +34,6 @@ const buildDeletedCampaign = (campaignId: string): CampaignShape => ({
     startDateTime: null,
     endDateTime: null,
     portfolioId: null,
+    creationDateTime: null,
+    lastUpdatedDateTime: null,
 });

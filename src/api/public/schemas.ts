@@ -50,6 +50,8 @@ export const campaignSchema = z.object({
     startDateTime: z.string().nullable().optional(),
     endDateTime: z.string().nullable().optional(),
     portfolioId: z.string().nullable().optional(),
+    creationDateTime: z.string().nullable(),
+    lastUpdatedDateTime: z.string().nullable(),
 });
 
 export const adGroupSchema = z.object({
