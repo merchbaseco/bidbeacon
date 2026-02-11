@@ -13,6 +13,7 @@
 - Performance data reference doc: `docs/performance-data.md` (hourly vs daily reconciliation).
 - Amazon Ads retry policy doc: `docs/amazon-ads-retry-policy.md`.
 - Tests: run `bun run test` (Vitest). Avoid `bun test` (missing Vitest helpers).
+- Proactively keep docs in sync with code changes: update the directly affected docs in the same PR, but avoid broad or speculative doc churn.
 
 ## Architecture
 

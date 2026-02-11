@@ -233,6 +233,7 @@ export const asinTreeAdGroupSchema = adGroupSchema.extend({
 export const asinTreeCampaignSchema = z.object({
     campaignId: z.string(),
     campaignName: z.string(),
+    state: stateSchema,
     creationDateTime: z.string().nullable(),
     targets: z.array(targetSchema),
     adGroups: z.array(asinTreeAdGroupSchema),

@@ -308,6 +308,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
             adState: ad.state,
             adProductId: ad.productAsin,
             campaignName: campaign.name,
+            campaignState: campaign.state,
             campaignCreationDateTime: campaign.creationDateTime,
         })
         .from(ad)
@@ -384,7 +385,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
             .orderBy(target.adGroupId, target.targetId),
     ]);
 
-    const campaignInfoById = new Map<string, { campaignName: string; creationDateTime: string | null }>();
+    const campaignInfoById = new Map<string, { campaignName: string; state: CampaignShape['state']; creationDateTime: string | null }>();
     const campaignOrder: string[] = [];
     const adGroupIdsByCampaignId = new Map<string, string[]>();
     const adGroupById = new Map<string, AdGroupShape>();
@@ -397,6 +398,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
             campaignOrder.push(row.campaignId);
             campaignInfoById.set(row.campaignId, {
                 campaignName: row.campaignName ?? '',
+                state: String(row.campaignState ?? 'PAUSED') as CampaignShape['state'],
                 creationDateTime: toIsoDateTime(row.campaignCreationDateTime),
             });
         }
@@ -459,6 +461,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
             return {
                 campaignId,
                 campaignName: campaignInfo?.campaignName ?? '',
+                state: campaignInfo?.state ?? 'PAUSED',
                 creationDateTime: campaignInfo?.creationDateTime ?? null,
                 targets: hydrateItems(campaignTargetIdsByCampaignId.get(campaignId) ?? [], targetById),
                 adGroups,

@@ -87,6 +87,7 @@ Drill down by passing parent IDs as flags.
 - Top-level `campaigns[]` items include:
   - `campaignId`
   - `campaignName`
+  - `state`
   - `creationDateTime`
   - `targets` (hydrated target objects, not target IDs)
   - `adGroups` (hydrated ad group objects)
