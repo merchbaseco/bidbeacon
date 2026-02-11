@@ -7,6 +7,7 @@ describe('bb help topics', () => {
         expect(resolveHelpTopicKey(['metrics', 'series'])).toBe('metrics series');
         expect(resolveHelpTopicKey(['metrics', 'table'])).toBe('metrics table');
         expect(resolveHelpTopicKey(['metrics', 'series', 'campaigns'])).toBe('metrics series');
+        expect(resolveHelpTopicKey(['asins'])).toBe('asins');
     });
 
     it('renders ASCII help output with usage and commands', () => {

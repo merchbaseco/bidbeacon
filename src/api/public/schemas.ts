@@ -221,6 +221,28 @@ export const adsDeleteInputSchema = publicConfigInputSchema.extend({
     adId: z.string(),
 });
 
+export const asinsGetInputSchema = publicConfigInputSchema.extend({
+    asin: z.string().trim().min(1),
+});
+
+export const asinTreeAdGroupSchema = z.object({
+    adGroupId: z.string(),
+    targets: z.array(z.string()),
+    adIds: z.array(z.string()).optional(),
+});
+
+export const asinTreeCampaignSchema = z.object({
+    campaignId: z.string(),
+    name: z.string(),
+    creationDateTime: z.string().nullable(),
+    targets: z.array(z.string()),
+    adGroups: z.array(asinTreeAdGroupSchema),
+});
+
+export const asinsGetOutputSchema = z.object({
+    campaigns: z.array(asinTreeCampaignSchema),
+});
+
 export const targetsListOutputSchema = z.object({
     items: z.array(targetSchema),
 });

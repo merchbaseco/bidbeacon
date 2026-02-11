@@ -607,6 +607,30 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				};
 				meta: object;
 			}>;
+			asinsGet: import("@trpc/server").TRPCQueryProcedure<{
+				input: {
+					config: {
+						accountId: string;
+						range: string;
+						countryCode?: string | undefined;
+					};
+					asin: string;
+				};
+				output: {
+					campaigns: {
+						campaignId: string;
+						name: string;
+						creationDateTime: string | null;
+						targets: string[];
+						adGroups: {
+							adGroupId: string;
+							targets: string[];
+							adIds?: string[] | undefined;
+						}[];
+					}[];
+				};
+				meta: object;
+			}>;
 			targetsList: import("@trpc/server").TRPCQueryProcedure<{
 				input: {
 					config: {
@@ -1853,6 +1877,30 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					adId: string;
 					deleted: true;
+				};
+				meta: object;
+			}>;
+			asinsGet: import("@trpc/server").TRPCQueryProcedure<{
+				input: {
+					config: {
+						accountId: string;
+						range: string;
+						countryCode?: string | undefined;
+					};
+					asin: string;
+				};
+				output: {
+					campaigns: {
+						campaignId: string;
+						name: string;
+						creationDateTime: string | null;
+						targets: string[];
+						adGroups: {
+							adGroupId: string;
+							targets: string[];
+							adIds?: string[] | undefined;
+						}[];
+					}[];
 				};
 				meta: object;
 			}>;
@@ -3161,6 +3209,30 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				};
 				meta: object;
 			}>;
+			asinsGet: import("@trpc/server").TRPCQueryProcedure<{
+				input: {
+					config: {
+						accountId: string;
+						range: string;
+						countryCode?: string | undefined;
+					};
+					asin: string;
+				};
+				output: {
+					campaigns: {
+						campaignId: string;
+						name: string;
+						creationDateTime: string | null;
+						targets: string[];
+						adGroups: {
+							adGroupId: string;
+							targets: string[];
+							adIds?: string[] | undefined;
+						}[];
+					}[];
+				};
+				meta: object;
+			}>;
 			targetsList: import("@trpc/server").TRPCQueryProcedure<{
 				input: {
 					config: {
@@ -4407,6 +4479,30 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					adId: string;
 					deleted: true;
+				};
+				meta: object;
+			}>;
+			asinsGet: import("@trpc/server").TRPCQueryProcedure<{
+				input: {
+					config: {
+						accountId: string;
+						range: string;
+						countryCode?: string | undefined;
+					};
+					asin: string;
+				};
+				output: {
+					campaigns: {
+						campaignId: string;
+						name: string;
+						creationDateTime: string | null;
+						targets: string[];
+						adGroups: {
+							adGroupId: string;
+							targets: string[];
+							adIds?: string[] | undefined;
+						}[];
+					}[];
 				};
 				meta: object;
 			}>;
