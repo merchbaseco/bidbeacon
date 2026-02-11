@@ -6,7 +6,7 @@ import { createTRPCProxyClient, httpLink } from '@trpc/client';
 import type { AppRouter } from '../../../src/api/router';
 import { getTimezoneForCountry } from '../../../src/utils/timezones';
 import { CliUsageError, isCliUsageError } from './cli-errors';
-import { renderHelp, resolveHelpTopicKey } from './help';
+import { type HelpTopicKey, renderHelp, resolveHelpTopicKey } from './help';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_RANGE = 'today';
@@ -17,6 +17,8 @@ const METRICS_KEYS_SET = new Set(METRICS_KEYS);
 const METRICS_BUCKETS = ['auto', 'hour', 'day', 'week', 'month', 'year'] as const;
 const METRICS_BUCKETS_SET = new Set(METRICS_BUCKETS);
 const METRIC_FILTER_REGEX = /^\s*([^<>=!~]+)\s*(<=|>=|!=|=|<|>|~)\s*(.+)\s*$/;
+const ASIN_REGEX = /^[A-Z0-9]{10}$/;
+const NUMERIC_ID_REGEX = /^[0-9]+$/;
 
 const main = async () => {
     const { positional, flags } = parseArgs(process.argv.slice(2));
@@ -76,10 +78,7 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'get') {
-                const campaignId = action;
-                if (!campaignId) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
-                }
+                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
                 const data = await client.api.client.campaignsGet.query({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
@@ -98,10 +97,7 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'update') {
-                const campaignId = action;
-                if (!campaignId) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
-                }
+                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
                 const name = readFlag(flags, ['name']);
                 const portfolioId = readFlag(flags, ['portfolio']);
                 const startDateTime = readFlag(flags, ['start']);
@@ -118,36 +114,27 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'pause') {
-                const campaignId = action;
-                if (!campaignId) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
-                }
+                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
                 const data = await client.api.client.campaignsPause.mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
-                const campaignId = action;
-                if (!campaignId) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
-                }
+                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
                 const data = await client.api.client.campaignsResume.mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'delete') {
-                const campaignId = action;
-                if (!campaignId) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing <campaign_id>.' });
-                }
+                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
                 const data = await client.api.client.campaignsDelete.mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'set-budget') {
-                const campaignId = action;
+                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
                 const budget = rest[0];
-                if (!(campaignId && budget)) {
+                if (!budget) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <budget>.' });
                 }
                 const data = await client.api.client.campaignsSetBudget.mutate({
@@ -159,9 +146,9 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'set-bid-strategy') {
-                const campaignId = action;
+                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
                 const strategy = rest[0];
-                if (!(campaignId && strategy)) {
+                if (!strategy) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <strategy>.' });
                 }
                 const data = await client.api.client.campaignsSetBidStrategy.mutate({
@@ -173,10 +160,10 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'set-bid-adjustments') {
-                const campaignId = action;
+                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
                 const scope = rest[0];
                 const json = rest[1];
-                if (!(campaignId && scope && json)) {
+                if (!(scope && json)) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <scope> <json>.' });
                 }
                 const data = await client.api.client.campaignsSetBidAdjustments.mutate({
@@ -200,13 +187,17 @@ const main = async () => {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
-                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
+                const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), {
+                    topicKey: 'ad-groups',
+                    label: '--campaign',
+                    expected: 'campaign_id',
+                });
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
                 const data = await client.api.client.adGroupsList.query({
                     config: cliConfig,
                     state,
-                    campaignId: campaignId ?? undefined,
+                    campaignId,
                     limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
                     offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
                 });
@@ -214,19 +205,17 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'get') {
-                const adGroupId = action;
-                if (!adGroupId) {
-                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing <ad_group_id>.' });
-                }
+                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
                 const data = await client.api.client.adGroupsGet.query({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'create') {
-                const [campaignId, name, bid] = [action, rest[0], rest[1]];
-                if (!(campaignId && name && bid)) {
+                const [campaignIdRaw, name, bid] = [action, rest[0], rest[1]];
+                if (!(campaignIdRaw && name && bid)) {
                     throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <campaign_id> <name> <default_bid>.' });
                 }
+                const campaignId = parseNumericId(campaignIdRaw, { topicKey: 'ad-groups', label: '<campaign_id>', expected: 'campaign_id' });
                 const data = await client.api.client.adGroupsCreate.mutate({
                     config: cliConfig,
                     campaignId,
@@ -237,9 +226,9 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'update') {
-                const adGroupId = action;
+                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
                 const name = rest[0];
-                if (!(adGroupId && name)) {
+                if (!name) {
                     throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <ad_group_id> <name>.' });
                 }
                 const data = await client.api.client.adGroupsUpdate.mutate({ config: cliConfig, adGroupId, name });
@@ -247,9 +236,9 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'set-default-bid') {
-                const adGroupId = action;
+                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
                 const value = rest[0];
-                if (!(adGroupId && value)) {
+                if (!value) {
                     throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <ad_group_id> <value>.' });
                 }
                 const data = await client.api.client.adGroupsSetDefaultBid.mutate({
@@ -261,28 +250,19 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'pause') {
-                const adGroupId = action;
-                if (!adGroupId) {
-                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing <ad_group_id>.' });
-                }
+                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
                 const data = await client.api.client.adGroupsPause.mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
-                const adGroupId = action;
-                if (!adGroupId) {
-                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing <ad_group_id>.' });
-                }
+                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
                 const data = await client.api.client.adGroupsResume.mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'delete') {
-                const adGroupId = action;
-                if (!adGroupId) {
-                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing <ad_group_id>.' });
-                }
+                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
                 const data = await client.api.client.adGroupsDelete.mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
@@ -299,15 +279,15 @@ const main = async () => {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
-                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
-                const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+                const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), { topicKey: 'ads', label: '--campaign', expected: 'campaign_id' });
+                const adGroupId = parseOptionalNumericIdFlag(readFlag(flags, ['ad-group', 'ad-group-id']), { topicKey: 'ads', label: '--ad-group', expected: 'ad_group_id' });
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
                 const data = await client.api.client.adsList.query({
                     config: cliConfig,
                     state,
-                    campaignId: campaignId ?? undefined,
-                    adGroupId: adGroupId ?? undefined,
+                    campaignId,
+                    adGroupId,
                     limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
                     offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
                 });
@@ -315,20 +295,18 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'get') {
-                const adId = action;
-                if (!adId) {
-                    throw new CliUsageError({ topicKey: 'ads', message: 'Missing <ad_id>.' });
-                }
+                const adId = requireNumericIdArg(action, { topicKey: 'ads', label: '<ad_id>', expected: 'ad_id' });
                 const data = await client.api.client.adsGet.query({ config: cliConfig, adId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'create') {
-                const [adGroupId, productId] = [action, rest[0]];
+                const [adGroupIdRaw, productId] = [action, rest[0]];
                 const productIdType = rest[1] ?? 'ASIN';
-                if (!(adGroupId && productId)) {
+                if (!(adGroupIdRaw && productId)) {
                     throw new CliUsageError({ topicKey: 'ads', message: 'Missing required args: <ad_group_id> <asin|sku>.' });
                 }
+                const adGroupId = parseNumericId(adGroupIdRaw, { topicKey: 'ads', label: '<ad_group_id>', expected: 'ad_group_id' });
                 const data = await client.api.client.adsCreate.mutate({
                     config: cliConfig,
                     adGroupId,
@@ -339,9 +317,9 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'update') {
-                const adId = action;
+                const adId = requireNumericIdArg(action, { topicKey: 'ads', label: '<ad_id>', expected: 'ad_id' });
                 const state = rest[0];
-                if (!(adId && state)) {
+                if (!state) {
                     throw new CliUsageError({ topicKey: 'ads', message: 'Missing required args: <ad_id> <state>.' });
                 }
                 const data = await client.api.client.adsUpdate.mutate({ config: cliConfig, adId, state });
@@ -349,10 +327,7 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'delete') {
-                const adId = action;
-                if (!adId) {
-                    throw new CliUsageError({ topicKey: 'ads', message: 'Missing <ad_id>.' });
-                }
+                const adId = requireNumericIdArg(action, { topicKey: 'ads', label: '<ad_id>', expected: 'ad_id' });
                 const data = await client.api.client.adsDelete.mutate({ config: cliConfig, adId });
                 printOutput(data);
                 return;
@@ -369,15 +344,15 @@ const main = async () => {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
-                const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
-                const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+                const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), { topicKey: 'targets', label: '--campaign', expected: 'campaign_id' });
+                const adGroupId = parseOptionalNumericIdFlag(readFlag(flags, ['ad-group', 'ad-group-id']), { topicKey: 'targets', label: '--ad-group', expected: 'ad_group_id' });
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
                 const data = await client.api.client.targetsList.query({
                     config: cliConfig,
                     state,
-                    campaignId: campaignId ?? undefined,
-                    adGroupId: adGroupId ?? undefined,
+                    campaignId,
+                    adGroupId,
                     limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
                     offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
                 });
@@ -385,9 +360,9 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'set-bid') {
-                const targetId = action;
+                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
                 const value = rest[0];
-                if (!(targetId && value)) {
+                if (!value) {
                     throw new CliUsageError({ topicKey: 'targets', message: 'Missing required args: <target_id> <value>.' });
                 }
                 const data = await client.api.client.bidsSet.mutate({
@@ -399,9 +374,9 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'adjust-bid') {
-                const targetId = action;
+                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
                 const delta = rest[0];
-                if (!(targetId && delta)) {
+                if (!delta) {
                     throw new CliUsageError({ topicKey: 'targets', message: 'Missing required args: <target_id> <delta>.' });
                 }
                 const data = await client.api.client.bidsAdjust.mutate({
@@ -413,10 +388,7 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'get') {
-                const targetId = action;
-                if (!targetId) {
-                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing <target_id>.' });
-                }
+                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
                 const data = await client.api.client.targetsGet.query({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
@@ -428,13 +400,14 @@ const main = async () => {
                     return;
                 }
                 if (targetType === 'keyword') {
-                    const [adGroupId, keyword, matchType, bid] = rest;
-                    if (!(adGroupId && keyword && matchType && bid)) {
+                    const [adGroupIdRaw, keyword, matchType, bid] = rest;
+                    if (!(adGroupIdRaw && keyword && matchType && bid)) {
                         throw new CliUsageError({
                             topicKey: 'targets',
                             message: 'Missing required args: keyword <ad_group_id> <keyword> <match_type> <bid>.',
                         });
                     }
+                    const adGroupId = parseNumericId(adGroupIdRaw, { topicKey: 'targets', label: '<ad_group_id>', expected: 'ad_group_id' });
                     const data = await client.api.client.targetsCreateKeyword.mutate({
                         config: cliConfig,
                         adGroupId,
@@ -446,13 +419,14 @@ const main = async () => {
                     return;
                 }
                 if (targetType === 'product') {
-                    const [adGroupId, productId, matchType, bid, productIdType] = rest;
-                    if (!(adGroupId && productId && matchType && bid)) {
+                    const [adGroupIdRaw, productId, matchType, bid, productIdType] = rest;
+                    if (!(adGroupIdRaw && productId && matchType && bid)) {
                         throw new CliUsageError({
                             topicKey: 'targets',
                             message: 'Missing required args: product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU].',
                         });
                     }
+                    const adGroupId = parseNumericId(adGroupIdRaw, { topicKey: 'targets', label: '<ad_group_id>', expected: 'ad_group_id' });
                     const data = await client.api.client.targetsCreateProduct.mutate({
                         config: cliConfig,
                         adGroupId,
@@ -467,28 +441,19 @@ const main = async () => {
                 throw new CliUsageError({ topicKey: 'targets', message: `Unknown create type: ${targetType}` });
             }
             if (subcommand === 'delete') {
-                const targetId = action;
-                if (!targetId) {
-                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing <target_id>.' });
-                }
+                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
                 const data = await client.api.client.targetsDelete.mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'pause') {
-                const targetId = action;
-                if (!targetId) {
-                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing <target_id>.' });
-                }
+                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
                 const data = await client.api.client.targetsPause.mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
-                const targetId = action;
-                if (!targetId) {
-                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing <target_id>.' });
-                }
+                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
                 const data = await client.api.client.targetsResume.mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
@@ -504,9 +469,9 @@ const main = async () => {
             const client = createApiClient(config);
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'set') {
-                const targetId = action;
+                const targetId = requireNumericIdArg(action, { topicKey: 'bids', label: '<target_id>', expected: 'target_id' });
                 const value = rest[0];
-                if (!(targetId && value)) {
+                if (!value) {
                     throw new CliUsageError({ topicKey: 'bids', message: 'Missing required args: <target_id> <value>.' });
                 }
                 const data = await client.api.client.bidsSet.mutate({
@@ -518,9 +483,9 @@ const main = async () => {
                 return;
             }
             if (subcommand === 'adjust') {
-                const targetId = action;
+                const targetId = requireNumericIdArg(action, { topicKey: 'bids', label: '<target_id>', expected: 'target_id' });
                 const delta = rest[0];
-                if (!(targetId && delta)) {
+                if (!delta) {
                     throw new CliUsageError({ topicKey: 'bids', message: 'Missing required args: <target_id> <delta>.' });
                 }
                 const data = await client.api.client.bidsAdjust.mutate({
@@ -550,8 +515,16 @@ const main = async () => {
             }
 
             const ids = parseIdsFlag(flags);
-            const campaignId = readFlag(flags, ['campaign', 'campaign-id']);
-            const adGroupId = readFlag(flags, ['ad-group', 'ad-group-id']);
+            const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), {
+                topicKey: subcommand === 'series' ? 'metrics series' : 'metrics table',
+                label: '--campaign',
+                expected: 'campaign_id',
+            });
+            const adGroupId = parseOptionalNumericIdFlag(readFlag(flags, ['ad-group', 'ad-group-id']), {
+                topicKey: subcommand === 'series' ? 'metrics series' : 'metrics table',
+                label: '--ad-group',
+                expected: 'ad_group_id',
+            });
             const metrics = parseMetricsSelectionFlag(flags);
             const filters = parseMetricsFiltersFlag(flags);
             const rangeOverride = readFlag(flags, ['range']);
@@ -1022,6 +995,41 @@ const parseJsonArg = (value: string) => {
     } catch {
         throw new Error('Invalid JSON payload.');
     }
+};
+
+const looksLikeAsin = (value: string) => {
+    const trimmed = value.trim().toUpperCase();
+    return ASIN_REGEX.test(trimmed);
+};
+
+const parseNumericId = (value: string, input: { topicKey: HelpTopicKey; label: string; expected: string }) => {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+        throw new CliUsageError({ topicKey: input.topicKey, message: `Missing ${input.label}.` });
+    }
+    if (NUMERIC_ID_REGEX.test(trimmed)) {
+        return trimmed;
+    }
+
+    const asinHint = looksLikeAsin(trimmed) ? ' This looks like an ASIN.' : '';
+    throw new CliUsageError({
+        topicKey: input.topicKey,
+        message: `Invalid ${input.label}: expected ${input.expected} (numeric), received ${JSON.stringify(trimmed)}.${asinHint}`,
+    });
+};
+
+const requireNumericIdArg = (value: string | undefined, input: { topicKey: HelpTopicKey; label: string; expected: string }) => {
+    if (!value) {
+        throw new CliUsageError({ topicKey: input.topicKey, message: `Missing ${input.label}.` });
+    }
+    return parseNumericId(value, input);
+};
+
+const parseOptionalNumericIdFlag = (value: string | null, input: { topicKey: HelpTopicKey; label: string; expected: string }) => {
+    if (!value) {
+        return undefined;
+    }
+    return parseNumericId(value, input);
 };
 
 const parseIdsFlag = (flags: ParsedFlags) => {
