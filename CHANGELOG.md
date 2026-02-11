@@ -12,7 +12,7 @@ All notable changes to this project will be documented in this file.
 
 ### Changed
 
-- Bumped `packages/bidbeacon-api-client` to `0.1.6`.
+- Bumped `packages/bidbeacon-api-client` to `0.3.0`.
 
 ## v0.2 - 2026-02-10
 
