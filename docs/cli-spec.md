@@ -171,8 +171,8 @@ Metrics filters:
 - `search` or `name`
 - `state` or `status` or `active-status`
 - `targeting` (`AUTO` or `MANUAL`)
-- `type` or `target-type` (`KEYWORD` or `PRODUCT`)
-- `target-match-type` (`BROAD`, `PHRASE`, `EXACT`, `PRODUCT_EXACT`, `PRODUCT_SIMILAR`)
+- `type` or `target-type` (`KEYWORD`, `PRODUCT`, or `AUTO`)
+- `target-match-type` (`BROAD`, `PHRASE`, `EXACT`, `PRODUCT_EXACT`, `PRODUCT_SIMILAR`, `SEARCH_CLOSE_MATCH`, `SEARCH_LOOSE_MATCH`, `PRODUCT_SUBSTITUTES`, `PRODUCT_COMPLEMENTS`)
 - `budget` (range)
 - `end-date` (range)
 - `out-of-budget` (`true|false`)

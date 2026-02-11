@@ -51,3 +51,25 @@ npm publish --access public
 ```
 
 Bump `packages/bidbeacon-api-client/package.json` version before every publish.
+
+## Versioning Policy
+
+BidBeacon uses two independent version tracks:
+
+- App release versions in `CHANGELOG.md` (for example `v0.3`) track product/server/dashboard releases.
+- npm package versions in `packages/bidbeacon-api-client/package.json` (for example `0.3.0`) track `@bidbeacon/api-client` releases.
+
+These versions do not need to match exactly.
+
+Use SemVer for the API client package:
+
+- `MAJOR`: breaking changes to the published client contract (removed/renamed procedures, incompatible input/output changes).
+- `MINOR`: backward-compatible additions to the public client surface.
+- `PATCH`: backward-compatible fixes or internal improvements.
+
+Release checklist for API client changes:
+
+1. Run `bun run api-client:build`.
+2. Bump `packages/bidbeacon-api-client/package.json`.
+3. Update `CHANGELOG.md` in the same PR with the new client package version.
+4. Publish with `npm publish --access public`.

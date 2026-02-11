@@ -105,6 +105,7 @@ Input: `ads.targets.list`
 
 - `filters`: `search`, `state`, `adProduct`, `campaignId`, `adGroupId`, `negative`, `targetType`, `targetMatchType`
 - `sort.field`: `lastUpdatedDateTime | bidAmount | state | targetType`
+- `targetType` supports `KEYWORD`, `PRODUCT`, and `AUTO`
 
 Output fields:
 

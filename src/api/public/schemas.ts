@@ -37,6 +37,7 @@ export const targetsListInputSchema = publicListInputSchema.extend({
 export const bidStrategySchema = z.enum(['MANUAL', 'RULE_BASED', 'SALES_DOWN_ONLY', 'SALES_UP_AND_DOWN', 'SALES', 'NEW_TO_BRAND', 'NONE']);
 export const keywordMatchTypeSchema = z.enum(['BROAD', 'PHRASE', 'EXACT']);
 export const productMatchTypeSchema = z.enum(['PRODUCT_EXACT', 'PRODUCT_SIMILAR']);
+export const targetTypeSchema = z.enum(['KEYWORD', 'PRODUCT', 'AUTO']);
 export const productIdTypeSchema = z.enum(['ASIN', 'SKU']);
 export const placementSchema = z.enum(['HOME_PAGE', 'TOP_OF_SEARCH', 'REST_OF_SEARCH', 'PRODUCT_PAGE', 'SITE_AMAZON_BUSINESS']);
 
@@ -79,7 +80,8 @@ export const targetSchema = z.object({
     negative: z.boolean(),
     state: stateSchema,
     bid: moneySchema.nullable(),
-    type: z.enum(['KEYWORD', 'PRODUCT']),
+    type: targetTypeSchema,
+    targetMatchType: z.string().nullable().optional(),
     keyword: z.string().nullable().optional(),
     keywordMatchType: keywordMatchTypeSchema.nullable().optional(),
     productIdType: productIdTypeSchema.nullable().optional(),
@@ -300,8 +302,8 @@ export const metricsFiltersSchema = z
         search: z.string().optional(),
         state: listStateSchema.optional(),
         targeting: z.enum(['AUTO', 'MANUAL']).optional(),
-        targetType: z.enum(['KEYWORD', 'PRODUCT']).optional(),
-        targetMatchType: z.union([keywordMatchTypeSchema, productMatchTypeSchema]).optional(),
+        targetType: targetTypeSchema.optional(),
+        targetMatchType: z.string().optional(),
         budget: z.object({ min: z.number().optional(), max: z.number().optional() }).optional(),
         endDate: z.object({ before: z.string().optional(), after: z.string().optional() }).optional(),
         outOfBudget: z.boolean().optional(),
@@ -374,7 +376,8 @@ export const metricsTableTargetItemSchema = z.object({
     adGroupId: z.string().nullable(),
     adGroupName: z.string().nullable(),
     state: stateSchema.nullable(),
-    type: z.enum(['KEYWORD', 'PRODUCT']),
+    type: targetTypeSchema,
+    targetMatchType: z.string().nullable(),
     keyword: z.string().nullable(),
     keywordMatchType: keywordMatchTypeSchema.nullable(),
     productId: z.string().nullable(),
