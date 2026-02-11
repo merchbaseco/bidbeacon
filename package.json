@@ -18,6 +18,7 @@
     "db:studio": "drizzle-kit studio",
     "worker": "dotenv --no-expand -e .env -- tsx src/worker/index.ts",
     "peek-dlq": "tsx scripts/peek-dlq.ts",
+    "changelog:generate": "tsx scripts/changelog.ts",
     "test": "vitest",
     "api-client:types": "dts-bundle-generator --no-check -o packages/bidbeacon-api-client/src/app-router.d.ts src/api/router-public.ts --project tsconfig.api-client.json",
     "api-client:build": "bun run api-client:types && tsc -p packages/bidbeacon-api-client/tsconfig.json && cp packages/bidbeacon-api-client/src/app-router.d.ts packages/bidbeacon-api-client/dist/app-router.d.ts",
