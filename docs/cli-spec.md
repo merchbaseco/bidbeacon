@@ -47,6 +47,7 @@ Drill down by passing parent IDs as flags.
 - `bb ads list --ad-group <ad_group_id>`
 - `bb targets list --campaign <campaign_id>`
 - `bb targets list --ad-group <ad_group_id>`
+- `bb targets list --negative <true|false>`
 
 **Accounts**
 - `bb accounts list`
@@ -113,9 +114,10 @@ Campaign objects returned by campaign commands include:
   - `ads` (hydrated ad objects, not ad IDs)
 
 This command returns entity objects for `targets` and `ads` to avoid follow-up lookups.
+Target objects include a `negative` boolean so clients can separate editable vs non-editable targets safely.
 
 **Targets**
-- `bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--limit <n>] [--offset <n>]`
+- `bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--negative <true|false>] [--limit <n>] [--offset <n>]`
 - `bb targets get <target_id>`
 - `bb targets create keyword <ad_group_id> <keyword> <match_type> <bid>`
 - `bb targets create product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU]`

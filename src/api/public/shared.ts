@@ -45,6 +45,7 @@ type ListOptions = {
     state?: ListState;
     campaignId?: string;
     adGroupId?: string;
+    negative?: boolean;
     productAsin?: string;
     limit?: number;
     offset?: number;
@@ -345,6 +346,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
                 campaignId: target.campaignId,
                 targetId: target.targetId,
                 adGroupId: target.adGroupId,
+                negative: target.negative,
                 state: target.state,
                 bidAmount: target.bidAmount,
                 targetType: target.targetType,
@@ -369,6 +371,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
                 adGroupId: target.adGroupId,
                 targetId: target.targetId,
                 campaignId: target.campaignId,
+                negative: target.negative,
                 state: target.state,
                 bidAmount: target.bidAmount,
                 targetType: target.targetType,
@@ -484,6 +487,7 @@ export const listTargets = async (config: PublicConfig, options?: ListOptions): 
             targetId: target.targetId,
             campaignId: target.campaignId,
             adGroupId: target.adGroupId,
+            negative: target.negative,
             state: target.state,
             bidAmount: target.bidAmount,
             targetType: target.targetType,
@@ -500,6 +504,7 @@ export const listTargets = async (config: PublicConfig, options?: ListOptions): 
                 inArray(target.targetType, ['KEYWORD', 'PRODUCT']),
                 ...(options?.campaignId ? [eq(target.campaignId, options.campaignId)] : []),
                 ...(options?.adGroupId ? [eq(target.adGroupId, options.adGroupId)] : []),
+                ...(typeof options?.negative === 'boolean' ? [eq(target.negative, options.negative)] : []),
                 ...(stateFilter ? [eq(target.state, stateFilter)] : [])
             )
         )
@@ -517,6 +522,7 @@ export const getTarget = async (config: PublicConfig, targetId: string): Promise
             targetId: target.targetId,
             campaignId: target.campaignId,
             adGroupId: target.adGroupId,
+            negative: target.negative,
             state: target.state,
             bidAmount: target.bidAmount,
             targetType: target.targetType,
@@ -805,6 +811,7 @@ export const mapTargetFromApi = (targetData: Record<string, unknown>): TargetSha
             targetId: String(targetData.targetId ?? ''),
             campaignId: String(targetData.campaignId ?? ''),
             adGroupId: targetData.adGroupId ? String(targetData.adGroupId) : null,
+            negative: Boolean(targetData.negative),
             state: String(targetData.state ?? 'PAUSED') as TargetShape['state'],
             bid: bidValue,
             type: 'KEYWORD',
@@ -820,6 +827,7 @@ export const mapTargetFromApi = (targetData: Record<string, unknown>): TargetSha
         targetId: String(targetData.targetId ?? ''),
         campaignId: String(targetData.campaignId ?? ''),
         adGroupId: targetData.adGroupId ? String(targetData.adGroupId) : null,
+        negative: Boolean(targetData.negative),
         state: String(targetData.state ?? 'PAUSED') as TargetShape['state'],
         bid: bidValue,
         type: 'PRODUCT',
@@ -966,6 +974,7 @@ const mapTargetRow = (row: {
     targetId: string | null;
     campaignId: string | null;
     adGroupId: string | null;
+    negative: boolean | null;
     state: string | null;
     bidAmount: string | number | null;
     targetType: string | null;
@@ -979,6 +988,7 @@ const mapTargetRow = (row: {
             targetId: String(row.targetId ?? ''),
             campaignId: String(row.campaignId ?? ''),
             adGroupId: row.adGroupId ? String(row.adGroupId) : null,
+            negative: Boolean(row.negative),
             state: String(row.state ?? 'PAUSED') as TargetShape['state'],
             bid: parseNumeric(row.bidAmount),
             type: 'KEYWORD',
@@ -994,6 +1004,7 @@ const mapTargetRow = (row: {
         targetId: String(row.targetId ?? ''),
         campaignId: String(row.campaignId ?? ''),
         adGroupId: row.adGroupId ? String(row.adGroupId) : null,
+        negative: Boolean(row.negative),
         state: String(row.state ?? 'PAUSED') as TargetShape['state'],
         bid: parseNumeric(row.bidAmount),
         type: 'PRODUCT',

@@ -364,6 +364,7 @@ const main = async () => {
                 const state = resolveListStateFlag(flags);
                 const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), { topicKey: 'targets', label: '--campaign', expected: 'campaign_id' });
                 const adGroupId = parseOptionalNumericIdFlag(readFlag(flags, ['ad-group', 'ad-group-id']), { topicKey: 'targets', label: '--ad-group', expected: 'ad_group_id' });
+                const negative = parseOptionalBooleanFlag(readFlag(flags, ['negative']), { topicKey: 'targets', label: '--negative' });
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
                 const data = await client.api.client.targetsList.query({
@@ -371,6 +372,7 @@ const main = async () => {
                     state,
                     campaignId,
                     adGroupId,
+                    negative,
                     limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
                     offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
                 });
@@ -1048,6 +1050,20 @@ const parseOptionalNumericIdFlag = (value: string | null, input: { topicKey: Hel
         return undefined;
     }
     return parseNumericId(value, input);
+};
+
+const parseOptionalBooleanFlag = (value: string | null, input: { topicKey: HelpTopicKey; label: string }) => {
+    if (value === null) {
+        return undefined;
+    }
+    try {
+        return parseBooleanValue(value);
+    } catch {
+        throw new CliUsageError({
+            topicKey: input.topicKey,
+            message: `Invalid ${input.label}: expected true|false.`,
+        });
+    }
 };
 
 const parseAsin = (value: string, input: { topicKey: HelpTopicKey; label: string }) => {

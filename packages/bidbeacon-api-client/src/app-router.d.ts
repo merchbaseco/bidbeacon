@@ -646,6 +646,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 							adGroupId: string | null;
 							targetId: string;
+							negative: boolean;
 							bid: number | null;
 							type: "KEYWORD" | "PRODUCT";
 							productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -666,6 +667,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 								adGroupId: string | null;
 								targetId: string;
+								negative: boolean;
 								bid: number | null;
 								type: "KEYWORD" | "PRODUCT";
 								productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -697,6 +699,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					campaignId?: string | undefined;
 					state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
 					adGroupId?: string | undefined;
+					negative?: boolean | undefined;
 					limit?: number | undefined;
 					offset?: number | undefined;
 				};
@@ -706,6 +709,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -732,6 +736,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -761,6 +766,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -791,6 +797,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -832,6 +839,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -858,6 +866,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -885,6 +894,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -912,6 +922,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -1975,6 +1986,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 							adGroupId: string | null;
 							targetId: string;
+							negative: boolean;
 							bid: number | null;
 							type: "KEYWORD" | "PRODUCT";
 							productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -1995,6 +2007,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 								adGroupId: string | null;
 								targetId: string;
+								negative: boolean;
 								bid: number | null;
 								type: "KEYWORD" | "PRODUCT";
 								productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -2026,6 +2039,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					campaignId?: string | undefined;
 					state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
 					adGroupId?: string | undefined;
+					negative?: boolean | undefined;
 					limit?: number | undefined;
 					offset?: number | undefined;
 				};
@@ -2035,6 +2049,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -2061,6 +2076,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -2090,6 +2106,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -2120,6 +2137,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -2161,6 +2179,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -2187,6 +2206,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -2214,6 +2234,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -2241,6 +2262,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3360,6 +3382,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 							adGroupId: string | null;
 							targetId: string;
+							negative: boolean;
 							bid: number | null;
 							type: "KEYWORD" | "PRODUCT";
 							productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3380,6 +3403,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 								adGroupId: string | null;
 								targetId: string;
+								negative: boolean;
 								bid: number | null;
 								type: "KEYWORD" | "PRODUCT";
 								productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3411,6 +3435,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					campaignId?: string | undefined;
 					state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
 					adGroupId?: string | undefined;
+					negative?: boolean | undefined;
 					limit?: number | undefined;
 					offset?: number | undefined;
 				};
@@ -3420,6 +3445,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3446,6 +3472,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3475,6 +3502,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3505,6 +3533,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3546,6 +3575,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3572,6 +3602,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3599,6 +3630,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -3626,6 +3658,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4689,6 +4722,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 							adGroupId: string | null;
 							targetId: string;
+							negative: boolean;
 							bid: number | null;
 							type: "KEYWORD" | "PRODUCT";
 							productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4709,6 +4743,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 								adGroupId: string | null;
 								targetId: string;
+								negative: boolean;
 								bid: number | null;
 								type: "KEYWORD" | "PRODUCT";
 								productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4740,6 +4775,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					campaignId?: string | undefined;
 					state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
 					adGroupId?: string | undefined;
+					negative?: boolean | undefined;
 					limit?: number | undefined;
 					offset?: number | undefined;
 				};
@@ -4749,6 +4785,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4775,6 +4812,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4804,6 +4842,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4834,6 +4873,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4875,6 +4915,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4901,6 +4942,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4928,6 +4970,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
@@ -4955,6 +4998,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						adGroupId: string | null;
 						targetId: string;
+						negative: boolean;
 						bid: number | null;
 						type: "KEYWORD" | "PRODUCT";
 						productIdType?: "ASIN" | "SKU" | null | undefined;
