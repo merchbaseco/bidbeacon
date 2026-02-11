@@ -619,6 +619,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					campaigns: {
 						campaignId: string;
+						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						creationDateTime: string | null;
 						targets: {
 							campaignId: string;
@@ -1927,6 +1928,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					campaigns: {
 						campaignId: string;
+						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						creationDateTime: string | null;
 						targets: {
 							campaignId: string;
@@ -3291,6 +3293,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					campaigns: {
 						campaignId: string;
+						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						creationDateTime: string | null;
 						targets: {
 							campaignId: string;
@@ -4599,6 +4602,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				output: {
 					campaigns: {
 						campaignId: string;
+						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
 						creationDateTime: string | null;
 						targets: {
 							campaignId: string;
