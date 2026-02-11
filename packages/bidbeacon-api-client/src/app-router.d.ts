@@ -510,6 +510,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					campaignId?: string | undefined;
 					state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
 					adGroupId?: string | undefined;
+					productAsin?: string | undefined;
 					limit?: number | undefined;
 					offset?: number | undefined;
 				};
@@ -1758,6 +1759,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					campaignId?: string | undefined;
 					state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
 					adGroupId?: string | undefined;
+					productAsin?: string | undefined;
 					limit?: number | undefined;
 					offset?: number | undefined;
 				};
@@ -3062,6 +3064,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					campaignId?: string | undefined;
 					state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
 					adGroupId?: string | undefined;
+					productAsin?: string | undefined;
 					limit?: number | undefined;
 					offset?: number | undefined;
 				};
@@ -4310,6 +4313,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					campaignId?: string | undefined;
 					state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
 					adGroupId?: string | undefined;
+					productAsin?: string | undefined;
 					limit?: number | undefined;
 					offset?: number | undefined;
 				};

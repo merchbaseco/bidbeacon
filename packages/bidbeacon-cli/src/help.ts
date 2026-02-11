@@ -109,6 +109,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: '--all', right: 'Alias for --state ALL (where supported)' },
             { left: '--campaign <campaign_id>', right: 'Filter to a campaign (list)' },
             { left: '--ad-group <ad_group_id>', right: 'Filter to an ad group (list)' },
+            { left: '--asin <ASIN>', right: 'Filter to ads that advertise a specific ASIN (list)' },
             { left: '--limit <n>', right: 'Limit number of results (list)' },
             { left: '--offset <n>', right: 'Offset results (list)' },
         ],

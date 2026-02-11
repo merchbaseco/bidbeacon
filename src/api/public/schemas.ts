@@ -26,6 +26,7 @@ export const adGroupsListInputSchema = publicListInputSchema.extend({
 export const adsListInputSchema = publicListInputSchema.extend({
     campaignId: z.string().optional(),
     adGroupId: z.string().optional(),
+    productAsin: z.string().optional(),
 });
 
 export const targetsListInputSchema = publicListInputSchema.extend({

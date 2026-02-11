@@ -281,6 +281,7 @@ const main = async () => {
                 const state = resolveListStateFlag(flags);
                 const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), { topicKey: 'ads', label: '--campaign', expected: 'campaign_id' });
                 const adGroupId = parseOptionalNumericIdFlag(readFlag(flags, ['ad-group', 'ad-group-id']), { topicKey: 'ads', label: '--ad-group', expected: 'ad_group_id' });
+                const asin = readFlag(flags, ['asin']);
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
                 const data = await client.api.client.adsList.query({
@@ -288,6 +289,7 @@ const main = async () => {
                     state,
                     campaignId,
                     adGroupId,
+                    productAsin: asin ?? undefined,
                     limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
                     offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
                 });

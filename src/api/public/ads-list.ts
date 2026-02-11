@@ -11,6 +11,7 @@ export const adsList = apiProcedure
             state: input.state,
             campaignId: input.campaignId,
             adGroupId: input.adGroupId,
+            productAsin: input.productAsin,
             limit: input.limit,
             offset: input.offset,
         });
