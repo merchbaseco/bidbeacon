@@ -648,7 +648,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							targetId: string;
 							negative: boolean;
 							bid: number | null;
-							type: "KEYWORD" | "PRODUCT";
+							type: "KEYWORD" | "PRODUCT" | "AUTO";
+							targetMatchType?: string | null | undefined;
 							productIdType?: "ASIN" | "SKU" | null | undefined;
 							productId?: string | null | undefined;
 							keyword?: string | null | undefined;
@@ -669,7 +670,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								targetId: string;
 								negative: boolean;
 								bid: number | null;
-								type: "KEYWORD" | "PRODUCT";
+								type: "KEYWORD" | "PRODUCT" | "AUTO";
+								targetMatchType?: string | null | undefined;
 								productIdType?: "ASIN" | "SKU" | null | undefined;
 								productId?: string | null | undefined;
 								keyword?: string | null | undefined;
@@ -711,7 +713,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -738,7 +741,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -768,7 +772,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -799,7 +804,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -841,7 +847,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -868,7 +875,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -896,7 +904,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -924,7 +933,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -953,8 +963,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -1003,8 +1013,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -1053,8 +1063,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -1103,8 +1113,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -1159,8 +1169,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -1213,8 +1223,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -1269,8 +1279,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -1327,8 +1337,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -1352,7 +1362,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
 						adGroupId: string | null;
 						targetId: string;
-						type: "KEYWORD" | "PRODUCT";
+						targetMatchType: string | null;
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
 						productId: string | null;
 						keyword: string | null;
 						keywordMatchType: "BROAD" | "PHRASE" | "EXACT" | null;
@@ -1988,7 +1999,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							targetId: string;
 							negative: boolean;
 							bid: number | null;
-							type: "KEYWORD" | "PRODUCT";
+							type: "KEYWORD" | "PRODUCT" | "AUTO";
+							targetMatchType?: string | null | undefined;
 							productIdType?: "ASIN" | "SKU" | null | undefined;
 							productId?: string | null | undefined;
 							keyword?: string | null | undefined;
@@ -2009,7 +2021,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								targetId: string;
 								negative: boolean;
 								bid: number | null;
-								type: "KEYWORD" | "PRODUCT";
+								type: "KEYWORD" | "PRODUCT" | "AUTO";
+								targetMatchType?: string | null | undefined;
 								productIdType?: "ASIN" | "SKU" | null | undefined;
 								productId?: string | null | undefined;
 								keyword?: string | null | undefined;
@@ -2051,7 +2064,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -2078,7 +2092,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -2108,7 +2123,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -2139,7 +2155,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -2181,7 +2198,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -2208,7 +2226,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -2236,7 +2255,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -2264,7 +2284,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -2293,8 +2314,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -2343,8 +2364,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -2393,8 +2414,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -2443,8 +2464,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -2499,8 +2520,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -2553,8 +2574,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -2609,8 +2630,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -2667,8 +2688,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -2692,7 +2713,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
 						adGroupId: string | null;
 						targetId: string;
-						type: "KEYWORD" | "PRODUCT";
+						targetMatchType: string | null;
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
 						productId: string | null;
 						keyword: string | null;
 						keywordMatchType: "BROAD" | "PHRASE" | "EXACT" | null;
@@ -3384,7 +3406,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							targetId: string;
 							negative: boolean;
 							bid: number | null;
-							type: "KEYWORD" | "PRODUCT";
+							type: "KEYWORD" | "PRODUCT" | "AUTO";
+							targetMatchType?: string | null | undefined;
 							productIdType?: "ASIN" | "SKU" | null | undefined;
 							productId?: string | null | undefined;
 							keyword?: string | null | undefined;
@@ -3405,7 +3428,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								targetId: string;
 								negative: boolean;
 								bid: number | null;
-								type: "KEYWORD" | "PRODUCT";
+								type: "KEYWORD" | "PRODUCT" | "AUTO";
+								targetMatchType?: string | null | undefined;
 								productIdType?: "ASIN" | "SKU" | null | undefined;
 								productId?: string | null | undefined;
 								keyword?: string | null | undefined;
@@ -3447,7 +3471,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -3474,7 +3499,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -3504,7 +3530,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -3535,7 +3562,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -3577,7 +3605,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -3604,7 +3633,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -3632,7 +3662,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -3660,7 +3691,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -3689,8 +3721,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -3739,8 +3771,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -3789,8 +3821,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -3839,8 +3871,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -3895,8 +3927,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -3949,8 +3981,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -4005,8 +4037,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -4063,8 +4095,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -4088,7 +4120,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
 						adGroupId: string | null;
 						targetId: string;
-						type: "KEYWORD" | "PRODUCT";
+						targetMatchType: string | null;
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
 						productId: string | null;
 						keyword: string | null;
 						keywordMatchType: "BROAD" | "PHRASE" | "EXACT" | null;
@@ -4724,7 +4757,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							targetId: string;
 							negative: boolean;
 							bid: number | null;
-							type: "KEYWORD" | "PRODUCT";
+							type: "KEYWORD" | "PRODUCT" | "AUTO";
+							targetMatchType?: string | null | undefined;
 							productIdType?: "ASIN" | "SKU" | null | undefined;
 							productId?: string | null | undefined;
 							keyword?: string | null | undefined;
@@ -4745,7 +4779,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								targetId: string;
 								negative: boolean;
 								bid: number | null;
-								type: "KEYWORD" | "PRODUCT";
+								type: "KEYWORD" | "PRODUCT" | "AUTO";
+								targetMatchType?: string | null | undefined;
 								productIdType?: "ASIN" | "SKU" | null | undefined;
 								productId?: string | null | undefined;
 								keyword?: string | null | undefined;
@@ -4787,7 +4822,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -4814,7 +4850,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -4844,7 +4881,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -4875,7 +4913,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -4917,7 +4956,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -4944,7 +4984,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -4972,7 +5013,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -5000,7 +5042,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						targetId: string;
 						negative: boolean;
 						bid: number | null;
-						type: "KEYWORD" | "PRODUCT";
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
+						targetMatchType?: string | null | undefined;
 						productIdType?: "ASIN" | "SKU" | null | undefined;
 						productId?: string | null | undefined;
 						keyword?: string | null | undefined;
@@ -5029,8 +5072,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -5079,8 +5122,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -5129,8 +5172,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -5179,8 +5222,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -5235,8 +5278,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -5289,8 +5332,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -5345,8 +5388,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -5403,8 +5446,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 							before?: string | undefined;
 							after?: string | undefined;
 						} | undefined;
-						targetMatchType?: "BROAD" | "PHRASE" | "EXACT" | "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | undefined;
-						targetType?: "KEYWORD" | "PRODUCT" | undefined;
+						targetMatchType?: string | undefined;
+						targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
 						budget?: {
 							max?: number | undefined;
 							min?: number | undefined;
@@ -5428,7 +5471,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
 						adGroupId: string | null;
 						targetId: string;
-						type: "KEYWORD" | "PRODUCT";
+						targetMatchType: string | null;
+						type: "KEYWORD" | "PRODUCT" | "AUTO";
 						productId: string | null;
 						keyword: string | null;
 						keywordMatchType: "BROAD" | "PHRASE" | "EXACT" | null;

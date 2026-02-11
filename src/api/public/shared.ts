@@ -362,7 +362,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
                     ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
                     inArray(target.campaignId, campaignIds),
                     isNull(target.adGroupId),
-                    inArray(target.targetType, ['KEYWORD', 'PRODUCT'])
+                    inArray(target.targetType, ['KEYWORD', 'PRODUCT', 'AUTO'])
                 )
             )
             .orderBy(target.campaignId, target.targetId),
@@ -386,7 +386,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
                     eq(campaign.accountId, config.accountId),
                     ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
                     inArray(target.adGroupId, adGroupIds),
-                    inArray(target.targetType, ['KEYWORD', 'PRODUCT'])
+                    inArray(target.targetType, ['KEYWORD', 'PRODUCT', 'AUTO'])
                 )
             )
             .orderBy(target.adGroupId, target.targetId),
@@ -501,7 +501,7 @@ export const listTargets = async (config: PublicConfig, options?: ListOptions): 
             and(
                 eq(campaign.accountId, config.accountId),
                 ...(countryCode ? [eq(campaign.countryCode, countryCode)] : []),
-                inArray(target.targetType, ['KEYWORD', 'PRODUCT']),
+                inArray(target.targetType, ['KEYWORD', 'PRODUCT', 'AUTO']),
                 ...(options?.campaignId ? [eq(target.campaignId, options.campaignId)] : []),
                 ...(options?.adGroupId ? [eq(target.adGroupId, options.adGroupId)] : []),
                 ...(typeof options?.negative === 'boolean' ? [eq(target.negative, options.negative)] : []),
@@ -799,14 +799,35 @@ export const mapAdFromApi = (adData: Record<string, unknown>): AdShape => {
 };
 
 export const mapTargetFromApi = (targetData: Record<string, unknown>): TargetShape => {
-    const bid = targetData.bid as Record<string, unknown> | undefined;
-    const bidValue = bid?.bid ? Number(bid.bid) : null;
+    const bidValue = resolveBidValue(targetData.bid);
+    const targetType = String(targetData.targetType ?? '').toUpperCase();
+    const expressionType = String(targetData.expressionType ?? '').toUpperCase();
+    const isAutoTarget = targetType === 'AUTO' || expressionType === 'AUTO';
     const targetDetails = targetData.targetDetails as Record<string, unknown> | undefined;
     const keywordTarget = targetDetails?.keywordTarget as Record<string, unknown> | undefined;
     const productTarget = targetDetails?.productTarget as Record<string, unknown> | undefined;
     const product = productTarget?.product as Record<string, unknown> | undefined;
+    const autoMatchType = isAutoTarget ? resolveAutoTargetMatchType(targetData, targetDetails) : null;
+
+    if (isAutoTarget) {
+        return {
+            targetId: String(targetData.targetId ?? ''),
+            campaignId: String(targetData.campaignId ?? ''),
+            adGroupId: targetData.adGroupId ? String(targetData.adGroupId) : null,
+            state: String(targetData.state ?? 'PAUSED') as TargetShape['state'],
+            bid: bidValue,
+            type: 'AUTO',
+            targetMatchType: autoMatchType,
+            keyword: null,
+            keywordMatchType: null,
+            productIdType: null,
+            productId: null,
+            productMatchType: null,
+        };
+    }
 
     if (keywordTarget) {
+        const keywordMatchType = String(keywordTarget.matchType ?? 'BROAD') as TargetShape['keywordMatchType'];
         return {
             targetId: String(targetData.targetId ?? ''),
             campaignId: String(targetData.campaignId ?? ''),
@@ -815,14 +836,16 @@ export const mapTargetFromApi = (targetData: Record<string, unknown>): TargetSha
             state: String(targetData.state ?? 'PAUSED') as TargetShape['state'],
             bid: bidValue,
             type: 'KEYWORD',
+            targetMatchType: keywordMatchType,
             keyword: String(keywordTarget.keyword ?? ''),
-            keywordMatchType: String(keywordTarget.matchType ?? 'BROAD') as TargetShape['keywordMatchType'],
+            keywordMatchType,
             productIdType: null,
             productId: null,
             productMatchType: null,
         };
     }
 
+    const productMatchType = String(productTarget?.matchType ?? 'PRODUCT_EXACT') as TargetShape['productMatchType'];
     return {
         targetId: String(targetData.targetId ?? ''),
         campaignId: String(targetData.campaignId ?? ''),
@@ -831,11 +854,12 @@ export const mapTargetFromApi = (targetData: Record<string, unknown>): TargetSha
         state: String(targetData.state ?? 'PAUSED') as TargetShape['state'],
         bid: bidValue,
         type: 'PRODUCT',
+        targetMatchType: productMatchType,
         keyword: null,
         keywordMatchType: null,
         productIdType: String(productTarget?.productIdType ?? 'ASIN') as TargetShape['productIdType'],
         productId: String(product?.productId ?? ''),
-        productMatchType: String(productTarget?.matchType ?? 'PRODUCT_EXACT') as TargetShape['productMatchType'],
+        productMatchType,
     };
 };
 
@@ -982,8 +1006,9 @@ const mapTargetRow = (row: {
     targetMatchType: string | null;
     targetAsin: string | null;
 }): TargetShape => {
-    const targetType = String(row.targetType ?? 'KEYWORD');
+    const targetType = String(row.targetType ?? 'KEYWORD').toUpperCase();
     if (targetType === 'KEYWORD') {
+        const keywordMatchType = row.targetMatchType ? (String(row.targetMatchType) as TargetShape['keywordMatchType']) : null;
         return {
             targetId: String(row.targetId ?? ''),
             campaignId: String(row.campaignId ?? ''),
@@ -992,8 +1017,26 @@ const mapTargetRow = (row: {
             state: String(row.state ?? 'PAUSED') as TargetShape['state'],
             bid: parseNumeric(row.bidAmount),
             type: 'KEYWORD',
+            targetMatchType: keywordMatchType,
             keyword: row.targetKeyword ?? '',
-            keywordMatchType: row.targetMatchType ? (String(row.targetMatchType) as TargetShape['keywordMatchType']) : null,
+            keywordMatchType,
+            productIdType: null,
+            productId: null,
+            productMatchType: null,
+        };
+    }
+
+    if (targetType === 'AUTO') {
+        return {
+            targetId: String(row.targetId ?? ''),
+            campaignId: String(row.campaignId ?? ''),
+            adGroupId: row.adGroupId ? String(row.adGroupId) : null,
+            state: String(row.state ?? 'PAUSED') as TargetShape['state'],
+            bid: parseNumeric(row.bidAmount),
+            type: 'AUTO',
+            targetMatchType: row.targetMatchType ? String(row.targetMatchType) : null,
+            keyword: null,
+            keywordMatchType: null,
             productIdType: null,
             productId: null,
             productMatchType: null,
@@ -1008,6 +1051,7 @@ const mapTargetRow = (row: {
         state: String(row.state ?? 'PAUSED') as TargetShape['state'],
         bid: parseNumeric(row.bidAmount),
         type: 'PRODUCT',
+        targetMatchType: row.targetMatchType ? String(row.targetMatchType) : null,
         keyword: null,
         keywordMatchType: null,
         productIdType: resolveProductIdType(row.targetAsin),
@@ -1506,6 +1550,7 @@ const getMetricsTableItems = async (table: MetricsTable, dimension: MetricsDimen
             adGroupName: row.adGroupName ?? null,
             state: row.state ? (String(row.state) as TargetShape['state']) : null,
             type: resolvedType,
+            targetMatchType: row.targetMatchType ? String(row.targetMatchType) : null,
             keyword: resolvedType === 'KEYWORD' ? (row.targetKeyword ?? null) : null,
             keywordMatchType: resolvedType === 'KEYWORD' ? (row.targetMatchType ? String(row.targetMatchType) : null) : null,
             productId: resolvedType === 'PRODUCT' ? (row.targetAsin ?? null) : null,
@@ -1549,10 +1594,87 @@ const buildSortExpression = (field: MetricsTableSortField, metrics: ReturnType<t
 };
 
 const resolveTargetType = (value: string | null, keyword: string | null) => {
-    if (value === 'KEYWORD' || value === 'PRODUCT') {
-        return value;
+    const normalizedValue = value ? value.toUpperCase() : null;
+    if (normalizedValue === 'KEYWORD' || normalizedValue === 'PRODUCT' || normalizedValue === 'AUTO') {
+        return normalizedValue;
     }
     return keyword ? 'KEYWORD' : 'PRODUCT';
+};
+
+const AUTO_EXPRESSION_TYPE_MAP = {
+    ASIN_ACCESSORY_RELATED: 'PRODUCT_COMPLEMENTS',
+    ASIN_SUBSTITUTE_RELATED: 'PRODUCT_SUBSTITUTES',
+    CLOSE_MATCH: 'SEARCH_CLOSE_MATCH',
+    COMPLEMENTS: 'PRODUCT_COMPLEMENTS',
+    LOOSE_MATCH: 'SEARCH_LOOSE_MATCH',
+    QUERY_BROAD_REL_MATCHES: 'SEARCH_LOOSE_MATCH',
+    QUERY_HIGH_REL_MATCHES: 'SEARCH_CLOSE_MATCH',
+    SUBSTITUTES: 'PRODUCT_SUBSTITUTES',
+} as const;
+
+const resolveBidValue = (value: unknown) => {
+    if (typeof value === 'number') {
+        return value;
+    }
+    if (!value || typeof value !== 'object') {
+        return null;
+    }
+    const bid = value as Record<string, unknown>;
+    if (typeof bid.bid === 'number') {
+        return bid.bid;
+    }
+    return null;
+};
+
+const resolveAutoTargetMatchType = (targetData: Record<string, unknown>, targetDetails?: Record<string, unknown>) => {
+    const autoTarget = targetDetails?.autoTarget as Record<string, unknown> | undefined;
+    const directMatchType = normalizeAutoMatchType(resolveString(targetData.targetMatchType, targetData.matchType, targetDetails?.matchType, autoTarget?.matchType));
+    if (directMatchType) {
+        return directMatchType;
+    }
+
+    return normalizeAutoMatchType(resolveExpressionType(targetData.resolvedExpression, targetData.expression, targetDetails?.resolvedExpression, targetDetails?.expression));
+};
+
+const resolveExpressionType = (...values: unknown[]) => {
+    for (const value of values) {
+        if (!Array.isArray(value) || value.length === 0) {
+            continue;
+        }
+        const first = value[0];
+        if (!first || typeof first !== 'object') {
+            continue;
+        }
+        const expression = first as Record<string, unknown>;
+        const expressionType = resolveString(expression.type);
+        if (expressionType) {
+            return expressionType;
+        }
+    }
+    return null;
+};
+
+const normalizeAutoMatchType = (value: string | null) => {
+    if (!value) {
+        return null;
+    }
+    const normalized = value.toUpperCase();
+    if (!normalized) {
+        return null;
+    }
+    return AUTO_EXPRESSION_TYPE_MAP[normalized as keyof typeof AUTO_EXPRESSION_TYPE_MAP] ?? normalized;
+};
+
+const resolveString = (...values: unknown[]) => {
+    for (const value of values) {
+        if (typeof value === 'string' && value.length > 0) {
+            const trimmed = value.trim();
+            if (trimmed.length > 0) {
+                return trimmed;
+            }
+        }
+    }
+    return null;
 };
 
 const formatDailyPoint = (
