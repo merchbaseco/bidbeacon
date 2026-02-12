@@ -1,17 +1,17 @@
-# @bidbeacon/api-client
+# @merchbase/bidbeacon-http-client
 
 Typed tRPC client for the BidBeacon API.
 
 ## Install
 
 ```bash
-npm install @bidbeacon/api-client
+npm install @merchbase/bidbeacon-http-client
 ```
 
 ## Usage
 
 ```ts
-import { createBidBeaconClient } from '@bidbeacon/api-client';
+import { createBidBeaconClient } from '@merchbase/bidbeacon-http-client';
 
 const client = createBidBeaconClient({
   baseUrl: 'https://bidbeacon.merchbase.co',
@@ -38,7 +38,7 @@ const history = await client['history/list'].query({
 ## Types
 
 ```ts
-import type { CliRouterInputs, CliRouterOutputs } from '@bidbeacon/api-client';
+import type { CliRouterInputs, CliRouterOutputs } from '@merchbase/bidbeacon-http-client';
 
 type CampaignsListInput = CliRouterInputs['campaigns/list'];
 type CampaignsListOutput = CliRouterOutputs['campaigns/list'];

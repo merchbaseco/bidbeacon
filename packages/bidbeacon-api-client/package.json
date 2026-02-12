@@ -1,5 +1,5 @@
 {
-  "name": "@bidbeacon/api-client",
+  "name": "@merchbase/bidbeacon-http-client",
   "version": "0.1.0",
   "description": "Typed tRPC client for BidBeacon",
   "type": "module",

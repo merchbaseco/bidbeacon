@@ -10,7 +10,7 @@ This spec defines the public npm client package that exposes typed access to the
 
 ## Package
 
-- Name: `@bidbeacon/api-client`
+- Name: `@merchbase/bidbeacon-http-client`
 - Location: `packages/bidbeacon-api-client`
 - Output: `dist/` (ESM + `.d.ts`)
 

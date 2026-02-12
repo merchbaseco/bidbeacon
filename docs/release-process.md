@@ -47,13 +47,13 @@ git push origin vX.Y.Z
 Publish npm package:
 
 ```bash
+# Ensure NPM_TOKEN is exported in your shell (granular token with bypass 2FA)
 cd packages/bidbeacon-api-client
-npm login
 npm publish --access public
 ```
 
 Optional verification:
 
 ```bash
-npm view @bidbeacon/api-client version
+npm view @merchbase/bidbeacon-http-client version
 ```
