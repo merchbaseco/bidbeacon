@@ -1,6 +1,6 @@
 {
   "name": "@bidbeacon/server",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "Docker-deployable API service for BidBeacon",
   "type": "module",
   "main": "dist/index.js",

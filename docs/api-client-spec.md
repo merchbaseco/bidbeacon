@@ -64,16 +64,16 @@ npm login
 npm publish --access public
 ```
 
-Bump `packages/bidbeacon-api-client/package.json` version before every publish.
+Bump `packages/bidbeacon-api-client/package.json` as part of the shared release process in `docs/release-process.md`.
 
 ## Versioning Policy
 
-BidBeacon uses two independent version tracks:
+BidBeacon uses one shared SemVer release version across surfaces:
 
-- App release versions in `CHANGELOG.md` (for example `v0.3`) track product/server/dashboard releases.
-- npm package versions in `packages/bidbeacon-api-client/package.json` (for example `0.3.0`) track `@bidbeacon/api-client` releases.
-
-These versions do not need to match exactly.
+- Tag: `vX.Y.Z`
+- App: `package.json#version`
+- API client: `packages/bidbeacon-api-client/package.json#version`
+- CLI: `packages/bidbeacon-cli/package.json#version`
 
 Use SemVer for the API client package:
 
@@ -83,7 +83,8 @@ Use SemVer for the API client package:
 
 Release checklist for API client changes:
 
-1. Run `bun run api-client:build`.
-2. Bump `packages/bidbeacon-api-client/package.json`.
-3. Update `CHANGELOG.md` in the same PR with the new client package version.
+1. Update shared version files (`package.json`, CLI package, and API client package) to the same `X.Y.Z`.
+2. Add a new `CHANGELOG.md` release section from commit summaries.
+3. Run `bun run api-client:build`.
 4. Publish with `npm publish --access public`.
+5. Tag and push with `git tag vX.Y.Z && git push origin vX.Y.Z`.

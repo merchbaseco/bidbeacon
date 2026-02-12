@@ -2,53 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## v0.1 - 2026-02-12
 
-## v0.4 - 2026-02-12
+### Launch Highlights
 
-### Added
-
-- Add `/api/history/list` for campaign, ad group, ad, and target change-history rows.
-- Add `bb history <campaigns|ad-groups|ads|targets> <entity_id>` with `--limit`/`--offset`.
-- Add history range filtering (`today`, `yesterday`, `Nd`, `YYYY-MM-DD..YYYY-MM-DD`) with `--range`.
-
-### Changed
-
-- Bump `packages/bidbeacon-api-client` to `0.4.0`.
-- Make entity detail APIs (for example `targets.get`) state-only; change history is now explicit via `historyList`.
-- Remove legacy `api.client.*` / `api.cli.*` public procedure aliases; public HTTP/tRPC paths are slash-style only (for example `/api/campaigns/list`).
-
-## v0.3 - 2026-02-11
-
-### Added
-
-- Public API now supports AUTO target types (Close/Loose/Substitutes/Complements) and exposes auto subtypes in target responses.
-
-### Changed
-
-- Bumped `packages/bidbeacon-api-client` to `0.3.0`.
-
-## v0.2 - 2026-02-10
-
-### Added
-
-- Add ASIN campaign tree CLI command.
-- Filter ads by ASIN.
-- Add Amazon Ads retry policy.
-- Harden ad entity sync flow.
-- Add contextual CLI help.
-
-### Fixed
-
-- Improve CLI ID errors.
-- Deploy: install `bb` wrapper pointing at `packages/bidbeacon-cli`.
-- Add lint scripts and clean lint.
-- Simplify CLI help header.
-
-## v0.1 - through 2026-02-09
-
-### Highlights
-
-- First internal beta build of BidBeacon.
-- One place to manage Amazon Ads performance across dashboard, API, and CLI with secure account-scoped access.
-- Faster optimization loops with near-real-time ingestion and reporting that turns campaign data into clear next actions.
+- BidBeacon launches pre-beta as one focused workflow to run Amazon Ads performance from dashboard, API, and CLI in one account-scoped system.
+- Teams get secure multi-account access out of the box with Clerk auth, API keys, and clean account-level permissions built directly into every surface.
+- Operators can move faster with near-real-time Amazon Marketing Stream ingestion, resilient retry handling, and reporting tuned for daily decisions.
+- Campaign analysis is now easier to automate with a typed public API client plus CLI commands for campaigns, ads, targets, ASIN views, and lifecycle actions.
+- Optimization history is first-class with dedicated change-history endpoints and range filters, so teams can quickly see what changed and why performance moved.
+- The public API surface is standardized and production-minded, with slash-style paths and account-safe contracts designed for automation from day one.

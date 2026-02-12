@@ -76,11 +76,18 @@ npm login
 npm publish --access public
 ```
 
-Version bump before each publish:
+Check current package version:
 
 ```bash
 cat packages/bidbeacon-api-client/package.json | rg '\"version\"'
 ```
+
+## Releases
+
+Release policy and step-by-step instructions live in `docs/release-process.md`.
+
+- One shared version (`vX.Y.Z`) is used across app, CLI, and `@bidbeacon/api-client`.
+- Release updates are done manually with agent assistance (no required GitHub automation).
 
 ## Docker Services
 
