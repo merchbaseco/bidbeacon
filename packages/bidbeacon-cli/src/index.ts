@@ -5,7 +5,7 @@ import { join } from 'node:path';
 import { createTRPCProxyClient, httpLink } from '@trpc/client';
 import type { AppRouter } from '../../../src/api/router';
 import { getTimezoneForCountry } from '../../../src/utils/timezones';
-import { normalizeApiBaseUrl, withTransportHint } from './base-url';
+import { encodeTrpcProcedurePath, normalizeApiBaseUrl, withTransportHint } from './base-url';
 import { CliUsageError, isCliUsageError } from './cli-errors';
 import { type HelpTopicKey, renderHelp, resolveHelpTopicKey } from './help';
 
@@ -873,6 +873,10 @@ const createApiClient = (config: CliConfig) => {
         links: [
             httpLink({
                 url: `${apiConfig.baseUrl}/api`,
+                fetch(input, init) {
+                    const url = getRequestUrl(input);
+                    return fetch(encodeTrpcProcedurePath(url), init);
+                },
                 headers() {
                     return { Authorization: `Bearer ${apiConfig.apiKey}` };
                 },
@@ -1521,6 +1525,16 @@ const truncateAccountId = (accountId: string) => {
         return accountId;
     }
     return `${accountId.slice(0, 16)}...${accountId.slice(-4)}`;
+};
+
+const getRequestUrl = (request: RequestInfo | URL) => {
+    if (typeof request === 'string') {
+        return request;
+    }
+    if (request instanceof URL) {
+        return request.toString();
+    }
+    return request.url;
 };
 
 await main().catch(async error => {

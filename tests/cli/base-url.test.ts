@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeApiBaseUrl, withTransportHint } from '../../packages/bidbeacon-cli/src/base-url';
+import { encodeTrpcProcedurePath, normalizeApiBaseUrl, withTransportHint } from '../../packages/bidbeacon-cli/src/base-url';
 
 describe('bb base-url normalization', () => {
     it('strips trailing slashes', () => {
@@ -26,5 +26,15 @@ describe('bb transport error hint', () => {
 
     it('leaves unrelated errors unchanged', () => {
         expect(withTransportHint('Campaign not found.')).toBe('Campaign not found.');
+    });
+});
+
+describe('bb transport path encoding', () => {
+    it('encodes slash-style tRPC procedures in the /api path', () => {
+        expect(encodeTrpcProcedurePath('https://bidbeacon.merchbase.co/api/campaigns/get?input=%7B%7D')).toBe('https://bidbeacon.merchbase.co/api/campaigns%2Fget?input=%7B%7D');
+    });
+
+    it('preserves batch separators while encoding each procedure', () => {
+        expect(encodeTrpcProcedurePath('https://bidbeacon.merchbase.co/api/campaigns/get,ad-groups/list?batch=1')).toBe('https://bidbeacon.merchbase.co/api/campaigns%2Fget,ad-groups%2Flist?batch=1');
     });
 });
