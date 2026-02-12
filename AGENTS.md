@@ -336,8 +336,10 @@ docker logs bidbeacon-worker --tail 50
 ## API Client Publishing (npm)
 
 Typed client package: `packages/bidbeacon-api-client`.
+Published npm package: `@merchbase/bidbeacon-http-client`.
 
 Spec doc: `docs/api-client-spec.md`.
+Release runbook: `docs/release-process.md`.
 
 Build:
 
@@ -348,8 +350,8 @@ bun run api-client:build
 Publish (public):
 
 ```bash
+# Ensure NPM_TOKEN is exported in your shell (granular token with bypass 2FA)
 cd packages/bidbeacon-api-client
-npm login
 npm publish --access public
 ```
 
@@ -370,6 +372,11 @@ Any change to the public API surface (for example files under `src/api/public/`,
    cd packages/bidbeacon-api-client
    npm publish --access public
    ```
+
+Quick verify:
+```bash
+npm view @merchbase/bidbeacon-http-client version
+```
 
 ---
 
