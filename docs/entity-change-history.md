@@ -53,16 +53,21 @@ Current normalization rules:
 
 This keeps one canonical per-day result while still allowing immediate local writes before authoritative daily replacement.
 
-## Read Path
+## Read Path (Explicit)
 
-`api.ads.targets.get` includes:
-- `lastBidChangeAt`
-- `previousBid`
-- `newBid`
+History is read through explicit history surfaces, not entity detail endpoints:
 
-Dashboard target details render:
-- Last bid change timestamp
-- Bid transition (`previous -> new`)
+- API: `api.client.historyList` (aliased as `api.cli.historyList`)
+  - Input: `config`, `entityType`, `entityId`, optional `range`, optional `limit`, optional `offset`
+  - `entityType`: `campaign` | `adGroup` | `ad` | `target`
+- CLI:
+  - `bb history campaigns <campaign_id> [--range <range>]`
+  - `bb history ad-groups <ad_group_id> [--range <range>]`
+  - `bb history ads <ad_id> [--range <range>]`
+  - `bb history targets <target_id> [--range <range>]`
+  - Optional flags: `--limit`, `--offset`
+
+Entity detail APIs (for example `targets.get`) return current entity state only.
 
 ## Sync State
 

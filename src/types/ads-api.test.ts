@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { updateAdGroupBidInputSchema, updateTargetBidInputSchema } from '@/types/ads-api';
+import { targetDetailOutputSchema, updateAdGroupBidInputSchema, updateTargetBidInputSchema } from '@/types/ads-api';
 
 const baseInput = {
     accountId: 'acc_123',
@@ -50,5 +50,11 @@ describe('ads-api bid input validation', () => {
                 bidAmount: 1.234,
             })
         ).toThrow();
+    });
+
+    it('keeps target detail schema focused on entity state (no implicit history fields)', () => {
+        expect(Object.hasOwn(targetDetailOutputSchema.shape, 'lastBidChangeAt')).toBe(false);
+        expect(Object.hasOwn(targetDetailOutputSchema.shape, 'previousBid')).toBe(false);
+        expect(Object.hasOwn(targetDetailOutputSchema.shape, 'newBid')).toBe(false);
     });
 });

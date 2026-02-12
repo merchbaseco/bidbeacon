@@ -691,6 +691,34 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				};
 				meta: object;
 			}>;
+			historyList: import("@trpc/server").TRPCQueryProcedure<{
+				input: {
+					entityType: "campaign" | "ad" | "target" | "adGroup";
+					entityId: string;
+					config: {
+						accountId: string;
+						range: string;
+						countryCode?: string | undefined;
+					};
+					limit?: number | undefined;
+					offset?: number | undefined;
+					range?: string | undefined;
+				};
+				output: {
+					items: {
+						id: string;
+						entityType: "campaign" | "ad" | "target" | "adGroup";
+						entityId: string;
+						eventType: "bid_change" | "state_change" | "budget_change";
+						fieldName: string;
+						previousValue: string | null;
+						newValue: string | null;
+						changedAt: string;
+						source: "bidbeacon" | "ams" | "change_history";
+					}[];
+				};
+				meta: object;
+			}>;
 			targetsList: import("@trpc/server").TRPCQueryProcedure<{
 				input: {
 					config: {
@@ -2038,6 +2066,34 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								productId: string;
 							}[];
 						}[];
+					}[];
+				};
+				meta: object;
+			}>;
+			historyList: import("@trpc/server").TRPCQueryProcedure<{
+				input: {
+					entityType: "campaign" | "ad" | "target" | "adGroup";
+					entityId: string;
+					config: {
+						accountId: string;
+						range: string;
+						countryCode?: string | undefined;
+					};
+					limit?: number | undefined;
+					offset?: number | undefined;
+					range?: string | undefined;
+				};
+				output: {
+					items: {
+						id: string;
+						entityType: "campaign" | "ad" | "target" | "adGroup";
+						entityId: string;
+						eventType: "bid_change" | "state_change" | "budget_change";
+						fieldName: string;
+						previousValue: string | null;
+						newValue: string | null;
+						changedAt: string;
+						source: "bidbeacon" | "ams" | "change_history";
 					}[];
 				};
 				meta: object;
@@ -3449,6 +3505,34 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				};
 				meta: object;
 			}>;
+			historyList: import("@trpc/server").TRPCQueryProcedure<{
+				input: {
+					entityType: "campaign" | "ad" | "target" | "adGroup";
+					entityId: string;
+					config: {
+						accountId: string;
+						range: string;
+						countryCode?: string | undefined;
+					};
+					limit?: number | undefined;
+					offset?: number | undefined;
+					range?: string | undefined;
+				};
+				output: {
+					items: {
+						id: string;
+						entityType: "campaign" | "ad" | "target" | "adGroup";
+						entityId: string;
+						eventType: "bid_change" | "state_change" | "budget_change";
+						fieldName: string;
+						previousValue: string | null;
+						newValue: string | null;
+						changedAt: string;
+						source: "bidbeacon" | "ams" | "change_history";
+					}[];
+				};
+				meta: object;
+			}>;
 			targetsList: import("@trpc/server").TRPCQueryProcedure<{
 				input: {
 					config: {
@@ -4796,6 +4880,34 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 								productId: string;
 							}[];
 						}[];
+					}[];
+				};
+				meta: object;
+			}>;
+			historyList: import("@trpc/server").TRPCQueryProcedure<{
+				input: {
+					entityType: "campaign" | "ad" | "target" | "adGroup";
+					entityId: string;
+					config: {
+						accountId: string;
+						range: string;
+						countryCode?: string | undefined;
+					};
+					limit?: number | undefined;
+					offset?: number | undefined;
+					range?: string | undefined;
+				};
+				output: {
+					items: {
+						id: string;
+						entityType: "campaign" | "ad" | "target" | "adGroup";
+						entityId: string;
+						eventType: "bid_change" | "state_change" | "budget_change";
+						fieldName: string;
+						previousValue: string | null;
+						newValue: string | null;
+						changedAt: string;
+						source: "bidbeacon" | "ams" | "change_history";
 					}[];
 				};
 				meta: object;

@@ -3,7 +3,7 @@ type HelpRow = {
     right: string;
 };
 
-export type HelpTopicKey = 'global' | 'config' | 'accounts' | 'campaigns' | 'ad-groups' | 'ads' | 'asins' | 'targets' | 'bids' | 'metrics' | 'metrics series' | 'metrics table' | 'enums';
+export type HelpTopicKey = 'global' | 'config' | 'accounts' | 'campaigns' | 'ad-groups' | 'ads' | 'asins' | 'targets' | 'history' | 'bids' | 'metrics' | 'metrics series' | 'metrics table' | 'enums';
 
 type HelpTopic = {
     key: HelpTopicKey;
@@ -27,6 +27,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'ads', right: 'Manage ads' },
             { left: 'asins', right: 'Inspect ASIN-scoped campaign trees' },
             { left: 'targets', right: 'Manage targeting (keywords/product targets)' },
+            { left: 'history', right: 'Inspect entity change history' },
             { left: 'bids', right: 'Set or adjust bids for a target' },
             { left: 'metrics', right: 'Fetch chart/table metrics' },
             { left: 'enums', right: 'Print enum values accepted by the API' },
@@ -154,6 +155,27 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'pause <target_id>', right: 'Pause a target' },
             { left: 'resume <target_id>', right: 'Resume a target' },
             { left: 'delete <target_id>', right: 'Delete a target' },
+        ],
+        notes: ['Use `bb history targets <target_id>` for change-history rows.'],
+    },
+    history: {
+        key: 'history',
+        usage: 'bb history [options] [command]',
+        summary: 'Inspect entity change history',
+        options: [
+            { left: '--range <range>', right: 'today|yesterday|Nd|YYYY-MM-DD..YYYY-MM-DD (aliases: t|y|w|week|m|month)' },
+            { left: '--limit <n>', right: 'Limit number of history rows (default: 20)' },
+            { left: '--offset <n>', right: 'Offset history rows' },
+        ],
+        commands: [
+            { left: 'campaigns <campaign_id>', right: 'List campaign history rows' },
+            { left: 'ad-groups <ad_group_id>', right: 'List ad-group history rows' },
+            { left: 'ads <ad_id>', right: 'List ad history rows' },
+            { left: 'targets <target_id>', right: 'List target history rows' },
+        ],
+        notes: [
+            'Rows include eventType (bid/state/budget), previous/new values, source, and changedAt.',
+            '--range overrides configured range; range values are interpreted in the selected account timezone.',
         ],
     },
     bids: {
@@ -288,6 +310,9 @@ export const resolveHelpTopicKey = (pathSegments: string[]): HelpTopicKey => {
     }
     if (first === 'targets') {
         return 'targets';
+    }
+    if (first === 'history') {
+        return 'history';
     }
     if (first === 'bids') {
         return 'bids';

@@ -31,6 +31,20 @@ const client = createBidBeaconClient({ baseUrl, apiKey });
 const accounts = await client.accountsList.query();
 ```
 
+History is explicit and entity-scoped:
+
+```ts
+const history = await client.historyList.query({
+  config: { accountId: '...', countryCode: 'US', range: 'today' },
+  entityType: 'campaign',
+  entityId: '1234567890',
+  range: 'yesterday', // optional override of config.range
+  limit: 50,
+});
+```
+
+Entity detail endpoints return current state; change history is fetched via `historyList`.
+
 ## Types
 
 - `CliRouterInputs` and `CliRouterOutputs` are exported for type-safe integration.

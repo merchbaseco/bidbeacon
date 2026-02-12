@@ -480,6 +480,36 @@ const main = async () => {
             }
             throw new CliUsageError({ topicKey: 'targets', message: `Unknown subcommand: ${subcommand}` });
         }
+        case 'history': {
+            if (!subcommand) {
+                process.stdout.write(renderHelp('history', helpContext));
+                return;
+            }
+
+            const entity = resolveHistoryEntityRef(subcommand);
+            const config = await loadConfig();
+            const client = createApiClient(config);
+            const cliConfig = requireCliConfig(config);
+            const entityId = requireNumericIdArg(action, {
+                topicKey: 'history',
+                label: entity.label,
+                expected: entity.expected,
+            });
+            const rangeOverride = readFlag(flags, ['range']);
+            const limitRaw = readFlag(flags, ['limit']);
+            const offsetRaw = readFlag(flags, ['offset']);
+
+            const data = await client.api.client.historyList.query({
+                config: cliConfig,
+                entityType: entity.entityType,
+                entityId,
+                range: rangeOverride ?? undefined,
+                limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
+                offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
+            });
+            printOutput(data);
+            return;
+        }
         case 'bids': {
             if (!subcommand) {
                 process.stdout.write(renderHelp('bids', helpContext));
@@ -1064,6 +1094,42 @@ const parseOptionalBooleanFlag = (value: string | null, input: { topicKey: HelpT
             message: `Invalid ${input.label}: expected true|false.`,
         });
     }
+};
+
+const resolveHistoryEntityRef = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'campaign' || normalized === 'campaigns') {
+        return {
+            entityType: 'campaign' as const,
+            label: '<campaign_id>',
+            expected: 'campaign_id',
+        };
+    }
+    if (normalized === 'ad-group' || normalized === 'ad-groups' || normalized === 'adgroup' || normalized === 'adgroups') {
+        return {
+            entityType: 'adGroup' as const,
+            label: '<ad_group_id>',
+            expected: 'ad_group_id',
+        };
+    }
+    if (normalized === 'ad' || normalized === 'ads') {
+        return {
+            entityType: 'ad' as const,
+            label: '<ad_id>',
+            expected: 'ad_id',
+        };
+    }
+    if (normalized === 'target' || normalized === 'targets') {
+        return {
+            entityType: 'target' as const,
+            label: '<target_id>',
+            expected: 'target_id',
+        };
+    }
+    throw new CliUsageError({
+        topicKey: 'history',
+        message: `Unknown history entity: ${value}. Use campaigns, ad-groups, ads, or targets.`,
+    });
 };
 
 const parseAsin = (value: string, input: { topicKey: HelpTopicKey; label: string }) => {
