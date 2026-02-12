@@ -18,15 +18,15 @@ const client = createBidBeaconClient({
   apiKey: 'bbk_...'
 });
 
-const accounts = await client.accountsList.query();
+const accounts = await client['accounts/list'].query();
 ```
 
-The client is scoped to the CLI surface (`api.cli.*`) so it stays in lockstep with the CLI.
+The client is scoped to slash-style CLI paths (for example `campaigns/list`) so it stays in lockstep with the CLI.
 
 Change history is available through an explicit endpoint:
 
 ```ts
-const history = await client.historyList.query({
+const history = await client['history/list'].query({
   config: { accountId: '...', countryCode: 'US', range: 'today' },
   entityType: 'target',
   entityId: '1234567890',
@@ -40,8 +40,8 @@ const history = await client.historyList.query({
 ```ts
 import type { CliRouterInputs, CliRouterOutputs } from '@bidbeacon/api-client';
 
-type CampaignsListInput = CliRouterInputs['campaignsList'];
-type CampaignsListOutput = CliRouterOutputs['campaignsList'];
+type CampaignsListInput = CliRouterInputs['campaigns/list'];
+type CampaignsListOutput = CliRouterOutputs['campaigns/list'];
 ```
 
 ## Maintenance

@@ -14,6 +14,7 @@
 - Amazon Ads retry policy doc: `docs/amazon-ads-retry-policy.md`.
 - Tests: run `bun run test` (Vitest). Avoid `bun test` (missing Vitest helpers).
 - Proactively keep docs in sync with code changes: update the directly affected docs in the same PR, but avoid broad or speculative doc churn.
+- Product phase policy: this is pre-beta, so prefer clean breaks over compatibility layers. Do not keep legacy/compat aliases unless explicitly requested.
 - If `packages/bidbeacon-api-client/package.json` version changes, update `CHANGELOG.md` in the same PR.
 - `CHANGELOG.md` release versions track BidBeacon app releases; API client package versions are independent and tracked in `packages/bidbeacon-api-client/package.json`.
 

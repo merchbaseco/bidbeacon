@@ -1,12 +1,7 @@
-import { clientApiRouter } from './public/client';
+import { clientRestProcedures } from './public/client-rest';
 import { router } from './trpc';
 
-export const publicAppRouter = router({
-    api: router({
-        client: clientApiRouter,
-        cli: clientApiRouter,
-    }),
-});
+export const publicAppRouter = router(clientRestProcedures);
 
 export const cliAppRouter = publicAppRouter;
 

@@ -17,7 +17,7 @@ This spec defines the public npm client package that exposes typed access to the
 ## Philosophy
 
 - The client mirrors the public API surface shared by the CLI.
-- The client hides the `api.client` router path (aliased as `api.cli` for compatibility) from consumers.
+- The client uses slash-style procedure keys that mirror CLI command shape (for example `campaigns/list`).
 - Typed inputs and outputs are derived from the server router, not duplicated.
 - Publish manually to npm for now.
 
@@ -28,13 +28,13 @@ This spec defines the public npm client package that exposes typed access to the
 
 ```ts
 const client = createBidBeaconClient({ baseUrl, apiKey });
-const accounts = await client.accountsList.query();
+const accounts = await client['accounts/list'].query();
 ```
 
 History is explicit and entity-scoped:
 
 ```ts
-const history = await client.historyList.query({
+const history = await client['history/list'].query({
   config: { accountId: '...', countryCode: 'US', range: 'today' },
   entityType: 'campaign',
   entityId: '1234567890',
@@ -43,13 +43,13 @@ const history = await client.historyList.query({
 });
 ```
 
-Entity detail endpoints return current state; change history is fetched via `historyList`.
+Entity detail endpoints return current state; change history is fetched via `history/list`.
 
 ## Types
 
 - `CliRouterInputs` and `CliRouterOutputs` are exported for type-safe integration.
 - These types are generated from the server router and bundled into the package.
-- For shape-sensitive endpoints (for example `asinsGet`), use `CliRouterOutputs[...]` directly instead of hardcoding local interfaces.
+- For shape-sensitive endpoints (for example `asins/get`), use `CliRouterOutputs[...]` directly instead of hardcoding local interfaces.
 - Metrics naming: conversion count is exposed as `purchases`.
 
 ## Build + Publish
