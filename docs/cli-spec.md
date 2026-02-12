@@ -19,6 +19,8 @@ This spec defines the public, user-facing shape of the Sponsored Products (SP) C
   - `bb campaigns create ...` -> `POST /api/campaigns/create`
   - `bb targets create keyword ...` -> `POST /api/targets/create/keyword`
   - `bb metrics series campaigns ...` -> `GET /api/metrics/series/campaigns`
+- Transport URL note:
+  - Slash-style procedure names are percent-encoded in the request path (for example `/api/campaigns%2Fget`).
 - Transport remains tRPC semantics:
   - query procedures use `GET` with URL-encoded `input`
   - mutation procedures use `POST` with JSON body
@@ -36,7 +38,7 @@ Config is stored locally at `~/.bidbeacon/config.json`.
 - `bb config show`
 - `bb config clear`
 - `bb config set api-key <value>`
-- `bb config set base-url <value>` (`<value>` should be the server origin; a trailing `/api` is accepted and normalized)
+- `bb config set base-url <value>` (`<value>` should be the server origin, for example `https://bidbeacon.merchbase.co`; a trailing `/api` is accepted and normalized)
 - `bb config set account <adsAccountId> <countryCode>`
 - `bb config set range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>`
 

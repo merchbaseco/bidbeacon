@@ -3,6 +3,8 @@ import type { inferRouterInputs, inferRouterOutputs } from '@trpc/server';
 import type { CliAppRouter } from './app-router';
 
 const TRAILING_SLASHES_REGEX = /\/+$/;
+const API_PATH_SEGMENT = '/api/';
+const PATH_SEPARATOR = ',';
 
 export type AppRouter = CliAppRouter;
 
@@ -30,6 +32,7 @@ export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
         ...(headers ?? {}),
     });
+    const transportFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(encodeTrpcProcedurePath(getRequestUrl(input)), init);
 
     if (batch) {
         const client = createTRPCProxyClient<CliAppRouter>({
@@ -37,6 +40,7 @@ export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }
                 httpBatchLink({
                     url,
                     headers: resolveHeaders,
+                    fetch: transportFetch,
                 }),
             ],
         });
@@ -48,6 +52,7 @@ export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }
             httpLink({
                 url,
                 headers: resolveHeaders,
+                fetch: transportFetch,
             }),
         ],
     });
@@ -55,3 +60,39 @@ export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }
 };
 
 const normalizeBaseUrl = (baseUrl: string) => baseUrl.replace(TRAILING_SLASHES_REGEX, '');
+
+const getRequestUrl = (request: RequestInfo | URL) => {
+    if (typeof request === 'string') {
+        return request;
+    }
+    if (request instanceof URL) {
+        return request.toString();
+    }
+    return request.url;
+};
+
+const encodeTrpcProcedurePath = (urlString: string) => {
+    const url = new URL(urlString);
+    const apiPathIndex = url.pathname.indexOf(API_PATH_SEGMENT);
+    if (apiPathIndex < 0) {
+        return urlString;
+    }
+
+    const procedurePathStart = apiPathIndex + API_PATH_SEGMENT.length;
+    const procedurePath = url.pathname.slice(procedurePathStart);
+    if (!procedurePath) {
+        return urlString;
+    }
+
+    const encodedProcedurePath = procedurePath
+        .split(PATH_SEPARATOR)
+        .map(segment => encodeURIComponent(decodeURIComponent(segment)))
+        .join(PATH_SEPARATOR);
+
+    if (encodedProcedurePath === procedurePath) {
+        return urlString;
+    }
+
+    url.pathname = `${url.pathname.slice(0, procedurePathStart)}${encodedProcedurePath}`;
+    return url.toString();
+};
