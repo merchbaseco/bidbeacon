@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { createTRPCProxyClient, httpLink } from '@trpc/client';
 import type { AppRouter } from '../../../src/api/router';
 import { getTimezoneForCountry } from '../../../src/utils/timezones';
+import { normalizeApiBaseUrl, withTransportHint } from './base-url';
 import { CliUsageError, isCliUsageError } from './cli-errors';
 import { type HelpTopicKey, renderHelp, resolveHelpTopicKey } from './help';
 
@@ -857,7 +858,7 @@ const saveConfig = async (config: CliConfig) => {
 };
 
 const resolveApiConfig = (config: CliConfig) => {
-    const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
+    const baseUrl = normalizeApiBaseUrl(config.baseUrl ?? DEFAULT_BASE_URL);
     const apiKey = config.apiKey;
     if (!apiKey) {
         throw new CliUsageError({ topicKey: 'config', message: 'Missing API key. Run: bb config set api-key <value>.' });
@@ -1530,6 +1531,6 @@ await main().catch(async error => {
         process.exit(error.exitCode);
     }
 
-    console.error(JSON.stringify({ ok: false, error: error instanceof Error ? error.message : error }, null, 2));
+    console.error(JSON.stringify({ ok: false, error: error instanceof Error ? withTransportHint(error.message) : error }, null, 2));
     process.exit(1);
 });
