@@ -5,6 +5,7 @@ import type { apiProcedure } from '@/api/trpc';
 import { router } from '@/api/trpc';
 import { db } from '@/db/index';
 import { campaign, target } from '@/db/schema';
+import { getLastBidChangeForEntity, recordEntityChange } from '@/lib/entity-change-history';
 import { targetDetailInputSchema, targetDetailOutputSchema, targetListInputSchema, targetListOutputSchema, updateTargetBidInputSchema, updateTargetBidOutputSchema } from '@/types/ads-api';
 import { formatDateTime, formatListResponse, getPagination, isSponsoredProducts, parseNumeric, resolveProfileId, toMoneyString } from './shared';
 
@@ -127,7 +128,19 @@ export const buildTargetsRouter = (procedure: typeof apiProcedure) =>
                     });
                 }
 
-                return formatTargetRow(row);
+                const bidChange = await getLastBidChangeForEntity({
+                    accountId: input.accountId,
+                    countryCode: row.countryCode,
+                    entityType: 'target',
+                    entityId: String(row.targetId),
+                });
+
+                return {
+                    ...formatTargetRow(row),
+                    lastBidChangeAt: bidChange?.lastBidChangeAt ?? null,
+                    previousBid: bidChange?.previousBid ?? null,
+                    newBid: bidChange?.newBid ?? null,
+                };
             }),
         updateBid: procedure
             .input(updateTargetBidInputSchema)
@@ -143,6 +156,7 @@ export const buildTargetsRouter = (procedure: typeof apiProcedure) =>
                         countryCode: campaign.countryCode,
                         adProduct: target.adProduct,
                         negative: target.negative,
+                        bidAmount: target.bidAmount,
                     })
                     .from(target)
                     .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
@@ -177,6 +191,13 @@ export const buildTargetsRouter = (procedure: typeof apiProcedure) =>
                     });
                 }
 
+                if (!(row.accountId && row.countryCode)) {
+                    throw new TRPCError({
+                        code: 'BAD_REQUEST',
+                        message: 'Missing account id or country code for this entity.',
+                    });
+                }
+
                 const profileId = await resolveProfileId(row.accountId, row.countryCode);
 
                 await updateTargetBid({
@@ -193,6 +214,19 @@ export const buildTargetsRouter = (procedure: typeof apiProcedure) =>
                         lastUpdatedDateTime: updatedAt,
                     })
                     .where(eq(target.targetId, row.targetId));
+
+                await recordEntityChange({
+                    accountId: row.accountId,
+                    countryCode: row.countryCode,
+                    entityType: 'target',
+                    entityId: row.targetId,
+                    eventType: 'bid_change',
+                    fieldName: 'bidAmount',
+                    previousValue: parseNumeric(row.bidAmount),
+                    newValue: input.bidAmount,
+                    changedAt: updatedAt,
+                    source: 'bidbeacon',
+                });
 
                 return {
                     targetId: row.targetId,

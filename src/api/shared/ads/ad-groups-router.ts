@@ -5,6 +5,7 @@ import type { apiProcedure } from '@/api/trpc';
 import { router } from '@/api/trpc';
 import { db } from '@/db/index';
 import { adGroup, campaign } from '@/db/schema';
+import { recordEntityChange } from '@/lib/entity-change-history';
 import { adGroupDetailInputSchema, adGroupDetailOutputSchema, adGroupListInputSchema, adGroupListOutputSchema, updateAdGroupBidInputSchema, updateAdGroupBidOutputSchema } from '@/types/ads-api';
 import { formatDateTime, formatListResponse, getPagination, isSponsoredProducts, parseNumeric, resolveProfileId, toMoneyString } from './shared';
 
@@ -115,6 +116,7 @@ export const buildAdGroupsRouter = (procedure: typeof apiProcedure) =>
                         accountId: campaign.accountId,
                         countryCode: campaign.countryCode,
                         adProduct: adGroup.adProduct,
+                        bidAmount: adGroup.bidAmount,
                     })
                     .from(adGroup)
                     .innerJoin(campaign, eq(adGroup.campaignId, campaign.campaignId))
@@ -135,6 +137,13 @@ export const buildAdGroupsRouter = (procedure: typeof apiProcedure) =>
                     });
                 }
 
+                if (!(row.accountId && row.countryCode)) {
+                    throw new TRPCError({
+                        code: 'BAD_REQUEST',
+                        message: 'Missing account id or country code for this entity.',
+                    });
+                }
+
                 const profileId = await resolveProfileId(row.accountId, row.countryCode);
 
                 await updateAdGroupBid({
@@ -151,6 +160,19 @@ export const buildAdGroupsRouter = (procedure: typeof apiProcedure) =>
                         lastUpdatedDateTime: updatedAt,
                     })
                     .where(eq(adGroup.adGroupId, row.adGroupId));
+
+                await recordEntityChange({
+                    accountId: row.accountId,
+                    countryCode: row.countryCode,
+                    entityType: 'adGroup',
+                    entityId: row.adGroupId,
+                    eventType: 'bid_change',
+                    fieldName: 'bidAmount',
+                    previousValue: parseNumeric(row.bidAmount),
+                    newValue: input.bidAmount,
+                    changedAt: updatedAt,
+                    source: 'bidbeacon',
+                });
 
                 return {
                     adGroupId: row.adGroupId,

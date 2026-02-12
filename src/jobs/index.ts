@@ -14,6 +14,8 @@ import './summarize-daily-target-stream';
 import './summarize-hourly-target-stream-for-account';
 import './summarize-hourly-target-stream';
 import './cleanup-ams-metrics';
+import './sync-change-history';
+import './sync-change-history-for-account';
 
 export async function startJobs(): Promise<void> {
     if (boss.isStarted) {

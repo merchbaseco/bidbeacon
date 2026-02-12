@@ -1,6 +1,7 @@
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { db } from '@/db/index.js';
 import { amsCmCampaigns, campaign } from '@/db/schema.js';
+import { recordEntityChange } from '@/lib/entity-change-history.js';
 import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { createContextLogger } from '@/utils/logger';
 import { campaignSchema } from '../schemas.js';
@@ -73,6 +74,22 @@ const updateCampaignFromAms = async (data: { campaign_id: string; last_updated_d
         return;
     }
 
+    const [current] = await db
+        .select({
+            campaignId: campaign.campaignId,
+            accountId: campaign.accountId,
+            countryCode: campaign.countryCode,
+            state: campaign.state,
+            lastUpdatedDateTime: campaign.lastUpdatedDateTime,
+        })
+        .from(campaign)
+        .where(and(eq(campaign.campaignId, data.campaign_id), or(isNull(campaign.lastUpdatedDateTime), lte(campaign.lastUpdatedDateTime, lastUpdated))))
+        .limit(1);
+
+    if (!current) {
+        return;
+    }
+
     const updates: Record<string, unknown> = {
         lastUpdatedDateTime: lastUpdated,
     };
@@ -91,8 +108,30 @@ const updateCampaignFromAms = async (data: { campaign_id: string; last_updated_d
         return;
     }
 
-    await db
+    const [updated] = await db
         .update(campaign)
         .set(updates)
-        .where(and(eq(campaign.campaignId, data.campaign_id), or(isNull(campaign.lastUpdatedDateTime), lte(campaign.lastUpdatedDateTime, lastUpdated))));
+        .where(and(eq(campaign.campaignId, data.campaign_id), or(isNull(campaign.lastUpdatedDateTime), lte(campaign.lastUpdatedDateTime, lastUpdated))))
+        .returning({ campaignId: campaign.campaignId });
+
+    if (!updated) {
+        return;
+    }
+
+    const nextState = typeof updates.state === 'string' ? updates.state : null;
+    if (current.accountId && nextState && current.state !== nextState) {
+        await recordEntityChange({
+            accountId: current.accountId,
+            countryCode: current.countryCode,
+            entityType: 'campaign',
+            entityId: current.campaignId,
+            eventType: 'state_change',
+            fieldName: 'state',
+            previousValue: current.state,
+            newValue: nextState,
+            changedAt: lastUpdated,
+            source: 'ams',
+            rawPayload: data,
+        });
+    }
 };

@@ -29,6 +29,7 @@ import type {
 import { parseNumeric, toMoneyString } from '@/api/shared/ads/shared';
 import { db } from '@/db/index';
 import { ad, adGroup, advertiserAccount, campaign, performanceDaily, performanceHourly, target } from '@/db/schema';
+import { recordEntityChange } from '@/lib/entity-change-history';
 import { getTimezoneForCountry } from '@/utils/timezones';
 
 export type PublicConfig = {
@@ -554,6 +555,22 @@ export const updateCampaignRow = async (
         portfolioId: string | null;
     }>
 ) => {
+    const [current] = await db
+        .select({
+            campaignId: campaign.campaignId,
+            accountId: campaign.accountId,
+            countryCode: campaign.countryCode,
+            state: campaign.state,
+            budgetAmount: campaign.budgetAmount,
+        })
+        .from(campaign)
+        .where(eq(campaign.campaignId, campaignId))
+        .limit(1);
+
+    if (!current) {
+        return;
+    }
+
     const values: Record<string, unknown> = {};
     if (updates.state) {
         values.state = updates.state;
@@ -576,11 +593,63 @@ export const updateCampaignRow = async (
     if (Object.keys(values).length === 0) {
         return;
     }
-    values.lastUpdatedDateTime = new Date();
+    const changedAt = new Date();
+    values.lastUpdatedDateTime = changedAt;
     await db.update(campaign).set(values).where(eq(campaign.campaignId, campaignId));
+
+    if (current.accountId && updates.state && current.state !== updates.state) {
+        await recordEntityChange({
+            accountId: current.accountId,
+            countryCode: current.countryCode,
+            entityType: 'campaign',
+            entityId: current.campaignId,
+            eventType: 'state_change',
+            fieldName: 'state',
+            previousValue: current.state,
+            newValue: updates.state,
+            changedAt,
+            source: 'bidbeacon',
+        });
+    }
+
+    if (current.accountId && updates.budget !== undefined) {
+        const previousBudget = parseNumeric(current.budgetAmount);
+        const nextBudget = parseNumeric(toMoneyString(updates.budget));
+        if (previousBudget !== nextBudget) {
+            await recordEntityChange({
+                accountId: current.accountId,
+                countryCode: current.countryCode,
+                entityType: 'campaign',
+                entityId: current.campaignId,
+                eventType: 'budget_change',
+                fieldName: 'budgetAmount',
+                previousValue: previousBudget,
+                newValue: nextBudget,
+                changedAt,
+                source: 'bidbeacon',
+            });
+        }
+    }
 };
 
 export const updateAdGroupRow = async (adGroupId: string, updates: Partial<{ state: string; name: string; defaultBid: number }>) => {
+    const [current] = await db
+        .select({
+            adGroupId: adGroup.adGroupId,
+            accountId: campaign.accountId,
+            countryCode: campaign.countryCode,
+            state: adGroup.state,
+            bidAmount: adGroup.bidAmount,
+        })
+        .from(adGroup)
+        .innerJoin(campaign, eq(adGroup.campaignId, campaign.campaignId))
+        .where(eq(adGroup.adGroupId, adGroupId))
+        .limit(1);
+
+    if (!current) {
+        return;
+    }
+
     const values: Record<string, unknown> = {};
     if (updates.state) {
         values.state = updates.state;
@@ -594,11 +663,62 @@ export const updateAdGroupRow = async (adGroupId: string, updates: Partial<{ sta
     if (Object.keys(values).length === 0) {
         return;
     }
-    values.lastUpdatedDateTime = new Date();
+    const changedAt = new Date();
+    values.lastUpdatedDateTime = changedAt;
     await db.update(adGroup).set(values).where(eq(adGroup.adGroupId, adGroupId));
+
+    if (current.accountId && updates.state && current.state !== updates.state) {
+        await recordEntityChange({
+            accountId: current.accountId,
+            countryCode: current.countryCode,
+            entityType: 'adGroup',
+            entityId: current.adGroupId,
+            eventType: 'state_change',
+            fieldName: 'state',
+            previousValue: current.state,
+            newValue: updates.state,
+            changedAt,
+            source: 'bidbeacon',
+        });
+    }
+
+    if (current.accountId && updates.defaultBid !== undefined) {
+        const previousBid = parseNumeric(current.bidAmount);
+        const nextBid = parseNumeric(toMoneyString(updates.defaultBid));
+        if (previousBid !== nextBid) {
+            await recordEntityChange({
+                accountId: current.accountId,
+                countryCode: current.countryCode,
+                entityType: 'adGroup',
+                entityId: current.adGroupId,
+                eventType: 'bid_change',
+                fieldName: 'bidAmount',
+                previousValue: previousBid,
+                newValue: nextBid,
+                changedAt,
+                source: 'bidbeacon',
+            });
+        }
+    }
 };
 
 export const updateAdRow = async (adId: string, updates: Partial<{ state: string }>) => {
+    const [current] = await db
+        .select({
+            adId: ad.adId,
+            accountId: campaign.accountId,
+            countryCode: campaign.countryCode,
+            state: ad.state,
+        })
+        .from(ad)
+        .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
+        .where(eq(ad.adId, adId))
+        .limit(1);
+
+    if (!current) {
+        return;
+    }
+
     const values: Record<string, unknown> = {};
     if (updates.state) {
         values.state = updates.state;
@@ -606,11 +726,44 @@ export const updateAdRow = async (adId: string, updates: Partial<{ state: string
     if (Object.keys(values).length === 0) {
         return;
     }
-    values.lastUpdatedDateTime = new Date();
+    const changedAt = new Date();
+    values.lastUpdatedDateTime = changedAt;
     await db.update(ad).set(values).where(eq(ad.adId, adId));
+
+    if (current.accountId && updates.state && current.state !== updates.state) {
+        await recordEntityChange({
+            accountId: current.accountId,
+            countryCode: current.countryCode,
+            entityType: 'ad',
+            entityId: current.adId,
+            eventType: 'state_change',
+            fieldName: 'state',
+            previousValue: current.state,
+            newValue: updates.state,
+            changedAt,
+            source: 'bidbeacon',
+        });
+    }
 };
 
 export const updateTargetRow = async (targetId: string, updates: Partial<{ state: string; bid: number }>) => {
+    const [current] = await db
+        .select({
+            targetId: target.targetId,
+            accountId: campaign.accountId,
+            countryCode: campaign.countryCode,
+            state: target.state,
+            bidAmount: target.bidAmount,
+        })
+        .from(target)
+        .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
+        .where(eq(target.targetId, targetId))
+        .limit(1);
+
+    if (!current) {
+        return;
+    }
+
     const values: Record<string, unknown> = {};
     if (updates.state) {
         values.state = updates.state;
@@ -621,8 +774,43 @@ export const updateTargetRow = async (targetId: string, updates: Partial<{ state
     if (Object.keys(values).length === 0) {
         return;
     }
-    values.lastUpdatedDateTime = new Date();
+    const changedAt = new Date();
+    values.lastUpdatedDateTime = changedAt;
     await db.update(target).set(values).where(eq(target.targetId, targetId));
+
+    if (current.accountId && updates.state && current.state !== updates.state) {
+        await recordEntityChange({
+            accountId: current.accountId,
+            countryCode: current.countryCode,
+            entityType: 'target',
+            entityId: current.targetId,
+            eventType: 'state_change',
+            fieldName: 'state',
+            previousValue: current.state,
+            newValue: updates.state,
+            changedAt,
+            source: 'bidbeacon',
+        });
+    }
+
+    if (current.accountId && updates.bid !== undefined) {
+        const previousBid = parseNumeric(current.bidAmount);
+        const nextBid = parseNumeric(toMoneyString(updates.bid));
+        if (previousBid !== nextBid) {
+            await recordEntityChange({
+                accountId: current.accountId,
+                countryCode: current.countryCode,
+                entityType: 'target',
+                entityId: current.targetId,
+                eventType: 'bid_change',
+                fieldName: 'bidAmount',
+                previousValue: previousBid,
+                newValue: nextBid,
+                changedAt,
+                source: 'bidbeacon',
+            });
+        }
+    }
 };
 
 export const getMetricsSeries = async (config: PublicConfig, dimension: MetricsDimension, options: MetricsSeriesOptions) => {
