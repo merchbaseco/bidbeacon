@@ -30,6 +30,7 @@ import { enumsBidStrategy } from './enums-bid-strategy';
 import { enumsMatchType } from './enums-match-type';
 import { enumsPlacement } from './enums-placement';
 import { enumsState } from './enums-state';
+import { historyList } from './history-list';
 import { metricsSeriesAdGroups } from './metrics-series-ad-groups';
 import { metricsSeriesAds } from './metrics-series-ads';
 import { metricsSeriesCampaigns } from './metrics-series-campaigns';
@@ -72,6 +73,7 @@ export const clientApiRouter = router({
     adsUpdate,
     adsDelete,
     asinsGet,
+    historyList,
     targetsList,
     targetsGet,
     targetsCreateKeyword,

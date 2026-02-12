@@ -185,12 +185,6 @@ const targetRowSchema = z.object({
     lastUpdatedDateTime: z.string(),
 });
 
-const targetBidChangeSchema = z.object({
-    lastBidChangeAt: z.string().nullable(),
-    previousBid: z.number().nullable(),
-    newBid: z.number().nullable(),
-});
-
 export const campaignListOutputSchema = z.object({
     rows: z.array(campaignRowSchema),
     nextCursor: z.string().nullable(),
@@ -214,7 +208,7 @@ export const targetListOutputSchema = z.object({
 export const campaignDetailOutputSchema = campaignRowSchema;
 export const adGroupDetailOutputSchema = adGroupRowSchema;
 export const adDetailOutputSchema = adRowSchema;
-export const targetDetailOutputSchema = targetRowSchema.extend(targetBidChangeSchema.shape);
+export const targetDetailOutputSchema = targetRowSchema;
 
 const bidAmountSchema = z
     .number()

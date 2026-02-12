@@ -91,12 +91,10 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
                           ...prev,
                           bidAmount: result.bidAmount,
                           lastUpdatedDateTime: result.lastUpdatedDateTime,
-                          lastBidChangeAt: result.lastUpdatedDateTime,
-                          previousBid: prev.bidAmount,
-                          newBid: result.bidAmount,
                       }
                     : prev
             );
+            utils.api.client.historyList.invalidate();
             utils.ads.targets.list.invalidate();
             toast.success('Bid updated', {
                 description: `New bid: ${formatCurrency(result.bidAmount)}`,
@@ -110,6 +108,21 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
     });
 
     const targetData = data && 'targetId' in data ? data : null;
+    const targetHistoryQuery = api.api.client.historyList.useQuery(
+        {
+            config: {
+                accountId,
+                range: 'today',
+            },
+            entityType: 'target',
+            entityId: targetData?.targetId ?? '',
+            limit: 20,
+        },
+        {
+            enabled: Boolean(open && targetData?.targetId),
+        }
+    );
+    const latestTargetBidChange = useMemo(() => targetHistoryQuery.data?.items.find(item => item.eventType === 'bid_change') ?? null, [targetHistoryQuery.data?.items]);
 
     useEffect(() => {
         if (!open) {
@@ -216,7 +229,7 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
             };
         }
 
-        if ('adGroupId' in data && 'bidAmount' in data) {
+        if ('adGroupId' in data && 'name' in data) {
             return {
                 title: 'Ad group details',
                 subtitle: data.adGroupId,
@@ -300,7 +313,9 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
             };
         }
 
-        if ('targetId' in data && 'targetType' in data) {
+        if ('targetId' in data) {
+            const previousBid = parseHistoryBidValue(latestTargetBidChange?.previousValue);
+            const newBid = parseHistoryBidValue(latestTargetBidChange?.newValue);
             return {
                 title: 'Target details',
                 subtitle: data.targetId,
@@ -349,10 +364,10 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
                     { label: 'Match type', value: data.targetMatchType ?? '—' },
                     { label: 'Negative', value: data.negative ? 'Yes' : 'No' },
                     { label: 'Bid', value: data.bidAmount !== null ? formatCurrency(data.bidAmount) : '—' },
-                    { label: 'Last bid change', value: data.lastBidChangeAt ? formatDateTime(data.lastBidChangeAt) : '—' },
+                    { label: 'Last bid change', value: latestTargetBidChange?.changedAt ? formatDateTime(latestTargetBidChange.changedAt) : '—' },
                     {
                         label: 'Bid transition',
-                        value: data.previousBid !== null && data.newBid !== null ? `${formatCurrency(data.previousBid)} → ${formatCurrency(data.newBid)}` : '—',
+                        value: previousBid !== null && newBid !== null ? `${formatCurrency(previousBid)} → ${formatCurrency(newBid)}` : '—',
                     },
                     { label: 'Created', value: formatDateTime(data.creationDateTime) },
                     { label: 'Updated', value: formatDateTime(data.lastUpdatedDateTime) },
@@ -361,7 +376,7 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
         }
 
         return null;
-    }, [data, handleNavigate]);
+    }, [data, handleNavigate, latestTargetBidChange]);
 
     return (
         <Dialog onOpenChange={onOpenChange} open={open}>
@@ -538,7 +553,7 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
                                                 {bidHelper ? <p className="text-muted-foreground text-xs">{bidHelper}</p> : null}
                                             </Field>
                                             <Button
-                                                disabled={!canEditBid || bidInvalid || !bidChanged || updateBid.isLoading}
+                                                disabled={!canEditBid || bidInvalid || !bidChanged || updateBid.isPending}
                                                 onClick={() => {
                                                     if (!targetData) {
                                                         return;
@@ -551,7 +566,7 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
                                                 }}
                                                 size="sm"
                                             >
-                                                {updateBid.isLoading ? (
+                                                {updateBid.isPending ? (
                                                     <span className="inline-flex items-center gap-2">
                                                         <Spinner className="size-3" />
                                                         Updating…
@@ -781,6 +796,14 @@ const formatBudget = (amount: number | null, type: string | null, period: string
     const budget = formatCurrency(amount);
     const suffix = [type, period].filter(Boolean).join(' · ');
     return suffix ? `${budget} · ${suffix}` : budget;
+};
+
+const parseHistoryBidValue = (value: string | null | undefined) => {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
 };
 
 const getBidHelper = (targetData: TargetDetails | null) => {

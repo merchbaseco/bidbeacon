@@ -5,7 +5,7 @@ import type { apiProcedure } from '@/api/trpc';
 import { router } from '@/api/trpc';
 import { db } from '@/db/index';
 import { campaign, target } from '@/db/schema';
-import { getLastBidChangeForEntity, recordEntityChange } from '@/lib/entity-change-history';
+import { recordEntityChange } from '@/lib/entity-change-history';
 import { targetDetailInputSchema, targetDetailOutputSchema, targetListInputSchema, targetListOutputSchema, updateTargetBidInputSchema, updateTargetBidOutputSchema } from '@/types/ads-api';
 import { formatDateTime, formatListResponse, getPagination, isSponsoredProducts, parseNumeric, resolveProfileId, toMoneyString } from './shared';
 
@@ -128,19 +128,7 @@ export const buildTargetsRouter = (procedure: typeof apiProcedure) =>
                     });
                 }
 
-                const bidChange = await getLastBidChangeForEntity({
-                    accountId: input.accountId,
-                    countryCode: row.countryCode,
-                    entityType: 'target',
-                    entityId: String(row.targetId),
-                });
-
-                return {
-                    ...formatTargetRow(row),
-                    lastBidChangeAt: bidChange?.lastBidChangeAt ?? null,
-                    previousBid: bidChange?.previousBid ?? null,
-                    newBid: bidChange?.newBid ?? null,
-                };
+                return formatTargetRow(row);
             }),
         updateBid: procedure
             .input(updateTargetBidInputSchema)

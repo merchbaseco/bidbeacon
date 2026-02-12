@@ -31,7 +31,7 @@ Config is stored locally at `~/.bidbeacon/config.json`.
 **Common Concepts**
 - States: `ENABLED`, `PAUSED`, `ARCHIVED`, `OTHER`, `ALL`
 - Metrics keys: `impressions`, `clicks`, `spend`, `purchases`, `sales`, `acos`, `cpc`, `ctr`, `roas`
-- Pagination: `--limit <n>` and `--offset <n>` (list + metrics table)
+- Pagination: `--limit <n>` and `--offset <n>` (list + history + metrics table)
 - Sorting: `--sort <field>` and `--direction <asc|desc>`
 
 **List Filters**
@@ -126,6 +126,31 @@ Target objects include a `negative` boolean so clients can separate editable vs 
 - `bb targets delete <target_id>`
 - `bb targets pause <target_id>`
 - `bb targets resume <target_id>`
+
+Target detail commands return current entity state only.
+Change history is fetched via explicit history commands.
+
+**History**
+- `bb history campaigns <campaign_id> [--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>] [--limit <n>] [--offset <n>]`
+- `bb history ad-groups <ad_group_id> [--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>] [--limit <n>] [--offset <n>]`
+- `bb history ads <ad_id> [--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>] [--limit <n>] [--offset <n>]`
+- `bb history targets <target_id> [--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>] [--limit <n>] [--offset <n>]`
+
+History range notes:
+- `--range` overrides configured range.
+- Aliases: `t`=`today`, `y`=`yesterday`, `w|week`=`7d`, `m|month`=`30d`.
+- Range interpretation uses the selected account timezone.
+
+History rows include:
+- `id`
+- `entityType` (`campaign`, `adGroup`, `ad`, `target`)
+- `entityId`
+- `eventType` (`bid_change`, `state_change`, `budget_change`)
+- `fieldName`
+- `previousValue`
+- `newValue`
+- `changedAt`
+- `source` (`bidbeacon`, `ams`, `change_history`)
 
 **Bids**
 Aliases that map to the same behavior as target bid updates.

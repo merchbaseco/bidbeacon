@@ -1,5 +1,4 @@
 import { formatInTimeZone } from 'date-fns-tz';
-import { and, desc, eq } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { entityChangeHistory } from '@/db/schema';
 import { getTimezoneForCountry } from '@/utils/timezones';
@@ -24,12 +23,6 @@ type RecordEntityChangeInput = {
     changedAt: Date;
     source: EntityChangeSource;
     rawPayload?: unknown;
-};
-
-type LastBidChange = {
-    lastBidChangeAt: string;
-    previousBid: number | null;
-    newBid: number | null;
 };
 
 export const recordEntityChange = async (input: RecordEntityChangeInput) => {
@@ -73,40 +66,6 @@ export const recordEntityChange = async (input: RecordEntityChangeInput) => {
         });
 };
 
-export const getLastBidChangeForEntity = async (input: { accountId: string; countryCode?: string | null; entityType: EntityChangeEntityType; entityId: string }): Promise<LastBidChange | null> => {
-    const conditions = [
-        eq(entityChangeHistory.accountId, input.accountId),
-        eq(entityChangeHistory.entityType, input.entityType),
-        eq(entityChangeHistory.entityId, input.entityId),
-        eq(entityChangeHistory.eventType, 'bid_change'),
-    ];
-
-    if (input.countryCode) {
-        conditions.push(eq(entityChangeHistory.countryCode, input.countryCode));
-    }
-
-    const [row] = await db
-        .select({
-            changedAt: entityChangeHistory.changedAt,
-            previousValue: entityChangeHistory.previousValue,
-            newValue: entityChangeHistory.newValue,
-        })
-        .from(entityChangeHistory)
-        .where(and(...conditions))
-        .orderBy(desc(entityChangeHistory.changedAt))
-        .limit(1);
-
-    if (!row) {
-        return null;
-    }
-
-    return {
-        lastBidChangeAt: row.changedAt.toISOString(),
-        previousBid: parseNullableNumber(row.previousValue),
-        newBid: parseNullableNumber(row.newValue),
-    };
-};
-
 const normalizeHistoryValue = (value: string | number | null | undefined) => {
     if (value === null || value === undefined) {
         return null;
@@ -115,15 +74,6 @@ const normalizeHistoryValue = (value: string | number | null | undefined) => {
         return Number.isFinite(value) ? String(value) : null;
     }
     return value;
-};
-
-const parseNullableNumber = (value: string | null) => {
-    if (value === null) {
-        return null;
-    }
-
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : null;
 };
 
 const resolveLocalDate = (changedAt: Date, countryCode: string | null) => {

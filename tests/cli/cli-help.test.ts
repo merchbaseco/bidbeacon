@@ -8,6 +8,7 @@ describe('bb help topics', () => {
         expect(resolveHelpTopicKey(['metrics', 'table'])).toBe('metrics table');
         expect(resolveHelpTopicKey(['metrics', 'series', 'campaigns'])).toBe('metrics series');
         expect(resolveHelpTopicKey(['asins'])).toBe('asins');
+        expect(resolveHelpTopicKey(['history'])).toBe('history');
     });
 
     it('renders ASCII help output with usage and commands', () => {
@@ -16,5 +17,13 @@ describe('bb help topics', () => {
         expect(output).toContain('Usage: bb campaigns');
         expect(output).toContain('Commands:');
         expect(output).not.toContain('—');
+    });
+
+    it('renders explicit history command guidance for targets', () => {
+        const targetsOutput = renderHelp('targets', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
+        expect(targetsOutput).toContain('Use `bb history targets <target_id>` for change-history rows.');
+
+        const historyOutput = renderHelp('history', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
+        expect(historyOutput).toContain('--range <range>');
     });
 });

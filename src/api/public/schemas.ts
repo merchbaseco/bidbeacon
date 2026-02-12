@@ -12,6 +12,9 @@ export const publicConfigInputSchema = z.object({
 
 export const stateSchema = z.enum(['ENABLED', 'PAUSED', 'ARCHIVED', 'OTHER']);
 export const listStateSchema = z.enum(['ENABLED', 'PAUSED', 'ARCHIVED', 'OTHER', 'ALL']);
+export const historyEntityTypeSchema = z.enum(['campaign', 'adGroup', 'ad', 'target']);
+export const historyEventTypeSchema = z.enum(['bid_change', 'state_change', 'budget_change']);
+export const historySourceSchema = z.enum(['bidbeacon', 'ams', 'change_history']);
 
 export const publicListInputSchema = publicConfigInputSchema.extend({
     state: listStateSchema.optional(),
@@ -255,6 +258,30 @@ export const targetsListOutputSchema = z.object({
 
 export const targetsGetOutputSchema = z.object({
     item: targetSchema,
+});
+
+export const historyListInputSchema = publicConfigInputSchema.extend({
+    entityType: historyEntityTypeSchema,
+    entityId: z.string(),
+    range: z.string().optional(),
+    limit: z.number().min(1).max(200).optional(),
+    offset: z.number().min(0).optional(),
+});
+
+export const historyEventSchema = z.object({
+    id: z.string(),
+    entityType: historyEntityTypeSchema,
+    entityId: z.string(),
+    eventType: historyEventTypeSchema,
+    fieldName: z.string(),
+    previousValue: z.string().nullable(),
+    newValue: z.string().nullable(),
+    changedAt: z.string(),
+    source: historySourceSchema,
+});
+
+export const historyListOutputSchema = z.object({
+    items: z.array(historyEventSchema),
 });
 
 export const targetsCreateKeywordInputSchema = publicConfigInputSchema.extend({
