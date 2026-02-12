@@ -1,6 +1,7 @@
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { db } from '@/db/index';
-import { adGroup, amsCmAdgroups } from '@/db/schema';
+import { adGroup, amsCmAdgroups, campaign } from '@/db/schema';
+import { recordEntityChange } from '@/lib/entity-change-history';
 import { trackAmsEvent } from '@/utils/ams-metrics';
 import { createContextLogger } from '@/utils/logger';
 import { adGroupSchema } from '../schemas';
@@ -65,9 +66,27 @@ export async function handleAdGroups(payload: unknown): Promise<void> {
     });
 }
 
-const updateAdGroupFromAms = async (data: { ad_group_id: string; last_updated_date_time?: string; state?: unknown; status?: unknown }) => {
+const updateAdGroupFromAms = async (data: { ad_group_id: string; last_updated_date_time?: string; state?: unknown; status?: unknown; bid?: unknown }) => {
     const lastUpdated = data.last_updated_date_time ? new Date(data.last_updated_date_time) : null;
     if (!lastUpdated) {
+        return;
+    }
+
+    const [current] = await db
+        .select({
+            adGroupId: adGroup.adGroupId,
+            accountId: campaign.accountId,
+            countryCode: campaign.countryCode,
+            state: adGroup.state,
+            bidAmount: adGroup.bidAmount,
+            lastUpdatedDateTime: adGroup.lastUpdatedDateTime,
+        })
+        .from(adGroup)
+        .leftJoin(campaign, eq(adGroup.campaignId, campaign.campaignId))
+        .where(and(eq(adGroup.adGroupId, data.ad_group_id), or(isNull(adGroup.lastUpdatedDateTime), lte(adGroup.lastUpdatedDateTime, lastUpdated))))
+        .limit(1);
+
+    if (!current) {
         return;
     }
 
@@ -85,12 +104,82 @@ const updateAdGroupFromAms = async (data: { ad_group_id: string; last_updated_da
         updates.deliveryStatus = deliveryStatus;
     }
 
+    const bidAmount = resolveAdGroupBid(data.bid);
+    if (bidAmount !== null) {
+        updates.bidAmount = toMoneyString(bidAmount);
+    }
+
     if (Object.keys(updates).length === 1) {
         return;
     }
 
-    await db
+    const [updated] = await db
         .update(adGroup)
         .set(updates)
-        .where(and(eq(adGroup.adGroupId, data.ad_group_id), or(isNull(adGroup.lastUpdatedDateTime), lte(adGroup.lastUpdatedDateTime, lastUpdated))));
+        .where(and(eq(adGroup.adGroupId, data.ad_group_id), or(isNull(adGroup.lastUpdatedDateTime), lte(adGroup.lastUpdatedDateTime, lastUpdated))))
+        .returning({ adGroupId: adGroup.adGroupId });
+
+    if (!updated) {
+        return;
+    }
+
+    const nextState = typeof updates.state === 'string' ? updates.state : null;
+    if (current.accountId && nextState && current.state !== nextState) {
+        await recordEntityChange({
+            accountId: current.accountId,
+            countryCode: current.countryCode,
+            entityType: 'adGroup',
+            entityId: current.adGroupId,
+            eventType: 'state_change',
+            fieldName: 'state',
+            previousValue: current.state,
+            newValue: nextState,
+            changedAt: lastUpdated,
+            source: 'ams',
+            rawPayload: data,
+        });
+    }
+
+    if (current.accountId && bidAmount !== null) {
+        const previousBid = parseNumeric(current.bidAmount);
+        if (previousBid !== bidAmount) {
+            await recordEntityChange({
+                accountId: current.accountId,
+                countryCode: current.countryCode,
+                entityType: 'adGroup',
+                entityId: current.adGroupId,
+                eventType: 'bid_change',
+                fieldName: 'bidAmount',
+                previousValue: previousBid,
+                newValue: bidAmount,
+                changedAt: lastUpdated,
+                source: 'ams',
+                rawPayload: data,
+            });
+        }
+    }
 };
+
+const parseNumeric = (value: string | number | null) => {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    const numberValue = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
+};
+
+const resolveAdGroupBid = (bid: unknown): number | null => {
+    if (!bid || typeof bid !== 'object') {
+        return null;
+    }
+
+    const bidContainer = (bid as { bid?: unknown }).bid;
+    if (!bidContainer || typeof bidContainer !== 'object') {
+        return null;
+    }
+
+    const defaultBid = (bidContainer as { default_bid?: unknown }).default_bid;
+    return typeof defaultBid === 'number' && Number.isFinite(defaultBid) ? defaultBid : null;
+};
+
+const toMoneyString = (value: number) => value.toFixed(2);

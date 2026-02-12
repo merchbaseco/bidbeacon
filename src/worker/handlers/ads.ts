@@ -1,6 +1,7 @@
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { db } from '@/db/index.js';
-import { ad, amsCmAds } from '@/db/schema.js';
+import { ad, amsCmAds, campaign } from '@/db/schema.js';
+import { recordEntityChange } from '@/lib/entity-change-history.js';
 import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { createContextLogger } from '@/utils/logger';
 import { adSchema } from '../schemas.js';
@@ -61,6 +62,23 @@ const updateAdFromAms = async (data: { ad_id: string; last_updated_date_time?: s
         return;
     }
 
+    const [current] = await db
+        .select({
+            adId: ad.adId,
+            accountId: campaign.accountId,
+            countryCode: campaign.countryCode,
+            state: ad.state,
+            lastUpdatedDateTime: ad.lastUpdatedDateTime,
+        })
+        .from(ad)
+        .leftJoin(campaign, eq(ad.campaignId, campaign.campaignId))
+        .where(and(eq(ad.adId, data.ad_id), or(isNull(ad.lastUpdatedDateTime), lte(ad.lastUpdatedDateTime, lastUpdated))))
+        .limit(1);
+
+    if (!current) {
+        return;
+    }
+
     const updates: Record<string, unknown> = {
         lastUpdatedDateTime: lastUpdated,
     };
@@ -79,8 +97,30 @@ const updateAdFromAms = async (data: { ad_id: string; last_updated_date_time?: s
         return;
     }
 
-    await db
+    const [updated] = await db
         .update(ad)
         .set(updates)
-        .where(and(eq(ad.adId, data.ad_id), or(isNull(ad.lastUpdatedDateTime), lte(ad.lastUpdatedDateTime, lastUpdated))));
+        .where(and(eq(ad.adId, data.ad_id), or(isNull(ad.lastUpdatedDateTime), lte(ad.lastUpdatedDateTime, lastUpdated))))
+        .returning({ adId: ad.adId });
+
+    if (!updated) {
+        return;
+    }
+
+    const nextState = typeof updates.state === 'string' ? updates.state : null;
+    if (current.accountId && nextState && current.state !== nextState) {
+        await recordEntityChange({
+            accountId: current.accountId,
+            countryCode: current.countryCode,
+            entityType: 'ad',
+            entityId: current.adId,
+            eventType: 'state_change',
+            fieldName: 'state',
+            previousValue: current.state,
+            newValue: nextState,
+            changedAt: lastUpdated,
+            source: 'ams',
+            rawPayload: data,
+        });
+    }
 };

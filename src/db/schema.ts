@@ -93,6 +93,65 @@ export const target = pgTable(
 
 /**
  * ----------------------------------------------------------------------------
+ * Entity Change History
+ * ----------------------------------------------------------------------------
+ *
+ * Canonical history for optimization-impacting entity changes. Sub-daily sources
+ * (BidBeacon + AMS) and daily authoritative sources (Amazon Change History API)
+ * all write into this table.
+ */
+export const entityChangeHistory = pgTable(
+    'entity_change_history',
+    {
+        id: uuid('id').primaryKey().defaultRandom(),
+        accountId: text('account_id').notNull(),
+        countryCode: text('country_code'),
+        localDate: date('local_date').notNull(),
+        entityType: text('entity_type').notNull(), // campaign | adGroup | ad | target
+        entityId: text('entity_id').notNull(),
+        eventType: text('event_type').notNull(), // bid_change | state_change | budget_change
+        fieldName: text('field_name').notNull(), // bidAmount | state | budgetAmount
+        previousValue: text('previous_value'),
+        newValue: text('new_value'),
+        changedAt: timestamp('changed_at', { withTimezone: true, mode: 'date' }).notNull(),
+        source: text('source').notNull(), // bidbeacon | ams | change_history
+        rawPayload: jsonb('raw_payload'),
+        createdAt: timestamp('created_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    },
+    table => [
+        uniqueIndex('entity_change_history_dedupe_idx').on(
+            table.accountId,
+            table.countryCode,
+            table.entityType,
+            table.entityId,
+            table.eventType,
+            table.fieldName,
+            table.changedAt,
+            table.newValue,
+            table.source
+        ),
+        index('entity_change_history_entity_time_idx').on(table.accountId, table.countryCode, table.entityType, table.entityId, table.changedAt),
+        index('entity_change_history_account_day_idx').on(table.accountId, table.countryCode, table.localDate),
+    ]
+);
+
+/**
+ * Tracks which local calendar dates have been reconciled from the authoritative
+ * Amazon Change History API for each account.
+ */
+export const changeHistorySyncState = pgTable(
+    'change_history_sync_state',
+    {
+        accountId: text('account_id').notNull(),
+        countryCode: text('country_code').notNull(),
+        localDate: date('local_date').notNull(),
+        reconciledAt: timestamp('reconciled_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+    },
+    table => [primaryKey({ columns: [table.accountId, table.countryCode, table.localDate] })]
+);
+
+/**
+ * ----------------------------------------------------------------------------
  * Account Dataset Metadata
  * ----------------------------------------------------------------------------
  * Tracks when ad entity exports (campaigns, ad groups, ads, targets) were last

@@ -1,6 +1,7 @@
 import { and, eq, isNull, lte, or } from 'drizzle-orm';
 import { db } from '@/db/index.js';
-import { amsCmTargets, target } from '@/db/schema.js';
+import { amsCmTargets, campaign, target } from '@/db/schema.js';
+import { recordEntityChange } from '@/lib/entity-change-history.js';
 import { trackAmsEvent } from '@/utils/ams-metrics.js';
 import { createContextLogger } from '@/utils/logger';
 import { targetSchema } from '../schemas.js';
@@ -57,9 +58,27 @@ export async function handleTargets(payload: unknown): Promise<void> {
     });
 }
 
-const updateTargetFromAms = async (data: { target_id: string; last_updated_date_time?: string; state?: unknown; status?: unknown }) => {
+const updateTargetFromAms = async (data: { target_id: string; last_updated_date_time?: string; state?: unknown; status?: unknown; bid?: unknown }) => {
     const lastUpdated = data.last_updated_date_time ? new Date(data.last_updated_date_time) : null;
     if (!lastUpdated) {
+        return;
+    }
+
+    const [current] = await db
+        .select({
+            targetId: target.targetId,
+            accountId: campaign.accountId,
+            countryCode: campaign.countryCode,
+            state: target.state,
+            bidAmount: target.bidAmount,
+            lastUpdatedDateTime: target.lastUpdatedDateTime,
+        })
+        .from(target)
+        .leftJoin(campaign, eq(target.campaignId, campaign.campaignId))
+        .where(and(eq(target.targetId, data.target_id), or(isNull(target.lastUpdatedDateTime), lte(target.lastUpdatedDateTime, lastUpdated))))
+        .limit(1);
+
+    if (!current) {
         return;
     }
 
@@ -77,12 +96,86 @@ const updateTargetFromAms = async (data: { target_id: string; last_updated_date_
         updates.deliveryStatus = deliveryStatus;
     }
 
+    const bidAmount = resolveTargetBid(data.bid);
+    if (bidAmount !== null) {
+        updates.bidAmount = toMoneyString(bidAmount);
+    }
+
     if (Object.keys(updates).length === 1) {
         return;
     }
 
-    await db
+    const [updated] = await db
         .update(target)
         .set(updates)
-        .where(and(eq(target.targetId, data.target_id), or(isNull(target.lastUpdatedDateTime), lte(target.lastUpdatedDateTime, lastUpdated))));
+        .where(and(eq(target.targetId, data.target_id), or(isNull(target.lastUpdatedDateTime), lte(target.lastUpdatedDateTime, lastUpdated))))
+        .returning({ targetId: target.targetId });
+
+    if (!updated) {
+        return;
+    }
+
+    const nextState = typeof updates.state === 'string' ? updates.state : null;
+    if (current.accountId && nextState && current.state !== nextState) {
+        await recordEntityChange({
+            accountId: current.accountId,
+            countryCode: current.countryCode,
+            entityType: 'target',
+            entityId: current.targetId,
+            eventType: 'state_change',
+            fieldName: 'state',
+            previousValue: current.state,
+            newValue: nextState,
+            changedAt: lastUpdated,
+            source: 'ams',
+            rawPayload: data,
+        });
+    }
+
+    if (current.accountId && bidAmount !== null) {
+        const previousBid = parseNumeric(current.bidAmount);
+        if (previousBid !== bidAmount) {
+            await recordEntityChange({
+                accountId: current.accountId,
+                countryCode: current.countryCode,
+                entityType: 'target',
+                entityId: current.targetId,
+                eventType: 'bid_change',
+                fieldName: 'bidAmount',
+                previousValue: previousBid,
+                newValue: bidAmount,
+                changedAt: lastUpdated,
+                source: 'ams',
+                rawPayload: data,
+            });
+        }
+    }
 };
+
+const parseNumeric = (value: string | number | null) => {
+    if (value === null || value === undefined) {
+        return null;
+    }
+    const numberValue = typeof value === 'number' ? value : Number(value);
+    return Number.isFinite(numberValue) ? numberValue : null;
+};
+
+const resolveTargetBid = (bid: unknown): number | null => {
+    if (!bid || typeof bid !== 'object') {
+        return null;
+    }
+
+    const bidContainer = (bid as { bid?: unknown }).bid;
+    if (typeof bidContainer === 'number' && Number.isFinite(bidContainer)) {
+        return bidContainer;
+    }
+
+    if (!bidContainer || typeof bidContainer !== 'object') {
+        return null;
+    }
+
+    const nestedBid = (bidContainer as { bid?: unknown }).bid;
+    return typeof nestedBid === 'number' && Number.isFinite(nestedBid) ? nestedBid : null;
+};
+
+const toMoneyString = (value: number) => value.toFixed(2);

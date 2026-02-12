@@ -85,7 +85,18 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
     const utils = api.useUtils();
     const updateBid = api.ads.targets.updateBid.useMutation({
         onSuccess: result => {
-            utils.ads.targets.get.setData({ accountId, targetId: result.targetId }, prev => (prev ? { ...prev, bidAmount: result.bidAmount, lastUpdatedDateTime: result.lastUpdatedDateTime } : prev));
+            utils.ads.targets.get.setData({ accountId, targetId: result.targetId }, prev =>
+                prev
+                    ? {
+                          ...prev,
+                          bidAmount: result.bidAmount,
+                          lastUpdatedDateTime: result.lastUpdatedDateTime,
+                          lastBidChangeAt: result.lastUpdatedDateTime,
+                          previousBid: prev.bidAmount,
+                          newBid: result.bidAmount,
+                      }
+                    : prev
+            );
             utils.ads.targets.list.invalidate();
             toast.success('Bid updated', {
                 description: `New bid: ${formatCurrency(result.bidAmount)}`,
@@ -338,6 +349,11 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
                     { label: 'Match type', value: data.targetMatchType ?? '—' },
                     { label: 'Negative', value: data.negative ? 'Yes' : 'No' },
                     { label: 'Bid', value: data.bidAmount !== null ? formatCurrency(data.bidAmount) : '—' },
+                    { label: 'Last bid change', value: data.lastBidChangeAt ? formatDateTime(data.lastBidChangeAt) : '—' },
+                    {
+                        label: 'Bid transition',
+                        value: data.previousBid !== null && data.newBid !== null ? `${formatCurrency(data.previousBid)} → ${formatCurrency(data.newBid)}` : '—',
+                    },
                     { label: 'Created', value: formatDateTime(data.creationDateTime) },
                     { label: 'Updated', value: formatDateTime(data.lastUpdatedDateTime) },
                 ],
