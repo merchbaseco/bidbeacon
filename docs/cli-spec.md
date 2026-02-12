@@ -36,7 +36,7 @@ Config is stored locally at `~/.bidbeacon/config.json`.
 - `bb config show`
 - `bb config clear`
 - `bb config set api-key <value>`
-- `bb config set base-url <value>`
+- `bb config set base-url <value>` (`<value>` should be the server origin; a trailing `/api` is accepted and normalized)
 - `bb config set account <adsAccountId> <countryCode>`
 - `bb config set range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>`
 

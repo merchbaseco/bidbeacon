@@ -41,7 +41,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'show', right: 'Print the current config file' },
             { left: 'clear', right: 'Clear the config file' },
             { left: 'set api-key <value>', right: 'Set API key used for requests' },
-            { left: 'set base-url <value>', right: 'Set API base URL (default: http://localhost:8080)' },
+            { left: 'set base-url <value>', right: 'Set API base URL (default: http://localhost:8080; trailing /api is optional)' },
             { left: 'set account <adsAccountId> <countryCode>', right: 'Set default advertiser account + country' },
             {
                 left: 'set range <value>',
