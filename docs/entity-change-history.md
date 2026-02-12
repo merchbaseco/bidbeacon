@@ -57,7 +57,7 @@ This keeps one canonical per-day result while still allowing immediate local wri
 
 History is read through explicit history surfaces, not entity detail endpoints:
 
-- API: `api.client.historyList` (aliased as `api.cli.historyList`)
+- HTTP API (tRPC path): `/api/history/list`
   - Input: `config`, `entityType`, `entityId`, optional `range`, optional `limit`, optional `offset`
   - `entityType`: `campaign` | `adGroup` | `ad` | `target`
 - CLI:

@@ -75,7 +75,7 @@ const cleanupStaleTestEntities = async (caller: TestCaller, accountId: string) =
     const cutoff = Date.now() - TEST_ENTITY_MAX_AGE_HOURS * 60 * 60 * 1000;
     const errors: string[] = [];
 
-    const campaigns = await caller.api.cli.campaignsList({ config });
+    const campaigns = await caller['campaigns/list']({ config });
     for (const campaign of campaigns.items) {
         if (!campaign.name.startsWith(TEST_ENTITY_PREFIX)) {
             continue;
@@ -86,7 +86,7 @@ const cleanupStaleTestEntities = async (caller: TestCaller, accountId: string) =
         }
 
         try {
-            await caller.api.cli.campaignsDelete({
+            await caller['campaigns/delete']({
                 config,
                 campaignId: campaign.campaignId,
             });
@@ -95,7 +95,7 @@ const cleanupStaleTestEntities = async (caller: TestCaller, accountId: string) =
         }
     }
 
-    const adGroups = await caller.api.cli.adGroupsList({ config });
+    const adGroups = await caller['ad-groups/list']({ config });
     for (const adGroup of adGroups.items) {
         if (!adGroup.name.startsWith(TEST_ENTITY_PREFIX)) {
             continue;
@@ -106,7 +106,7 @@ const cleanupStaleTestEntities = async (caller: TestCaller, accountId: string) =
         }
 
         try {
-            await caller.api.cli.adGroupsDelete({
+            await caller['ad-groups/delete']({
                 config,
                 adGroupId: adGroup.adGroupId,
             });

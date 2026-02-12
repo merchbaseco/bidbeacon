@@ -4,9 +4,11 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+## v0.4 - 2026-02-12
+
 ### Added
 
-- Add `api.client.historyList` / `api.cli.historyList` for campaign, ad group, ad, and target change-history rows.
+- Add `/api/history/list` for campaign, ad group, ad, and target change-history rows.
 - Add `bb history <campaigns|ad-groups|ads|targets> <entity_id>` with `--limit`/`--offset`.
 - Add history range filtering (`today`, `yesterday`, `Nd`, `YYYY-MM-DD..YYYY-MM-DD`) with `--range`.
 
@@ -14,6 +16,7 @@ All notable changes to this project will be documented in this file.
 
 - Bump `packages/bidbeacon-api-client` to `0.4.0`.
 - Make entity detail APIs (for example `targets.get`) state-only; change history is now explicit via `historyList`.
+- Remove legacy `api.client.*` / `api.cli.*` public procedure aliases; public HTTP/tRPC paths are slash-style only (for example `/api/campaigns/list`).
 
 ## v0.3 - 2026-02-11
 

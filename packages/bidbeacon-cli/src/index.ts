@@ -52,7 +52,7 @@ const main = async () => {
             }
             const config = await loadConfig();
             const client = createApiClient(config);
-            const data = await client.api.client.accountsList.query();
+            const data = await client['accounts/list'].query();
             printOutput(data);
             return;
         }
@@ -68,7 +68,7 @@ const main = async () => {
                 const state = resolveListStateFlag(flags);
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
-                const data = await client.api.client.campaignsList.query({
+                const data = await client['campaigns/list'].query({
                     config: cliConfig,
                     state,
                     limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
@@ -79,7 +79,7 @@ const main = async () => {
             }
             if (subcommand === 'get') {
                 const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const data = await client.api.client.campaignsGet.query({ config: cliConfig, campaignId });
+                const data = await client['campaigns/get'].query({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
@@ -88,7 +88,7 @@ const main = async () => {
                 if (!(name && budget)) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <name> <budget>.' });
                 }
-                const data = await client.api.client.campaignsCreate.mutate({
+                const data = await client['campaigns/create'].mutate({
                     config: cliConfig,
                     name,
                     budget: parseNumberArg(budget, 'budget'),
@@ -102,7 +102,7 @@ const main = async () => {
                 const portfolioId = readFlag(flags, ['portfolio']);
                 const startDateTime = readFlag(flags, ['start']);
                 const endDateTime = readFlag(flags, ['end']);
-                const data = await client.api.client.campaignsUpdate.mutate({
+                const data = await client['campaigns/update'].mutate({
                     config: cliConfig,
                     campaignId,
                     name: name ?? undefined,
@@ -115,19 +115,19 @@ const main = async () => {
             }
             if (subcommand === 'pause') {
                 const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const data = await client.api.client.campaignsPause.mutate({ config: cliConfig, campaignId });
+                const data = await client['campaigns/pause'].mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
                 const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const data = await client.api.client.campaignsResume.mutate({ config: cliConfig, campaignId });
+                const data = await client['campaigns/resume'].mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'delete') {
                 const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const data = await client.api.client.campaignsDelete.mutate({ config: cliConfig, campaignId });
+                const data = await client['campaigns/delete'].mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
@@ -137,7 +137,7 @@ const main = async () => {
                 if (!budget) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <budget>.' });
                 }
-                const data = await client.api.client.campaignsSetBudget.mutate({
+                const data = await client['campaigns/set-budget'].mutate({
                     config: cliConfig,
                     campaignId,
                     budget: parseNumberArg(budget, 'budget'),
@@ -151,7 +151,7 @@ const main = async () => {
                 if (!strategy) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <strategy>.' });
                 }
-                const data = await client.api.client.campaignsSetBidStrategy.mutate({
+                const data = await client['campaigns/set-bid-strategy'].mutate({
                     config: cliConfig,
                     campaignId,
                     strategy,
@@ -166,7 +166,7 @@ const main = async () => {
                 if (!(scope && json)) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <scope> <json>.' });
                 }
-                const data = await client.api.client.campaignsSetBidAdjustments.mutate({
+                const data = await client['campaigns/set-bid-adjustments'].mutate({
                     config: cliConfig,
                     campaignId,
                     scope,
@@ -194,7 +194,7 @@ const main = async () => {
                 });
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
-                const data = await client.api.client.adGroupsList.query({
+                const data = await client['ad-groups/list'].query({
                     config: cliConfig,
                     state,
                     campaignId,
@@ -206,7 +206,7 @@ const main = async () => {
             }
             if (subcommand === 'get') {
                 const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client.api.client.adGroupsGet.query({ config: cliConfig, adGroupId });
+                const data = await client['ad-groups/get'].query({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
@@ -216,7 +216,7 @@ const main = async () => {
                     throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <campaign_id> <name> <default_bid>.' });
                 }
                 const campaignId = parseNumericId(campaignIdRaw, { topicKey: 'ad-groups', label: '<campaign_id>', expected: 'campaign_id' });
-                const data = await client.api.client.adGroupsCreate.mutate({
+                const data = await client['ad-groups/create'].mutate({
                     config: cliConfig,
                     campaignId,
                     name,
@@ -231,7 +231,7 @@ const main = async () => {
                 if (!name) {
                     throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <ad_group_id> <name>.' });
                 }
-                const data = await client.api.client.adGroupsUpdate.mutate({ config: cliConfig, adGroupId, name });
+                const data = await client['ad-groups/update'].mutate({ config: cliConfig, adGroupId, name });
                 printOutput(data);
                 return;
             }
@@ -241,7 +241,7 @@ const main = async () => {
                 if (!value) {
                     throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <ad_group_id> <value>.' });
                 }
-                const data = await client.api.client.adGroupsSetDefaultBid.mutate({
+                const data = await client['ad-groups/set-default-bid'].mutate({
                     config: cliConfig,
                     adGroupId,
                     value: parseNumberArg(value, 'value'),
@@ -251,19 +251,19 @@ const main = async () => {
             }
             if (subcommand === 'pause') {
                 const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client.api.client.adGroupsPause.mutate({ config: cliConfig, adGroupId });
+                const data = await client['ad-groups/pause'].mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
                 const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client.api.client.adGroupsResume.mutate({ config: cliConfig, adGroupId });
+                const data = await client['ad-groups/resume'].mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'delete') {
                 const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client.api.client.adGroupsDelete.mutate({ config: cliConfig, adGroupId });
+                const data = await client['ad-groups/delete'].mutate({ config: cliConfig, adGroupId });
                 printOutput(data);
                 return;
             }
@@ -284,7 +284,7 @@ const main = async () => {
                 const asin = readFlag(flags, ['asin']);
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
-                const data = await client.api.client.adsList.query({
+                const data = await client['ads/list'].query({
                     config: cliConfig,
                     state,
                     campaignId,
@@ -298,7 +298,7 @@ const main = async () => {
             }
             if (subcommand === 'get') {
                 const adId = requireNumericIdArg(action, { topicKey: 'ads', label: '<ad_id>', expected: 'ad_id' });
-                const data = await client.api.client.adsGet.query({ config: cliConfig, adId });
+                const data = await client['ads/get'].query({ config: cliConfig, adId });
                 printOutput(data);
                 return;
             }
@@ -309,7 +309,7 @@ const main = async () => {
                     throw new CliUsageError({ topicKey: 'ads', message: 'Missing required args: <ad_group_id> <asin|sku>.' });
                 }
                 const adGroupId = parseNumericId(adGroupIdRaw, { topicKey: 'ads', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client.api.client.adsCreate.mutate({
+                const data = await client['ads/create'].mutate({
                     config: cliConfig,
                     adGroupId,
                     productIdType,
@@ -324,13 +324,13 @@ const main = async () => {
                 if (!state) {
                     throw new CliUsageError({ topicKey: 'ads', message: 'Missing required args: <ad_id> <state>.' });
                 }
-                const data = await client.api.client.adsUpdate.mutate({ config: cliConfig, adId, state });
+                const data = await client['ads/update'].mutate({ config: cliConfig, adId, state });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'delete') {
                 const adId = requireNumericIdArg(action, { topicKey: 'ads', label: '<ad_id>', expected: 'ad_id' });
-                const data = await client.api.client.adsDelete.mutate({ config: cliConfig, adId });
+                const data = await client['ads/delete'].mutate({ config: cliConfig, adId });
                 printOutput(data);
                 return;
             }
@@ -346,7 +346,7 @@ const main = async () => {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'get') {
                 const asin = requireAsinArg(action, { topicKey: 'asins', label: '<asin>' });
-                const data = await client.api.client.asinsGet.query({ config: cliConfig, asin });
+                const data = await client['asins/get'].query({ config: cliConfig, asin });
                 printOutput(data);
                 return;
             }
@@ -367,7 +367,7 @@ const main = async () => {
                 const negative = parseOptionalBooleanFlag(readFlag(flags, ['negative']), { topicKey: 'targets', label: '--negative' });
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
-                const data = await client.api.client.targetsList.query({
+                const data = await client['targets/list'].query({
                     config: cliConfig,
                     state,
                     campaignId,
@@ -385,7 +385,7 @@ const main = async () => {
                 if (!value) {
                     throw new CliUsageError({ topicKey: 'targets', message: 'Missing required args: <target_id> <value>.' });
                 }
-                const data = await client.api.client.bidsSet.mutate({
+                const data = await client['bids/set'].mutate({
                     config: cliConfig,
                     targetId,
                     value: parseNumberArg(value, 'value'),
@@ -399,7 +399,7 @@ const main = async () => {
                 if (!delta) {
                     throw new CliUsageError({ topicKey: 'targets', message: 'Missing required args: <target_id> <delta>.' });
                 }
-                const data = await client.api.client.bidsAdjust.mutate({
+                const data = await client['bids/adjust'].mutate({
                     config: cliConfig,
                     targetId,
                     delta: parseNumberArg(delta, 'delta'),
@@ -409,7 +409,7 @@ const main = async () => {
             }
             if (subcommand === 'get') {
                 const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const data = await client.api.client.targetsGet.query({ config: cliConfig, targetId });
+                const data = await client['targets/get'].query({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
@@ -428,7 +428,7 @@ const main = async () => {
                         });
                     }
                     const adGroupId = parseNumericId(adGroupIdRaw, { topicKey: 'targets', label: '<ad_group_id>', expected: 'ad_group_id' });
-                    const data = await client.api.client.targetsCreateKeyword.mutate({
+                    const data = await client['targets/create/keyword'].mutate({
                         config: cliConfig,
                         adGroupId,
                         keyword,
@@ -447,7 +447,7 @@ const main = async () => {
                         });
                     }
                     const adGroupId = parseNumericId(adGroupIdRaw, { topicKey: 'targets', label: '<ad_group_id>', expected: 'ad_group_id' });
-                    const data = await client.api.client.targetsCreateProduct.mutate({
+                    const data = await client['targets/create/product'].mutate({
                         config: cliConfig,
                         adGroupId,
                         productIdType: productIdType ?? 'ASIN',
@@ -462,19 +462,19 @@ const main = async () => {
             }
             if (subcommand === 'delete') {
                 const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const data = await client.api.client.targetsDelete.mutate({ config: cliConfig, targetId });
+                const data = await client['targets/delete'].mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'pause') {
                 const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const data = await client.api.client.targetsPause.mutate({ config: cliConfig, targetId });
+                const data = await client['targets/pause'].mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
                 const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const data = await client.api.client.targetsResume.mutate({ config: cliConfig, targetId });
+                const data = await client['targets/resume'].mutate({ config: cliConfig, targetId });
                 printOutput(data);
                 return;
             }
@@ -499,7 +499,7 @@ const main = async () => {
             const limitRaw = readFlag(flags, ['limit']);
             const offsetRaw = readFlag(flags, ['offset']);
 
-            const data = await client.api.client.historyList.query({
+            const data = await client['history/list'].query({
                 config: cliConfig,
                 entityType: entity.entityType,
                 entityId,
@@ -524,7 +524,7 @@ const main = async () => {
                 if (!value) {
                     throw new CliUsageError({ topicKey: 'bids', message: 'Missing required args: <target_id> <value>.' });
                 }
-                const data = await client.api.client.bidsSet.mutate({
+                const data = await client['bids/set'].mutate({
                     config: cliConfig,
                     targetId,
                     value: parseNumberArg(value, 'value'),
@@ -538,7 +538,7 @@ const main = async () => {
                 if (!delta) {
                     throw new CliUsageError({ topicKey: 'bids', message: 'Missing required args: <target_id> <delta>.' });
                 }
-                const data = await client.api.client.bidsAdjust.mutate({
+                const data = await client['bids/adjust'].mutate({
                     config: cliConfig,
                     targetId,
                     delta: parseNumberArg(delta, 'delta'),
@@ -615,7 +615,7 @@ const main = async () => {
                             message: 'Series campaigns does not accept --campaign or --ad-group.',
                         });
                     }
-                    const data = await client.api.client.metricsSeriesCampaigns.query({
+                    const data = await client['metrics/series/campaigns'].query({
                         config: cliConfig,
                         ids,
                         metrics,
@@ -633,7 +633,7 @@ const main = async () => {
                             message: 'Series ad-groups does not accept --ad-group (use --campaign to scope).',
                         });
                     }
-                    const data = await client.api.client.metricsSeriesAdGroups.query({
+                    const data = await client['metrics/series/ad-groups'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
                         ids,
@@ -646,7 +646,7 @@ const main = async () => {
                     return;
                 }
                 if (action === 'ads') {
-                    const data = await client.api.client.metricsSeriesAds.query({
+                    const data = await client['metrics/series/ads'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
                         adGroupId: adGroupId ?? undefined,
@@ -660,7 +660,7 @@ const main = async () => {
                     return;
                 }
                 if (action === 'targets') {
-                    const data = await client.api.client.metricsSeriesTargets.query({
+                    const data = await client['metrics/series/targets'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
                         adGroupId: adGroupId ?? undefined,
@@ -687,7 +687,7 @@ const main = async () => {
                             message: 'Table campaigns does not accept --campaign or --ad-group.',
                         });
                     }
-                    const data = await client.api.client.metricsTableCampaigns.query({
+                    const data = await client['metrics/table/campaigns'].query({
                         config: cliConfig,
                         ids,
                         metrics,
@@ -707,7 +707,7 @@ const main = async () => {
                             message: 'Table ad-groups does not accept --ad-group (use --campaign to scope).',
                         });
                     }
-                    const data = await client.api.client.metricsTableAdGroups.query({
+                    const data = await client['metrics/table/ad-groups'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
                         ids,
@@ -722,7 +722,7 @@ const main = async () => {
                     return;
                 }
                 if (action === 'ads') {
-                    const data = await client.api.client.metricsTableAds.query({
+                    const data = await client['metrics/table/ads'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
                         adGroupId: adGroupId ?? undefined,
@@ -738,7 +738,7 @@ const main = async () => {
                     return;
                 }
                 if (action === 'targets') {
-                    const data = await client.api.client.metricsTableTargets.query({
+                    const data = await client['metrics/table/targets'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
                         adGroupId: adGroupId ?? undefined,
@@ -765,22 +765,22 @@ const main = async () => {
             const config = await loadConfig();
             const client = createApiClient(config);
             if (subcommand === 'bid-strategy') {
-                const data = await client.api.client.enumsBidStrategy.query();
+                const data = await client['enums/bid-strategy'].query();
                 printOutput(data);
                 return;
             }
             if (subcommand === 'match-type') {
-                const data = await client.api.client.enumsMatchType.query();
+                const data = await client['enums/match-type'].query();
                 printOutput(data);
                 return;
             }
             if (subcommand === 'placement') {
-                const data = await client.api.client.enumsPlacement.query();
+                const data = await client['enums/placement'].query();
                 printOutput(data);
                 return;
             }
             if (subcommand === 'state') {
-                const data = await client.api.client.enumsState.query();
+                const data = await client['enums/state'].query();
                 printOutput(data);
                 return;
             }
@@ -1431,7 +1431,7 @@ const resolveAccountTimezoneHint = async (config: CliConfig) => {
 
     try {
         const client = createApiClient(config);
-        const data = await client.api.client.accountsList.query();
+        const data = await client['accounts/list'].query();
         const countryCode = config.countryCode?.toUpperCase();
         const matches = data.items.filter(item => item.accountId === config.accountId);
         if (!countryCode && matches.length > 1) {

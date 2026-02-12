@@ -29,7 +29,7 @@ describeIntegration('cli sp lifecycle', () => {
         config = createCliConfig(accountId);
 
         const campaignName = `bb-cli-${Date.now()}-campaign`;
-        const campaign = await caller.api.cli.campaignsCreate({
+        const campaign = await caller['campaigns/create']({
             config,
             name: campaignName,
             budget: 10,
@@ -37,7 +37,7 @@ describeIntegration('cli sp lifecycle', () => {
         campaignId = campaign.item.campaignId;
 
         const adGroupName = `bb-cli-${Date.now()}-ad-group`;
-        const adGroup = await caller.api.cli.adGroupsCreate({
+        const adGroup = await caller['ad-groups/create']({
             config,
             campaignId,
             name: adGroupName,
@@ -45,7 +45,7 @@ describeIntegration('cli sp lifecycle', () => {
         });
         adGroupId = adGroup.item.adGroupId;
 
-        const ad = await caller.api.cli.adsCreate({
+        const ad = await caller['ads/create']({
             config,
             adGroupId,
             productIdType: 'ASIN',
@@ -53,7 +53,7 @@ describeIntegration('cli sp lifecycle', () => {
         });
         adId = ad.item.adId;
 
-        const target = await caller.api.cli.targetsCreateKeyword({
+        const target = await caller['targets/create/keyword']({
             config,
             adGroupId,
             keyword: `bb-cli-${Date.now()}-kw`,
@@ -79,25 +79,25 @@ describeIntegration('cli sp lifecycle', () => {
 
         if (targetId) {
             await attempt('delete target', async () => {
-                await caller!.api.cli.targetsDelete({ config: config!, targetId: targetId! });
+                await caller!['targets/delete']({ config: config!, targetId: targetId! });
             });
         }
 
         if (adId) {
             await attempt('delete ad', async () => {
-                await caller!.api.cli.adsDelete({ config: config!, adId: adId! });
+                await caller!['ads/delete']({ config: config!, adId: adId! });
             });
         }
 
         if (adGroupId) {
             await attempt('delete ad group', async () => {
-                await caller!.api.cli.adGroupsDelete({ config: config!, adGroupId: adGroupId! });
+                await caller!['ad-groups/delete']({ config: config!, adGroupId: adGroupId! });
             });
         }
 
         if (campaignId) {
             await attempt('delete campaign', async () => {
-                await caller!.api.cli.campaignsDelete({ config: config!, campaignId: campaignId! });
+                await caller!['campaigns/delete']({ config: config!, campaignId: campaignId! });
             });
         }
 
@@ -112,43 +112,43 @@ describeIntegration('cli sp lifecycle', () => {
         }
 
         // This test validates Amazon Ads API-backed mutations, not BidBeacon DB reads.
-        const pausedCampaign = await caller.api.cli.campaignsPause({ config, campaignId });
+        const pausedCampaign = await caller['campaigns/pause']({ config, campaignId });
         expect(pausedCampaign.item.state).toBe('PAUSED');
 
-        const resumedCampaign = await caller.api.cli.campaignsResume({ config, campaignId });
+        const resumedCampaign = await caller['campaigns/resume']({ config, campaignId });
         expect(resumedCampaign.item.state).toBe('ENABLED');
 
-        const pausedAdGroup = await caller.api.cli.adGroupsPause({ config, adGroupId });
+        const pausedAdGroup = await caller['ad-groups/pause']({ config, adGroupId });
         expect(pausedAdGroup.item.state).toBe('PAUSED');
 
-        const resumedAdGroup = await caller.api.cli.adGroupsResume({ config, adGroupId });
+        const resumedAdGroup = await caller['ad-groups/resume']({ config, adGroupId });
         expect(resumedAdGroup.item.state).toBe('ENABLED');
 
-        const pausedTarget = await caller.api.cli.targetsPause({ config, targetId });
+        const pausedTarget = await caller['targets/pause']({ config, targetId });
         expect(pausedTarget.item.state).toBe('PAUSED');
 
-        const resumedTarget = await caller.api.cli.targetsResume({ config, targetId });
+        const resumedTarget = await caller['targets/resume']({ config, targetId });
         expect(resumedTarget.item.state).toBe('ENABLED');
 
-        const setBid = await caller.api.cli.bidsSet({ config, targetId, value: 0.8 });
+        const setBid = await caller['bids/set']({ config, targetId, value: 0.8 });
         expect(setBid.item.bid).toBe(0.8);
 
-        const updatedAd = await caller.api.cli.adsUpdate({ config, adId, state: 'PAUSED' });
+        const updatedAd = await caller['ads/update']({ config, adId, state: 'PAUSED' });
         expect(updatedAd.item.state).toBe('PAUSED');
 
-        const resumedAd = await caller.api.cli.adsUpdate({ config, adId, state: 'ENABLED' });
+        const resumedAd = await caller['ads/update']({ config, adId, state: 'ENABLED' });
         expect(resumedAd.item.state).toBe('ENABLED');
 
-        await caller.api.cli.targetsDelete({ config, targetId });
+        await caller['targets/delete']({ config, targetId });
         targetId = null;
 
-        await caller.api.cli.adsDelete({ config, adId });
+        await caller['ads/delete']({ config, adId });
         adId = null;
 
-        await caller.api.cli.adGroupsDelete({ config, adGroupId });
+        await caller['ad-groups/delete']({ config, adGroupId });
         adGroupId = null;
 
-        await caller.api.cli.campaignsDelete({ config, campaignId });
+        await caller['campaigns/delete']({ config, campaignId });
         campaignId = null;
     }, 30_000);
 });

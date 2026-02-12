@@ -94,7 +94,7 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
                       }
                     : prev
             );
-            utils.api.client.historyList.invalidate();
+            utils['history/list'].invalidate();
             utils.ads.targets.list.invalidate();
             toast.success('Bid updated', {
                 description: `New bid: ${formatCurrency(result.bidAmount)}`,
@@ -108,7 +108,7 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
     });
 
     const targetData = data && 'targetId' in data ? data : null;
-    const targetHistoryQuery = api.api.client.historyList.useQuery(
+    const targetHistoryQuery = api['history/list'].useQuery(
         {
             config: {
                 accountId,

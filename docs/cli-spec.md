@@ -11,6 +11,18 @@ This spec defines the public, user-facing shape of the Sponsored Products (SP) C
 - One CLI command maps to one API capability.
 - Flat command structure. Filters provide drill-down.
 
+**HTTP Path Shape (tRPC)**
+- CLI command segments map to slash-style tRPC procedure paths.
+- Pattern: `/api/<resource>/<verb>` (and deeper segments when needed).
+- Examples:
+  - `bb campaigns list` -> `GET /api/campaigns/list`
+  - `bb campaigns create ...` -> `POST /api/campaigns/create`
+  - `bb targets create keyword ...` -> `POST /api/targets/create/keyword`
+  - `bb metrics series campaigns ...` -> `GET /api/metrics/series/campaigns`
+- Transport remains tRPC semantics:
+  - query procedures use `GET` with URL-encoded `input`
+  - mutation procedures use `POST` with JSON body
+
 **Response Envelope**
 ```json
 {"ok": true, "data": {}}
