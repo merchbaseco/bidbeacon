@@ -23,13 +23,21 @@ This spec defines the public npm client package that exposes typed access to the
 
 ## Client Surface
 
-- Primary entrypoint: `createBidBeaconClient({ baseUrl, apiKey, headers, batch })`
+- Primary entrypoint: `createBidBeaconClient({ baseUrl, apiKey, headers, batch, batchMaxItems, batchMaxURLLength })`
 - Usage returns the CLI surface directly, for example:
 
 ```ts
 const client = createBidBeaconClient({ baseUrl, apiKey });
 const accounts = await client['accounts/list'].query();
 ```
+
+Batch behavior:
+
+- `batch` defaults to `true`.
+- `batchMaxItems` defaults to `20` (applies when batching is enabled).
+- `batchMaxURLLength` defaults to `2000` (applies when batching is enabled).
+- `batchMaxURLLength` should stay below the server route param limit; this project uses Fastify `maxParamLength: 4096`.
+- Server note: Fastify's default router `maxParamLength` (`100`) can reject long batched procedure paths with 404; configure a higher value (for example `4096`) on the API server.
 
 History is explicit and entity-scoped:
 

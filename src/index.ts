@@ -13,6 +13,7 @@ import { startJobs, stopJobs } from '@/jobs/index.js';
 import { emitEvent } from '@/utils/events.js';
 
 const PORT = Number(process.env.PORT) || 8080;
+const TRPC_MAX_PATH_PARAM_LENGTH = 4096;
 
 // ============================================================================
 // BidBeacon Server Startup
@@ -21,7 +22,14 @@ const PORT = Number(process.env.PORT) || 8080;
 async function main() {
     console.log('Starting BidBeacon Server');
 
-    const fastify = Fastify({ logger: false });
+    const fastify = Fastify({
+        logger: false,
+        routerOptions: {
+            // tRPC batch queries encode comma-separated procedure paths into a single route param.
+            // Fastify's default maxParamLength (100) is too small and causes false 404s under concurrency.
+            maxParamLength: TRPC_MAX_PATH_PARAM_LENGTH,
+        },
+    });
 
     // Fastify setup
     await registerPlugins(fastify);
