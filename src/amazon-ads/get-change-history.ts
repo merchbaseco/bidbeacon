@@ -1,10 +1,8 @@
 import { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker';
-import type { ApiRegion } from './config';
+import { type ApiRegion, getApiBaseUrl } from './config';
 import { refreshAccessToken } from './reauth';
 import { AMAZON_ADS_API_RETRY, throttledFetch } from './throttled-fetch';
-
-const CHANGE_HISTORY_URL = 'https://d1y2lf8k3vrkfu.cloudfront.net/history';
 
 const historyFilterSchema = z.enum(['BID_AMOUNT', 'BUDGET_AMOUNT', 'END_DATE', 'IN_BUDGET', 'NAME', 'PLACEMENT_GROUP', 'SMART_BIDDING_STRATEGY', 'START_DATE', 'STATUS']);
 
@@ -104,6 +102,8 @@ export const getChangeHistory = async (options: GetChangeHistoryOptions, region:
     return withTracking({ apiName: 'getChangeHistory', region }, async () => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
+        const baseUrl = getApiBaseUrl(region);
+        const url = `${baseUrl}/history`;
 
         if (!clientId) {
             throw new Error('Missing ADS_API_CLIENT_ID environment variable');
@@ -121,7 +121,7 @@ export const getChangeHistory = async (options: GetChangeHistoryOptions, region:
             },
         });
 
-        const response = await throttledFetch(CHANGE_HISTORY_URL, {
+        const response = await throttledFetch(url, {
             method: 'POST',
             headers: {
                 'Amazon-Advertising-API-ClientId': clientId,
