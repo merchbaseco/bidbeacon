@@ -76,9 +76,10 @@ git push origin vX.Y.Z
 Publish npm package:
 
 ```bash
-# Ensure NPM_TOKEN is exported in your shell (granular token with bypass 2FA)
 cd packages/bidbeacon-api-client
-npm publish --access public
+# If NPM_TOKEN is stored in repo .env, load it for this command:
+NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm whoami
+NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm publish --access public
 ```
 
 Note: the repo root package is marked `private: true` and has a `prepublishOnly` block.
