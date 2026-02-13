@@ -3,13 +3,14 @@ import helmet from '@fastify/helmet';
 import websocket from '@fastify/websocket';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import { eq, or } from 'drizzle-orm';
-import Fastify, { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { createContext } from '@/api/context.js';
 import { appRouter } from '@/api/router.js';
 import { db, testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
 import { accountDatasetMetadata, reportDatasetMetadata } from '@/db/schema.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
+import { createServer } from '@/server-config.js';
 import { emitEvent } from '@/utils/events.js';
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -21,7 +22,7 @@ const PORT = Number(process.env.PORT) || 8080;
 async function main() {
     console.log('Starting BidBeacon Server');
 
-    const fastify = Fastify({ logger: false });
+    const fastify = createServer();
 
     // Fastify setup
     await registerPlugins(fastify);

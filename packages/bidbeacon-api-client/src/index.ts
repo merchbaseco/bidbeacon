@@ -5,6 +5,8 @@ import type { CliAppRouter } from './app-router';
 const TRAILING_SLASHES_REGEX = /\/+$/;
 const API_PATH_SEGMENT = '/api/';
 const PATH_SEPARATOR = ',';
+const DEFAULT_BATCH_MAX_ITEMS = 20;
+const DEFAULT_BATCH_MAX_URL_LENGTH = 2000;
 
 export type AppRouter = CliAppRouter;
 
@@ -20,13 +22,22 @@ export type BidBeaconClientOptions = {
     apiKey?: string;
     headers?: Record<string, string>;
     batch?: boolean;
+    batchMaxItems?: number;
+    batchMaxURLLength?: number;
 };
 
 type CliProxyClient = ReturnType<typeof createTRPCProxyClient<CliAppRouter>>;
 
 export type BidBeaconClient = CliProxyClient;
 
-export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }: BidBeaconClientOptions): BidBeaconClient => {
+export const createBidBeaconClient = ({
+    baseUrl,
+    apiKey,
+    headers,
+    batch = true,
+    batchMaxItems = DEFAULT_BATCH_MAX_ITEMS,
+    batchMaxURLLength = DEFAULT_BATCH_MAX_URL_LENGTH,
+}: BidBeaconClientOptions): BidBeaconClient => {
     const url = `${normalizeBaseUrl(baseUrl)}/api`;
     const resolveHeaders = () => ({
         ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
@@ -41,6 +52,8 @@ export const createBidBeaconClient = ({ baseUrl, apiKey, headers, batch = true }
                     url,
                     headers: resolveHeaders,
                     fetch: transportFetch,
+                    maxItems: batchMaxItems,
+                    maxURLLength: batchMaxURLLength,
                 }),
             ],
         });

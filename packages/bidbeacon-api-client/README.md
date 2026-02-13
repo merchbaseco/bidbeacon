@@ -21,6 +21,25 @@ const client = createBidBeaconClient({
 const accounts = await client['accounts/list'].query();
 ```
 
+Batching is enabled by default.
+You can tune or disable batching:
+
+```ts
+const client = createBidBeaconClient({
+  baseUrl: 'https://bidbeacon.merchbase.co',
+  apiKey: 'bbk_...',
+  batch: true, // default
+  batchMaxItems: 20, // default when batching
+  batchMaxURLLength: 2000, // default when batching
+});
+
+const unbatchedClient = createBidBeaconClient({
+  baseUrl: 'https://bidbeacon.merchbase.co',
+  apiKey: 'bbk_...',
+  batch: false, // optional
+});
+```
+
 The client is scoped to slash-style CLI paths (for example `campaigns/list`) so it stays in lockstep with the CLI.
 
 Change history is available through an explicit endpoint:

@@ -23,13 +23,21 @@ This spec defines the public npm client package that exposes typed access to the
 
 ## Client Surface
 
-- Primary entrypoint: `createBidBeaconClient({ baseUrl, apiKey, headers, batch })`
+- Primary entrypoint: `createBidBeaconClient({ baseUrl, apiKey, headers, batch, batchMaxItems, batchMaxURLLength })`
 - Usage returns the CLI surface directly, for example:
 
 ```ts
 const client = createBidBeaconClient({ baseUrl, apiKey });
 const accounts = await client['accounts/list'].query();
 ```
+
+Batch behavior:
+
+- `batch` defaults to `true`.
+- `batchMaxItems` defaults to `20` (applies when batching is enabled).
+- `batchMaxURLLength` defaults to `2000` (applies when batching is enabled).
+- `batchMaxURLLength` should stay below the server route param limit; this project uses Fastify `maxParamLength: 4096`.
+- Server note: Fastify's default router `maxParamLength` (`100`) can reject long batched procedure paths with 404; configure a higher value (for example `4096`) on the API server.
 
 History is explicit and entity-scoped:
 
@@ -60,8 +68,8 @@ bun run api-client:build
 
 ```bash
 cd packages/bidbeacon-api-client
-npm login
-npm publish --access public
+NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm whoami
+NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm publish --access public
 ```
 
 Bump `packages/bidbeacon-api-client/package.json` as part of the shared release process in `docs/release-process.md`.
@@ -84,7 +92,10 @@ Use SemVer for the API client package:
 Release checklist for API client changes:
 
 1. Update shared version files (`package.json`, CLI package, and API client package) to the same `X.Y.Z`.
-2. Add a new `CHANGELOG.md` release section from commit summaries.
-3. Run `bun run api-client:build`.
-4. Publish with `npm publish --access public`.
-5. Tag and push with `git tag vX.Y.Z && git push origin vX.Y.Z`.
+2. Review all commits since the previous version bump and summarize them under a new `CHANGELOG.md` version header (`## vX.Y.Z - YYYY-MM-DD`).
+3. Never use an `Unreleased` header in `CHANGELOG.md`; changelog updates happen only during version bumps.
+4. Ensure the release commit follows the searchable convention from `docs/release-process.md`: `feat: version bump vX.Y.Z`.
+5. Run `bun run api-client:build`.
+6. Run `bun run test` and publish only when tests pass.
+7. Publish with `npm publish --access public`.
+8. Tag and push with `git tag vX.Y.Z && git push origin vX.Y.Z`.

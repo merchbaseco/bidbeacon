@@ -55,7 +55,6 @@ Postgres is bound to `127.0.0.1` for local-only access.
 - `bun run start` – run compiled server
 - `bun run worker` – run worker in dev mode
 - `bun run dev:dashboard` – run dashboard dev server (proxies /api to production)
-- `bun run changelog:generate -- --from "<date>" --to "<date>" --version "vX.Y" --date "YYYY-MM-DD"` – generate a changelog entry from conventional commits
 - `./test-api.sh` – smoke test the health endpoint
 
 ## API Client (npm)
@@ -72,8 +71,8 @@ Publish (public scope):
 
 ```bash
 cd packages/bidbeacon-api-client
-npm login
-npm publish --access public
+NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm whoami
+NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm publish --access public
 ```
 
 Check current package version:
