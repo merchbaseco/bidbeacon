@@ -52,6 +52,9 @@ cd packages/bidbeacon-api-client
 npm publish --access public
 ```
 
+Note: the repo root package is marked `private: true` and has a `prepublishOnly` block.
+Always publish from `packages/bidbeacon-api-client`.
+
 Optional verification:
 
 ```bash
