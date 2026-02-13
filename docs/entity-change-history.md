@@ -47,6 +47,7 @@ Current normalization rules:
 - `sync-change-history` (hourly scheduler) fans out account jobs.
 - `sync-change-history-for-account` fetches Amazon Change History and reconciles by local day.
 - Change History requests use the regional Amazon Advertising API base URL (`advertising-api.amazon.com`, `advertising-api-eu.amazon.com`, `advertising-api-fe.amazon.com`) with `POST /history`.
+- To stay inside Amazon's rolling 90-day retention requirement, sync windows start at account-local midnight for `today - 89 days`.
 - Reconcile behavior for each local day:
   1. Delete existing rows for `(account_id, country_code, local_date)` (including provisional `bidbeacon` / `ams` rows).
   2. Insert normalized authoritative rows with `source = 'change_history'`.

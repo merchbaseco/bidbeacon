@@ -11,7 +11,7 @@ import { zonedNow, zonedStartOfDay, zonedSubtractDays } from '@/utils/date';
 import { type JobMetricsRecorder, withJobMetrics } from '@/utils/job-metrics';
 import { getTimezoneForCountry } from '@/utils/timezones';
 
-const CHANGE_HISTORY_RETENTION_DAYS = 90;
+const CHANGE_HISTORY_LOOKBACK_DAYS = 89;
 const CHANGE_HISTORY_PAGE_SIZE = 200;
 const TIMESTAMP_SECONDS_THRESHOLD = 1_000_000_000_000;
 const jobInputSchema = z.object({
@@ -105,7 +105,7 @@ const syncChangeHistoryForAccount = async (accountId: string, countryCode: strin
     const yesterdayStart = subDays(todayStart, 1);
     const yesterdayLocalDate = formatInTimeZone(yesterdayStart, timezone, 'yyyy-MM-dd');
 
-    const windowStart = zonedSubtractDays(todayStart, CHANGE_HISTORY_RETENTION_DAYS, timezone);
+    const windowStart = zonedSubtractDays(todayStart, CHANGE_HISTORY_LOOKBACK_DAYS, timezone);
     const windowStartLocalDate = formatInTimeZone(windowStart, timezone, 'yyyy-MM-dd');
 
     const syncRows = await db
