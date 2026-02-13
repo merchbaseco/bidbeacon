@@ -92,7 +92,10 @@ Use SemVer for the API client package:
 Release checklist for API client changes:
 
 1. Update shared version files (`package.json`, CLI package, and API client package) to the same `X.Y.Z`.
-2. Add a new `CHANGELOG.md` release section from commit summaries.
-3. Run `bun run api-client:build`.
-4. Publish with `npm publish --access public`.
-5. Tag and push with `git tag vX.Y.Z && git push origin vX.Y.Z`.
+2. Review all commits since the previous version bump and summarize them under a new `CHANGELOG.md` version header (`## vX.Y.Z - YYYY-MM-DD`).
+3. Never use an `Unreleased` header in `CHANGELOG.md`; changelog updates happen only during version bumps.
+4. Ensure the release commit follows the searchable convention from `docs/release-process.md`: `feat: version bump vX.Y.Z`.
+5. Run `bun run api-client:build`.
+6. Run `bun run test` and publish only when tests pass.
+7. Publish with `npm publish --access public`.
+8. Tag and push with `git tag vX.Y.Z && git push origin vX.Y.Z`.

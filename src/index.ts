@@ -3,17 +3,17 @@ import helmet from '@fastify/helmet';
 import websocket from '@fastify/websocket';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import { eq, or } from 'drizzle-orm';
-import Fastify, { type FastifyInstance } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { createContext } from '@/api/context.js';
 import { appRouter } from '@/api/router.js';
 import { db, testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
 import { accountDatasetMetadata, reportDatasetMetadata } from '@/db/schema.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
+import { createServer } from '@/server-config.js';
 import { emitEvent } from '@/utils/events.js';
 
 const PORT = Number(process.env.PORT) || 8080;
-const TRPC_MAX_PATH_PARAM_LENGTH = 4096;
 
 // ============================================================================
 // BidBeacon Server Startup
@@ -22,14 +22,7 @@ const TRPC_MAX_PATH_PARAM_LENGTH = 4096;
 async function main() {
     console.log('Starting BidBeacon Server');
 
-    const fastify = Fastify({
-        logger: false,
-        routerOptions: {
-            // tRPC batch queries encode comma-separated procedure paths into a single route param.
-            // Fastify's default maxParamLength (100) is too small and causes false 404s under concurrency.
-            maxParamLength: TRPC_MAX_PATH_PARAM_LENGTH,
-        },
-    });
+    const fastify = createServer();
 
     // Fastify setup
     await registerPlugins(fastify);

@@ -1,7 +1,7 @@
 {
   "name": "@bidbeacon/server",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Docker-deployable API service for BidBeacon",
   "type": "module",
   "main": "dist/index.js",
@@ -19,7 +19,6 @@
     "db:studio": "drizzle-kit studio",
     "worker": "dotenv --no-expand -e .env -- tsx src/worker/index.ts",
     "peek-dlq": "tsx scripts/peek-dlq.ts",
-    "changelog:generate": "tsx scripts/changelog.ts",
     "prepublishOnly": "node -e \"console.error('Root package publish is blocked. Publish from packages/bidbeacon-api-client instead.'); process.exit(1)\"",
     "test": "vitest",
     "api-client:types": "dts-bundle-generator --no-check -o packages/bidbeacon-api-client/src/app-router.d.ts src/api/router-public.ts --project tsconfig.api-client.json",

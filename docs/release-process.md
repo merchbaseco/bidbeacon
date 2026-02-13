@@ -16,6 +16,13 @@ BidBeacon uses one shared SemVer release version across surfaces:
 - Commit normally. Not every commit needs a version bump.
 - Keep commit subjects descriptive so release summaries are easy to generate.
 - Keep feature notes in PRs/commits; consolidate them when cutting a release.
+- Do not add or maintain an `Unreleased` section in `CHANGELOG.md`.
+
+## Version-Bump Commit Convention
+
+- Every release/version-bump commit message must include `version bump vX.Y.Z`.
+- Use this exact format for the release commit subject: `feat: version bump vX.Y.Z`.
+- This keeps version bumps searchable in git history and easy for agents to anchor changelog ranges.
 
 ## Release Trigger (Agent-Driven)
 
@@ -25,12 +32,34 @@ When ready, ask the agent directly, for example:
 
 The agent should perform this checklist:
 
-1. Determine commit range since the last release tag.
-2. Summarize commits into a new `CHANGELOG.md` section for `vX.Y.Z` dated `YYYY-MM-DD`.
-3. Update all shared version files to `X.Y.Z`.
-4. Run `bun run lint:fix`.
-5. Run `bun run test`.
-6. Build API client artifacts with `bun run api-client:build`.
+1. Determine the commit range since the previous version bump:
+   - Prefer git tags: `<previous-tag>..HEAD`.
+   - If tags are missing, find the latest commit whose subject contains `version bump v`.
+   - If local history is incomplete or ambiguous, use GitHub Releases/Compare for the same range (`previous-tag...HEAD`) and use merged PRs from that window.
+   - If both tags and release commits are unavailable, use the previous version header in `CHANGELOG.md` as a last-resort cutoff and document that assumption.
+2. Review all commits in that range and summarize user-facing changes (features, fixes, behavior changes, docs) into grouped changelog bullets.
+3. Add a new versioned section at the top of `CHANGELOG.md`:
+   - Format: `## vX.Y.Z - YYYY-MM-DD`
+   - `CHANGELOG.md` is only updated during version bumps.
+   - Never create `## Unreleased`.
+4. Update all shared version files to `X.Y.Z`.
+5. Run `bun run lint:fix`.
+6. Run `bun run test`.
+7. Build API client artifacts with `bun run api-client:build`.
+8. Only if tests pass, publish `@merchbase/bidbeacon-http-client` to npm.
+
+## Completion Criteria
+
+A version bump is only complete when all are true:
+
+- Shared versions updated (`package.json`, `packages/bidbeacon-cli/package.json`, and `packages/bidbeacon-api-client/package.json`).
+- `CHANGELOG.md` has a new versioned section for that release.
+- `bun run lint:fix`, `bun run test`, and `bun run api-client:build` have succeeded.
+- Release commit uses `feat: version bump vX.Y.Z`.
+- Git tag `vX.Y.Z` exists.
+- npm publish of `@merchbase/bidbeacon-http-client@X.Y.Z` succeeds.
+
+If npm publish fails (for example auth/token/permissions), stop and report the exact error.
 
 ## Publish + Tag
 
@@ -38,7 +67,7 @@ After reviewing the release commit:
 
 ```bash
 git add .
-git commit -m "feat: prepare release vX.Y.Z"
+git commit -m "feat: version bump vX.Y.Z"
 git tag vX.Y.Z
 git push origin main
 git push origin vX.Y.Z

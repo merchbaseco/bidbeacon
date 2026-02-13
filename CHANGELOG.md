@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.0 - 2026-02-13
+
+### Added
+
+- Added configurable API client batching controls: `batch`, `batchMaxItems`, and `batchMaxURLLength`.
+- Added regression coverage to ensure long tRPC-style batched route params are accepted by server routing.
+- Added a documented, searchable version-bump commit convention: `feat: version bump vX.Y.Z`.
+
+### Changed
+
+- Increased server router path param limit for tRPC batching to prevent false 404s under concurrent batched requests.
+- Updated release documentation to make version bumps agent-driven end-to-end, including commit-range review and versioned changelog generation.
+
+### Removed
+
+- Removed the legacy local changelog generation script and its references to keep changelog updates strictly AI-driven via the release process.
+
 ## v0.1 - 2026-02-12
 
 ### Launch Highlights
