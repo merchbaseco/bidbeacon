@@ -107,6 +107,15 @@ Campaign objects returned by campaign commands include:
 - `bb ads update <ad_id> <state>`
 - `bb ads delete <ad_id>`
 
+Ad objects returned by ad commands include:
+- `adId`
+- `campaignId`
+- `adGroupId`
+- `state`
+- `productIdType`
+- `productId`
+- `productTitle` (nullable)
+
 **ASINs**
 - `bb asins get <ASIN>`
 

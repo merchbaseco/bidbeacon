@@ -58,6 +58,7 @@ export const ad = pgTable(
         state: text('state').notNull(),
         deliveryStatus: text('delivery_status').notNull(), // vvvv below is from creative.products[0] array.
         productAsin: text('product_asin'), // May need to support multiple ASINs in the future with a M:M...
+        productTitle: text('product_title'),
         creationDateTime: timestamp('creation_date_time').notNull(), // but for now, since we only support SP,
         lastUpdatedDateTime: timestamp('last_updated_date_time').notNull(), // just take the first in the export.
     },

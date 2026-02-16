@@ -260,6 +260,7 @@ export const listAds = async (config: PublicConfig, options?: ListOptions): Prom
             adGroupId: ad.adGroupId,
             state: ad.state,
             productId: ad.productAsin,
+            productTitle: ad.productTitle,
         })
         .from(ad)
         .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
@@ -289,6 +290,7 @@ export const getAd = async (config: PublicConfig, adId: string): Promise<AdShape
             adGroupId: ad.adGroupId,
             state: ad.state,
             productId: ad.productAsin,
+            productTitle: ad.productTitle,
         })
         .from(ad)
         .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
@@ -313,6 +315,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
             campaignId: ad.campaignId,
             adState: ad.state,
             adProductId: ad.productAsin,
+            adProductTitle: ad.productTitle,
             campaignName: campaign.name,
             campaignState: campaign.state,
             campaignCreationDateTime: campaign.creationDateTime,
@@ -420,6 +423,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
                 adGroupId: row.adGroupId,
                 state: row.adState,
                 productId: row.adProductId,
+                productTitle: row.adProductTitle,
             })
         );
     }
@@ -937,6 +941,19 @@ export const resolveProductIdType = (value: string | null) => {
     return 'ASIN' as const;
 };
 
+const resolveAdProductTitleFromApi = (adData: Record<string, unknown>) => {
+    const creative = adData.creative as Record<string, unknown> | undefined;
+    const productCreative = creative?.productCreative as Record<string, unknown> | undefined;
+    const productSettings = productCreative?.productCreativeSettings as Record<string, unknown> | undefined;
+    const advertisedProduct = productSettings?.advertisedProduct as Record<string, unknown> | undefined;
+    const rawTitle = advertisedProduct?.title ?? advertisedProduct?.productTitle ?? advertisedProduct?.name;
+    if (typeof rawTitle !== 'string') {
+        return null;
+    }
+    const title = rawTitle.trim();
+    return title.length > 0 ? title : null;
+};
+
 export const mapCampaignFromApi = (campaignData: Record<string, unknown>): CampaignShape => {
     const budgets = (campaignData.budgets as Record<string, unknown>[] | undefined) ?? [];
     const budgetValue = extractBudgetValue(budgets[0] ?? null) ?? 0;
@@ -983,6 +1000,7 @@ export const mapAdFromApi = (adData: Record<string, unknown>): AdShape => {
         state: String(adData.state ?? 'PAUSED') as AdShape['state'],
         productIdType: String(advertisedProduct?.productIdType ?? 'ASIN') as AdShape['productIdType'],
         productId: String(advertisedProduct?.productId ?? ''),
+        productTitle: resolveAdProductTitleFromApi(adData),
     };
 };
 
@@ -1174,13 +1192,14 @@ const mapAdGroupRow = (row: { adGroupId: string | null; campaignId: string | nul
     defaultBid: parseNumeric(row.bidAmount) ?? 0,
 });
 
-const mapAdRow = (row: { adId: string | null; campaignId: string | null; adGroupId: string | null; state: string | null; productId: string | null }): AdShape => ({
+const mapAdRow = (row: { adId: string | null; campaignId: string | null; adGroupId: string | null; state: string | null; productId: string | null; productTitle: string | null }): AdShape => ({
     adId: String(row.adId ?? ''),
     campaignId: String(row.campaignId ?? ''),
     adGroupId: String(row.adGroupId ?? ''),
     state: String(row.state ?? 'PAUSED') as AdShape['state'],
     productIdType: resolveProductIdType(row.productId),
     productId: String(row.productId ?? ''),
+    productTitle: row.productTitle ? String(row.productTitle) : null,
 });
 
 const mapTargetRow = (row: {
