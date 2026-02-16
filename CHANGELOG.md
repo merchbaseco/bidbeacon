@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.1 - 2026-02-16
+
+### Added
+
+- Added nullable `productTitle` on ad entities in the public API so `ads/get`, `ads/list`, and ASIN tree ad payloads can include product titles when available from Amazon ad exports.
+
+### Changed
+
+- Updated ad entity sync ingestion and schema to persist `ad.product_title`, and bumped `@merchbase/bidbeacon-http-client` to `0.2.1`.
+
 ## v0.2.0 - 2026-02-13
 
 ### Added

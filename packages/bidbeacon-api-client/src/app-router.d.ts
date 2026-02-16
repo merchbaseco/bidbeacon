@@ -488,6 +488,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				adId: string;
 				productIdType: "ASIN" | "SKU";
 				productId: string;
+				productTitle: string | null;
 			}[];
 		};
 		meta: object;
@@ -509,6 +510,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				adId: string;
 				productIdType: "ASIN" | "SKU";
 				productId: string;
+				productTitle: string | null;
 			};
 		};
 		meta: object;
@@ -532,6 +534,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				adId: string;
 				productIdType: "ASIN" | "SKU";
 				productId: string;
+				productTitle: string | null;
 			};
 		};
 		meta: object;
@@ -554,6 +557,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				adId: string;
 				productIdType: "ASIN" | "SKU";
 				productId: string;
+				productTitle: string | null;
 			};
 		};
 		meta: object;
@@ -631,6 +635,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						adId: string;
 						productIdType: "ASIN" | "SKU";
 						productId: string;
+						productTitle: string | null;
 					}[];
 				}[];
 			}[];
@@ -1867,6 +1872,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				adId: string;
 				productIdType: "ASIN" | "SKU";
 				productId: string;
+				productTitle: string | null;
 			}[];
 		};
 		meta: object;
@@ -1888,6 +1894,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				adId: string;
 				productIdType: "ASIN" | "SKU";
 				productId: string;
+				productTitle: string | null;
 			};
 		};
 		meta: object;
@@ -1911,6 +1918,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				adId: string;
 				productIdType: "ASIN" | "SKU";
 				productId: string;
+				productTitle: string | null;
 			};
 		};
 		meta: object;
@@ -1933,6 +1941,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				adId: string;
 				productIdType: "ASIN" | "SKU";
 				productId: string;
+				productTitle: string | null;
 			};
 		};
 		meta: object;
@@ -2010,6 +2019,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						adId: string;
 						productIdType: "ASIN" | "SKU";
 						productId: string;
+						productTitle: string | null;
 					}[];
 				}[];
 			}[];

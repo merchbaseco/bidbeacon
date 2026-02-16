@@ -91,6 +91,9 @@ const adGroupsExportSchema = z.array(adGroupExportSchema);
 const productSchema = z.object({
     productIdType: z.string(),
     productId: z.string(), // This is the ASIN
+    title: z.string().optional(),
+    productTitle: z.string().optional(),
+    name: z.string().optional(),
 });
 
 const creativeSchema = z.object({
@@ -591,19 +594,24 @@ export const syncAdEntitiesForAccountJob = boss
 
                             // Insert ads
                             if (adsData.length > 0) {
-                                const adRecords: InferInsertModel<typeof ad>[] = adsData.map(a => ({
-                                    id: a.adId,
-                                    adId: a.adId,
-                                    adGroupId: a.adGroupId,
-                                    campaignId: a.campaignId,
-                                    adProduct: a.adProduct,
-                                    adType: a.adType,
-                                    state: a.state,
-                                    deliveryStatus: a.deliveryStatus,
-                                    productAsin: a.creative.products[0]?.productId ?? null,
-                                    creationDateTime: new Date(a.creationDateTime),
-                                    lastUpdatedDateTime: new Date(a.lastUpdatedDateTime),
-                                }));
+                                const adRecords: InferInsertModel<typeof ad>[] = adsData.map(a => {
+                                    const product = a.creative.products[0];
+
+                                    return {
+                                        id: a.adId,
+                                        adId: a.adId,
+                                        adGroupId: a.adGroupId,
+                                        campaignId: a.campaignId,
+                                        adProduct: a.adProduct,
+                                        adType: a.adType,
+                                        state: a.state,
+                                        deliveryStatus: a.deliveryStatus,
+                                        productAsin: product?.productId ?? null,
+                                        productTitle: resolveExportProductTitle(product),
+                                        creationDateTime: new Date(a.creationDateTime),
+                                        lastUpdatedDateTime: new Date(a.lastUpdatedDateTime),
+                                    };
+                                });
 
                                 await batchInsert(tx, ad, adRecords);
                             }
@@ -743,6 +751,20 @@ async function downloadAndParse<T>(url: string, schema: z.ZodType<T>): Promise<T
 
     return schema.parse(rawJson);
 }
+
+const resolveExportProductTitle = (product: z.infer<typeof productSchema> | undefined) => {
+    if (!product) {
+        return null;
+    }
+
+    const rawTitle = product.title ?? product.productTitle ?? product.name;
+    if (typeof rawTitle !== 'string') {
+        return null;
+    }
+
+    const title = rawTitle.trim();
+    return title.length > 0 ? title : null;
+};
 
 async function batchInsert<T extends Record<string, unknown>>(
     tx: Parameters<Parameters<typeof db.transaction>[0]>[0],

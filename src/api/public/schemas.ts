@@ -74,6 +74,7 @@ export const adSchema = z.object({
     state: stateSchema,
     productIdType: productIdTypeSchema,
     productId: z.string(),
+    productTitle: z.string().nullable(),
 });
 
 export const targetSchema = z.object({

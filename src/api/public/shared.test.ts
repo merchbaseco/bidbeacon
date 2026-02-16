@@ -12,9 +12,14 @@ let mapTargetFromApi: (targetData: Record<string, unknown>) => {
     productId?: string | null;
     productMatchType?: string | null;
 };
+let mapAdFromApi: (adData: Record<string, unknown>) => {
+    productIdType: string;
+    productId: string;
+    productTitle: string | null;
+};
 
 beforeAll(async () => {
-    ({ mapTargetFromApi } = await import('@/api/public/shared'));
+    ({ mapAdFromApi, mapTargetFromApi } = await import('@/api/public/shared'));
 });
 
 describe('mapTargetFromApi', () => {
@@ -97,5 +102,52 @@ describe('mapTargetFromApi', () => {
         expect(mapped.targetMatchType).toBe('PRODUCT_EXACT');
         expect(mapped.productId).toBe('B000000001');
         expect(mapped.productMatchType).toBe('PRODUCT_EXACT');
+    });
+});
+
+describe('mapAdFromApi', () => {
+    it('maps advertised product titles when present', () => {
+        const mapped = mapAdFromApi({
+            adId: 'ad-1',
+            campaignId: 'campaign-1',
+            adGroupId: 'ad-group-1',
+            state: 'ENABLED',
+            creative: {
+                productCreative: {
+                    productCreativeSettings: {
+                        advertisedProduct: {
+                            productIdType: 'ASIN',
+                            productId: 'B000000001',
+                            title: '  PopSockets Grip  ',
+                        },
+                    },
+                },
+            },
+        });
+
+        expect(mapped.productIdType).toBe('ASIN');
+        expect(mapped.productId).toBe('B000000001');
+        expect(mapped.productTitle).toBe('PopSockets Grip');
+    });
+
+    it('returns null titles when advertised product title is missing', () => {
+        const mapped = mapAdFromApi({
+            adId: 'ad-1',
+            campaignId: 'campaign-1',
+            adGroupId: 'ad-group-1',
+            state: 'ENABLED',
+            creative: {
+                productCreative: {
+                    productCreativeSettings: {
+                        advertisedProduct: {
+                            productIdType: 'ASIN',
+                            productId: 'B000000001',
+                        },
+                    },
+                },
+            },
+        });
+
+        expect(mapped.productTitle).toBeNull();
     });
 });
