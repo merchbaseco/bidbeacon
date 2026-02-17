@@ -59,7 +59,7 @@ API keys are scoped to advertiser accounts and are used by the `bb` CLI and any 
 - `src/db/schema.ts` - `api_key` and `api_key_account_access` tables (hashed secrets, revocable keys)
 - `src/api/context.ts` - API key auth (`Authorization: Bearer bbk_...` or `x-bidbeacon-api-key`)
 - `src/api/app/api-keys.ts` - create/list/revoke keys (creating a new key revokes prior keys)
-- `packages/bidbeacon-cli/src/index.ts` - CLI entrypoint (`bun run bb`)
+- `packages/bidbeacon-cli/src/index.ts` - CLI entrypoint for the globally installed `bb` binary (`@bidbeacon/cli`)
 
 **CLI defaults:** If no `--account` is provided, `bb` uses the dashboard-selected account from `api.users.getSelectedAccount`, then falls back to the first accessible account.
 

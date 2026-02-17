@@ -14,7 +14,8 @@ This skill covers:
 
 - API server running (local dev: `bun run dev`).
 - API key generated from the dashboard More menu: `Get API key`.
-- CLI available in repo as `bun run bb`.
+- Install globally: `npm install -g @bidbeacon/cli`.
+- Use command `bb`.
 
 ## Auth & Config
 
@@ -29,10 +30,10 @@ Other config values:
 
 Config commands:
 ```bash
-bun run bb config show
-bun run bb config set api-key <value>
-bun run bb config set base-url <url>
-bun run bb config set account <adsAccountId>
+bb config show
+bb config set api-key <value>
+bb config set base-url <url>
+bb config set account <adsAccountId>
 ```
 
 ## Default Account Behavior
@@ -45,9 +46,9 @@ If `--account` is not provided:
 ## Core Commands
 
 ```bash
-bun run bb accounts list
+bb accounts list
 
-bun run bb reports summary --account <adsAccountId>
+bb reports summary --account <adsAccountId>
   --country <US|CA|...>
   --aggregation <daily|hourly>
   --entity-type <target|product>
@@ -57,7 +58,7 @@ bun run bb reports summary --account <adsAccountId>
   --limit <n>
   --offset <n>
 
-bun run bb ads campaigns list --account <adsAccountId>
+bb ads campaigns list --account <adsAccountId>
   --country <US|CA|...>
   --limit <n>
   --cursor <cursor>
@@ -73,13 +74,13 @@ Common flags:
 
 ```bash
 # Use env var, list accounts
-BIDBEACON_API_KEY=bbk_... bun run bb accounts list
+BIDBEACON_API_KEY=bbk_... bb accounts list
 
 # Reports summary using dashboard default account
-BIDBEACON_API_KEY=bbk_... bun run bb reports summary --country US --aggregation daily
+BIDBEACON_API_KEY=bbk_... bb reports summary --country US --aggregation daily
 
 # Campaign list with explicit account
-bun run bb ads campaigns list --account amzn1.ads-account.g.xyz --country US
+bb ads campaigns list --account amzn1.ads-account.g.xyz --country US
 ```
 
 ## Safety & Best Practices
@@ -94,4 +95,4 @@ bun run bb ads campaigns list --account amzn1.ads-account.g.xyz --country US
 - If the CLI cannot connect, confirm `base-url` and that the API server is running.
 - If account access fails, verify the API key was created with the correct account scopes.
 - If the dashboard selection is missing, set a default with:
-  `bun run bb config set account <adsAccountId>`
+  `bb config set account <adsAccountId>`
