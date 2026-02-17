@@ -46,7 +46,7 @@ The agent should perform this checklist:
 5. Run `bun run lint:fix`.
 6. Run `bun run test`.
 7. Build API client artifacts with `bun run api-client:build`.
-8. Only if tests pass, publish `@merchbase/bidbeacon-http-client` to npm.
+8. Only if tests pass, publish `@bidbeacon/http-client` to npm.
 
 ## Completion Criteria
 
@@ -57,7 +57,7 @@ A version bump is only complete when all are true:
 - `bun run lint:fix`, `bun run test`, and `bun run api-client:build` have succeeded.
 - Release commit uses `feat: version bump vX.Y.Z`.
 - Git tag `vX.Y.Z` exists.
-- npm publish of `@merchbase/bidbeacon-http-client@X.Y.Z` succeeds.
+- npm publish of `@bidbeacon/http-client@X.Y.Z` succeeds.
 
 If npm publish fails (for example auth/token/permissions), stop and report the exact error.
 
@@ -88,5 +88,5 @@ Always publish from `packages/bidbeacon-api-client`.
 Optional verification:
 
 ```bash
-npm view @merchbase/bidbeacon-http-client version
+npm view @bidbeacon/http-client version
 ```
