@@ -1,13 +1,13 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
+import { spawnSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
-import { createTRPCProxyClient, httpLink } from '@trpc/client';
-import type { AppRouter } from '../../../src/api/router';
-import { getTimezoneForCountry } from '../../../src/utils/timezones';
-import { encodeTrpcProcedurePath, normalizeApiBaseUrl, withTransportHint } from './base-url';
+import { createBidBeaconClient } from '@bidbeacon/http-client';
+import { normalizeApiBaseUrl, withTransportHint } from './base-url';
 import { CliUsageError, isCliUsageError } from './cli-errors';
 import { type HelpTopicKey, renderHelp, resolveHelpTopicKey } from './help';
+import { getTimezoneForCountry } from './timezones';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_RANGE = 'today';
@@ -869,19 +869,10 @@ const resolveApiConfig = (config: CliConfig) => {
 
 const createApiClient = (config: CliConfig) => {
     const apiConfig = resolveApiConfig(config);
-    return createTRPCProxyClient<AppRouter>({
-        links: [
-            httpLink({
-                url: `${apiConfig.baseUrl}/api`,
-                fetch(input, init) {
-                    const url = getRequestUrl(input);
-                    return fetch(encodeTrpcProcedurePath(url), init);
-                },
-                headers() {
-                    return { Authorization: `Bearer ${apiConfig.apiKey}` };
-                },
-            }),
-        ],
+    return createBidBeaconClient({
+        baseUrl: apiConfig.baseUrl,
+        apiKey: apiConfig.apiKey,
+        batch: false,
     });
 };
 
@@ -1499,14 +1490,11 @@ const resolveCliSha = () => {
 const tryGetGitSha = () => {
     try {
         // Best-effort only; `bb` may be running outside a git checkout.
-        const result = Bun.spawnSync(['git', 'rev-parse', '--short', 'HEAD'], {
-            stdout: 'pipe',
-            stderr: 'pipe',
-        });
-        if (result.exitCode !== 0) {
+        const result = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
+        if (result.status !== 0) {
             return undefined;
         }
-        return new TextDecoder().decode(result.stdout).trim() || undefined;
+        return result.stdout.trim() || undefined;
     } catch {
         return undefined;
     }
@@ -1525,16 +1513,6 @@ const truncateAccountId = (accountId: string) => {
         return accountId;
     }
     return `${accountId.slice(0, 16)}...${accountId.slice(-4)}`;
-};
-
-const getRequestUrl = (request: RequestInfo | URL) => {
-    if (typeof request === 'string') {
-        return request;
-    }
-    if (request instanceof URL) {
-        return request.toString();
-    }
-    return request.url;
 };
 
 await main().catch(async error => {

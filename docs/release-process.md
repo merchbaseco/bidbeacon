@@ -11,6 +11,9 @@ BidBeacon uses one shared SemVer release version across surfaces:
 - CLI: `packages/bidbeacon-cli/package.json#version`
 - Git tag: `vX.Y.Z`
 
+This is a strict lockstep rule: server/app, API client, and CLI versions must always be identical.
+Never publish a client surface at a divergent version from the app/server release line.
+
 ## Day-to-Day Development
 
 - Commit normally. Not every commit needs a version bump.
@@ -43,10 +46,15 @@ The agent should perform this checklist:
    - `CHANGELOG.md` is only updated during version bumps.
    - Never create `## Unreleased`.
 4. Update all shared version files to `X.Y.Z`.
+   - `package.json`
+   - `packages/bidbeacon-api-client/package.json`
+   - `packages/bidbeacon-cli/package.json`
+   - If any one of these differs, stop and fix versions before build/publish.
 5. Run `bun run lint:fix`.
 6. Run `bun run test`.
 7. Build API client artifacts with `bun run api-client:build`.
-8. Only if tests pass, publish `@bidbeacon/http-client` to npm.
+8. Build CLI artifacts with `bun run cli:build`.
+9. Only if tests pass, publish `@bidbeacon/http-client` and `@bidbeacon/cli` to npm.
 
 ## Completion Criteria
 
@@ -54,10 +62,11 @@ A version bump is only complete when all are true:
 
 - Shared versions updated (`package.json`, `packages/bidbeacon-cli/package.json`, and `packages/bidbeacon-api-client/package.json`).
 - `CHANGELOG.md` has a new versioned section for that release.
-- `bun run lint:fix`, `bun run test`, and `bun run api-client:build` have succeeded.
+- `bun run lint:fix`, `bun run test`, `bun run api-client:build`, and `bun run cli:build` have succeeded.
 - Release commit uses `feat: version bump vX.Y.Z`.
 - Git tag `vX.Y.Z` exists.
 - npm publish of `@bidbeacon/http-client@X.Y.Z` succeeds.
+- npm publish of `@bidbeacon/cli@X.Y.Z` succeeds.
 
 If npm publish fails (for example auth/token/permissions), stop and report the exact error.
 
@@ -89,4 +98,19 @@ Optional verification:
 
 ```bash
 npm view @bidbeacon/http-client version
+```
+
+Publish CLI package:
+
+```bash
+cd packages/bidbeacon-cli
+# If NPM_TOKEN is stored in repo .env, load it for this command:
+NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm whoami
+NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm publish --access public
+```
+
+Optional verification:
+
+```bash
+npm view @bidbeacon/cli version
 ```
