@@ -1,13 +1,26 @@
 {
   "name": "@bidbeacon/cli",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "BidBeacon CLI",
   "type": "module",
-  "private": true,
+  "main": "./dist/index.js",
   "bin": {
-    "bb": "./src/index.ts"
+    "bb": "dist/index.js"
+  },
+  "scripts": {
+    "build": "rm -rf dist && bun build src/index.ts --target=node --format=esm --external @bidbeacon/http-client --outfile dist/index.js"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "dependencies": {
+    "@bidbeacon/http-client": "^0.2.1"
   },
   "files": [
-    "src"
+    "dist",
+    "README.md"
   ]
 }

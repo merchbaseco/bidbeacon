@@ -83,6 +83,9 @@ BidBeacon uses one shared SemVer release version across surfaces:
 - API client: `packages/bidbeacon-api-client/package.json#version`
 - CLI: `packages/bidbeacon-cli/package.json#version`
 
+Version lockstep is mandatory: these three version numbers must match exactly for every release.
+Do not publish `@bidbeacon/http-client` or `@bidbeacon/cli` at versions that diverge from `package.json`.
+
 Use SemVer for the API client package:
 
 - `MAJOR`: breaking changes to the published client contract (removed/renamed procedures, incompatible input/output changes).
