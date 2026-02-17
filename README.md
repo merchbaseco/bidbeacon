@@ -85,7 +85,7 @@ cat packages/bidbeacon-api-client/package.json | rg '\"version\"'
 
 Release policy and step-by-step instructions live in `docs/release-process.md`.
 
-- One shared version (`vX.Y.Z`) is used across app, CLI, and `@merchbase/bidbeacon-http-client`.
+- One shared version (`vX.Y.Z`) is used across app, CLI, and `@bidbeacon/http-client`.
 - Release updates are done manually with agent assistance (no required GitHub automation).
 
 ## Docker Services
