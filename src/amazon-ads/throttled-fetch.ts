@@ -18,11 +18,13 @@ type RetryOptions = {
 
 type ThrottledFetchOptions = RequestInit & {
     retry?: RetryOptions;
+    timeoutMs?: number;
 };
 
 const DEFAULT_RETRYABLE_STATUS_CODES = [408, 409, 429, 500, 502, 503, 504];
 const DEFAULT_BACKOFF_MULTIPLIER = 2;
 const DEFAULT_RETRY_AFTER_BUFFER_MS = 100;
+const noop = () => undefined;
 
 export const AMAZON_ADS_API_RETRY: RetryOptions = {
     attempts: 3,
@@ -51,8 +53,9 @@ const DEFAULT_MIN_TIME = 500;
  * @returns Promise resolving to Response
  */
 export async function throttledFetch(url: string | URL | Request, options?: ThrottledFetchOptions): Promise<Response> {
-    const { retry, ...fetchOptions } = options ?? {};
+    const { retry, timeoutMs, ...fetchOptions } = options ?? {};
     const resolvedRetry = retry ? normalizeRetryOptions(retry) : null;
+    const resolvedTimeoutMs = normalizeTimeoutMs(timeoutMs);
     const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
     const method = fetchOptions.method || 'GET';
 
@@ -61,7 +64,14 @@ export async function throttledFetch(url: string | URL | Request, options?: Thro
 
     while (attempt <= (resolvedRetry?.attempts ?? 1)) {
         try {
-            const response = await limiter.schedule(() => fetch(url, fetchOptions));
+            const response = await limiter.schedule(async () => {
+                const { options: attemptFetchOptions, cleanup } = createAttemptFetchOptions(fetchOptions, resolvedTimeoutMs);
+                try {
+                    return await fetch(url, attemptFetchOptions);
+                } finally {
+                    cleanup();
+                }
+            });
 
             if (response.status === 429) {
                 const retryAfter = response.headers.get('Retry-After');
@@ -116,6 +126,59 @@ function normalizeRetryOptions(options: RetryOptions): RetryOptions {
         maxDelayMs: options.maxDelayMs,
         retryableStatusCodes: options.retryableStatusCodes ?? DEFAULT_RETRYABLE_STATUS_CODES,
         retryOnNetworkError: options.retryOnNetworkError ?? true,
+    };
+}
+
+function normalizeTimeoutMs(timeoutMs?: number): number | null {
+    if (timeoutMs === undefined || !Number.isFinite(timeoutMs)) {
+        return null;
+    }
+
+    const normalizedTimeoutMs = Math.trunc(timeoutMs);
+    if (normalizedTimeoutMs <= 0) {
+        return null;
+    }
+
+    return normalizedTimeoutMs;
+}
+
+function createAttemptFetchOptions(fetchOptions: RequestInit, timeoutMs: number | null): { options: RequestInit; cleanup: () => void } {
+    if (timeoutMs === null) {
+        return { options: fetchOptions, cleanup: noop };
+    }
+
+    const timeoutController = new AbortController();
+    const parentSignal = fetchOptions.signal;
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let removeParentAbortListener: (() => void) | null = null;
+
+    timeoutId = setTimeout(() => {
+        timeoutController.abort(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+    }, timeoutMs);
+
+    if (parentSignal) {
+        if (parentSignal.aborted) {
+            timeoutController.abort(parentSignal.reason);
+        } else {
+            const onParentAbort = () => timeoutController.abort(parentSignal.reason);
+            parentSignal.addEventListener('abort', onParentAbort, { once: true });
+            removeParentAbortListener = () => parentSignal.removeEventListener('abort', onParentAbort);
+        }
+    }
+
+    return {
+        options: {
+            ...fetchOptions,
+            signal: timeoutController.signal,
+        },
+        cleanup: () => {
+            if (timeoutId) {
+                clearTimeout(timeoutId);
+                timeoutId = null;
+            }
+            removeParentAbortListener?.();
+            removeParentAbortListener = null;
+        },
     };
 }
 

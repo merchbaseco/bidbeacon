@@ -131,7 +131,7 @@ export const getChangeHistory = async (options: GetChangeHistoryOptions, region:
                 Accept: 'application/vnd.historyresponse.v1.1+json',
             },
             body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(30_000),
+            timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
         });
 
