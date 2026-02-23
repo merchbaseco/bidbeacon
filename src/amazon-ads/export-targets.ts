@@ -116,7 +116,7 @@ export async function exportTargets(options: ExportTargetsOptions, region: ApiRe
             method: 'POST',
             headers,
             body: JSON.stringify(validatedRequestBody),
-            signal: AbortSignal.timeout(30_000),
+            timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
         });
 

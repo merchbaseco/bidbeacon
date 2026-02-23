@@ -38,7 +38,7 @@ export const spRequest = async <T>(options: SpRequestOptions<T>, region: ApiRegi
             method: 'POST',
             headers,
             body: JSON.stringify(options.body),
-            signal: AbortSignal.timeout(30_000),
+            timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
         });
 

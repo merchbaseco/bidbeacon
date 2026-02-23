@@ -75,7 +75,7 @@ export async function getExportStatus(options: GetExportStatusOptions, region: A
         const response = await throttledFetch(url, {
             method: 'GET',
             headers,
-            signal: AbortSignal.timeout(30_000),
+            timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
         });
 

@@ -80,7 +80,7 @@ export async function updateTargetBid(options: UpdateTargetBidOptions, region: A
             method: 'PUT',
             headers,
             body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(30_000),
+            timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
         });
 

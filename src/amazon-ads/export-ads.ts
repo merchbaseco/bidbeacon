@@ -97,7 +97,7 @@ export async function exportAds(options: ExportAdsOptions, region: ApiRegion = '
             method: 'POST',
             headers,
             body: JSON.stringify(validatedRequestBody),
-            signal: AbortSignal.timeout(30_000),
+            timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
         });
 

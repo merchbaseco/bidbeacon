@@ -98,7 +98,7 @@ export async function listAdvertiserAccounts(options?: ListAdsAccountsOptions, r
             method: 'POST',
             headers,
             body: JSON.stringify(requestBody),
-            signal: AbortSignal.timeout(30_000),
+            timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
         });
 
