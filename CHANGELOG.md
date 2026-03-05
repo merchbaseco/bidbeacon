@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.3 - 2026-03-05
+
+### Added
+
+- Added CLI response context metadata in command output and documented it in CLI help/spec references.
+
 ## v0.2.2 - 2026-03-05
 
 ### Added
