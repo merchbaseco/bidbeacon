@@ -8,7 +8,7 @@ This spec defines the public, user-facing shape of the Sponsored Products (SP) C
 - Config-only state. No prompts or interactive flows.
 - Resource-first, verb-second command shape.
 - JSON-only output.
-- One CLI command maps to one API capability.
+- One CLI command maps to one user capability (some commands compose multiple API calls).
 - Flat command structure. Filters provide drill-down.
 
 **HTTP Path Shape (tRPC)**
@@ -68,6 +68,7 @@ Drill down by passing parent IDs as flags.
 
 **Campaigns**
 - `bb campaigns list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--limit <n>] [--offset <n>]`
+- `bb campaigns search <query> [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--limit <n>] [--offset <n>]`
 - `bb campaigns get <campaign_id>`
 - `bb campaigns create <name> <budget>`
 - `bb campaigns update <campaign_id> --name <name> [--portfolio <id>] [--start <iso>] [--end <iso>]`
@@ -117,14 +118,24 @@ Ad objects returned by ad commands include:
 - `productTitle` (nullable)
 
 **ASINs**
-- `bb asins get <ASIN>`
+- `bb asins get <ASIN> [--range <range>] [--metrics <key1,key2,...>] [--bucket <auto|hour|day|week|month|year>]`
 
 `bb asins get <ASIN>` response shape:
+- Top-level includes:
+  - `asin`
+  - `campaigns` (same structural hierarchy as before)
+  - `metrics`:
+    - `range` (string when no bucket; structured range object when bucket is enabled)
+    - `totals` (range rollup; defaults to all metrics keys)
+    - `timezone` (present when `--bucket` is provided)
+    - `granularity` (present when `--bucket` is provided)
+    - `series[]` (present when `--bucket` is provided)
 - Top-level `campaigns[]` items include:
   - `campaignId`
   - `campaignName`
   - `state`
   - `creationDateTime`
+  - `metrics` (campaign-scoped totals for selected range)
   - `targets` (hydrated target objects, not target IDs)
   - `adGroups` (hydrated ad group objects)
 - Each `adGroups[]` item includes:
@@ -133,11 +144,13 @@ Ad objects returned by ad commands include:
   - `name`
   - `state`
   - `defaultBid`
+  - `metrics` (ad-group scoped totals for selected range)
   - `targets` (hydrated target objects, not target IDs)
   - `ads` (hydrated ad objects, not ad IDs)
 
 This command returns entity objects for `targets` and `ads` to avoid follow-up lookups.
 Target objects include a `negative` boolean so clients can separate editable vs non-editable targets safely.
+When `--bucket` is omitted, totals still reflect the configured/default range (`today` if unset) but no series points are returned.
 
 **Targets**
 - `bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--negative <true|false>] [--limit <n>] [--offset <n>]`
@@ -188,6 +201,7 @@ Metrics commands come in two shapes.
 Metrics common flags:
 - `--metrics <key1,key2,...>` selects which metrics are returned. Defaults to all.
 - `--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>` overrides the configured range.
+- `--group-by <campaigns|ad-groups|ads|targets>` alias for entity subcommands on both `series` and `table`.
 - `--filter <key><op><value>` repeatable.
 - `--search <text>` shortcut for `filters.search`.
 - `--state <ENABLED|PAUSED|ARCHIVED|OTHER|ALL>` shortcut for `filters.state`.

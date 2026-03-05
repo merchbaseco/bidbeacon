@@ -7,6 +7,7 @@ describe('bb help topics', () => {
         expect(resolveHelpTopicKey(['metrics', 'series'])).toBe('metrics series');
         expect(resolveHelpTopicKey(['metrics', 'table'])).toBe('metrics table');
         expect(resolveHelpTopicKey(['metrics', 'series', 'campaigns'])).toBe('metrics series');
+        expect(resolveHelpTopicKey(['campaign'])).toBe('campaigns');
         expect(resolveHelpTopicKey(['asins'])).toBe('asins');
         expect(resolveHelpTopicKey(['history'])).toBe('history');
     });
@@ -25,5 +26,15 @@ describe('bb help topics', () => {
 
         const historyOutput = renderHelp('history', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
         expect(historyOutput).toContain('--range <range>');
+    });
+
+    it('renders ASIN and metrics discoverability flags', () => {
+        const asinsOutput = renderHelp('asins', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
+        expect(asinsOutput).toContain('--range <range>');
+        expect(asinsOutput).toContain('--metrics <keys>');
+        expect(asinsOutput).toContain('--bucket <value>');
+
+        const metricsSeriesOutput = renderHelp('metrics series', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
+        expect(metricsSeriesOutput).toContain('--group-by <entity>');
     });
 });

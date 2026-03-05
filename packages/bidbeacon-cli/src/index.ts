@@ -20,6 +20,8 @@ const METRICS_BUCKETS_SET = new Set(METRICS_BUCKETS);
 const METRIC_FILTER_REGEX = /^\s*([^<>=!~]+)\s*(<=|>=|!=|=|<|>|~)\s*(.+)\s*$/;
 const ASIN_REGEX = /^[A-Z0-9]{10}$/;
 const NUMERIC_ID_REGEX = /^[0-9]+$/;
+const SEARCH_PAGE_LIMIT = 200;
+const MAX_METRICS_TABLE_IDS_PER_REQUEST = 200;
 
 const main = async () => {
     const { positional, flags } = parseArgs(process.argv.slice(2));
@@ -31,7 +33,8 @@ const main = async () => {
         return;
     }
 
-    const [command, subcommand, action, ...rest] = positional;
+    const [rawCommand, subcommand, action, ...rest] = positional;
+    const command = resolveCommandAlias(rawCommand);
 
     if (command === 'config') {
         if (!subcommand) {
@@ -71,6 +74,25 @@ const main = async () => {
                 const offsetRaw = readFlag(flags, ['offset']);
                 const data = await client['campaigns/list'].query({
                     config: cliConfig,
+                    state,
+                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
+                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
+                });
+                printOutput(data);
+                return;
+            }
+            if (subcommand === 'search') {
+                if (!action) {
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <query>.' });
+                }
+                const query = action.trim();
+                if (query.length === 0) {
+                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <query>.' });
+                }
+                const state = resolveListStateFlag(flags) ?? 'ALL';
+                const limitRaw = readFlag(flags, ['limit']);
+                const offsetRaw = readFlag(flags, ['offset']);
+                const data = await searchCampaigns(client, cliConfig, query, {
                     state,
                     limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
                     offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
@@ -347,7 +369,14 @@ const main = async () => {
             const cliConfig = requireCliConfig(config);
             if (subcommand === 'get') {
                 const asin = requireAsinArg(action, { topicKey: 'asins', label: '<asin>' });
-                const data = await client['asins/get'].query({ config: cliConfig, asin });
+                const rangeOverride = readFlag(flags, ['range']);
+                const metrics = parseMetricsSelectionFlag(flags);
+                const bucket = parseMetricsBucketFlag(flags);
+                const data = await getAsinViewWithMetrics(client, cliConfig, asin, {
+                    range: rangeOverride ?? undefined,
+                    metrics,
+                    bucket,
+                });
                 printOutput(data);
                 return;
             }
@@ -554,16 +583,14 @@ const main = async () => {
                 process.stdout.write(renderHelp('metrics', helpContext));
                 return;
             }
-            if ((subcommand === 'series' || subcommand === 'table') && !action) {
-                process.stdout.write(renderHelp(subcommand === 'series' ? 'metrics series' : 'metrics table', helpContext));
-                return;
-            }
             const config = await loadConfig();
             const client = createApiClient(config);
             const cliConfig = requireCliConfig(config);
             if (subcommand !== 'series' && subcommand !== 'table') {
                 throw new CliUsageError({ topicKey: 'metrics', message: `Unknown subcommand: ${subcommand}` });
             }
+            const groupBy = readFlag(flags, ['group-by', 'groupby']);
+            const entity = resolveMetricsEntity(action, groupBy, subcommand === 'series' ? 'metrics series' : 'metrics table');
 
             const ids = parseIdsFlag(flags);
             const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), {
@@ -609,7 +636,7 @@ const main = async () => {
                     : null;
 
             if (subcommand === 'series') {
-                if (action === 'campaigns') {
+                if (entity === 'campaigns') {
                     if (campaignId || adGroupId) {
                         throw new CliUsageError({
                             topicKey: 'metrics series',
@@ -627,7 +654,7 @@ const main = async () => {
                     printOutput(data);
                     return;
                 }
-                if (action === 'ad-groups') {
+                if (entity === 'ad-groups') {
                     if (adGroupId) {
                         throw new CliUsageError({
                             topicKey: 'metrics series',
@@ -646,7 +673,7 @@ const main = async () => {
                     printOutput(data);
                     return;
                 }
-                if (action === 'ads') {
+                if (entity === 'ads') {
                     const data = await client['metrics/series/ads'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
@@ -660,7 +687,7 @@ const main = async () => {
                     printOutput(data);
                     return;
                 }
-                if (action === 'targets') {
+                if (entity === 'targets') {
                     const data = await client['metrics/series/targets'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
@@ -681,7 +708,7 @@ const main = async () => {
                     throw new Error('Missing table options.');
                 }
 
-                if (action === 'campaigns') {
+                if (entity === 'campaigns') {
                     if (campaignId || adGroupId) {
                         throw new CliUsageError({
                             topicKey: 'metrics table',
@@ -701,7 +728,7 @@ const main = async () => {
                     printOutput(data);
                     return;
                 }
-                if (action === 'ad-groups') {
+                if (entity === 'ad-groups') {
                     if (adGroupId) {
                         throw new CliUsageError({
                             topicKey: 'metrics table',
@@ -722,7 +749,7 @@ const main = async () => {
                     printOutput(data);
                     return;
                 }
-                if (action === 'ads') {
+                if (entity === 'ads') {
                     const data = await client['metrics/table/ads'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
@@ -738,7 +765,7 @@ const main = async () => {
                     printOutput(data);
                     return;
                 }
-                if (action === 'targets') {
+                if (entity === 'targets') {
                     const data = await client['metrics/table/targets'].query({
                         config: cliConfig,
                         campaignId: campaignId ?? undefined,
@@ -755,8 +782,7 @@ const main = async () => {
                     return;
                 }
             }
-
-            throw new CliUsageError({ topicKey: subcommand === 'series' ? 'metrics series' : 'metrics table', message: `Unknown entity: ${action}` });
+            throw new CliUsageError({ topicKey: subcommand === 'series' ? 'metrics series' : 'metrics table', message: `Unknown entity: ${entity}` });
         }
         case 'enums': {
             if (!subcommand) {
@@ -874,6 +900,17 @@ const createApiClient = (config: CliConfig) => {
         apiKey: apiConfig.apiKey,
         batch: false,
     });
+};
+
+const resolveCommandAlias = (value?: string) => {
+    if (!value) {
+        return value;
+    }
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'campaign') {
+        return 'campaigns';
+    }
+    return normalized;
 };
 
 const requireCliConfig = (config: CliConfig) => {
@@ -1447,6 +1484,331 @@ const resolveAccountTimezoneHint = async (config: CliConfig) => {
         return 'unknown (unable to fetch)';
     }
 };
+
+const searchCampaigns = async (client: ApiClient, config: RequiredCliConfig, query: string, options: { state: string; limit?: number; offset?: number }) => {
+    const normalizedQuery = query.trim().toLowerCase();
+    const requestedLimit = options.limit ?? 20;
+    const requestedOffset = options.offset ?? 0;
+    const matchedItems: CampaignListItem[] = [];
+
+    let pageOffset = 0;
+    while (true) {
+        const page = await client['campaigns/list'].query({
+            config,
+            state: options.state as CampaignSearchState,
+            limit: SEARCH_PAGE_LIMIT,
+            offset: pageOffset,
+        });
+        if (page.items.length === 0) {
+            break;
+        }
+
+        for (const item of page.items) {
+            const idMatch = item.campaignId.toLowerCase().includes(normalizedQuery);
+            const nameMatch = (item.name ?? '').toLowerCase().includes(normalizedQuery);
+            if (idMatch || nameMatch) {
+                matchedItems.push(item);
+            }
+        }
+
+        if (page.items.length < SEARCH_PAGE_LIMIT) {
+            break;
+        }
+        pageOffset += SEARCH_PAGE_LIMIT;
+    }
+
+    return {
+        query,
+        totalMatched: matchedItems.length,
+        items: matchedItems.slice(requestedOffset, requestedOffset + requestedLimit),
+    };
+};
+
+const resolveMetricsEntity = (action: string | undefined, groupBy: string | null, topicKey: HelpTopicKey) => {
+    const actionValue = action ? normalizeMetricsEntity(action) : null;
+    const groupByValue = groupBy ? normalizeMetricsEntity(groupBy) : null;
+
+    if (action && !actionValue) {
+        throw new CliUsageError({
+            topicKey,
+            message: `Unknown entity: ${action}. Use campaigns, ad-groups, ads, or targets.`,
+        });
+    }
+    if (groupBy && !groupByValue) {
+        throw new CliUsageError({
+            topicKey,
+            message: `Invalid --group-by: ${groupBy}. Use campaigns, ad-groups, ads, or targets.`,
+        });
+    }
+    if (actionValue && groupByValue && actionValue !== groupByValue) {
+        throw new CliUsageError({
+            topicKey,
+            message: `Conflicting entity selectors: positional ${actionValue} and --group-by ${groupByValue}.`,
+        });
+    }
+
+    const resolved = actionValue ?? groupByValue;
+    if (!resolved) {
+        throw new CliUsageError({
+            topicKey,
+            message: 'Missing entity. Use campaigns, ad-groups, ads, or targets (or pass --group-by).',
+        });
+    }
+    return resolved;
+};
+
+const normalizeMetricsEntity = (value: string) => {
+    const normalized = value.trim().toLowerCase();
+    if (normalized === 'campaign' || normalized === 'campaigns') {
+        return 'campaigns' as const;
+    }
+    if (normalized === 'ad-group' || normalized === 'ad-groups' || normalized === 'adgroup' || normalized === 'adgroups') {
+        return 'ad-groups' as const;
+    }
+    if (normalized === 'ad' || normalized === 'ads') {
+        return 'ads' as const;
+    }
+    if (normalized === 'target' || normalized === 'targets') {
+        return 'targets' as const;
+    }
+    return null;
+};
+
+const getAsinViewWithMetrics = async (client: ApiClient, config: RequiredCliConfig, asin: string, options: { range?: string; metrics?: MetricsSelection; bucket?: MetricsBucket }) => {
+    const tree = await client['asins/get'].query({ config, asin });
+    const metricKeys = resolveMetricKeys(options.metrics);
+    const scope = collectAsinScope(tree);
+
+    const [campaignTable, adGroupTable, targetTable, adTable, adSeries] = await Promise.all([
+        queryCampaignMetricsTable(client, config, scope.campaignIds, options.range, options.metrics),
+        queryAdGroupMetricsTable(client, config, scope.adGroupIds, options.range, options.metrics),
+        queryTargetMetricsTable(client, config, scope.targetIds, options.range, options.metrics),
+        queryAdMetricsTable(client, config, scope.adIds, options.range, options.metrics),
+        queryAdMetricsSeries(client, config, scope.adIds, options.range, options.metrics, options.bucket),
+    ]);
+
+    const campaignMetricsById = new Map(campaignTable.items.map(item => [item.campaignId, normalizeMetrics(item.metrics, metricKeys)]));
+    const adGroupMetricsById = new Map(adGroupTable.items.map(item => [item.adGroupId, normalizeMetrics(item.metrics, metricKeys)]));
+    const targetMetricsById = new Map(targetTable.items.map(item => [item.targetId, normalizeMetrics(item.metrics, metricKeys)]));
+    const adMetricsById = new Map(adTable.items.map(item => [item.adId, normalizeMetrics(item.metrics, metricKeys)]));
+
+    const campaigns = tree.campaigns.map(campaign => ({
+        ...campaign,
+        metrics: campaignMetricsById.get(campaign.campaignId) ?? buildZeroMetrics(metricKeys),
+        targets: campaign.targets.map(target => ({
+            ...target,
+            metrics: targetMetricsById.get(target.targetId) ?? buildZeroMetrics(metricKeys),
+        })),
+        adGroups: campaign.adGroups.map(adGroup => ({
+            ...adGroup,
+            metrics: adGroupMetricsById.get(adGroup.adGroupId) ?? buildZeroMetrics(metricKeys),
+            targets: adGroup.targets.map(target => ({
+                ...target,
+                metrics: targetMetricsById.get(target.targetId) ?? buildZeroMetrics(metricKeys),
+            })),
+            ads: adGroup.ads.map(ad => ({
+                ...ad,
+                metrics: adMetricsById.get(ad.adId) ?? buildZeroMetrics(metricKeys),
+            })),
+        })),
+    }));
+
+    const metricsOutput = adSeries
+        ? {
+              range: adSeries.range,
+              timezone: adSeries.timezone,
+              granularity: adSeries.granularity,
+              totals: normalizeMetrics(adSeries.totals, metricKeys),
+              series: adSeries.series.map(point => ({
+                  ...point,
+                  metrics: normalizeMetrics(point.metrics, metricKeys),
+              })),
+          }
+        : {
+              range: options.range ?? config.range,
+              totals: normalizeMetrics(adTable.totals, metricKeys),
+          };
+
+    return {
+        asin,
+        campaigns,
+        metrics: metricsOutput,
+    };
+};
+
+const queryCampaignMetricsTable = async (client: ApiClient, config: RequiredCliConfig, ids: string[], range: string | undefined, metrics: MetricsSelection) => {
+    if (ids.length === 0) {
+        return { totals: buildZeroMetrics(resolveMetricKeys(metrics)), items: [] as CampaignMetricsTableItem[] };
+    }
+    return queryTableInChunks<CampaignMetricsTableItem>(ids, async chunkIds => {
+        const data = await client['metrics/table/campaigns'].query({
+            config,
+            ids: chunkIds,
+            range,
+            metrics,
+            limit: MAX_METRICS_TABLE_IDS_PER_REQUEST,
+        });
+        return { totals: data.totals, items: data.items };
+    });
+};
+
+const queryAdGroupMetricsTable = async (client: ApiClient, config: RequiredCliConfig, ids: string[], range: string | undefined, metrics: MetricsSelection) => {
+    if (ids.length === 0) {
+        return { totals: buildZeroMetrics(resolveMetricKeys(metrics)), items: [] as AdGroupMetricsTableItem[] };
+    }
+    return queryTableInChunks<AdGroupMetricsTableItem>(ids, async chunkIds => {
+        const data = await client['metrics/table/ad-groups'].query({
+            config,
+            ids: chunkIds,
+            range,
+            metrics,
+            limit: MAX_METRICS_TABLE_IDS_PER_REQUEST,
+        });
+        return { totals: data.totals, items: data.items };
+    });
+};
+
+const queryTargetMetricsTable = async (client: ApiClient, config: RequiredCliConfig, ids: string[], range: string | undefined, metrics: MetricsSelection) => {
+    if (ids.length === 0) {
+        return { totals: buildZeroMetrics(resolveMetricKeys(metrics)), items: [] as TargetMetricsTableItem[] };
+    }
+    return queryTableInChunks<TargetMetricsTableItem>(ids, async chunkIds => {
+        const data = await client['metrics/table/targets'].query({
+            config,
+            ids: chunkIds,
+            range,
+            metrics,
+            limit: MAX_METRICS_TABLE_IDS_PER_REQUEST,
+        });
+        return { totals: data.totals, items: data.items };
+    });
+};
+
+const queryAdMetricsTable = async (client: ApiClient, config: RequiredCliConfig, ids: string[], range: string | undefined, metrics: MetricsSelection) => {
+    if (ids.length === 0) {
+        return { totals: buildZeroMetrics(resolveMetricKeys(metrics)), items: [] as AdMetricsTableItem[] };
+    }
+    return queryTableInChunks<AdMetricsTableItem>(ids, async chunkIds => {
+        const data = await client['metrics/table/ads'].query({
+            config,
+            ids: chunkIds,
+            range,
+            metrics,
+            limit: MAX_METRICS_TABLE_IDS_PER_REQUEST,
+        });
+        return { totals: data.totals, items: data.items };
+    });
+};
+
+const queryAdMetricsSeries = async (client: ApiClient, config: RequiredCliConfig, ids: string[], range: string | undefined, metrics: MetricsSelection, bucket: MetricsBucket | undefined) => {
+    if (!bucket || ids.length === 0) {
+        return null;
+    }
+    return client['metrics/series/ads'].query({
+        config,
+        ids,
+        range,
+        metrics,
+        bucket,
+    });
+};
+
+const queryTableInChunks = async <TItem>(ids: string[], query: (chunkIds: string[]) => Promise<{ totals: MetricRecord; items: TItem[] }>): Promise<{ totals: MetricRecord; items: TItem[] }> => {
+    const chunks = chunkArray(ids, MAX_METRICS_TABLE_IDS_PER_REQUEST);
+    const results = await Promise.all(chunks.map(chunk => query(chunk)));
+    const totals = sumMetrics(results.map(result => result.totals));
+    const items = results.flatMap(result => result.items);
+    return { totals, items };
+};
+
+const collectAsinScope = (tree: AsinsTreeOutput) => {
+    const campaignIds: string[] = [];
+    const adGroupIds: string[] = [];
+    const targetIds: string[] = [];
+    const adIds: string[] = [];
+
+    for (const campaign of tree.campaigns) {
+        campaignIds.push(campaign.campaignId);
+        for (const target of campaign.targets) {
+            targetIds.push(target.targetId);
+        }
+        for (const adGroup of campaign.adGroups) {
+            adGroupIds.push(adGroup.adGroupId);
+            for (const target of adGroup.targets) {
+                targetIds.push(target.targetId);
+            }
+            for (const ad of adGroup.ads) {
+                adIds.push(ad.adId);
+            }
+        }
+    }
+
+    return {
+        campaignIds: uniqueStrings(campaignIds),
+        adGroupIds: uniqueStrings(adGroupIds),
+        targetIds: uniqueStrings(targetIds),
+        adIds: uniqueStrings(adIds),
+    };
+};
+
+const chunkArray = <T>(items: T[], chunkSize: number) => {
+    const chunks: T[][] = [];
+    for (let index = 0; index < items.length; index += chunkSize) {
+        chunks.push(items.slice(index, index + chunkSize));
+    }
+    return chunks;
+};
+
+const uniqueStrings = (values: string[]) => {
+    return Array.from(new Set(values));
+};
+
+const resolveMetricKeys = (selection: MetricsSelection) => {
+    return selection ?? [...METRICS_KEYS];
+};
+
+const buildZeroMetrics = (keys: readonly string[]) => {
+    const metrics: Record<string, number> = {};
+    for (const key of keys) {
+        metrics[key] = 0;
+    }
+    return metrics;
+};
+
+const normalizeMetrics = (value: MetricRecord, keys: readonly string[]) => {
+    const metrics: Record<string, number> = {};
+    for (const key of keys) {
+        const raw = value[key];
+        metrics[key] = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
+    }
+    return metrics;
+};
+
+const sumMetrics = (values: MetricRecord[]) => {
+    const totals: Record<string, number> = buildZeroMetrics(METRICS_KEYS);
+    for (const metrics of values) {
+        for (const key of METRICS_KEYS) {
+            const raw = metrics[key];
+            if (typeof raw === 'number' && Number.isFinite(raw)) {
+                totals[key] += raw;
+            }
+        }
+    }
+    return totals;
+};
+
+type ApiClient = ReturnType<typeof createApiClient>;
+type RequiredCliConfig = ReturnType<typeof requireCliConfig>;
+type CampaignSearchState = 'ENABLED' | 'PAUSED' | 'ARCHIVED' | 'OTHER' | 'ALL';
+type MetricsBucket = (typeof METRICS_BUCKETS)[number];
+type MetricsSelection = (typeof METRICS_KEYS)[number][] | undefined;
+type AsinsTreeOutput = Awaited<ReturnType<ApiClient['asins/get']['query']>>;
+type CampaignListItem = Awaited<ReturnType<ApiClient['campaigns/list']['query']>>['items'][number];
+type CampaignMetricsTableItem = Awaited<ReturnType<ApiClient['metrics/table/campaigns']['query']>>['items'][number];
+type AdGroupMetricsTableItem = Awaited<ReturnType<ApiClient['metrics/table/ad-groups']['query']>>['items'][number];
+type TargetMetricsTableItem = Awaited<ReturnType<ApiClient['metrics/table/targets']['query']>>['items'][number];
+type AdMetricsTableItem = Awaited<ReturnType<ApiClient['metrics/table/ads']['query']>>['items'][number];
+type MetricRecord = Record<string, number | null | undefined>;
 
 type CliConfig = {
     baseUrl?: string;
