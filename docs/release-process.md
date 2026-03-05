@@ -55,6 +55,7 @@ The agent should perform this checklist:
 7. Build API client artifacts with `bun run api-client:build`.
 8. Build CLI artifacts with `bun run cli:build`.
 9. Only if tests pass, publish `@bidbeacon/http-client` and `@bidbeacon/cli` to npm.
+10. Create a GitHub Release for `vX.Y.Z` using the matching `CHANGELOG.md` section as release notes.
 
 ## Completion Criteria
 
@@ -65,6 +66,7 @@ A version bump is only complete when all are true:
 - `bun run lint:fix`, `bun run test`, `bun run api-client:build`, and `bun run cli:build` have succeeded.
 - Release commit uses `feat: version bump vX.Y.Z`.
 - Git tag `vX.Y.Z` exists.
+- GitHub Release `vX.Y.Z` exists and matches the release notes from `CHANGELOG.md`.
 - npm publish of `@bidbeacon/http-client@X.Y.Z` succeeds.
 - npm publish of `@bidbeacon/cli@X.Y.Z` succeeds.
 
@@ -113,4 +115,12 @@ Optional verification:
 
 ```bash
 npm view @bidbeacon/cli version
+```
+
+Create GitHub Release notes from the matching changelog section and publish the release:
+
+```bash
+mkdir -p .context
+awk 'BEGIN{capture=0} /^## vX.Y.Z - /{capture=1; next} /^## v[0-9]/{if(capture) exit} capture{print}' CHANGELOG.md > .context/release-vX.Y.Z-notes.md
+gh release create vX.Y.Z --title "vX.Y.Z" --notes-file .context/release-vX.Y.Z-notes.md
 ```
