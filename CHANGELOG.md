@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.2.2 - 2026-03-05
+
+### Added
+
+- Published `@bidbeacon/cli` for global npm installs and expanded CLI help/discoverability, including inline ASIN metrics support in command output.
+- Added deploy notifications to Discord with an AI-generated summary payload for rollout visibility.
+
+### Changed
+
+- Migrated the public HTTP client package namespace to `@bidbeacon/http-client` across app, CLI, and docs.
+- Standardized deploy notifications on a shared captainhook notifier and explicit Discord webhook `User-Agent` handling.
+
+### Fixed
+
+- Updated Amazon Ads request handling to enforce per-attempt timeouts across throttled and retried API calls.
+
 ## v0.2.1 - 2026-02-16
 
 ### Added
