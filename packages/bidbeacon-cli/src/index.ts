@@ -528,16 +528,32 @@ const main = async () => {
             const rangeOverride = readFlag(flags, ['range']);
             const limitRaw = readFlag(flags, ['limit']);
             const offsetRaw = readFlag(flags, ['offset']);
+            const limit = limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined;
+            const offset = offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined;
+            const rangeContext = resolveRangeContext(cliConfig, rangeOverride);
 
             const data = await client['history/list'].query({
                 config: cliConfig,
                 entityType: entity.entityType,
                 entityId,
                 range: rangeOverride ?? undefined,
-                limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
-                offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
+                limit,
+                offset,
             });
-            printOutput(data);
+            printOutput({
+                context: {
+                    accountId: cliConfig.accountId,
+                    countryCode: cliConfig.countryCode,
+                    entityType: entity.entityType,
+                    entityId,
+                    range: rangeContext.range,
+                    rangeSource: rangeContext.rangeSource,
+                    timezone: rangeContext.timezone,
+                    limit: limit ?? null,
+                    offset: offset ?? null,
+                },
+                ...data,
+            });
             return;
         }
         case 'bids': {
@@ -607,6 +623,20 @@ const main = async () => {
             const filters = parseMetricsFiltersFlag(flags);
             const rangeOverride = readFlag(flags, ['range']);
             const bucket = parseMetricsBucketFlag(flags);
+            const rangeContext = resolveRangeContext(cliConfig, rangeOverride);
+            const metricsContext = {
+                accountId: cliConfig.accountId,
+                countryCode: cliConfig.countryCode,
+                groupBy: entity,
+                ids: ids ?? [],
+                campaignId: campaignId ?? null,
+                adGroupId: adGroupId ?? null,
+                metrics: resolveMetricKeys(metrics),
+                filters: filters ?? {},
+                range: rangeContext.range,
+                rangeSource: rangeContext.rangeSource,
+                timezone: rangeContext.timezone,
+            };
 
             const sortField = readFlag(flags, ['sort']);
             const sortDirection = readFlag(flags, ['direction']);
@@ -651,7 +681,13 @@ const main = async () => {
                         range: rangeOverride ?? undefined,
                         bucket: bucket ?? undefined,
                     });
-                    printOutput(data);
+                    printOutput({
+                        context: {
+                            ...metricsContext,
+                            bucket: bucket ?? null,
+                        },
+                        ...data,
+                    });
                     return;
                 }
                 if (entity === 'ad-groups') {
@@ -670,7 +706,13 @@ const main = async () => {
                         range: rangeOverride ?? undefined,
                         bucket: bucket ?? undefined,
                     });
-                    printOutput(data);
+                    printOutput({
+                        context: {
+                            ...metricsContext,
+                            bucket: bucket ?? null,
+                        },
+                        ...data,
+                    });
                     return;
                 }
                 if (entity === 'ads') {
@@ -684,7 +726,13 @@ const main = async () => {
                         range: rangeOverride ?? undefined,
                         bucket: bucket ?? undefined,
                     });
-                    printOutput(data);
+                    printOutput({
+                        context: {
+                            ...metricsContext,
+                            bucket: bucket ?? null,
+                        },
+                        ...data,
+                    });
                     return;
                 }
                 if (entity === 'targets') {
@@ -698,7 +746,13 @@ const main = async () => {
                         range: rangeOverride ?? undefined,
                         bucket: bucket ?? undefined,
                     });
-                    printOutput(data);
+                    printOutput({
+                        context: {
+                            ...metricsContext,
+                            bucket: bucket ?? null,
+                        },
+                        ...data,
+                    });
                     return;
                 }
             }
@@ -725,7 +779,16 @@ const main = async () => {
                         limit: tableOptions.limit,
                         offset: tableOptions.offset,
                     });
-                    printOutput(data);
+                    printOutput({
+                        context: {
+                            ...metricsContext,
+                            sort: tableOptions.sort.field,
+                            direction: tableOptions.sort.direction,
+                            limit: tableOptions.limit ?? null,
+                            offset: tableOptions.offset ?? null,
+                        },
+                        ...data,
+                    });
                     return;
                 }
                 if (entity === 'ad-groups') {
@@ -746,7 +809,16 @@ const main = async () => {
                         limit: tableOptions.limit,
                         offset: tableOptions.offset,
                     });
-                    printOutput(data);
+                    printOutput({
+                        context: {
+                            ...metricsContext,
+                            sort: tableOptions.sort.field,
+                            direction: tableOptions.sort.direction,
+                            limit: tableOptions.limit ?? null,
+                            offset: tableOptions.offset ?? null,
+                        },
+                        ...data,
+                    });
                     return;
                 }
                 if (entity === 'ads') {
@@ -762,7 +834,16 @@ const main = async () => {
                         limit: tableOptions.limit,
                         offset: tableOptions.offset,
                     });
-                    printOutput(data);
+                    printOutput({
+                        context: {
+                            ...metricsContext,
+                            sort: tableOptions.sort.field,
+                            direction: tableOptions.sort.direction,
+                            limit: tableOptions.limit ?? null,
+                            offset: tableOptions.offset ?? null,
+                        },
+                        ...data,
+                    });
                     return;
                 }
                 if (entity === 'targets') {
@@ -778,7 +859,16 @@ const main = async () => {
                         limit: tableOptions.limit,
                         offset: tableOptions.offset,
                     });
-                    printOutput(data);
+                    printOutput({
+                        context: {
+                            ...metricsContext,
+                            sort: tableOptions.sort.field,
+                            direction: tableOptions.sort.direction,
+                            limit: tableOptions.limit ?? null,
+                            offset: tableOptions.offset ?? null,
+                        },
+                        ...data,
+                    });
                     return;
                 }
             }
@@ -929,6 +1019,14 @@ const requireCliConfig = (config: CliConfig) => {
 
 const printOutput = (data: unknown) => {
     console.log(JSON.stringify({ ok: true, data }, null, 2));
+};
+
+const resolveRangeContext = (config: RequiredCliConfig, rangeOverride: string | null) => {
+    return {
+        range: rangeOverride ?? config.range,
+        rangeSource: rangeOverride ? 'flag' : 'config',
+        timezone: getTimezoneForCountry(config.countryCode),
+    };
 };
 
 const parseArgs = (args: string[]) => {
@@ -1577,6 +1675,8 @@ const normalizeMetricsEntity = (value: string) => {
 const getAsinViewWithMetrics = async (client: ApiClient, config: RequiredCliConfig, asin: string, options: { range?: string; metrics?: MetricsSelection; bucket?: MetricsBucket }) => {
     const tree = await client['asins/get'].query({ config, asin });
     const metricKeys = resolveMetricKeys(options.metrics);
+    const requestedRange = options.range ?? config.range;
+    const rangeSource = options.range ? 'flag' : 'config';
     const scope = collectAsinScope(tree);
 
     const [campaignTable, adGroupTable, targetTable, adTable, adSeries] = await Promise.all([
@@ -1612,6 +1712,23 @@ const getAsinViewWithMetrics = async (client: ApiClient, config: RequiredCliConf
             })),
         })),
     }));
+    const timezone = adSeries?.timezone ?? getTimezoneForCountry(config.countryCode);
+    const context = {
+        accountId: config.accountId,
+        countryCode: config.countryCode,
+        range: requestedRange,
+        rangeSource,
+        bucket: options.bucket ?? null,
+        metrics: metricKeys,
+        timezone,
+        resolvedRange: adSeries?.range ?? null,
+        scope: {
+            campaigns: campaigns.length,
+            adGroups: scope.adGroupIds.length,
+            ads: scope.adIds.length,
+            targets: scope.targetIds.length,
+        },
+    };
 
     const metricsOutput = adSeries
         ? {
@@ -1625,12 +1742,13 @@ const getAsinViewWithMetrics = async (client: ApiClient, config: RequiredCliConf
               })),
           }
         : {
-              range: options.range ?? config.range,
+              range: requestedRange,
               totals: normalizeMetrics(adTable.totals, metricKeys),
           };
 
     return {
         asin,
+        context,
         campaigns,
         metrics: metricsOutput,
     };

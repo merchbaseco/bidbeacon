@@ -137,7 +137,11 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: '--bucket <value>', right: 'auto|hour|day|week|month|year (adds top-level series)' },
         ],
         commands: [{ left: 'get <asin>', right: 'Fetch ASIN structure with inline metrics rollups' }],
-        notes: ['--range omitted: uses configured range (or default today).', '--bucket omitted: only totals are returned in the top-level metrics object.'],
+        notes: [
+            '--range omitted: uses configured range (or default today).',
+            '--bucket omitted: only totals are returned in the top-level metrics object.',
+            'Response includes context block with requested range, timezone, and selected metrics for downstream agents.',
+        ],
     },
     targets: {
         key: 'targets',
@@ -183,6 +187,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         notes: [
             'Rows include eventType (bid/state/budget), previous/new values, source, and changedAt.',
             '--range overrides configured range; range values are interpreted in the selected account timezone.',
+            'Response includes a context block with entity/range/timezone and pagination inputs.',
         ],
     },
     bids: {
@@ -238,6 +243,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             '--bucket auto uses hour for single-day ranges, otherwise day.',
             '--bucket hour requires a single-day range.',
             'Series does not support --sort, --direction, --limit, or --offset.',
+            'Response includes a context block with group-by/range/bucket/metrics/filter inputs.',
         ],
     },
     'metrics table': {
@@ -265,7 +271,12 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'ads', right: 'Ad table metrics' },
             { left: 'targets', right: 'Target table metrics' },
         ],
-        notes: ['--metrics omitted: returns all metric keys.', 'Defaults: --sort spend and --direction desc.', 'Table does not support --bucket.'],
+        notes: [
+            '--metrics omitted: returns all metric keys.',
+            'Defaults: --sort spend and --direction desc.',
+            'Table does not support --bucket.',
+            'Response includes a context block with group-by/range/metrics/filter/sort inputs.',
+        ],
     },
     enums: {
         key: 'enums',

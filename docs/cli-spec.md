@@ -123,6 +123,15 @@ Ad objects returned by ad commands include:
 `bb asins get <ASIN>` response shape:
 - Top-level includes:
   - `asin`
+  - `context`:
+    - `accountId` / `countryCode`
+    - `range` (`--range` value when provided, otherwise configured/default range)
+    - `rangeSource` (`flag` or `config`)
+    - `bucket` (`null` when `--bucket` is omitted)
+    - `metrics` (effective metrics keys used for rollups)
+    - `timezone` (account timezone used for interpreting relative ranges)
+    - `resolvedRange` (`{ startDate, endDate }` when `--bucket` is enabled; otherwise `null`)
+    - `scope` counts (`campaigns`, `adGroups`, `ads`, `targets`)
   - `campaigns` (same structural hierarchy as before)
   - `metrics`:
     - `range` (string when no bucket; structured range object when bucket is enabled)
@@ -187,6 +196,12 @@ History rows include:
 - `newValue`
 - `changedAt`
 - `source` (`bidbeacon`, `ams`, `change_history`)
+
+History response shape also includes:
+- `context.entityType` / `context.entityId`
+- `context.range` / `context.rangeSource`
+- `context.timezone`
+- `context.limit` / `context.offset` (`null` when omitted)
 
 **Bids**
 Aliases that map to the same behavior as target bid updates.
@@ -257,11 +272,22 @@ Metrics series commands:
 - `bb metrics series ads [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
 - `bb metrics series targets [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
 
+Metrics series responses include a `context` object with:
+- `groupBy`, `ids`, `campaignId`, `adGroupId`
+- `range`, `rangeSource`, `timezone`
+- `bucket`, `metrics`, `filters`
+
 Metrics table commands:
 - `bb metrics table campaigns [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
 - `bb metrics table ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
 - `bb metrics table ads [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
 - `bb metrics table targets [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
+
+Metrics table responses include a `context` object with:
+- `groupBy`, `ids`, `campaignId`, `adGroupId`
+- `range`, `rangeSource`, `timezone`
+- `metrics`, `filters`
+- `sort`, `direction`, `limit`, `offset` (`null` when omitted)
 
 **Enums**
 - `bb enums bid-strategy`
