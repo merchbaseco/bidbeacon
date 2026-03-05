@@ -72,6 +72,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         ],
         commands: [
             { left: 'list', right: 'List campaigns' },
+            { left: 'search <query>', right: 'Search campaigns by name/id (defaults to ALL states)' },
             { left: 'get <campaign_id>', right: 'Fetch a campaign' },
             { left: 'create <name> <budget>', right: 'Create a campaign' },
             { left: 'update <campaign_id> --name <name>', right: 'Update fields on a campaign' },
@@ -130,7 +131,13 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         key: 'asins',
         usage: 'bb asins [options] [command]',
         summary: 'Inspect ASIN-scoped campaign trees',
-        commands: [{ left: 'get <asin>', right: 'Fetch campaigns/ad groups/targets relevant to an ASIN' }],
+        options: [
+            { left: '--range <range>', right: 'Override configured range (today|yesterday|Nd|YYYY-MM-DD..YYYY-MM-DD + aliases)' },
+            { left: '--metrics <keys>', right: 'Comma-separated metric keys for inline metrics payloads' },
+            { left: '--bucket <value>', right: 'auto|hour|day|week|month|year (adds top-level series)' },
+        ],
+        commands: [{ left: 'get <asin>', right: 'Fetch ASIN structure with inline metrics rollups' }],
+        notes: ['--range omitted: uses configured range (or default today).', '--bucket omitted: only totals are returned in the top-level metrics object.'],
     },
     targets: {
         key: 'targets',
@@ -215,6 +222,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: '--campaign <campaign_id>', right: 'Scope to a campaign (ad-groups/ads/targets); alias: --campaign-id' },
             { left: '--ad-group <ad_group_id>', right: 'Scope to an ad group (ads/targets); alias: --ad-group-id' },
             { left: '--metrics <keys>', right: 'Comma-separated metric keys' },
+            { left: '--group-by <entity>', right: 'Alias for entity command: campaigns|ad-groups|ads|targets' },
             { left: '--filter <expr>', right: 'Repeatable filter expression' },
             { left: '--search <text>', right: 'Search by name' },
             { left: '--state <value>', right: 'ENABLED|PAUSED|ARCHIVED|OTHER|ALL (or --all)' },
@@ -246,6 +254,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: '--campaign <campaign_id>', right: 'Scope to a campaign (ad-groups/ads/targets); alias: --campaign-id' },
             { left: '--ad-group <ad_group_id>', right: 'Scope to an ad group (ads/targets); alias: --ad-group-id' },
             { left: '--metrics <keys>', right: 'Comma-separated metric keys' },
+            { left: '--group-by <entity>', right: 'Alias for entity command: campaigns|ad-groups|ads|targets' },
             { left: '--filter <expr>', right: 'Repeatable filter expression' },
             { left: '--search <text>', right: 'Search by name' },
             { left: '--state <value>', right: 'ENABLED|PAUSED|ARCHIVED|OTHER|ALL (or --all)' },
@@ -297,6 +306,9 @@ export const resolveHelpTopicKey = (pathSegments: string[]): HelpTopicKey => {
         return 'accounts';
     }
     if (first === 'campaigns') {
+        return 'campaigns';
+    }
+    if (first === 'campaign') {
         return 'campaigns';
     }
     if (first === 'ad-groups') {
