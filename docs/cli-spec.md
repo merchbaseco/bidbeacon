@@ -11,6 +11,16 @@ This spec defines the public, user-facing shape of the Sponsored Products (SP) C
 - One CLI command maps to one user capability (some commands compose multiple API calls).
 - Flat command structure. Filters provide drill-down.
 
+**ASIN-Centric Command Model (Pre-Beta Direction)**
+- ASIN workflows are first-class because optimization is frequently done per ASIN.
+- The CLI must support one-hop ASIN check-ins without forcing users to manually chain multiple commands.
+- Command responsibilities are explicit:
+  - `bb asins tree <ASIN>` (topology): resolve connected entities (campaigns, ad groups, targets, ads) with minimal structural fields.
+  - `bb asins overview <ASIN>` (operator check-in): opinionated ASIN performance summary with lightweight rollups and optional depth controls.
+  - `bb metrics ... --asin <ASIN>` (analysis workbench): full metrics querying (filters, sort, pagination, entity pivots, series/table).
+- `--asin` in metrics commands performs internal ASIN->entity resolution so users keep one-hop ergonomics while command boundaries stay clean.
+- Pre-beta policy applies: prefer clean command boundaries over compatibility shims.
+
 **HTTP Path Shape (tRPC)**
 - CLI command segments map to slash-style tRPC procedure paths.
 - Pattern: `/api/<resource>/<verb>` (and deeper segments when needed).
@@ -118,33 +128,28 @@ Ad objects returned by ad commands include:
 - `productTitle` (nullable)
 
 **ASINs**
-- `bb asins get <ASIN> [--range <range>] [--metrics <key1,key2,...>] [--bucket <auto|hour|day|week|month|year>]`
+- Directional target model:
+  - `bb asins tree <ASIN>`
+  - `bb asins overview <ASIN> [--range <range>] [--depth <campaign|target>] [--metrics <key1,key2,...>]`
 
-`bb asins get <ASIN>` response shape:
+- Why this split exists:
+  - `tree` answers "what is connected to this ASIN?"
+  - `overview` answers "how is this ASIN performing right now?"
+  - `metrics --asin` answers "which exact entities are driving the result and by how much?"
+
+`bb asins tree <ASIN>` response shape:
 - Top-level includes:
   - `asin`
   - `context`:
     - `accountId` / `countryCode`
-    - `range` (`--range` value when provided, otherwise configured/default range)
-    - `rangeSource` (`flag` or `config`)
-    - `bucket` (`null` when `--bucket` is omitted)
-    - `metrics` (effective metrics keys used for rollups)
-    - `timezone` (account timezone used for interpreting relative ranges)
-    - `resolvedRange` (`{ startDate, endDate }` when `--bucket` is enabled; otherwise `null`)
+    - `depth` (`campaign|ad-group|target|ad`)
     - `scope` counts (`campaigns`, `adGroups`, `ads`, `targets`)
   - `campaigns` (same structural hierarchy as before)
-  - `metrics`:
-    - `range` (string when no bucket; structured range object when bucket is enabled)
-    - `totals` (range rollup; defaults to all metrics keys)
-    - `timezone` (present when `--bucket` is provided)
-    - `granularity` (present when `--bucket` is provided)
-    - `series[]` (present when `--bucket` is provided)
 - Top-level `campaigns[]` items include:
   - `campaignId`
   - `campaignName`
   - `state`
   - `creationDateTime`
-  - `metrics` (campaign-scoped totals for selected range)
   - `targets` (hydrated target objects, not target IDs)
   - `adGroups` (hydrated ad group objects)
 - Each `adGroups[]` item includes:
@@ -153,13 +158,28 @@ Ad objects returned by ad commands include:
   - `name`
   - `state`
   - `defaultBid`
-  - `metrics` (ad-group scoped totals for selected range)
   - `targets` (hydrated target objects, not target IDs)
   - `ads` (hydrated ad objects, not ad IDs)
 
-This command returns entity objects for `targets` and `ads` to avoid follow-up lookups.
-Target objects include a `negative` boolean so clients can separate editable vs non-editable targets safely.
-When `--bucket` is omitted, totals still reflect the configured/default range (`today` if unset) but no series points are returned.
+`bb asins overview <ASIN>` response shape:
+- Top-level includes:
+  - `asin`
+  - `context`:
+    - `accountId` / `countryCode`
+    - `range` / `rangeSource`
+    - `timezone`
+    - `depth` (`campaign` default, `target` optional)
+    - `metrics` (effective metrics keys)
+    - `scope` counts (`campaigns`, `adGroups`, `ads`, `targets`)
+  - `summary`:
+    - `totals` (ASIN-level rollup for selected range)
+    - `campaigns[]` (campaign-level rollups; always present)
+    - `targets[]` (only when `--depth target`)
+
+Boundary guarantees:
+- `asins tree` returns topology only (no performance metrics payload).
+- `asins overview` returns curated ASIN-centric rollups only (not full workbench controls).
+- Deep analysis belongs to `metrics series/table --asin <ASIN>`.
 
 **Targets**
 - `bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--negative <true|false>] [--limit <n>] [--offset <n>]`
@@ -213,10 +233,16 @@ Metrics commands come in two shapes.
 - `series` returns a time-series for charting.
 - `table` returns totals per entity.
 
+ASIN support:
+- `bb metrics series <entity> --asin <ASIN> ...`
+- `bb metrics table <entity> --asin <ASIN> ...`
+- `--asin` is a first-class scope selector and can be combined with existing filters (`--campaign`, `--ad-group`, `--ids`, `--filter`, `--search`), with narrower filters taking precedence.
+
 Metrics common flags:
 - `--metrics <key1,key2,...>` selects which metrics are returned. Defaults to all.
 - `--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>` overrides the configured range.
 - `--group-by <campaigns|ad-groups|ads|targets>` alias for entity subcommands on both `series` and `table`.
+- `--asin <ASIN>` scopes results to entities connected to the ASIN.
 - `--filter <key><op><value>` repeatable.
 - `--search <text>` shortcut for `filters.search`.
 - `--state <ENABLED|PAUSED|ARCHIVED|OTHER|ALL>` shortcut for `filters.state`.
@@ -267,24 +293,24 @@ bb metrics series campaigns --filter search~holiday
 ```
 
 Metrics series commands:
-- `bb metrics series campaigns [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
-- `bb metrics series ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
-- `bb metrics series ads [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
-- `bb metrics series targets [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
+- `bb metrics series campaigns [--asin <ASIN>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
+- `bb metrics series ad-groups [--asin <ASIN>] [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
+- `bb metrics series ads [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
+- `bb metrics series targets [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
 
 Metrics series responses include a `context` object with:
-- `groupBy`, `ids`, `campaignId`, `adGroupId`
+- `groupBy`, `ids`, `campaignId`, `adGroupId`, `asin`, `asinScope`
 - `range`, `rangeSource`, `timezone`
 - `bucket`, `metrics`, `filters`
 
 Metrics table commands:
-- `bb metrics table campaigns [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
-- `bb metrics table ad-groups [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
-- `bb metrics table ads [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
-- `bb metrics table targets [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
+- `bb metrics table campaigns [--asin <ASIN>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
+- `bb metrics table ad-groups [--asin <ASIN>] [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
+- `bb metrics table ads [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
+- `bb metrics table targets [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
 
 Metrics table responses include a `context` object with:
-- `groupBy`, `ids`, `campaignId`, `adGroupId`
+- `groupBy`, `ids`, `campaignId`, `adGroupId`, `asin`, `asinScope`
 - `range`, `rangeSource`, `timezone`
 - `metrics`, `filters`
 - `sort`, `direction`, `limit`, `offset` (`null` when omitted)
@@ -294,3 +320,30 @@ Metrics table responses include a `context` object with:
 - `bb enums match-type`
 - `bb enums placement`
 - `bb enums state`
+
+**Implementation Plan (ASIN Command Boundaries)**
+1. Introduce explicit command roles
+- Add `bb asins overview` as the default one-hop ASIN check-in surface.
+- Add `bb asins tree` as the structural resolver surface.
+- Remove `bb asins get` in the same release to keep one canonical command per capability.
+
+2. Add ASIN scoping to metrics workbench
+- Add `--asin` to metrics series/table for all entities (`campaigns`, `ad-groups`, `ads`, `targets`).
+- Resolve ASIN->entity IDs internally, then execute the existing metrics pipeline.
+- Include `context.asin` and resolved scope counts in metrics responses for traceability.
+
+3. Tighten payload boundaries
+- `asins tree`: no metrics payloads.
+- `asins overview`: curated/limited metrics payload intended for quick decisions.
+- `metrics --asin`: full flexible payload for analysis and diagnosis.
+
+4. Align docs/help/examples in same change set
+- Update CLI help text and README examples to teach the three-command model.
+- Add side-by-side examples for:
+  - quick ASIN check-in (`asins overview`)
+  - structural drill (`asins tree`)
+  - deep diagnosis (`metrics table/series --asin`)
+
+5. Ship a clean break
+- Treat this as a pre-beta command-contract reset.
+- Do not add aliases, deprecated paths, or compatibility wrappers for `asins get`.
