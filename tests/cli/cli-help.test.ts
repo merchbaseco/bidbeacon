@@ -33,6 +33,7 @@ describe('bb help topics', () => {
         expect(asinsOutput).toContain('--range <range>');
         expect(asinsOutput).toContain('--metrics <keys>');
         expect(asinsOutput).toContain('--depth <value>');
+        expect(asinsOutput).toContain('--state <value>');
         expect(asinsOutput).toContain('tree <asin>');
         expect(asinsOutput).toContain('overview <asin>');
 

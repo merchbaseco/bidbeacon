@@ -16,7 +16,7 @@ This spec defines the public, user-facing shape of the Sponsored Products (SP) C
 - The CLI must support one-hop ASIN check-ins without forcing users to manually chain multiple commands.
 - Command responsibilities are explicit:
   - `bb asins tree <ASIN>` (topology): resolve connected entities (campaigns, ad groups, targets, ads) with minimal structural fields.
-  - `bb asins overview <ASIN>` (operator check-in): opinionated ASIN performance summary with lightweight rollups and optional depth controls.
+  - `bb asins overview <ASIN>` (operator check-in): ASIN performance summary derived from matched ad metrics, with optional hierarchical rollups.
   - `bb metrics ... --asin <ASIN>` (analysis workbench): full metrics querying (filters, sort, pagination, entity pivots, series/table).
 - `--asin` in metrics commands performs internal ASIN->entity resolution so users keep one-hop ergonomics while command boundaries stay clean.
 - Pre-beta policy applies: prefer clean command boundaries over compatibility shims.
@@ -130,7 +130,7 @@ Ad objects returned by ad commands include:
 **ASINs**
 - Directional target model:
   - `bb asins tree <ASIN>`
-  - `bb asins overview <ASIN> [--range <range>] [--depth <campaign|target>] [--metrics <key1,key2,...>]`
+  - `bb asins overview <ASIN> [--range <range>] [--depth <campaign|ad-group|ad>] [--metrics <key1,key2,...>] [--state <value>|--all]`
 
 - Why this split exists:
   - `tree` answers "what is connected to this ASIN?"
@@ -143,6 +143,7 @@ Ad objects returned by ad commands include:
   - `context`:
     - `accountId` / `countryCode`
     - `depth` (`campaign|ad-group|target|ad`)
+    - `stateFilter` (`ENABLED` default, `ALL` when `--all`, other values when `--state` is passed)
     - `scope` counts (`campaigns`, `adGroups`, `ads`, `targets`)
   - `campaigns` (same structural hierarchy as before)
 - Top-level `campaigns[]` items include:
@@ -168,17 +169,19 @@ Ad objects returned by ad commands include:
     - `accountId` / `countryCode`
     - `range` / `rangeSource`
     - `timezone`
-    - `depth` (`campaign` default, `target` optional)
+    - `depth` (`campaign` default, `ad-group`, or `ad`)
+    - `stateFilter` (`ENABLED` default, `ALL` when `--all`, other values when `--state` is passed)
     - `metrics` (effective metrics keys)
     - `scope` counts (`campaigns`, `adGroups`, `ads`, `targets`)
   - `summary`:
-    - `totals` (ASIN-level rollup for selected range)
+    - `totals` (ASIN-level rollup for selected range, derived from matched ad metrics)
     - `campaigns[]` (campaign-level rollups; always present)
-    - `targets[]` (only when `--depth target`)
+    - `campaigns[].adGroups[]` (when `--depth ad-group|ad`)
+    - `campaigns[].adGroups[].ads[]` (when `--depth ad`)
 
 Boundary guarantees:
 - `asins tree` returns topology only (no performance metrics payload).
-- `asins overview` returns curated ASIN-centric rollups only (not full workbench controls).
+- `asins overview` returns curated ASIN-centric rollups only (not full workbench controls) and computes them from the matched ASIN ads, not whole-campaign totals.
 - Deep analysis belongs to `metrics series/table --asin <ASIN>`.
 
 **Targets**
@@ -299,7 +302,7 @@ Metrics series commands:
 - `bb metrics series targets [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
 
 Metrics series responses include a `context` object with:
-- `groupBy`, `ids`, `campaignId`, `adGroupId`, `asin`, `asinScope`
+- `groupBy`, `ids`, `campaignId`, `adGroupId`, `asin`, `asinScope`, `asinStateFilter`
 - `range`, `rangeSource`, `timezone`
 - `bucket`, `metrics`, `filters`
 
@@ -310,7 +313,7 @@ Metrics table commands:
 - `bb metrics table targets [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
 
 Metrics table responses include a `context` object with:
-- `groupBy`, `ids`, `campaignId`, `adGroupId`, `asin`, `asinScope`
+- `groupBy`, `ids`, `campaignId`, `adGroupId`, `asin`, `asinScope`, `asinStateFilter`
 - `range`, `rangeSource`, `timezone`
 - `metrics`, `filters`
 - `sort`, `direction`, `limit`, `offset` (`null` when omitted)

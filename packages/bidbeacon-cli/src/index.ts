@@ -4,6 +4,7 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import { createBidBeaconClient } from '@bidbeacon/http-client';
+import { type AsinOverviewDepth, type AsinStateFilter, getAsinOverview, getAsinTree, type MetricKey, type MetricsEntity, resolveAsinMetricsScope } from './asin-commands';
 import { normalizeApiBaseUrl, withTransportHint } from './base-url';
 import { CliUsageError, isCliUsageError } from './cli-errors';
 import { type HelpTopicKey, renderHelp, resolveHelpTopicKey } from './help';
@@ -21,7 +22,6 @@ const METRIC_FILTER_REGEX = /^\s*([^<>=!~]+)\s*(<=|>=|!=|=|<|>|~)\s*(.+)\s*$/;
 const ASIN_REGEX = /^[A-Z0-9]{10}$/;
 const NUMERIC_ID_REGEX = /^[0-9]+$/;
 const SEARCH_PAGE_LIMIT = 200;
-const MAX_METRICS_TABLE_IDS_PER_REQUEST = 200;
 const METRICS_NO_MATCH_ID = '__bb_no_match__';
 
 const main = async () => {
@@ -371,8 +371,10 @@ const main = async () => {
             if (subcommand === 'tree') {
                 const asin = requireAsinArg(action, { topicKey: 'asins', label: '<asin>' });
                 const depth = parseAsinTreeDepthFlag(flags);
+                const stateFilter = resolveAsinStateFilter(flags);
                 const data = await getAsinTree(client, cliConfig, asin, {
                     depth,
+                    stateFilter,
                 });
                 printOutput(data);
                 return;
@@ -380,12 +382,14 @@ const main = async () => {
             if (subcommand === 'overview') {
                 const asin = requireAsinArg(action, { topicKey: 'asins', label: '<asin>' });
                 const rangeOverride = readFlag(flags, ['range']);
-                const metrics = parseMetricsSelectionFlag(flags);
+                const metrics = resolveMetricKeys(parseMetricsSelectionFlag(flags));
                 const depth = parseAsinOverviewDepthFlag(flags);
+                const stateFilter = resolveAsinStateFilter(flags);
                 const data = await getAsinOverview(client, cliConfig, asin, {
                     range: rangeOverride ?? undefined,
                     metrics,
                     depth,
+                    stateFilter,
                 });
                 printOutput(data);
                 return;
@@ -641,7 +645,8 @@ const main = async () => {
             const rangeOverride = readFlag(flags, ['range']);
             const bucket = parseMetricsBucketFlag(flags);
             const rangeContext = resolveRangeContext(cliConfig, rangeOverride);
-            const asinScope = asin ? await resolveAsinMetricsScope(client, cliConfig, asin, entity) : null;
+            const asinStateFilter = resolveMetricsAsinStateFilter(flags);
+            const asinScope = asin ? await resolveAsinMetricsScope(client, cliConfig, asin, entity, asinStateFilter) : null;
             const resolvedIds = mergeMetricScopeIds(ids, asinScope?.ids);
             const scopedIds = resolvedIds && resolvedIds.length === 0 ? [METRICS_NO_MATCH_ID] : resolvedIds;
             const metricsContext = {
@@ -653,6 +658,7 @@ const main = async () => {
                 adGroupId: adGroupId ?? null,
                 asin: asin ?? null,
                 asinScope: asinScope?.scope ?? null,
+                asinStateFilter: asin ? asinStateFilter : null,
                 metrics: resolveMetricKeys(metrics),
                 filters: filters ?? {},
                 range: rangeContext.range,
@@ -1303,6 +1309,14 @@ const requireAsinArg = (value: string | undefined, input: { topicKey: HelpTopicK
     return parseAsin(value, input);
 };
 
+const resolveAsinStateFilter = (flags: ParsedFlags): AsinStateFilter => {
+    return resolveListStateFlag(flags) ?? 'ENABLED';
+};
+
+const resolveMetricsAsinStateFilter = (flags: ParsedFlags): AsinStateFilter => {
+    return resolveAsinStateFilter(flags);
+};
+
 const parseAsinTreeDepthFlag = (flags: ParsedFlags) => {
     const raw = readFlag(flags, ['depth']);
     if (!raw) {
@@ -1331,12 +1345,15 @@ const parseAsinOverviewDepthFlag = (flags: ParsedFlags) => {
     }
     const normalized = raw.trim().toLowerCase();
     if (normalized === 'campaign' || normalized === 'campaigns') {
-        return 'campaign' as const;
+        return 'campaign' as const satisfies AsinOverviewDepth;
     }
-    if (normalized === 'target' || normalized === 'targets') {
-        return 'target' as const;
+    if (normalized === 'ad-group' || normalized === 'ad-groups' || normalized === 'adgroup' || normalized === 'adgroups') {
+        return 'ad-group' as const satisfies AsinOverviewDepth;
     }
-    throw new Error('Invalid --depth for asins overview. Use campaign or target.');
+    if (normalized === 'ad' || normalized === 'ads') {
+        return 'ad' as const satisfies AsinOverviewDepth;
+    }
+    throw new Error('Invalid --depth for asins overview. Use campaign, ad-group, or ad.');
 };
 
 const parseIdsFlag = (flags: ParsedFlags) => {
@@ -1359,10 +1376,10 @@ const parseSortField = (value?: string) => {
         return 'spend' as const;
     }
     const normalized = value.trim().toLowerCase();
-    if (!METRICS_KEYS_SET.has(normalized as (typeof METRICS_KEYS)[number])) {
+    if (!METRICS_KEYS_SET.has(normalized as MetricKey)) {
         throw new Error('Invalid --sort. Use impressions, clicks, purchases, spend, sales, acos, cpc, ctr, or roas.');
     }
-    return normalized as (typeof METRICS_KEYS)[number];
+    return normalized as MetricKey;
 };
 
 const parseSortDirection = (value?: string) => {
@@ -1405,11 +1422,11 @@ const parseMetricsSelectionFlag = (flags: ParsedFlags) => {
         throw new Error('Invalid --metrics. Use a comma-separated list of metric keys.');
     }
     for (const key of entries) {
-        if (!METRICS_KEYS_SET.has(key as (typeof METRICS_KEYS)[number])) {
+        if (!METRICS_KEYS_SET.has(key as MetricKey)) {
             throw new Error(`Invalid metric key: ${key}.`);
         }
     }
-    return entries as (typeof METRICS_KEYS)[number][];
+    return entries as MetricKey[];
 };
 
 const parseMetricsBucketFlag = (flags: ParsedFlags) => {
@@ -1533,9 +1550,9 @@ const resolveMetricKey = (key: string) => {
     const trimmed = key.trim().toLowerCase();
     if (trimmed.startsWith('metrics.')) {
         const candidate = trimmed.replace('metrics.', '');
-        return METRICS_KEYS_SET.has(candidate as (typeof METRICS_KEYS)[number]) ? candidate : null;
+        return METRICS_KEYS_SET.has(candidate as MetricKey) ? candidate : null;
     }
-    if (METRICS_KEYS_SET.has(trimmed as (typeof METRICS_KEYS)[number])) {
+    if (METRICS_KEYS_SET.has(trimmed as MetricKey)) {
         return trimmed;
     }
     return null;
@@ -1730,153 +1747,6 @@ const normalizeMetricsEntity = (value: string): MetricsEntity | null => {
     return null;
 };
 
-const getAsinTree = async (client: ApiClient, config: RequiredCliConfig, asin: string, options: { depth: AsinTreeDepth }) => {
-    const tree = await client['asins/get'].query({ config, asin });
-    const scope = collectAsinScope(tree);
-    return {
-        asin,
-        context: {
-            accountId: config.accountId,
-            countryCode: config.countryCode,
-            depth: options.depth,
-            scope: buildAsinScopeCounts(tree, scope),
-        },
-        campaigns: selectAsinTreeDepth(tree.campaigns, options.depth),
-    };
-};
-
-const getAsinOverview = async (client: ApiClient, config: RequiredCliConfig, asin: string, options: { range?: string; metrics?: MetricsSelection; depth: AsinOverviewDepth }) => {
-    const tree = await client['asins/get'].query({ config, asin });
-    const scope = collectAsinScope(tree);
-    const metricKeys = resolveMetricKeys(options.metrics);
-    const requestedRange = options.range ?? config.range;
-    const rangeSource = options.range ? 'flag' : 'config';
-    const timezone = getTimezoneForCountry(config.countryCode);
-
-    const [campaignTable, targetTable] = await Promise.all([
-        queryCampaignMetricsTable(client, config, scope.campaignIds, options.range, options.metrics),
-        options.depth === 'target' ? queryTargetMetricsTable(client, config, scope.targetIds, options.range, options.metrics) : Promise.resolve(null),
-    ]);
-
-    const campaignMetricsById = new Map(campaignTable.items.map(item => [item.campaignId, normalizeMetrics(item.metrics, metricKeys)]));
-    const campaigns = tree.campaigns.map(campaign => ({
-        campaignId: campaign.campaignId,
-        campaignName: campaign.campaignName,
-        state: campaign.state,
-        creationDateTime: campaign.creationDateTime,
-        metrics: campaignMetricsById.get(campaign.campaignId) ?? buildZeroMetrics(metricKeys),
-    }));
-
-    const targets =
-        options.depth === 'target' && targetTable
-            ? buildAsinOverviewTargets(tree, new Map(targetTable.items.map(item => [item.targetId, normalizeMetrics(item.metrics, metricKeys)])), metricKeys)
-            : undefined;
-
-    return {
-        asin,
-        context: {
-            accountId: config.accountId,
-            countryCode: config.countryCode,
-            range: requestedRange,
-            rangeSource,
-            timezone,
-            depth: options.depth,
-            metrics: metricKeys,
-            scope: buildAsinScopeCounts(tree, scope),
-        },
-        summary: {
-            totals: normalizeMetrics(campaignTable.totals, metricKeys),
-            campaigns,
-            ...(targets ? { targets } : {}),
-        },
-    };
-};
-
-const queryCampaignMetricsTable = async (client: ApiClient, config: RequiredCliConfig, ids: string[], range: string | undefined, metrics: MetricsSelection) => {
-    if (ids.length === 0) {
-        return { totals: buildZeroMetrics(resolveMetricKeys(metrics)), items: [] as CampaignMetricsTableItem[] };
-    }
-    return queryTableInChunks<CampaignMetricsTableItem>(ids, async chunkIds => {
-        const data = await client['metrics/table/campaigns'].query({
-            config,
-            ids: chunkIds,
-            range,
-            metrics,
-            limit: MAX_METRICS_TABLE_IDS_PER_REQUEST,
-        });
-        return { totals: data.totals, items: data.items };
-    });
-};
-
-const queryTargetMetricsTable = async (client: ApiClient, config: RequiredCliConfig, ids: string[], range: string | undefined, metrics: MetricsSelection) => {
-    if (ids.length === 0) {
-        return { totals: buildZeroMetrics(resolveMetricKeys(metrics)), items: [] as TargetMetricsTableItem[] };
-    }
-    return queryTableInChunks<TargetMetricsTableItem>(ids, async chunkIds => {
-        const data = await client['metrics/table/targets'].query({
-            config,
-            ids: chunkIds,
-            range,
-            metrics,
-            limit: MAX_METRICS_TABLE_IDS_PER_REQUEST,
-        });
-        return { totals: data.totals, items: data.items };
-    });
-};
-
-const queryTableInChunks = async <TItem>(ids: string[], query: (chunkIds: string[]) => Promise<{ totals: MetricRecord; items: TItem[] }>): Promise<{ totals: MetricRecord; items: TItem[] }> => {
-    const chunks = chunkArray(ids, MAX_METRICS_TABLE_IDS_PER_REQUEST);
-    const results = await Promise.all(chunks.map(chunk => query(chunk)));
-    const totals = sumMetrics(results.map(result => result.totals));
-    const items = results.flatMap(result => result.items);
-    return { totals, items };
-};
-
-const collectAsinScope = (tree: AsinsTreeOutput) => {
-    const campaignIds: string[] = [];
-    const adGroupIds: string[] = [];
-    const targetIds: string[] = [];
-    const adIds: string[] = [];
-
-    for (const campaign of tree.campaigns) {
-        campaignIds.push(campaign.campaignId);
-        for (const target of campaign.targets) {
-            targetIds.push(target.targetId);
-        }
-        for (const adGroup of campaign.adGroups) {
-            adGroupIds.push(adGroup.adGroupId);
-            for (const target of adGroup.targets) {
-                targetIds.push(target.targetId);
-            }
-            for (const ad of adGroup.ads) {
-                adIds.push(ad.adId);
-            }
-        }
-    }
-
-    return {
-        campaignIds: uniqueStrings(campaignIds),
-        adGroupIds: uniqueStrings(adGroupIds),
-        targetIds: uniqueStrings(targetIds),
-        adIds: uniqueStrings(adIds),
-    };
-};
-
-const resolveAsinMetricsScope = async (client: ApiClient, config: RequiredCliConfig, asin: string, entity: MetricsEntity) => {
-    const tree = await client['asins/get'].query({ config, asin });
-    const scope = collectAsinScope(tree);
-    if (entity === 'campaigns') {
-        return { ids: scope.campaignIds, scope: buildAsinScopeCounts(tree, scope) };
-    }
-    if (entity === 'ad-groups') {
-        return { ids: scope.adGroupIds, scope: buildAsinScopeCounts(tree, scope) };
-    }
-    if (entity === 'ads') {
-        return { ids: scope.adIds, scope: buildAsinScopeCounts(tree, scope) };
-    }
-    return { ids: scope.targetIds, scope: buildAsinScopeCounts(tree, scope) };
-};
-
 const mergeMetricScopeIds = (primary: string[] | undefined, secondary: string[] | undefined) => {
     if (primary && secondary) {
         const secondarySet = new Set(secondary);
@@ -1885,150 +1755,20 @@ const mergeMetricScopeIds = (primary: string[] | undefined, secondary: string[] 
     return primary ?? secondary;
 };
 
-const buildAsinScopeCounts = (tree: AsinsTreeOutput, scope: ReturnType<typeof collectAsinScope>) => {
-    return {
-        campaigns: tree.campaigns.length,
-        adGroups: scope.adGroupIds.length,
-        ads: scope.adIds.length,
-        targets: scope.targetIds.length,
-    };
-};
-
-const selectAsinTreeDepth = (campaigns: AsinsTreeOutput['campaigns'], depth: AsinTreeDepth) => {
-    if (depth === 'ad') {
-        return campaigns;
-    }
-    if (depth === 'campaign') {
-        return campaigns.map(campaign => ({
-            campaignId: campaign.campaignId,
-            campaignName: campaign.campaignName,
-            state: campaign.state,
-            creationDateTime: campaign.creationDateTime,
-        }));
-    }
-    if (depth === 'ad-group') {
-        return campaigns.map(campaign => ({
-            campaignId: campaign.campaignId,
-            campaignName: campaign.campaignName,
-            state: campaign.state,
-            creationDateTime: campaign.creationDateTime,
-            adGroups: campaign.adGroups.map(adGroup => ({
-                adGroupId: adGroup.adGroupId,
-                campaignId: adGroup.campaignId,
-                name: adGroup.name,
-                state: adGroup.state,
-                defaultBid: adGroup.defaultBid,
-            })),
-        }));
-    }
-    return campaigns.map(campaign => ({
-        campaignId: campaign.campaignId,
-        campaignName: campaign.campaignName,
-        state: campaign.state,
-        creationDateTime: campaign.creationDateTime,
-        targets: campaign.targets,
-        adGroups: campaign.adGroups.map(adGroup => ({
-            adGroupId: adGroup.adGroupId,
-            campaignId: adGroup.campaignId,
-            name: adGroup.name,
-            state: adGroup.state,
-            defaultBid: adGroup.defaultBid,
-            targets: adGroup.targets,
-        })),
-    }));
-};
-
-const buildAsinOverviewTargets = (tree: AsinsTreeOutput, metricsByTargetId: Map<string, Record<string, number>>, metricKeys: readonly string[]) => {
-    const targetById = new Map<string, AsinOverviewTarget>();
-
-    for (const campaign of tree.campaigns) {
-        for (const target of campaign.targets) {
-            if (targetById.has(target.targetId)) {
-                continue;
-            }
-            targetById.set(target.targetId, {
-                ...target,
-                metrics: metricsByTargetId.get(target.targetId) ?? buildZeroMetrics(metricKeys),
-            });
-        }
-        for (const adGroup of campaign.adGroups) {
-            for (const target of adGroup.targets) {
-                if (targetById.has(target.targetId)) {
-                    continue;
-                }
-                targetById.set(target.targetId, {
-                    ...target,
-                    metrics: metricsByTargetId.get(target.targetId) ?? buildZeroMetrics(metricKeys),
-                });
-            }
-        }
-    }
-
-    return Array.from(targetById.values());
-};
-
-const chunkArray = <T>(items: T[], chunkSize: number) => {
-    const chunks: T[][] = [];
-    for (let index = 0; index < items.length; index += chunkSize) {
-        chunks.push(items.slice(index, index + chunkSize));
-    }
-    return chunks;
-};
-
 const uniqueStrings = (values: string[]) => {
     return Array.from(new Set(values));
 };
 
-const resolveMetricKeys = (selection: MetricsSelection) => {
+const resolveMetricKeys = (selection: MetricsSelection): MetricKey[] => {
     return selection ?? [...METRICS_KEYS];
-};
-
-const buildZeroMetrics = (keys: readonly string[]) => {
-    const metrics: Record<string, number> = {};
-    for (const key of keys) {
-        metrics[key] = 0;
-    }
-    return metrics;
-};
-
-const normalizeMetrics = (value: MetricRecord, keys: readonly string[]) => {
-    const metrics: Record<string, number> = {};
-    for (const key of keys) {
-        const raw = value[key];
-        metrics[key] = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0;
-    }
-    return metrics;
-};
-
-const sumMetrics = (values: MetricRecord[]) => {
-    const totals: Record<string, number> = buildZeroMetrics(METRICS_KEYS);
-    for (const metrics of values) {
-        for (const key of METRICS_KEYS) {
-            const raw = metrics[key];
-            if (typeof raw === 'number' && Number.isFinite(raw)) {
-                totals[key] += raw;
-            }
-        }
-    }
-    return totals;
 };
 
 type ApiClient = ReturnType<typeof createApiClient>;
 type RequiredCliConfig = ReturnType<typeof requireCliConfig>;
 type CampaignSearchState = 'ENABLED' | 'PAUSED' | 'ARCHIVED' | 'OTHER' | 'ALL';
-type MetricsEntity = 'campaigns' | 'ad-groups' | 'ads' | 'targets';
 type MetricsBucket = (typeof METRICS_BUCKETS)[number];
-type MetricsSelection = (typeof METRICS_KEYS)[number][] | undefined;
-type AsinTreeDepth = 'campaign' | 'ad-group' | 'target' | 'ad';
-type AsinOverviewDepth = 'campaign' | 'target';
-type AsinsTreeOutput = Awaited<ReturnType<ApiClient['asins/get']['query']>>;
 type CampaignListItem = Awaited<ReturnType<ApiClient['campaigns/list']['query']>>['items'][number];
-type CampaignMetricsTableItem = Awaited<ReturnType<ApiClient['metrics/table/campaigns']['query']>>['items'][number];
-type TargetMetricsTableItem = Awaited<ReturnType<ApiClient['metrics/table/targets']['query']>>['items'][number];
-type MetricRecord = Record<string, number | null | undefined>;
-type AsinOverviewTarget = AsinsTreeOutput['campaigns'][number]['targets'][number] & {
-    metrics: Record<string, number>;
-};
+type MetricsSelection = MetricKey[] | undefined;
 
 type CliConfig = {
     baseUrl?: string;

@@ -134,7 +134,9 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         options: [
             { left: '--range <range>', right: 'Override configured range (today|yesterday|Nd|YYYY-MM-DD..YYYY-MM-DD + aliases)' },
             { left: '--metrics <keys>', right: 'Comma-separated metric keys for overview rollups' },
-            { left: '--depth <value>', right: 'tree: campaign|ad-group|target|ad (default ad), overview: campaign|target (default campaign)' },
+            { left: '--depth <value>', right: 'tree: campaign|ad-group|target|ad (default ad), overview: campaign|ad-group|ad (default campaign)' },
+            { left: '--state <value>', right: 'Filter ASIN scope by entity state; default ENABLED' },
+            { left: '--all', right: 'Include paused/archived entities in ASIN scope' },
         ],
         commands: [
             { left: 'tree <asin>', right: 'Fetch ASIN topology only (no metrics)' },
@@ -142,7 +144,8 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         ],
         notes: [
             '`tree` is structural only and ignores --range/--metrics.',
-            '`overview` defaults to campaign-level rollups; use --depth target to include target-level rollups.',
+            '`tree`, `overview`, and `metrics --asin` default to ENABLED entities only; use --all when you want the attic.',
+            '`overview` rolls up matched ad metrics only, so deeper drill-down is campaign -> ad-group -> ad.',
             'Use `bb metrics series|table ...` for full analysis workflows (sorting, paging, bucketed series).',
         ],
     },
@@ -248,6 +251,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             '--bucket hour requires a single-day range.',
             'Series does not support --sort, --direction, --limit, or --offset.',
             'Response includes a context block with group-by/range/bucket/metrics/filter inputs.',
+            'When --asin is set without an explicit --state/--all, ASIN scope resolves against ENABLED entities only.',
         ],
     },
     'metrics table': {
@@ -281,6 +285,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             'Defaults: --sort spend and --direction desc.',
             'Table does not support --bucket.',
             'Response includes a context block with group-by/range/metrics/filter/sort inputs.',
+            'When --asin is set without an explicit --state/--all, ASIN scope resolves against ENABLED entities only.',
         ],
     },
     enums: {
