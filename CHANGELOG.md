@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.0 - 2026-03-06
+
+### Added
+
+- Added dedicated ASIN CLI command regression coverage for enabled-only scope handling and chunked overview aggregation.
+
+### Changed
+
+- Changed `bb asins overview` to compute rollups from matched ad metrics only and to drill down by `campaign`, `ad-group`, or `ad`.
+- Changed `bb asins tree`, `bb asins overview`, and `metrics --asin` to default ASIN scope resolution to enabled entities unless `--state` or `--all` is passed.
+- Updated the CLI help, README, and CLI spec to document the new ASIN scope defaults and overview contract.
+
 ## v0.2.4 - 2026-03-06
 
 ### Added
