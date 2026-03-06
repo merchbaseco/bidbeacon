@@ -49,21 +49,28 @@ The agent should perform this checklist:
    - `package.json`
    - `packages/bidbeacon-api-client/package.json`
    - `packages/bidbeacon-cli/package.json`
+   - The root dependency on `@bidbeacon/http-client` must also match `X.Y.Z`.
    - If any one of these differs, stop and fix versions before build/publish.
 5. Run `bun run lint:fix`.
-6. Run `bun run test`.
-7. Build API client artifacts with `bun run api-client:build`.
-8. Build CLI artifacts with `bun run cli:build`.
-9. Only if tests pass, publish `@bidbeacon/http-client` and `@bidbeacon/cli` to npm.
-10. Create a GitHub Release for `vX.Y.Z` using the matching `CHANGELOG.md` section as release notes.
+6. Run `bun run api-client:build`.
+7. Publish `@bidbeacon/http-client` to npm.
+8. Run `bun install` to refresh `bun.lock` now that the new `@bidbeacon/http-client` version exists.
+9. Run `bun run version:check`.
+   - This fails if package versions, the root `@bidbeacon/http-client` dependency, or `bun.lock` drift apart.
+10. Build CLI artifacts with `bun run cli:build`.
+11. Run `bun run test`.
+12. Only if tests pass, publish `@bidbeacon/cli` to npm.
+13. Create a GitHub Release for `vX.Y.Z` using the matching `CHANGELOG.md` section as release notes.
 
 ## Completion Criteria
 
 A version bump is only complete when all are true:
 
 - Shared versions updated (`package.json`, `packages/bidbeacon-cli/package.json`, and `packages/bidbeacon-api-client/package.json`).
+- Root `package.json` dependency on `@bidbeacon/http-client` matches the shared release version.
+- `bun.lock` has been refreshed after publishing `@bidbeacon/http-client`, and `bun run version:check` passes.
 - `CHANGELOG.md` has a new versioned section for that release.
-- `bun run lint:fix`, `bun run test`, `bun run api-client:build`, and `bun run cli:build` have succeeded.
+- `bun run lint:fix`, `bun run version:check`, `bun run api-client:build`, `bun run cli:build`, and `bun run test` have succeeded.
 - Release commit uses `feat: version bump vX.Y.Z`.
 - Git tag `vX.Y.Z` exists.
 - GitHub Release `vX.Y.Z` exists and matches the release notes from `CHANGELOG.md`.

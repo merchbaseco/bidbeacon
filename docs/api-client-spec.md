@@ -73,6 +73,7 @@ NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm publish --access public
 ```
 
 Bump `packages/bidbeacon-api-client/package.json` as part of the shared release process in `docs/release-process.md`.
+That release flow now also requires `bun install` and `bun run version:check` so `bun.lock` stays aligned with the published client version.
 
 ## Versioning Policy
 
@@ -85,6 +86,7 @@ BidBeacon uses one shared SemVer release version across surfaces:
 
 Version lockstep is mandatory: these three version numbers must match exactly for every release.
 Do not publish `@bidbeacon/http-client` or `@bidbeacon/cli` at versions that diverge from `package.json`.
+Do not publish if `bun.lock` still resolves `@bidbeacon/http-client` to an older version.
 
 Use SemVer for the API client package:
 

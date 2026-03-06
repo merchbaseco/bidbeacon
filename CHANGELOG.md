@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.3.2 - 2026-03-06
+
+### Added
+
+- Added automated release-version sync checks so version bumps now fail fast when `package.json`, published package versions, or `bun.lock` drift apart.
+
+### Fixed
+
+- Fixed the npm CLI build so installed `bb` binaries ship with a runnable Node entrypoint and no longer bundle server-only code into the published package.
+
 ## v0.3.1 - 2026-03-06
 
 ### Added
