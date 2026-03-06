@@ -32,9 +32,12 @@ describe('bb help topics', () => {
         const asinsOutput = renderHelp('asins', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
         expect(asinsOutput).toContain('--range <range>');
         expect(asinsOutput).toContain('--metrics <keys>');
-        expect(asinsOutput).toContain('--bucket <value>');
+        expect(asinsOutput).toContain('--depth <value>');
+        expect(asinsOutput).toContain('tree <asin>');
+        expect(asinsOutput).toContain('overview <asin>');
 
         const metricsSeriesOutput = renderHelp('metrics series', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
         expect(metricsSeriesOutput).toContain('--group-by <entity>');
+        expect(metricsSeriesOutput).toContain('--asin <ASIN>');
     });
 });
