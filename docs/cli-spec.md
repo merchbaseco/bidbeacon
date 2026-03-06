@@ -10,6 +10,7 @@ This spec defines the public, user-facing shape of the Sponsored Products (SP) C
 - JSON-only output.
 - One CLI command maps to one user capability (some commands compose multiple API calls).
 - Flat command structure. Filters provide drill-down.
+- Release notes must be available from the installed CLI package so agents can inspect what changed without needing repo access.
 
 **ASIN-Centric Command Model (Pre-Beta Direction)**
 - ASIN workflows are first-class because optimization is frequently done per ASIN.
@@ -75,6 +76,16 @@ Drill down by passing parent IDs as flags.
 
 **Accounts**
 - `bb accounts list`
+
+**Changelog**
+- `bb changelog`
+- `bb changelog <version>`
+- `bb changelog --all`
+
+Changelog behavior:
+- Default output returns the current CLI version entry when available, otherwise the latest packaged entry.
+- `<version>` accepts `1.2.3` or `v1.2.3`.
+- `--all` returns every packaged changelog entry.
 
 **Campaigns**
 - `bb campaigns list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--limit <n>] [--offset <n>]`

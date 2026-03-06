@@ -1,7 +1,7 @@
 {
   "name": "@bidbeacon/server",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Docker-deployable API service for BidBeacon",
   "type": "module",
   "main": "dist/index.js",
@@ -23,7 +23,7 @@
     "test": "vitest",
     "api-client:types": "dts-bundle-generator --no-check -o packages/bidbeacon-api-client/src/app-router.d.ts src/api/router-public.ts --project tsconfig.api-client.json",
     "api-client:build": "bun run api-client:types && tsc -p packages/bidbeacon-api-client/tsconfig.json && cp packages/bidbeacon-api-client/src/app-router.d.ts packages/bidbeacon-api-client/dist/app-router.d.ts",
-    "cli:build": "rm -rf packages/bidbeacon-cli/dist && bun build packages/bidbeacon-cli/src/index.ts --target=node --format=esm --external @bidbeacon/http-client --outfile packages/bidbeacon-cli/dist/index.js",
+    "cli:build": "cd packages/bidbeacon-cli && bun run build",
     "lint": "ultracite check",
     "lint:fix": "ultracite fix",
     "check": "ultracite check",
@@ -32,7 +32,7 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "^3.700.0",
     "@aws-sdk/client-sqs": "^3.700.0",
-    "@bidbeacon/http-client": "0.3.0",
+    "@bidbeacon/http-client": "0.3.1",
     "@clerk/backend": "^2.29.3",
     "@clerk/clerk-react": "^5.59.4",
     "@fastify/cors": "^11.1.0",

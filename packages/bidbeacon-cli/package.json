@@ -1,6 +1,6 @@
 {
   "name": "@bidbeacon/cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "BidBeacon CLI",
   "type": "module",
   "main": "./dist/index.js",
@@ -8,7 +8,8 @@
     "bb": "dist/index.js"
   },
   "scripts": {
-    "build": "rm -rf dist && bun build src/index.ts --target=node --format=esm --external @bidbeacon/http-client --outfile dist/index.js"
+    "build:changelog": "cp ../../CHANGELOG.md CHANGELOG.md",
+    "build": "bun run build:changelog && rm -rf dist && bun build src/index.ts --target=node --format=esm --external @bidbeacon/http-client --outfile dist/index.js"
   },
   "publishConfig": {
     "access": "public"
@@ -17,10 +18,11 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@bidbeacon/http-client": "^0.3.0"
+    "@bidbeacon/http-client": "^0.3.1"
   },
   "files": [
     "dist",
+    "CHANGELOG.md",
     "README.md"
   ]
 }

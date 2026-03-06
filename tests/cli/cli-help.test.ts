@@ -6,6 +6,7 @@ describe('bb help topics', () => {
         expect(resolveHelpTopicKey(['metrics'])).toBe('metrics');
         expect(resolveHelpTopicKey(['metrics', 'series'])).toBe('metrics series');
         expect(resolveHelpTopicKey(['metrics', 'table'])).toBe('metrics table');
+        expect(resolveHelpTopicKey(['changelog'])).toBe('changelog');
         expect(resolveHelpTopicKey(['metrics', 'series', 'campaigns'])).toBe('metrics series');
         expect(resolveHelpTopicKey(['campaign'])).toBe('campaigns');
         expect(resolveHelpTopicKey(['asins'])).toBe('asins');
@@ -40,5 +41,12 @@ describe('bb help topics', () => {
         const metricsSeriesOutput = renderHelp('metrics series', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
         expect(metricsSeriesOutput).toContain('--group-by <entity>');
         expect(metricsSeriesOutput).toContain('--asin <ASIN>');
+    });
+
+    it('renders changelog command guidance', () => {
+        const output = renderHelp('changelog', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
+        expect(output).toContain('Usage: bb changelog [version] [--all]');
+        expect(output).toContain('--all');
+        expect(output).toContain('Version arg accepts `1.2.3` or `v1.2.3`.');
     });
 });

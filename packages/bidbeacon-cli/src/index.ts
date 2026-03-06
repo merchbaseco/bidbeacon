@@ -23,6 +23,14 @@ const ASIN_REGEX = /^[A-Z0-9]{10}$/;
 const NUMERIC_ID_REGEX = /^[0-9]+$/;
 const SEARCH_PAGE_LIMIT = 200;
 const METRICS_NO_MATCH_ID = '__bb_no_match__';
+const CHANGELOG_SPLIT_REGEX = /\r?\n/;
+const CHANGELOG_ENTRY_REGEX = /^##\s+v?([0-9][^\s]*)\s+-\s+([0-9]{4}-[0-9]{2}-[0-9]{2})\s*$/;
+const CHANGELOG_SECTION_REGEX = /^###\s+(.+?)\s*$/;
+const CHANGELOG_VERSION_PREFIX_REGEX = /^v/i;
+const CHANGELOG_SOURCES = [
+    { label: 'package', url: new URL('../CHANGELOG.md', import.meta.url) },
+    { label: 'workspace', url: new URL('../../../CHANGELOG.md', import.meta.url) },
+] as const;
 
 const main = async () => {
     const { positional, flags } = parseArgs(process.argv.slice(2));
@@ -931,6 +939,53 @@ const main = async () => {
             }
             throw new CliUsageError({ topicKey: 'enums', message: `Unknown subcommand: ${subcommand}` });
         }
+        case 'changelog': {
+            if (action || rest.length > 0) {
+                throw new CliUsageError({ topicKey: 'changelog', message: 'Too many positional args. Use: bb changelog [version] [--all].' });
+            }
+
+            const includeAll = readBooleanFlag(flags, ['all']);
+            const requestedVersion = subcommand ? normalizeChangelogVersion(subcommand) : undefined;
+            if (includeAll && requestedVersion) {
+                throw new CliUsageError({ topicKey: 'changelog', message: 'Use either a version arg or --all, not both.' });
+            }
+
+            const currentVersion = await resolveCliVersion();
+            const changelog = await loadCliChangelog();
+            const latestVersion = changelog.entries[0]?.version ?? null;
+
+            if (includeAll) {
+                printOutput({
+                    currentVersion,
+                    latestVersion,
+                    source: changelog.source,
+                    entries: changelog.entries,
+                });
+                return;
+            }
+
+            const entry = resolveRequestedChangelogEntry(changelog.entries, {
+                currentVersion,
+                requestedVersion,
+            });
+            if (!entry) {
+                const availableVersions = changelog.entries.map(item => `v${item.version}`).join(', ');
+                throw new CliUsageError({
+                    topicKey: 'changelog',
+                    message: `Unknown changelog version: v${requestedVersion}. Available versions: ${availableVersions}.`,
+                });
+            }
+
+            printOutput({
+                currentVersion,
+                latestVersion,
+                requestedVersion: requestedVersion ?? null,
+                selectedVersion: entry.version,
+                source: changelog.source,
+                entry,
+            });
+            return;
+        }
         default:
             throw new CliUsageError({ topicKey: 'global', message: `Unknown command: ${command}` });
     }
@@ -1782,6 +1837,22 @@ type ParsedFlags = Record<string, string | boolean | string[]> & {
     help?: boolean;
 };
 
+type ChangelogSection = {
+    title: string;
+    changes: string[];
+};
+
+type ChangelogEntry = {
+    version: string;
+    date: string;
+    sections: ChangelogSection[];
+};
+
+type LoadedChangelog = {
+    source: (typeof CHANGELOG_SOURCES)[number]['label'];
+    entries: ChangelogEntry[];
+};
+
 const buildHelpContext = async () => {
     const version = await resolveCliVersion();
     const sha = resolveCliSha();
@@ -1835,6 +1906,81 @@ const truncateAccountId = (accountId: string) => {
         return accountId;
     }
     return `${accountId.slice(0, 16)}...${accountId.slice(-4)}`;
+};
+
+const loadCliChangelog = async (): Promise<LoadedChangelog> => {
+    for (const source of CHANGELOG_SOURCES) {
+        try {
+            const raw = await readFile(source.url, 'utf8');
+            const entries = parseChangelog(raw);
+            if (entries.length > 0) {
+                return { source: source.label, entries };
+            }
+        } catch {
+            // Fall through so local development can use the workspace changelog when the package copy is absent.
+        }
+    }
+
+    throw new Error('CLI changelog is unavailable. Rebuild or reinstall `@bidbeacon/cli` to bundle release notes.');
+};
+
+const parseChangelog = (raw: string): ChangelogEntry[] => {
+    const entries: ChangelogEntry[] = [];
+    const lines = raw.split(CHANGELOG_SPLIT_REGEX);
+    let currentEntry: ChangelogEntry | null = null;
+    let currentSection: ChangelogSection | null = null;
+
+    for (const line of lines) {
+        const entryMatch = line.match(CHANGELOG_ENTRY_REGEX);
+        if (entryMatch) {
+            currentEntry = {
+                version: entryMatch[1],
+                date: entryMatch[2],
+                sections: [],
+            };
+            entries.push(currentEntry);
+            currentSection = null;
+            continue;
+        }
+
+        const sectionMatch = line.match(CHANGELOG_SECTION_REGEX);
+        if (sectionMatch && currentEntry) {
+            currentSection = {
+                title: sectionMatch[1],
+                changes: [],
+            };
+            currentEntry.sections.push(currentSection);
+            continue;
+        }
+
+        if (line.startsWith('- ') && currentSection) {
+            currentSection.changes.push(line.slice(2).trim());
+        }
+    }
+
+    return entries;
+};
+
+const normalizeChangelogVersion = (value: string) => {
+    const trimmed = value.trim();
+    if (!trimmed) {
+        throw new CliUsageError({ topicKey: 'changelog', message: 'Missing changelog version.' });
+    }
+    return trimmed.replace(CHANGELOG_VERSION_PREFIX_REGEX, '');
+};
+
+const resolveRequestedChangelogEntry = (
+    entries: ChangelogEntry[],
+    input: {
+        currentVersion: string;
+        requestedVersion?: string;
+    }
+) => {
+    if (input.requestedVersion) {
+        return entries.find(entry => entry.version === input.requestedVersion) ?? null;
+    }
+
+    return entries.find(entry => entry.version === input.currentVersion) ?? entries[0] ?? null;
 };
 
 await main().catch(async error => {

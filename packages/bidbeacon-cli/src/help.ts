@@ -3,7 +3,22 @@ type HelpRow = {
     right: string;
 };
 
-export type HelpTopicKey = 'global' | 'config' | 'accounts' | 'campaigns' | 'ad-groups' | 'ads' | 'asins' | 'targets' | 'history' | 'bids' | 'metrics' | 'metrics series' | 'metrics table' | 'enums';
+export type HelpTopicKey =
+    | 'global'
+    | 'config'
+    | 'accounts'
+    | 'campaigns'
+    | 'ad-groups'
+    | 'ads'
+    | 'asins'
+    | 'targets'
+    | 'history'
+    | 'bids'
+    | 'metrics'
+    | 'metrics series'
+    | 'metrics table'
+    | 'changelog'
+    | 'enums';
 
 type HelpTopic = {
     key: HelpTopicKey;
@@ -30,6 +45,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'history', right: 'Inspect entity change history' },
             { left: 'bids', right: 'Set or adjust bids for a target' },
             { left: 'metrics', right: 'Fetch chart/table metrics' },
+            { left: 'changelog', right: 'Show packaged release notes for the current CLI version or a requested version' },
             { left: 'enums', right: 'Print enum values accepted by the API' },
         ],
     },
@@ -288,6 +304,13 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             'When --asin is set without an explicit --state/--all, ASIN scope resolves against ENABLED entities only.',
         ],
     },
+    changelog: {
+        key: 'changelog',
+        usage: 'bb changelog [version] [--all]',
+        summary: 'Show packaged CLI release notes',
+        options: [{ left: '--all', right: 'Print the full packaged changelog instead of a single version entry' }],
+        notes: ['No version arg: prints the current CLI version entry when available, otherwise the latest changelog entry.', 'Version arg accepts `1.2.3` or `v1.2.3`.'],
+    },
     enums: {
         key: 'enums',
         usage: 'bb enums [options] [command]',
@@ -352,6 +375,9 @@ export const resolveHelpTopicKey = (pathSegments: string[]): HelpTopicKey => {
     }
     if (first === 'metrics') {
         return 'metrics';
+    }
+    if (first === 'changelog') {
+        return 'changelog';
     }
     if (first === 'enums') {
         return 'enums';
