@@ -112,7 +112,7 @@ const getApiKeyContext = async (token: string) => {
         where: eq(apiKey.id, parsed.apiKeyId),
     });
 
-    if (!record || record.revokedAt) {
+    if (!record) {
         return null;
     }
 

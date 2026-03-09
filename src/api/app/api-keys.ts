@@ -1,6 +1,6 @@
 import { createHash, randomBytes, randomUUID } from 'node:crypto';
 import { TRPCError } from '@trpc/server';
-import { and, eq, inArray, isNull } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { apiKey, apiKeyAccountAccess } from '@/db/schema';
@@ -19,7 +19,6 @@ export const apiKeysRouter = router({
                 secretSuffix: apiKey.secretSuffix,
                 createdAt: apiKey.createdAt,
                 lastUsedAt: apiKey.lastUsedAt,
-                revokedAt: apiKey.revokedAt,
             })
             .from(apiKey)
             .where(eq(apiKey.createdBy, ctx.user.sub));
@@ -67,10 +66,7 @@ export const apiKeysRouter = router({
             const token = buildApiKeyToken(apiKeyId, secret);
 
             await db.transaction(async tx => {
-                await tx
-                    .update(apiKey)
-                    .set({ revokedAt: new Date() })
-                    .where(and(eq(apiKey.createdBy, ctx.user.sub), isNull(apiKey.revokedAt)));
+                await tx.delete(apiKey).where(eq(apiKey.createdBy, ctx.user.sub));
 
                 await tx.insert(apiKey).values({
                     id: apiKeyId,
@@ -114,7 +110,7 @@ export const apiKeysRouter = router({
                 throw new TRPCError({ code: 'NOT_FOUND', message: 'API key not found' });
             }
 
-            await db.update(apiKey).set({ revokedAt: new Date() }).where(eq(apiKey.id, input.apiKeyId));
+            await db.delete(apiKey).where(eq(apiKey.id, input.apiKeyId));
 
             return true;
         }),

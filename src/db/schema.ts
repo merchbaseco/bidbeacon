@@ -823,9 +823,8 @@ export const apiKey = pgTable(
         createdBy: text('created_by').notNull(),
         createdAt: timestamp('created_at').notNull().defaultNow(),
         lastUsedAt: timestamp('last_used_at'),
-        revokedAt: timestamp('revoked_at'),
     },
-    table => [index('api_key_created_by_idx').on(table.createdBy), index('api_key_revoked_at_idx').on(table.revokedAt)]
+    table => [index('api_key_created_by_idx').on(table.createdBy)]
 );
 
 export const apiKeyAccountAccess = pgTable(

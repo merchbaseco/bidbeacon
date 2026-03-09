@@ -147,7 +147,7 @@ export function MoreMenu() {
                 <DialogPopup className="sm:max-w-xl">
                     <DialogHeader>
                         <DialogTitle>Get API key</DialogTitle>
-                        <DialogDescription>Copy this key now. You will not be able to retrieve it again once this dialog is closed. Each new key replaces the one shown here.</DialogDescription>
+                        <DialogDescription>Copy this key now. You will not be able to retrieve it again once this dialog is closed. Generating a new key deletes any previous keys.</DialogDescription>
                     </DialogHeader>
                     <DialogPanel>
                         <div className="rounded-lg border bg-muted/50 p-4">
