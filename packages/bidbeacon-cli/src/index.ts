@@ -2,7 +2,7 @@
 import { spawnSync } from 'node:child_process';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { createBidBeaconClient } from '@bidbeacon/http-client';
 import { type AsinOverviewDepth, type AsinStateFilter, getAsinOverview, getAsinTree, type MetricKey, type MetricsEntity, resolveAsinMetricsScope } from './asin-commands';
 import { normalizeApiBaseUrl, withTransportHint } from './base-url';
@@ -12,8 +12,10 @@ import { getTimezoneForCountry } from './timezones';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_RANGE = 'today';
-const CONFIG_DIR = join(homedir(), '.bidbeacon');
-const CONFIG_PATH = join(CONFIG_DIR, 'config.json');
+const API_KEY_ENV_VAR = 'BB_API_KEY';
+const DEFAULT_STORAGE_DIR = join(homedir(), '.bidbeacon');
+const STORAGE_SETTINGS_PATH = join(DEFAULT_STORAGE_DIR, 'settings.json');
+const CONFIG_FILENAME = 'config.json';
 const METRICS_KEYS = ['impressions', 'clicks', 'spend', 'purchases', 'sales', 'acos', 'cpc', 'ctr', 'roas'] as const;
 const METRICS_KEYS_SET = new Set(METRICS_KEYS);
 const METRICS_BUCKETS = ['auto', 'hour', 'day', 'week', 'month', 'year'] as const;
@@ -993,8 +995,13 @@ const main = async () => {
 
 const handleConfigCommand = async (subcommand?: string, action?: string, rest: string[] = []) => {
     if (subcommand === 'show') {
+        const storage = await loadCliStorage();
         const config = await loadConfig();
-        printOutput({ config });
+        printOutput({
+            storageDir: storage.storageDir,
+            configPath: storage.configPath,
+            config,
+        });
         return;
     }
 
@@ -1018,9 +1025,15 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
     }
 
     switch (action) {
-        case 'api-key':
-            config.apiKey = value;
-            break;
+        case 'storage-dir': {
+            const storage = await setStorageDir(value);
+            printOutput({
+                saved: true,
+                storageDir: storage.storageDir,
+                configPath: storage.configPath,
+            });
+            return;
+        }
         case 'base-url':
             config.baseUrl = value;
             break;
@@ -1043,24 +1056,26 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
 };
 
 const loadConfig = async (): Promise<CliConfig> => {
+    const { configPath } = await loadCliStorage();
     try {
-        const raw = await readFile(CONFIG_PATH, 'utf8');
-        return JSON.parse(raw) as CliConfig;
+        const raw = await readFile(configPath, 'utf8');
+        return sanitizeCliConfig(JSON.parse(raw));
     } catch {
         return {};
     }
 };
 
 const saveConfig = async (config: CliConfig) => {
-    await mkdir(CONFIG_DIR, { recursive: true });
-    await writeFile(CONFIG_PATH, JSON.stringify(config, null, 2));
+    const { storageDir, configPath } = await loadCliStorage();
+    await mkdir(storageDir, { recursive: true });
+    await writeFile(configPath, JSON.stringify(config, null, 2));
 };
 
 const resolveApiConfig = (config: CliConfig) => {
     const baseUrl = normalizeApiBaseUrl(config.baseUrl ?? DEFAULT_BASE_URL);
-    const apiKey = config.apiKey;
+    const apiKey = resolveApiKey();
     if (!apiKey) {
-        throw new CliUsageError({ topicKey: 'config', message: 'Missing API key. Run: bb config set api-key <value>.' });
+        throw new CliUsageError({ topicKey: 'config', message: `Missing API key. Set ${API_KEY_ENV_VAR} in your environment.` });
     }
 
     return { baseUrl, apiKey };
@@ -1686,8 +1701,8 @@ const resolveAccountTimezoneHint = async (config: CliConfig) => {
     if (!(config.accountId && config.countryCode)) {
         return 'unknown (set account + country first)';
     }
-    if (!config.apiKey) {
-        return 'unknown (set api-key first)';
+    if (!resolveApiKey()) {
+        return `unknown (set ${API_KEY_ENV_VAR} first)`;
     }
 
     try {
@@ -1827,10 +1842,18 @@ type MetricsSelection = MetricKey[] | undefined;
 
 type CliConfig = {
     baseUrl?: string;
-    apiKey?: string;
     accountId?: string;
     countryCode?: string;
     range?: string;
+};
+
+type CliStorageSettings = {
+    storageDir?: string;
+};
+
+type CliStorage = {
+    storageDir: string;
+    configPath: string;
 };
 
 type ParsedFlags = Record<string, string | boolean | string[]> & {
@@ -1906,6 +1929,77 @@ const truncateAccountId = (accountId: string) => {
         return accountId;
     }
     return `${accountId.slice(0, 16)}...${accountId.slice(-4)}`;
+};
+
+const loadCliStorage = async (): Promise<CliStorage> => {
+    const storageDir = await resolveStorageDir();
+    return {
+        storageDir,
+        configPath: join(storageDir, CONFIG_FILENAME),
+    };
+};
+
+const resolveApiKey = () => {
+    const apiKey = process.env[API_KEY_ENV_VAR]?.trim();
+    return apiKey ? apiKey : undefined;
+};
+
+const sanitizeCliConfig = (value: unknown): CliConfig => {
+    if (!value || typeof value !== 'object') {
+        return {};
+    }
+
+    const candidate = value as Record<string, unknown>;
+    return {
+        baseUrl: typeof candidate.baseUrl === 'string' ? candidate.baseUrl : undefined,
+        accountId: typeof candidate.accountId === 'string' ? candidate.accountId : undefined,
+        countryCode: typeof candidate.countryCode === 'string' ? candidate.countryCode : undefined,
+        range: typeof candidate.range === 'string' ? candidate.range : undefined,
+    };
+};
+
+const resolveStorageDir = async () => {
+    try {
+        const raw = await readFile(STORAGE_SETTINGS_PATH, 'utf8');
+        const parsed = JSON.parse(raw) as CliStorageSettings;
+        return normalizeStorageDir(parsed.storageDir);
+    } catch {
+        return DEFAULT_STORAGE_DIR;
+    }
+};
+
+const setStorageDir = async (value: string): Promise<CliStorage> => {
+    const storageDir = normalizeStorageDir(value);
+    const config = await loadConfig();
+    const configPath = join(storageDir, CONFIG_FILENAME);
+
+    await mkdir(DEFAULT_STORAGE_DIR, { recursive: true });
+    await mkdir(storageDir, { recursive: true });
+    await writeFile(STORAGE_SETTINGS_PATH, JSON.stringify({ storageDir }, null, 2));
+    await writeFile(configPath, JSON.stringify(config, null, 2));
+
+    return { storageDir, configPath };
+};
+
+const normalizeStorageDir = (value?: string | null) => {
+    if (!value) {
+        return DEFAULT_STORAGE_DIR;
+    }
+
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+        return DEFAULT_STORAGE_DIR;
+    }
+
+    if (trimmed === '~') {
+        return homedir();
+    }
+
+    if (trimmed.startsWith('~/')) {
+        return join(homedir(), trimmed.slice(2));
+    }
+
+    return resolve(trimmed);
 };
 
 const loadCliChangelog = async (): Promise<LoadedChangelog> => {

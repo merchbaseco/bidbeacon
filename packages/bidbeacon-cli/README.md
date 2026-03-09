@@ -11,8 +11,9 @@ npm install -g @bidbeacon/cli
 ## Usage
 
 ```bash
+export BB_API_KEY=<bbk_...>
 bb --help
-bb config set api-key <bbk_...>
+bb config set storage-dir ~/.config/bidbeacon-work
 bb accounts list
 bb changelog
 bb campaigns search lepricorn
@@ -22,3 +23,7 @@ bb metrics table targets --asin B07NXRP1B8 --range 14d --sort acos --direction d
 ```
 
 `bb changelog` prints the packaged release notes for the installed CLI version by default. Use `bb changelog --all` to dump the full bundled changelog or `bb changelog v0.2.3` to inspect a specific release.
+
+Authentication uses the `BB_API_KEY` environment variable.
+
+`bb config set storage-dir <path>` persists a custom directory for CLI config/data. After you set it once, future `bb` commands use `<path>/config.json` instead of `~/.bidbeacon/config.json`.
