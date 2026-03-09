@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { constants } from 'node:fs';
-import { access, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(import.meta.dirname, '..');
@@ -57,7 +57,7 @@ describe('bidbeacon cli build', () => {
 
         runCli(outputFile, homeDir, ['config', 'set', 'base-url', 'https://example.com'], cliEnv);
         runCli(outputFile, homeDir, ['config', 'set', 'storage-dir', customStorageDir], cliEnv);
-        runCli(outputFile, homeDir, ['config', 'set', 'range', '7d'], cliEnv);
+        runCli(outputFile, homeDir, ['config', 'set', 'account', '123', 'US'], cliEnv);
 
         const settingsPath = join(homeDir, '.bidbeacon', 'settings.json');
         const defaultConfigPath = join(homeDir, '.bidbeacon', 'config.json');
@@ -67,19 +67,68 @@ describe('bidbeacon cli build', () => {
         await expect(readJson(defaultConfigPath)).resolves.toEqual({ baseUrl: 'https://example.com' });
         await expect(readJson(customConfigPath)).resolves.toEqual({
             baseUrl: 'https://example.com',
-            range: '7d',
+            accountId: '123',
+            countryCode: 'US',
         });
 
         const showOutput = runCli(outputFile, homeDir, ['config', 'show'], cliEnv);
         const parsed = JSON.parse(showOutput) as {
-            data: { storageDir: string; configPath: string; config: { baseUrl?: string; range?: string } };
+            data: { storageDir: string; configPath: string; config: { baseUrl?: string; accountId?: string; countryCode?: string } };
         };
 
         expect(parsed.data.storageDir).toBe(customStorageDir);
         expect(parsed.data.configPath).toBe(customConfigPath);
         expect(parsed.data.config).toEqual({
             baseUrl: 'https://example.com',
-            range: '7d',
+            accountId: '123',
+            countryCode: 'US',
+        });
+    });
+
+    it('applies env overrides for all CLI config values', async () => {
+        const tempDir = await createTempDir('bidbeacon-cli-env-');
+        tempDirs.push(tempDir);
+
+        const outputFile = join(tempDir, 'bb.js');
+        const homeDir = join(tempDir, 'home');
+        const envStorageDir = join(tempDir, 'env-storage');
+
+        await mkdir(homeDir, { recursive: true });
+        await mkdir(envStorageDir, { recursive: true });
+
+        execFileSync('bun', ['build', '../../packages/bidbeacon-cli/src/index.ts', '--target=node', '--format=esm', '--packages=external', '--outfile', outputFile], {
+            cwd: cliPackageDir,
+            stdio: 'pipe',
+        });
+
+        await writeJson(join(homeDir, '.bidbeacon', 'config.json'), {
+            baseUrl: 'https://config.example',
+            accountId: '111',
+            countryCode: 'US',
+        });
+        await writeJson(join(envStorageDir, 'config.json'), {
+            baseUrl: 'https://env-storage.example',
+            accountId: '222',
+            countryCode: 'GB',
+        });
+
+        const showOutput = runCli(outputFile, homeDir, ['config', 'show'], {
+            BB_API_KEY: 'bbk_test',
+            BB_STORAGE_DIR: envStorageDir,
+            BB_BASE_URL: 'https://env.example',
+            BB_ACCOUNT_ID: '333',
+            BB_COUNTRY_CODE: 'CA',
+        });
+        const parsed = JSON.parse(showOutput) as {
+            data: { storageDir: string; configPath: string; config: { baseUrl?: string; accountId?: string; countryCode?: string } };
+        };
+
+        expect(parsed.data.storageDir).toBe(envStorageDir);
+        expect(parsed.data.configPath).toBe(join(envStorageDir, 'config.json'));
+        expect(parsed.data.config).toEqual({
+            baseUrl: 'https://env.example',
+            accountId: '333',
+            countryCode: 'CA',
         });
     });
 });
@@ -106,4 +155,9 @@ const runCli = (outputFile: string, homeDir: string, args: string[], extraEnv?: 
 const readJson = async (path: string) => {
     const raw = await readFile(path, 'utf8');
     return JSON.parse(raw) as unknown;
+};
+
+const writeJson = async (path: string, value: unknown) => {
+    await mkdir(dirname(path), { recursive: true });
+    await writeFile(path, JSON.stringify(value, null, 2));
 };

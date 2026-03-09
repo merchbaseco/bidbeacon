@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.5.0 - 2026-03-09
+
+### Added
+
+- Added environment-variable overrides for the remaining CLI config values: `BB_STORAGE_DIR`, `BB_BASE_URL`, `BB_ACCOUNT_ID`, and `BB_COUNTRY_CODE`.
+- Added internal `.env.example` entries and built-CLI regression coverage for the env-driven config flow.
+
+### Changed
+
+- Changed the CLI to default to a hardcoded `7d` range whenever `--range` is not passed.
+- Updated CLI help and README to document the simplified config surface and env precedence.
+
+### Removed
+
+- Removed `bb config set range` and the `BB_RANGE` environment variable.
+
 ## v0.4.0 - 2026-03-09
 
 ### Added

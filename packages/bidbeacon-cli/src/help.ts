@@ -59,14 +59,12 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'set storage-dir <path>', right: 'Set the persistent config/data directory used by all future `bb` commands' },
             { left: 'set base-url <value>', right: 'Set API base URL (default: http://localhost:8080; trailing /api is optional)' },
             { left: 'set account <adsAccountId> <countryCode>', right: 'Set default advertiser account + country' },
-            {
-                left: 'set range <value>',
-                right: 'Set default range (today|yesterday|Nd|YYYY-MM-DD..YYYY-MM-DD; aliases: t|y|w|week|m|month)',
-            },
         ],
         notes: [
             'Authentication uses the `BB_API_KEY` environment variable.',
+            'Env overrides win over saved config: `BB_STORAGE_DIR`, `BB_BASE_URL`, `BB_ACCOUNT_ID`, and `BB_COUNTRY_CODE`.',
             'Date ranges are interpreted in the selected account timezone (derived from `countryCode`).',
+            'When no `--range` is passed, the CLI defaults to `7d`.',
             'Changing `storage-dir` preserves the current config by copying it into the new directory.',
         ],
     },

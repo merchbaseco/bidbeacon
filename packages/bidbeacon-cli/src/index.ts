@@ -11,8 +11,12 @@ import { type HelpTopicKey, renderHelp, resolveHelpTopicKey } from './help';
 import { getTimezoneForCountry } from './timezones';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
-const DEFAULT_RANGE = 'today';
+const DEFAULT_RANGE = '7d';
 const API_KEY_ENV_VAR = 'BB_API_KEY';
+const STORAGE_DIR_ENV_VAR = 'BB_STORAGE_DIR';
+const BASE_URL_ENV_VAR = 'BB_BASE_URL';
+const ACCOUNT_ID_ENV_VAR = 'BB_ACCOUNT_ID';
+const COUNTRY_CODE_ENV_VAR = 'BB_COUNTRY_CODE';
 const DEFAULT_STORAGE_DIR = join(homedir(), '.bidbeacon');
 const STORAGE_SETTINGS_PATH = join(DEFAULT_STORAGE_DIR, 'settings.json');
 const CONFIG_FILENAME = 'config.json';
@@ -1031,12 +1035,9 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
         throw new CliUsageError({ topicKey: 'config', message: 'Missing config subcommand. Use: bb config set <key> <value>.' });
     }
 
-    const config = await loadConfig();
+    const config = await loadStoredConfig();
     const value = rest[0];
     if (!value) {
-        if (action === 'range') {
-            throw new CliUsageError({ topicKey: 'config', message: await buildRangeHelpMessage(config) });
-        }
         throw new CliUsageError({ topicKey: 'config', message: 'Missing value for config set.' });
     }
 
@@ -1060,9 +1061,6 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
             config.accountId = value;
             config.countryCode = rest[1];
             break;
-        case 'range':
-            config.range = value;
-            break;
         default:
             throw new CliUsageError({ topicKey: 'config', message: `Unknown config key: ${action}.` });
     }
@@ -1072,6 +1070,10 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
 };
 
 const loadConfig = async (): Promise<CliConfig> => {
+    return resolveConfigEnvOverrides(await loadStoredConfig());
+};
+
+const loadStoredConfig = async (): Promise<CliConfig> => {
     const { configPath } = await loadCliStorage();
     try {
         const raw = await readFile(configPath, 'utf8');
@@ -1127,7 +1129,7 @@ const requireCliConfig = (config: CliConfig) => {
     return {
         accountId: config.accountId,
         countryCode: config.countryCode,
-        range: config.range ?? DEFAULT_RANGE,
+        range: DEFAULT_RANGE,
     };
 };
 
@@ -1138,7 +1140,7 @@ const printOutput = (data: unknown) => {
 const resolveRangeContext = (config: RequiredCliConfig, rangeOverride: string | null) => {
     return {
         range: rangeOverride ?? config.range,
-        rangeSource: rangeOverride ? 'flag' : 'config',
+        rangeSource: rangeOverride ? 'flag' : 'default',
         timezone: getTimezoneForCountry(config.countryCode),
     };
 };
@@ -1708,42 +1710,6 @@ const parseBooleanValue = (value: string) => {
     throw new Error(`Invalid boolean value: ${value}.`);
 };
 
-const buildRangeHelpMessage = async (config: CliConfig) => {
-    const timezoneHint = await resolveAccountTimezoneHint(config);
-    return `Missing value for config set range. Options: today (aliases: 1d, t), yesterday (alias: y), 7d (aliases: week, w), 30d (aliases: month, m), YYYY-MM-DD..YYYY-MM-DD (inclusive). Account timezone: ${timezoneHint}.`;
-};
-
-const resolveAccountTimezoneHint = async (config: CliConfig) => {
-    if (!(config.accountId && config.countryCode)) {
-        return 'unknown (set account + country first)';
-    }
-    if (!resolveApiKey()) {
-        return `unknown (set ${API_KEY_ENV_VAR} first)`;
-    }
-
-    try {
-        const client = createApiClient(config);
-        const data = await client['accounts/list'].query();
-        const countryCode = config.countryCode?.toUpperCase();
-        const matches = data.items.filter(item => item.accountId === config.accountId);
-        if (!countryCode && matches.length > 1) {
-            const codes = Array.from(new Set(matches.map(item => (item.countryCode ?? '').toUpperCase()).filter(Boolean))).sort();
-            return `unknown (multiple country codes: ${codes.join(', ') || 'unknown'}; set config country)`;
-        }
-        const account = matches.find(item => !countryCode || (item.countryCode ?? '').toUpperCase() === countryCode);
-        if (!account) {
-            return `unknown (account ${config.accountId} not found)`;
-        }
-        if (!account.countryCode) {
-            return 'unknown (missing country code)';
-        }
-        const timezone = getTimezoneForCountry(account.countryCode);
-        return `${timezone} (from ${account.countryCode})`;
-    } catch {
-        return 'unknown (unable to fetch)';
-    }
-};
-
 const searchCampaigns = async (client: ApiClient, config: RequiredCliConfig, query: string, options: { state: string; limit?: number; offset?: number }) => {
     const normalizedQuery = query.trim().toLowerCase();
     const requestedLimit = options.limit ?? 20;
@@ -1860,7 +1826,6 @@ type CliConfig = {
     baseUrl?: string;
     accountId?: string;
     countryCode?: string;
-    range?: string;
 };
 
 type CliStorageSettings = {
@@ -1956,8 +1921,17 @@ const loadCliStorage = async (): Promise<CliStorage> => {
 };
 
 const resolveApiKey = () => {
-    const apiKey = process.env[API_KEY_ENV_VAR]?.trim();
+    const apiKey = resolveEnvValue(API_KEY_ENV_VAR);
     return apiKey ? apiKey : undefined;
+};
+
+const resolveConfigEnvOverrides = (config: CliConfig): CliConfig => {
+    return {
+        ...config,
+        baseUrl: resolveEnvValue(BASE_URL_ENV_VAR) ?? config.baseUrl,
+        accountId: resolveEnvValue(ACCOUNT_ID_ENV_VAR) ?? config.accountId,
+        countryCode: resolveEnvValue(COUNTRY_CODE_ENV_VAR) ?? config.countryCode,
+    };
 };
 
 const sanitizeCliConfig = (value: unknown): CliConfig => {
@@ -1970,11 +1944,15 @@ const sanitizeCliConfig = (value: unknown): CliConfig => {
         baseUrl: typeof candidate.baseUrl === 'string' ? candidate.baseUrl : undefined,
         accountId: typeof candidate.accountId === 'string' ? candidate.accountId : undefined,
         countryCode: typeof candidate.countryCode === 'string' ? candidate.countryCode : undefined,
-        range: typeof candidate.range === 'string' ? candidate.range : undefined,
     };
 };
 
 const resolveStorageDir = async () => {
+    const envStorageDir = resolveEnvValue(STORAGE_DIR_ENV_VAR);
+    if (envStorageDir) {
+        return normalizeStorageDir(envStorageDir);
+    }
+
     try {
         const raw = await readFile(STORAGE_SETTINGS_PATH, 'utf8');
         const parsed = JSON.parse(raw) as CliStorageSettings;
@@ -1986,7 +1964,7 @@ const resolveStorageDir = async () => {
 
 const setStorageDir = async (value: string): Promise<CliStorage> => {
     const storageDir = normalizeStorageDir(value);
-    const config = await loadConfig();
+    const config = await loadStoredConfig();
     const configPath = join(storageDir, CONFIG_FILENAME);
 
     await mkdir(DEFAULT_STORAGE_DIR, { recursive: true });
@@ -2016,6 +1994,11 @@ const normalizeStorageDir = (value?: string | null) => {
     }
 
     return resolve(trimmed);
+};
+
+const resolveEnvValue = (name: string) => {
+    const value = process.env[name]?.trim();
+    return value ? value : undefined;
 };
 
 const loadCliChangelog = async (): Promise<LoadedChangelog> => {
