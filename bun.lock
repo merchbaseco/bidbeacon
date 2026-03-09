@@ -7,7 +7,7 @@
       "dependencies": {
         "@aws-sdk/client-cloudwatch": "^3.700.0",
         "@aws-sdk/client-sqs": "^3.700.0",
-        "@bidbeacon/http-client": "0.3.2",
+        "@bidbeacon/http-client": "0.4.0",
         "@clerk/backend": "^2.29.3",
         "@clerk/clerk-react": "^5.59.4",
         "@fastify/cors": "^11.1.0",
@@ -183,7 +183,7 @@
 
     "@base-ui-components/utils": ["@base-ui-components/utils@0.2.2", "", { "dependencies": { "@babel/runtime": "^7.28.4", "@floating-ui/utils": "^0.2.10", "reselect": "^5.1.1", "use-sync-external-store": "^1.6.0" }, "peerDependencies": { "@types/react": "^17 || ^18 || ^19", "react": "^17 || ^18 || ^19", "react-dom": "^17 || ^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-rNJCD6TFy3OSRDKVHJDzLpxO3esTV1/drRtWNUpe7rCpPN9HZVHUCuP+6rdDYDGWfXnQHbqi05xOyRP2iZAlkw=="],
 
-    "@bidbeacon/http-client": ["@bidbeacon/http-client@0.3.2", "", { "dependencies": { "@trpc/client": "^11.0.0", "@trpc/server": "^11.0.0" } }, "sha512-JGTliSxCoO+od+wjf/gIUncjYKVqlSjeJAiLBg0WHmh903eMdun4Te1sD7S6/41f6y3nmou/pFntyCW+6hpzTA=="],
+    "@bidbeacon/http-client": ["@bidbeacon/http-client@0.4.0", "", { "dependencies": { "@trpc/client": "^11.0.0", "@trpc/server": "^11.0.0" } }, "sha512-Y4U4zYCalfSjmx1j2mLu4OA48K9tG5kR+Z61nH4BrXYQbTaPHUyiDGygaQ8N1EvMtM6cvG99879tvIvWzEMVZg=="],
 
     "@biomejs/biome": ["@biomejs/biome@2.3.13", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "2.3.13", "@biomejs/cli-darwin-x64": "2.3.13", "@biomejs/cli-linux-arm64": "2.3.13", "@biomejs/cli-linux-arm64-musl": "2.3.13", "@biomejs/cli-linux-x64": "2.3.13", "@biomejs/cli-linux-x64-musl": "2.3.13", "@biomejs/cli-win32-arm64": "2.3.13", "@biomejs/cli-win32-x64": "2.3.13" }, "bin": { "biome": "bin/biome" } }, "sha512-Fw7UsV0UAtWIBIm0M7g5CRerpu1eKyKAXIazzxhbXYUyMkwNrkX/KLkGI7b+uVDQ5cLUMfOC9vR60q9IDYDstA=="],
 

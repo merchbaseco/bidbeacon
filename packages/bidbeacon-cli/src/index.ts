@@ -77,12 +77,18 @@ const main = async () => {
                 return;
             }
             const config = await loadConfig();
-            const client = createApiClient(config);
-            const cliConfig = requireCliConfig(config);
+            const getContext = () => {
+                const cliConfig = requireCliConfig(config);
+                return {
+                    client: createApiClient(config),
+                    cliConfig,
+                };
+            };
             if (subcommand === 'list') {
                 const state = resolveListStateFlag(flags);
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/list'].query({
                     config: cliConfig,
                     state,
@@ -103,6 +109,7 @@ const main = async () => {
                 const state = resolveListStateFlag(flags) ?? 'ALL';
                 const limitRaw = readFlag(flags, ['limit']);
                 const offsetRaw = readFlag(flags, ['offset']);
+                const { client, cliConfig } = getContext();
                 const data = await searchCampaigns(client, cliConfig, query, {
                     state,
                     limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
@@ -113,6 +120,7 @@ const main = async () => {
             }
             if (subcommand === 'get') {
                 const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/get'].query({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
@@ -122,6 +130,7 @@ const main = async () => {
                 if (!(name && budget)) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <name> <budget>.' });
                 }
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/create'].mutate({
                     config: cliConfig,
                     name,
@@ -136,6 +145,7 @@ const main = async () => {
                 const portfolioId = readFlag(flags, ['portfolio']);
                 const startDateTime = readFlag(flags, ['start']);
                 const endDateTime = readFlag(flags, ['end']);
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/update'].mutate({
                     config: cliConfig,
                     campaignId,
@@ -149,18 +159,21 @@ const main = async () => {
             }
             if (subcommand === 'pause') {
                 const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/pause'].mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'resume') {
                 const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/resume'].mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
             }
             if (subcommand === 'delete') {
                 const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/delete'].mutate({ config: cliConfig, campaignId });
                 printOutput(data);
                 return;
@@ -171,6 +184,7 @@ const main = async () => {
                 if (!budget) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <budget>.' });
                 }
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/set-budget'].mutate({
                     config: cliConfig,
                     campaignId,
@@ -185,6 +199,7 @@ const main = async () => {
                 if (!strategy) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <strategy>.' });
                 }
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/set-bid-strategy'].mutate({
                     config: cliConfig,
                     campaignId,
@@ -200,6 +215,7 @@ const main = async () => {
                 if (!(scope && json)) {
                     throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <scope> <json>.' });
                 }
+                const { client, cliConfig } = getContext();
                 const data = await client['campaigns/set-bid-adjustments'].mutate({
                     config: cliConfig,
                     campaignId,

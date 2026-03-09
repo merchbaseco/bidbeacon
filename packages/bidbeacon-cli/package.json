@@ -1,6 +1,6 @@
 {
   "name": "@bidbeacon/cli",
-  "version": "0.3.2",
+  "version": "0.4.0",
   "description": "BidBeacon CLI",
   "type": "module",
   "main": "./dist/index.js",
@@ -18,7 +18,7 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@bidbeacon/http-client": "^0.3.2"
+    "@bidbeacon/http-client": "^0.4.0"
   },
   "files": [
     "dist",

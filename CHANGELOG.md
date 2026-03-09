@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.4.0 - 2026-03-09
+
+### Added
+
+- Added `bb config set storage-dir <path>` so the CLI can persist config/data outside `~/.bidbeacon`, and updated `bb config show` to print the active storage path.
+
+### Changed
+
+- Changed CLI authentication to read `BB_API_KEY` from the environment instead of from persisted local config.
+- Updated CLI help, README, and regression coverage for the new storage-dir and env-auth workflow.
+
+### Removed
+
+- Removed `bb config set api-key` and stopped carrying API keys forward in CLI config files.
+
 ## v0.3.2 - 2026-03-06
 
 ### Added
