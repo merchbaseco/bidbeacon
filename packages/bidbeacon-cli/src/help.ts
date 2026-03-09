@@ -35,7 +35,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         usage: 'bb [options] [command]',
         summary: 'BidBeacon CLI',
         commands: [
-            { left: 'config', right: 'Manage local CLI configuration (API key, base URL, default account, range)' },
+            { left: 'config', right: 'Manage local CLI configuration (storage dir, base URL, default account, range)' },
             { left: 'accounts', right: 'List accessible Amazon Ads accounts' },
             { left: 'campaigns', right: 'Manage campaigns (list/get/create/update/pause/resume/delete)' },
             { left: 'ad-groups', right: 'Manage ad groups' },
@@ -54,9 +54,9 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         usage: 'bb config [options] [command]',
         summary: 'Manage local CLI configuration',
         commands: [
-            { left: 'show', right: 'Print the current config file' },
-            { left: 'clear', right: 'Clear the config file' },
-            { left: 'set api-key <value>', right: 'Set API key used for requests' },
+            { left: 'show', right: 'Print the current config file plus active storage path' },
+            { left: 'clear', right: 'Clear the current config file' },
+            { left: 'set storage-dir <path>', right: 'Set the persistent config/data directory used by all future `bb` commands' },
             { left: 'set base-url <value>', right: 'Set API base URL (default: http://localhost:8080; trailing /api is optional)' },
             { left: 'set account <adsAccountId> <countryCode>', right: 'Set default advertiser account + country' },
             {
@@ -64,7 +64,11 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
                 right: 'Set default range (today|yesterday|Nd|YYYY-MM-DD..YYYY-MM-DD; aliases: t|y|w|week|m|month)',
             },
         ],
-        notes: ['Date ranges are interpreted in the selected account timezone (derived from `countryCode`).'],
+        notes: [
+            'Authentication uses the `BB_API_KEY` environment variable.',
+            'Date ranges are interpreted in the selected account timezone (derived from `countryCode`).',
+            'Changing `storage-dir` preserves the current config by copying it into the new directory.',
+        ],
     },
     accounts: {
         key: 'accounts',
