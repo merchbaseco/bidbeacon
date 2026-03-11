@@ -11,6 +11,7 @@ import { runMigrations } from '@/db/migrate.js';
 import { accountDatasetMetadata, reportDatasetMetadata } from '@/db/schema.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
 import { createServer } from '@/server-config.js';
+import { getServerRuntimeFlags } from '@/server-runtime';
 import { emitEvent } from '@/utils/events.js';
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -21,6 +22,9 @@ const PORT = Number(process.env.PORT) || 8080;
 
 async function main() {
     console.log('Starting BidBeacon Server');
+
+    const runtimeFlags = getServerRuntimeFlags();
+    console.log('Server runtime flags', runtimeFlags);
 
     const fastify = createServer();
 
@@ -38,7 +42,11 @@ async function main() {
     await performStartupCleanup();
 
     // Background jobs
-    await startJobs();
+    if (runtimeFlags.runServerJobRunner) {
+        await startJobs();
+    } else {
+        console.log('Server job runner disabled via DISABLE_SERVER_JOB_RUNNER');
+    }
 
     // Start server
     await fastify.listen({ port: PORT, host: '0.0.0.0' });
