@@ -25,6 +25,12 @@ Run just the server if you don't want the dashboard:
 bun run dev:server
 ```
 
+`bun run dev` and `bun run dev:server` now default to `DISABLE_SERVER_JOB_RUNNER=true`, so local app-server sessions do not start PgBoss workers unless you explicitly opt in:
+
+```bash
+DISABLE_SERVER_JOB_RUNNER=false bun run dev:server
+```
+
 Run the worker in a second terminal if needed:
 
 ```bash
@@ -51,7 +57,7 @@ Postgres is bound to `127.0.0.1` for local-only access.
 
 - `bun run build` – bundle server and worker
 - `bun run dev` – run API server + dashboard in dev mode
-- `bun run dev:server` – run API server in dev mode
+- `bun run dev:server` – run API server in dev mode with the server job runner disabled by default
 - `bun run start` – run compiled server
 - `bun run worker` – run worker in dev mode
 - `bun run dev:dashboard` – run dashboard dev server (proxies /api to production)
