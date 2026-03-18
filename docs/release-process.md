@@ -95,9 +95,9 @@ Publish npm package:
 
 ```bash
 cd packages/bidbeacon-api-client
-# If NPM_TOKEN is stored in repo .env, load it for this command:
-NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm whoami
-NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm publish --access public
+# Load NPM_TOKEN from the macOS Keychain item `rankwrangler-npm-token`:
+NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm whoami
+NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm publish --access public
 ```
 
 Note: the repo root package is marked `private: true` and has a `prepublishOnly` block.
@@ -113,9 +113,9 @@ Publish CLI package:
 
 ```bash
 cd packages/bidbeacon-cli
-# If NPM_TOKEN is stored in repo .env, load it for this command:
-NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm whoami
-NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm publish --access public
+# Load NPM_TOKEN from the macOS Keychain item `rankwrangler-npm-token`:
+NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm whoami
+NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm publish --access public
 ```
 
 Optional verification:

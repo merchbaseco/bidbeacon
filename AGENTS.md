@@ -351,9 +351,9 @@ Publish (public):
 
 ```bash
 cd packages/bidbeacon-api-client
-# Ensure NPM_TOKEN is exported in your shell (granular token with bypass 2FA)
-NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm whoami
-npm publish --access public
+# Load NPM_TOKEN from the macOS Keychain item `rankwrangler-npm-token`
+NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm whoami
+NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm publish --access public
 ```
 
 Update `packages/bidbeacon-api-client/package.json` version before each publish.

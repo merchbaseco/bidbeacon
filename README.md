@@ -77,8 +77,8 @@ Publish (public scope):
 
 ```bash
 cd packages/bidbeacon-api-client
-NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm whoami
-NPM_TOKEN="$(sed -n 's/^NPM_TOKEN=//p' ../../.env)" npm publish --access public
+NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm whoami
+NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm publish --access public
 ```
 
 Check current package version:
