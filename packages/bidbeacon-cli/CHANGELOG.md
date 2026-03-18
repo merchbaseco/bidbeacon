@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.6.0 - 2026-03-18
+
+### Added
+
+- Added CLI secure-store auth commands: `bb auth set`, `bb auth status`, and `bb auth clear`, with macOS Keychain support and Linux Secret Service support.
+- Added CLI regression coverage for secure-store behavior, auth precedence, and auth command discoverability.
+- Added a runtime flag and example env wiring so local development can disable the server job runner without patching commands by hand.
+
+### Changed
+
+- Changed CLI auth to store only non-secret defaults in `config.json`, keep API keys in the platform secure store, and reserve `BB_API_KEY` for automation, CI, and agent runtimes.
+- Updated CLI help, README, and the CLI spec to document the new auth model and config boundary.
+
+### Fixed
+
+- Fixed API-key rotation so creating a new key removes prior keys and their account-access rows before saving the replacement.
+- Fixed the default storage-dir env example so it matches the CLI's real fallback behavior.
+
 ## v0.5.0 - 2026-03-09
 
 ### Added

@@ -5,6 +5,7 @@ type HelpRow = {
 
 export type HelpTopicKey =
     | 'global'
+    | 'auth'
     | 'config'
     | 'accounts'
     | 'campaigns'
@@ -35,7 +36,8 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         usage: 'bb [options] [command]',
         summary: 'BidBeacon CLI',
         commands: [
-            { left: 'config', right: 'Manage local CLI configuration (storage dir, base URL, default account, range)' },
+            { left: 'auth', right: 'Manage CLI authentication (secure store + env overrides)' },
+            { left: 'config', right: 'Manage local CLI defaults (storage dir, base URL, default account)' },
             { left: 'accounts', right: 'List accessible Amazon Ads accounts' },
             { left: 'campaigns', right: 'Manage campaigns (list/get/create/update/pause/resume/delete)' },
             { left: 'ad-groups', right: 'Manage ad groups' },
@@ -47,6 +49,21 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'metrics', right: 'Fetch chart/table metrics' },
             { left: 'changelog', right: 'Show packaged release notes for the current CLI version or a requested version' },
             { left: 'enums', right: 'Print enum values accepted by the API' },
+        ],
+    },
+    auth: {
+        key: 'auth',
+        usage: 'bb auth [options] [command]',
+        summary: 'Manage CLI authentication',
+        commands: [
+            { left: 'set <bbk_...>', right: 'Save an API key in the platform secure store' },
+            { left: 'status', right: 'Show whether auth resolves from env or the secure store' },
+            { left: 'clear', right: 'Remove the stored API key from the secure store' },
+        ],
+        notes: [
+            'Local secrets live in the platform secure store (macOS Keychain on macOS).',
+            'The `BB_API_KEY` environment variable overrides the secure-store value and is intended for automation, CI, and agent runtimes.',
+            'Auth commands never print the raw API key.',
         ],
     },
     config: {
@@ -61,7 +78,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: 'set account <adsAccountId> <countryCode>', right: 'Set default advertiser account + country' },
         ],
         notes: [
-            'Authentication uses the `BB_API_KEY` environment variable.',
+            'Config stores non-secret defaults only. Use `bb auth ...` for API-key management.',
             'Env overrides win over saved config: `BB_STORAGE_DIR`, `BB_BASE_URL`, `BB_ACCOUNT_ID`, and `BB_COUNTRY_CODE`.',
             'Date ranges are interpreted in the selected account timezone (derived from `countryCode`).',
             'When no `--range` is passed, the CLI defaults to `7d`.',
@@ -347,6 +364,9 @@ export const resolveHelpTopicKey = (pathSegments: string[]): HelpTopicKey => {
     }
     if (first === 'config') {
         return 'config';
+    }
+    if (first === 'auth') {
+        return 'auth';
     }
     if (first === 'accounts') {
         return 'accounts';

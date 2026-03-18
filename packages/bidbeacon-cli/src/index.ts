@@ -5,6 +5,7 @@ import { homedir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { createBidBeaconClient } from '@bidbeacon/http-client';
 import { type AsinOverviewDepth, type AsinStateFilter, getAsinOverview, getAsinTree, type MetricKey, type MetricsEntity, resolveAsinMetricsScope } from './asin-commands';
+import { API_KEY_ENV_VAR, clearStoredApiKey, getMissingApiKeyMessage, loadAuthState, setStoredApiKey } from './auth';
 import { normalizeApiBaseUrl, withTransportHint } from './base-url';
 import { CliUsageError, isCliUsageError } from './cli-errors';
 import { type HelpTopicKey, renderHelp, resolveHelpTopicKey } from './help';
@@ -12,7 +13,6 @@ import { getTimezoneForCountry } from './timezones';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_RANGE = '7d';
-const API_KEY_ENV_VAR = 'BB_API_KEY';
 const STORAGE_DIR_ENV_VAR = 'BB_STORAGE_DIR';
 const BASE_URL_ENV_VAR = 'BB_BASE_URL';
 const ACCOUNT_ID_ENV_VAR = 'BB_ACCOUNT_ID';
@@ -57,6 +57,15 @@ const main = async () => {
             return;
         }
         await handleConfigCommand(subcommand, action, rest);
+        return;
+    }
+
+    if (command === 'auth') {
+        if (!subcommand) {
+            process.stdout.write(renderHelp('auth', helpContext));
+            return;
+        }
+        await handleAuthCommand(subcommand, action);
         return;
     }
 
@@ -1013,6 +1022,47 @@ const main = async () => {
     }
 };
 
+const handleAuthCommand = async (subcommand?: string, value?: string) => {
+    try {
+        if (subcommand === 'status') {
+            printOutput(serializeAuthState(loadAuthState()));
+            return;
+        }
+
+        if (subcommand === 'set') {
+            if (!value) {
+                throw new CliUsageError({ topicKey: 'auth', message: 'Missing API key. Use: bb auth set <bbk_...>.' });
+            }
+
+            const auth = setStoredApiKey(value);
+            printOutput({
+                saved: true,
+                ...serializeAuthState(auth),
+            });
+            return;
+        }
+
+        if (subcommand === 'clear') {
+            const { cleared, auth } = clearStoredApiKey();
+            printOutput({
+                cleared,
+                ...serializeAuthState(auth),
+            });
+            return;
+        }
+
+        throw new CliUsageError({ topicKey: 'auth', message: `Unknown auth subcommand: ${subcommand}.` });
+    } catch (error) {
+        if (isCliUsageError(error)) {
+            throw error;
+        }
+        if (error instanceof Error) {
+            throw new CliUsageError({ topicKey: 'auth', message: error.message });
+        }
+        throw error;
+    }
+};
+
 const handleConfigCommand = async (subcommand?: string, action?: string, rest: string[] = []) => {
     if (subcommand === 'show') {
         const storage = await loadCliStorage();
@@ -1093,7 +1143,7 @@ const resolveApiConfig = (config: CliConfig) => {
     const baseUrl = normalizeApiBaseUrl(config.baseUrl ?? DEFAULT_BASE_URL);
     const apiKey = resolveApiKey();
     if (!apiKey) {
-        throw new CliUsageError({ topicKey: 'config', message: `Missing API key. Set ${API_KEY_ENV_VAR} in your environment.` });
+        throw new CliUsageError({ topicKey: 'auth', message: getMissingApiKeyMessage() });
     }
 
     return { baseUrl, apiKey };
@@ -1117,6 +1167,22 @@ const resolveCommandAlias = (value?: string) => {
         return 'campaigns';
     }
     return normalized;
+};
+
+const serializeAuthState = (auth: ReturnType<typeof loadAuthState>) => {
+    return {
+        authenticated: auth.source !== 'none',
+        source: auth.source,
+        envOverride: auth.envOverride,
+        envVar: API_KEY_ENV_VAR,
+        secureStore: {
+            backend: auth.secureStore.backend,
+            label: auth.secureStore.label,
+            available: auth.secureStore.available,
+            configured: auth.secureStore.configured,
+            detail: auth.secureStore.detail ?? null,
+        },
+    };
 };
 
 const requireCliConfig = (config: CliConfig) => {
@@ -1902,7 +1968,9 @@ const formatConfigSummary = (config: CliConfig) => {
     const accountId = config.accountId;
     const accountCountry = config.countryCode?.toUpperCase();
     const accountSummary = accountId ? `account ${truncateAccountId(accountId)}${accountCountry ? ` (${accountCountry})` : ''}` : 'account not set';
-    return `${accountSummary}, base-url ${baseUrl}`;
+    const authSource = resolveAuthSummarySource();
+    const authSummary = authSource === 'none' ? 'auth not set' : `auth ${authSource}`;
+    return `${accountSummary}, base-url ${baseUrl}, ${authSummary}`;
 };
 
 const truncateAccountId = (accountId: string) => {
@@ -1910,6 +1978,17 @@ const truncateAccountId = (accountId: string) => {
         return accountId;
     }
     return `${accountId.slice(0, 16)}...${accountId.slice(-4)}`;
+};
+
+const resolveAuthSummarySource = () => {
+    if (resolveEnvValue(API_KEY_ENV_VAR)) {
+        return 'env' as const;
+    }
+    try {
+        return loadAuthState().source;
+    } catch {
+        return 'none' as const;
+    }
 };
 
 const loadCliStorage = async (): Promise<CliStorage> => {
@@ -1921,8 +2000,11 @@ const loadCliStorage = async (): Promise<CliStorage> => {
 };
 
 const resolveApiKey = () => {
-    const apiKey = resolveEnvValue(API_KEY_ENV_VAR);
-    return apiKey ? apiKey : undefined;
+    const envApiKey = resolveEnvValue(API_KEY_ENV_VAR);
+    if (envApiKey) {
+        return envApiKey;
+    }
+    return loadAuthState().apiKey;
 };
 
 const resolveConfigEnvOverrides = (config: CliConfig): CliConfig => {

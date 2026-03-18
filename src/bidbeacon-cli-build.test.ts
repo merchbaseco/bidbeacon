@@ -37,6 +37,7 @@ describe('bidbeacon cli build', () => {
 
         expect(helpOutput).toContain('Usage: bb [options] [command]');
         expect(helpOutput).toContain('BidBeacon CLI');
+        expect(helpOutput).toContain('auth');
     });
 
     it('persists a custom storage directory across commands', async () => {
