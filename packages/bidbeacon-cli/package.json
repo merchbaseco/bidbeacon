@@ -12,7 +12,8 @@
     "build": "bun run build:changelog && rm -rf dist && bun build ../../packages/bidbeacon-cli/src/index.ts --target=node --format=esm --packages=external --outfile dist/index.js"
   },
   "publishConfig": {
-    "access": "public"
+    "access": "public",
+    "provenance": true
   },
   "engines": {
     "node": ">=18.0.0"
