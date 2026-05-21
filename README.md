@@ -12,7 +12,7 @@ Fastify-based API for BidBeacon's Amazon Ads integration.
 ### Dev (no Docker)
 
 ```bash
-bun install
+bun install --frozen-lockfile
 cp .env.example .env
 # Fill in .env with your credentials
 # Set BIDBEACON_DATABASE_HOST=localhost for local Postgres
