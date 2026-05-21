@@ -4,7 +4,7 @@ RUN apk add --no-cache libc6-compat
 
 FROM base AS deps
 ARG MERCHBASE_NPM_TOKEN
-COPY package.json bun.lock .npmrc ./
+COPY package.json bun.lock bunfig.toml .npmrc ./
 RUN : > .env && \
     if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
       printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" >> .env; \
