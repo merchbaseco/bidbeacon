@@ -21,7 +21,7 @@
   ],
   "sideEffects": false,
   "dependencies": {
-    "@trpc/client": "^11.0.0",
-    "@trpc/server": "^11.0.0"
+    "@trpc/client": "11.8.1",
+    "@trpc/server": "11.8.1"
   }
 }

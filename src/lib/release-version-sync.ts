@@ -33,7 +33,7 @@ export const assertReleaseVersionSync = async (repoRoot = resolve(import.meta.di
     }
 
     const cliHttpClientVersion = cliPackageJson.dependencies?.[HTTP_CLIENT_PACKAGE_NAME];
-    const expectedCliDependencyVersion = `^${expectedVersion}`;
+    const expectedCliDependencyVersion = expectedVersion;
     if (cliHttpClientVersion !== expectedCliDependencyVersion) {
         problems.push(`packages/bidbeacon-cli/package.json dependency ${HTTP_CLIENT_PACKAGE_NAME} is ${cliHttpClientVersion ?? 'missing'}; expected ${expectedCliDependencyVersion}.`);
     }
