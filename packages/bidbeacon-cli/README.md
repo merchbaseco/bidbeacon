@@ -11,9 +11,10 @@ npm install -g @bidbeacon/cli
 ## Usage
 
 ```bash
-bb auth set <bbk_...>
+bb auth set
 bb auth status
 bb --help
+bb config show
 bb config set storage-dir ~/.config/bidbeacon-work
 bb accounts list
 bb changelog
@@ -25,7 +26,7 @@ bb metrics table targets --asin B07NXRP1B8 --range 14d --sort acos --direction d
 
 `bb changelog` prints the packaged release notes for the installed CLI version by default. Use `bb changelog --all` to dump the full bundled changelog or `bb changelog v0.2.3` to inspect a specific release.
 
-Authentication defaults to the platform secure store and keeps secrets out of `config.json`. On macOS, `bb auth set` saves the API key in Keychain.
+Authentication defaults to the platform secure store and keeps secrets out of `config.json`. On macOS, `bb auth set` saves the API key in Keychain. For non-interactive setup, pass `--stdin`.
 
 `bb config set storage-dir <path>` persists a custom directory for CLI config/data. After you set it once, future `bb` commands use `<path>/config.json` instead of `~/.bidbeacon/config.json`.
 

@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## v0.7.0 - 2026-06-15
+
+### Added
+
+- Added `bb auth set --stdin` and hidden interactive auth entry so humans can store keys without shell history and agents can pipe keys in non-interactive runs.
+- Added `bb config get`, `bb config unset`, and `bb config reset` so local defaults are easy to inspect, remove, and rebuild.
+
+### Changed
+
+- Changed `bb config show` to include the active auth source without printing secrets.
+- Updated CLI help, README, spec docs, and regression coverage for the clarified auth/config surface.
+
+### Removed
+
+- Removed `bb config clear` in favor of explicit `bb config unset <key>` and full `bb config reset`.
+
 ## v0.6.0 - 2026-03-18
 
 ### Added

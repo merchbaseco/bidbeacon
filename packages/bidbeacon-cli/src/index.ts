@@ -20,6 +20,7 @@ const COUNTRY_CODE_ENV_VAR = 'BB_COUNTRY_CODE';
 const DEFAULT_STORAGE_DIR = join(homedir(), '.bidbeacon');
 const STORAGE_SETTINGS_PATH = join(DEFAULT_STORAGE_DIR, 'settings.json');
 const CONFIG_FILENAME = 'config.json';
+const CONFIG_KEYS = ['storage-dir', 'base-url', 'account'] as const;
 const METRICS_KEYS = ['impressions', 'clicks', 'spend', 'purchases', 'sales', 'acos', 'cpc', 'ctr', 'roas'] as const;
 const METRICS_KEYS_SET = new Set(METRICS_KEYS);
 const METRICS_BUCKETS = ['auto', 'hour', 'day', 'week', 'month', 'year'] as const;
@@ -65,7 +66,7 @@ const main = async () => {
             process.stdout.write(renderHelp('auth', helpContext));
             return;
         }
-        await handleAuthCommand(subcommand, action);
+        await handleAuthCommand(subcommand, action, flags);
         return;
     }
 
@@ -1022,7 +1023,7 @@ const main = async () => {
     }
 };
 
-const handleAuthCommand = async (subcommand?: string, value?: string) => {
+const handleAuthCommand = async (subcommand?: string, value?: string, flags: ParsedFlags = {}) => {
     try {
         if (subcommand === 'status') {
             printOutput(serializeAuthState(loadAuthState()));
@@ -1030,12 +1031,10 @@ const handleAuthCommand = async (subcommand?: string, value?: string) => {
         }
 
         if (subcommand === 'set') {
-            if (!value) {
-                throw new CliUsageError({ topicKey: 'auth', message: 'Missing API key. Use: bb auth set <bbk_...>.' });
-            }
-
-            const auth = setStoredApiKey(value);
+            const input = await resolveAuthSetInput(value, flags);
+            const auth = setStoredApiKey(input.apiKey);
             printOutput({
+                inputSource: input.source,
                 saved: true,
                 ...serializeAuthState(auth),
             });
@@ -1068,6 +1067,7 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
         const storage = await loadCliStorage();
         const config = await loadConfig();
         printOutput({
+            auth: serializeAuthState(loadAuthState()),
             storageDir: storage.storageDir,
             configPath: storage.configPath,
             config,
@@ -1075,23 +1075,44 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
         return;
     }
 
-    if (subcommand === 'clear') {
+    if (subcommand === 'get') {
+        const key = requireConfigKey(action, 'get');
+        printOutput({
+            key,
+            value: await getConfigValue(key),
+        });
+        return;
+    }
+
+    if (subcommand === 'reset') {
         await saveConfig({});
         printOutput({ cleared: true });
         return;
     }
 
-    if (subcommand !== 'set' || !action) {
+    if (subcommand === 'unset') {
+        const key = requireConfigKey(action, 'unset');
+        const result = await unsetConfigValue(key);
+        printOutput({
+            key,
+            saved: true,
+            ...result,
+        });
+        return;
+    }
+
+    if (subcommand !== 'set') {
         throw new CliUsageError({ topicKey: 'config', message: 'Missing config subcommand. Use: bb config set <key> <value>.' });
     }
 
+    const key = requireConfigKey(action, 'set');
     const config = await loadStoredConfig();
     const value = rest[0];
     if (!value) {
-        throw new CliUsageError({ topicKey: 'config', message: 'Missing value for config set.' });
+        throw new CliUsageError({ topicKey: 'config', message: `Missing value for config key "${key}". Use: bb config set ${key} <value>.` });
     }
 
-    switch (action) {
+    switch (key) {
         case 'storage-dir': {
             const storage = await setStorageDir(value);
             printOutput({
@@ -1102,7 +1123,7 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
             return;
         }
         case 'base-url':
-            config.baseUrl = value;
+            config.baseUrl = normalizeApiBaseUrl(value);
             break;
         case 'account':
             if (!rest[1]) {
@@ -1112,11 +1133,152 @@ const handleConfigCommand = async (subcommand?: string, action?: string, rest: s
             config.countryCode = rest[1];
             break;
         default:
-            throw new CliUsageError({ topicKey: 'config', message: `Unknown config key: ${action}.` });
+            throw new CliUsageError({ topicKey: 'config', message: `Unknown config key: ${key}.` });
     }
 
     await saveConfig(config);
-    printOutput({ saved: true });
+    printOutput({ key, saved: true });
+};
+
+const resolveAuthSetInput = async (value: string | undefined, flags: ParsedFlags) => {
+    const useStdin = readBooleanFlag(flags, ['stdin']);
+
+    if (value && useStdin) {
+        throw new CliUsageError({ topicKey: 'auth', message: 'Use either an API-key argument or --stdin, not both.' });
+    }
+
+    if (value) {
+        return {
+            apiKey: value,
+            source: 'argument',
+        };
+    }
+
+    if (useStdin) {
+        return {
+            apiKey: await readSecretFromStdin(),
+            source: 'stdin',
+        };
+    }
+
+    return {
+        apiKey: await readSecretFromPrompt('BidBeacon API key: '),
+        source: 'prompt',
+    };
+};
+
+const readSecretFromStdin = async () => {
+    let value = '';
+
+    for await (const chunk of process.stdin) {
+        value += String(chunk);
+    }
+
+    return value.trim();
+};
+
+const readSecretFromPrompt = (prompt: string) => {
+    if (!(process.stdin.isTTY && process.stdin.setRawMode)) {
+        throw new CliUsageError({
+            topicKey: 'auth',
+            message: 'auth set needs <api-key>, --stdin, or an interactive terminal prompt.',
+        });
+    }
+
+    return new Promise<string>((resolve, reject) => {
+        const input = process.stdin;
+        const onData = (chunk: Buffer) => {
+            const text = chunk.toString('utf8');
+
+            for (const character of text) {
+                if (character === '\u0003') {
+                    cleanup();
+                    process.stdout.write('\n');
+                    reject(new CliUsageError({ topicKey: 'auth', message: 'auth set was canceled.' }));
+                    return;
+                }
+
+                if (character === '\r' || character === '\n') {
+                    cleanup();
+                    process.stdout.write('\n');
+                    resolve(buffer.trim());
+                    return;
+                }
+
+                if (character === '\u007f') {
+                    buffer = buffer.slice(0, -1);
+                    return;
+                }
+
+                buffer += character;
+            }
+        };
+
+        const cleanup = () => {
+            input.off('data', onData);
+            input.setRawMode(false);
+            input.pause();
+        };
+
+        let buffer = '';
+        process.stdout.write(prompt);
+        input.setRawMode(true);
+        input.resume();
+        input.on('data', onData);
+    });
+};
+
+const requireConfigKey = (value: string | undefined, command: 'get' | 'set' | 'unset'): ConfigKey => {
+    const key = CONFIG_KEYS.find(candidate => candidate === value);
+    if (key) {
+        return key;
+    }
+
+    if (!value) {
+        throw new CliUsageError({
+            topicKey: 'config',
+            message: `Missing config key. Use: bb config ${command} <key>${command === 'set' ? ' <value>' : ''}. Expected: ${CONFIG_KEYS.join(', ')}.`,
+        });
+    }
+
+    throw new CliUsageError({
+        topicKey: 'config',
+        message: `Unknown config key: ${value}. Expected: ${CONFIG_KEYS.join(', ')}.`,
+    });
+};
+
+const getConfigValue = async (key: ConfigKey) => {
+    if (key === 'storage-dir') {
+        return (await loadCliStorage()).storageDir;
+    }
+
+    const config = await loadConfig();
+    if (key === 'base-url') {
+        return config.baseUrl ?? DEFAULT_BASE_URL;
+    }
+
+    return {
+        accountId: config.accountId ?? null,
+        countryCode: config.countryCode ?? null,
+    };
+};
+
+const unsetConfigValue = async (key: ConfigKey) => {
+    if (key === 'storage-dir') {
+        const storage = await setStorageDir(DEFAULT_STORAGE_DIR);
+        return {
+            configPath: storage.configPath,
+            storageDir: storage.storageDir,
+        };
+    }
+
+    const config = await loadStoredConfig();
+    const nextConfig = key === 'base-url' ? { ...config, baseUrl: undefined } : { ...config, accountId: undefined, countryCode: undefined };
+
+    await saveConfig(nextConfig);
+    return {
+        config: await loadConfig(),
+    };
 };
 
 const loadConfig = async (): Promise<CliConfig> => {
@@ -1885,6 +2047,7 @@ type ApiClient = ReturnType<typeof createApiClient>;
 type RequiredCliConfig = ReturnType<typeof requireCliConfig>;
 type CampaignSearchState = 'ENABLED' | 'PAUSED' | 'ARCHIVED' | 'OTHER' | 'ALL';
 type MetricsBucket = (typeof METRICS_BUCKETS)[number];
+type ConfigKey = (typeof CONFIG_KEYS)[number];
 type CampaignListItem = Awaited<ReturnType<ApiClient['campaigns/list']['query']>>['items'][number];
 type MetricsSelection = MetricKey[] | undefined;
 

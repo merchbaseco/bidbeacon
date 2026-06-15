@@ -21,6 +21,19 @@ describe('bb help topics', () => {
         expect(output).not.toContain('—');
     });
 
+    it('renders auth and config setup commands', () => {
+        const authOutput = renderHelp('auth', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
+        expect(authOutput).toContain('set [bbk_...]');
+        expect(authOutput).toContain('set --stdin');
+        expect(authOutput).toContain('BB_API_KEY');
+
+        const configOutput = renderHelp('config', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
+        expect(configOutput).toContain('get <key>');
+        expect(configOutput).toContain('unset <key>');
+        expect(configOutput).toContain('reset');
+        expect(configOutput).not.toContain('config clear');
+    });
+
     it('renders explicit history command guidance for targets', () => {
         const targetsOutput = renderHelp('targets', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
         expect(targetsOutput).toContain('Use `bb history targets <target_id>` for change-history rows.');

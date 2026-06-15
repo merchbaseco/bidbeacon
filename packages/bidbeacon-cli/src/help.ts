@@ -56,7 +56,8 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         usage: 'bb auth [options] [command]',
         summary: 'Manage CLI authentication',
         commands: [
-            { left: 'set <bbk_...>', right: 'Save an API key in the platform secure store' },
+            { left: 'set [bbk_...]', right: 'Save an API key in the platform secure store' },
+            { left: 'set --stdin', right: 'Read an API key from stdin and save it' },
             { left: 'status', right: 'Show whether auth resolves from env or the secure store' },
             { left: 'clear', right: 'Remove the stored API key from the secure store' },
         ],
@@ -72,12 +73,16 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         summary: 'Manage local CLI configuration',
         commands: [
             { left: 'show', right: 'Print the current config file plus active storage path' },
-            { left: 'clear', right: 'Clear the current config file' },
+            { left: 'get <key>', right: 'Print one config value' },
+            { left: 'set <key> <value>', right: 'Set one config value' },
+            { left: 'unset <key>', right: 'Unset one config value' },
+            { left: 'reset', right: 'Clear the current config file' },
             { left: 'set storage-dir <path>', right: 'Set the persistent config/data directory used by all future `bb` commands' },
             { left: 'set base-url <value>', right: 'Set API base URL (default: http://localhost:8080; trailing /api is optional)' },
             { left: 'set account <adsAccountId> <countryCode>', right: 'Set default advertiser account + country' },
         ],
         notes: [
+            'Keys: `storage-dir`, `base-url`, `account`.',
             'Config stores non-secret defaults only. Use `bb auth ...` for API-key management.',
             'Env overrides win over saved config: `BB_STORAGE_DIR`, `BB_BASE_URL`, `BB_ACCOUNT_ID`, and `BB_COUNTRY_CODE`.',
             'Date ranges are interpreted in the selected account timezone (derived from `countryCode`).',

@@ -84,6 +84,24 @@ describe('bidbeacon cli build', () => {
             accountId: '123',
             countryCode: 'US',
         });
+
+        const getOutput = runCli(outputFile, homeDir, ['config', 'get', 'base-url'], cliEnv);
+        expect(JSON.parse(getOutput)).toMatchObject({
+            data: {
+                key: 'base-url',
+                value: 'https://example.com',
+            },
+        });
+
+        runCli(outputFile, homeDir, ['config', 'unset', 'account'], cliEnv);
+        const unsetOutput = runCli(outputFile, homeDir, ['config', 'show'], cliEnv);
+        expect(JSON.parse(unsetOutput).data.config).toEqual({
+            baseUrl: 'https://example.com',
+        });
+
+        runCli(outputFile, homeDir, ['config', 'reset'], cliEnv);
+        const resetOutput = runCli(outputFile, homeDir, ['config', 'show'], cliEnv);
+        expect(JSON.parse(resetOutput).data.config).toEqual({});
     });
 
     it('applies env overrides for all CLI config values', async () => {
@@ -141,11 +159,13 @@ const createTempDir = async (prefix: string) => {
 };
 
 const runCli = (outputFile: string, homeDir: string, args: string[], extraEnv?: Record<string, string>) => {
+    const { BB_ACCOUNT_ID: _bbAccountId, BB_API_KEY: _bbApiKey, BB_BASE_URL: _bbBaseUrl, BB_COUNTRY_CODE: _bbCountryCode, BB_STORAGE_DIR: _bbStorageDir, ...baseEnv } = process.env;
+
     return execFileSync(outputFile, args, {
         cwd: repoRoot,
         encoding: 'utf8',
         env: {
-            ...process.env,
+            ...baseEnv,
             HOME: homeDir,
             ...extraEnv,
         },

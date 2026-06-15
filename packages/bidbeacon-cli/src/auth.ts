@@ -85,7 +85,7 @@ export const clearStoredApiKey = (options: { env?: NodeJS.ProcessEnv; secureStor
 };
 
 export const getMissingApiKeyMessage = () => {
-    return `Missing API key. Use \`bb auth set <bbk_...>\` for local use or set ${API_KEY_ENV_VAR} for automation/CI/agent runtimes.`;
+    return `Missing BidBeacon auth. Run \`bb auth set\` for local use or set ${API_KEY_ENV_VAR} for automation, CI, and agent runtimes.`;
 };
 
 const getSecureStoreUnavailableMessage = (status: SecureStoreStatus) => {

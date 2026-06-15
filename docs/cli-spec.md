@@ -5,7 +5,7 @@
 This spec defines the public, user-facing shape of the Sponsored Products (SP) CLI. It describes how the CLI looks and behaves from a product perspective.
 
 **Principles**
-- Non-secret defaults in config, secrets in the platform secure store. No prompts or interactive flows.
+- Non-secret defaults in config, secrets in the platform secure store. Data commands do not prompt; `auth set` may prompt for local setup.
 - Resource-first, verb-second command shape.
 - JSON-only output.
 - One CLI command maps to one user capability (some commands compose multiple API calls).
@@ -46,7 +46,8 @@ This spec defines the public, user-facing shape of the Sponsored Products (SP) C
 
 **Auth**
 Secrets are stored outside the config file.
-- `bb auth set <bbk_...>`
+- `bb auth set`
+- `bb auth set --stdin`
 - `bb auth status`
 - `bb auth clear`
 
@@ -58,9 +59,12 @@ Auth behavior:
 **Config**
 Config is stored locally at `~/.bidbeacon/config.json`.
 - `bb config show`
-- `bb config clear`
+- `bb config get <key>`
 - `bb config set base-url <value>` (`<value>` should be the server origin, for example `https://bidbeacon.merchbase.co`; a trailing `/api` is accepted and normalized)
 - `bb config set account <adsAccountId> <countryCode>`
+- `bb config set storage-dir <path>`
+- `bb config unset <key>`
+- `bb config reset`
 
 **Common Concepts**
 - States: `ENABLED`, `PAUSED`, `ARCHIVED`, `OTHER`, `ALL`

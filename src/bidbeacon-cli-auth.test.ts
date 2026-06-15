@@ -22,7 +22,7 @@ describe('bidbeacon cli auth', () => {
     it('falls back to the secure store when no env override exists', () => {
         const secureStore = createMockSecureStore({ secret: 'bbk_stored' });
 
-        const auth = loadAuthState({ secureStore });
+        const auth = loadAuthState({ env: {}, secureStore });
 
         expect(auth.source).toBe('secure-store');
         expect(auth.apiKey).toBe('bbk_stored');
@@ -32,11 +32,11 @@ describe('bidbeacon cli auth', () => {
     it('writes and clears the stored api key without exposing it', () => {
         const secureStore = createMockSecureStore();
 
-        const saved = setStoredApiKey('  bbk_saved  ', { secureStore });
+        const saved = setStoredApiKey('  bbk_saved  ', { env: {}, secureStore });
         expect(saved.source).toBe('secure-store');
         expect(saved.apiKey).toBe('bbk_saved');
 
-        const cleared = clearStoredApiKey({ secureStore });
+        const cleared = clearStoredApiKey({ env: {}, secureStore });
         expect(cleared.cleared).toBe(true);
         expect(cleared.auth.source).toBe('none');
         expect(cleared.auth.apiKey).toBeUndefined();
