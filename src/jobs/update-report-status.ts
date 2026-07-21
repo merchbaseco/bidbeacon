@@ -15,6 +15,7 @@ import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibilit
 import { getNextAction } from '@/lib/report-status-state-machine/state-machine';
 import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports';
 import { utcNow } from '@/utils/date';
+import { formatError, serializeError } from '@/utils/errors';
 import { emitEvent } from '@/utils/events';
 import { withJobMetrics } from '@/utils/job-metrics';
 import { getTimezoneForCountry } from '@/utils/timezones';
@@ -67,6 +68,14 @@ export const updateReportStatusJob = boss
                             badges.push(datasetBadge);
                             return badges;
                         };
+                        const buildFreshnessMetrics = (row?: InferSelectModel<typeof reportDatasetMetadata>) => {
+                            const observedAt = Date.now();
+                            return {
+                                periodAgeMs: Math.max(0, observedAt - date.getTime()),
+                                refreshDueAt: row?.nextRefreshAt?.toISOString() ?? null,
+                                refreshDelayMs: row?.nextRefreshAt ? Math.max(0, observedAt - row.nextRefreshAt.getTime()) : null,
+                            };
+                        };
 
                         let action: string | undefined;
                         let reportDatum: InferSelectModel<typeof reportDatasetMetadata> | undefined;
@@ -82,12 +91,16 @@ export const updateReportStatusJob = boss
                                 ),
                             });
 
-                            if (!reportDatum || reportDatum.refreshing) {
+                            if (!reportDatum) {
                                 return;
                             }
 
-                            // Mark as refreshing immediately so UI updates ASAP
-                            await setRefreshing(reportDatum, true);
+                            // Atomically claim the row so duplicate jobs cannot issue duplicate API calls.
+                            const claimedReport = await claimReport(reportDatum);
+                            if (!claimedReport) {
+                                return;
+                            }
+                            reportDatum = claimedReport;
 
                             // Determine next action using state machine
                             // The state machine will fetch report status if reportId exists
@@ -124,6 +137,7 @@ export const updateReportStatusJob = boss
                                             entityType,
                                             periodStart: date.toISOString(),
                                             reportId,
+                                            ...buildFreshnessMetrics(reportDatum),
                                         },
                                     });
                                     break;
@@ -152,6 +166,8 @@ export const updateReportStatusJob = boss
                                             rowsProcessed: parseResult.rowsProcessed,
                                             successCount: parseResult.successCount,
                                             errorCount: parseResult.errorCount,
+                                            errorSamples: parseResult.errorSamples,
+                                            ...buildFreshnessMetrics(reportDatum),
                                         },
                                     });
                                     break;
@@ -165,7 +181,7 @@ export const updateReportStatusJob = boss
                                 await clearError(reportDatum);
                             }
                         } catch (error) {
-                            const message = error instanceof Error ? error.message : String(error);
+                            const message = formatError(error);
                             recorder.setErrorEvent({
                                 message: `Report {{badges}} failed: ${message}`,
                                 badges: buildBadges(reportDatum?.reportId ?? null),
@@ -177,6 +193,8 @@ export const updateReportStatusJob = boss
                                     periodStart: date.toISOString(),
                                     reportId: reportDatum?.reportId ?? null,
                                     error: message,
+                                    errorDetails: serializeError(error),
+                                    ...buildFreshnessMetrics(reportDatum),
                                 },
                             });
                             recorder.markFailure(message);
@@ -196,7 +214,28 @@ export const updateReportStatusJob = boss
 // ============================================================================
 
 /**
- * Sets refreshing=true/false and emits update event.
+ * Atomically claims a report row and emits an update event.
+ */
+async function claimReport(row: InferSelectModel<typeof reportDatasetMetadata>): Promise<InferSelectModel<typeof reportDatasetMetadata> | null> {
+    const [updatedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({ refreshing: true })
+        .where(and(eq(reportDatasetMetadata.uid, row.uid), eq(reportDatasetMetadata.refreshing, false)))
+        .returning();
+
+    if (!updatedRow) {
+        return null;
+    }
+
+    emitEvent({
+        type: 'report:refreshed',
+        row: updatedRow,
+    });
+    return updatedRow;
+}
+
+/**
+ * Sets refreshing=false and emits update event.
  */
 async function setRefreshing(row: InferSelectModel<typeof reportDatasetMetadata>, refreshing: boolean): Promise<void> {
     const [updatedRow] = await db
@@ -346,14 +385,9 @@ async function setReport(row: InferSelectModel<typeof reportDatasetMetadata>, re
  * Builds detailed error message, logs error, sets error state, schedules retry, and emits events.
  */
 async function setError(reportDatum: typeof reportDatasetMetadata.$inferSelect, error: unknown): Promise<void> {
-    // Build error message and stack trace for logging
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    const errorStack = error instanceof Error && error.stack ? error.stack : undefined;
-    const fullError = errorStack ? `${errorMessage}\n${JSON.stringify(errorStack)}` : errorMessage;
-
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
-        .set({ status: 'error', error: fullError, refreshing: false })
+        .set({ status: 'error', error: formatError(error), refreshing: false })
         .where(
             and(
                 eq(reportDatasetMetadata.accountId, reportDatum.accountId),

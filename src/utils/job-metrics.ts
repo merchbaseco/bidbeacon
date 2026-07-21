@@ -1,6 +1,7 @@
 import { eq } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { events, jobMetrics } from '@/db/schema';
+import { formatError, serializeError } from '@/utils/errors';
 import { emitEvent } from '@/utils/events';
 
 type JobMetricStatus = 'running' | 'succeeded' | 'failed';
@@ -134,7 +135,12 @@ export const withJobMetrics = async <T>(options: StartJobMetricsOptions, handler
         await recorder.finalize('succeeded');
         return result;
     } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = formatError(error);
+        recorder.setErrorEvent({
+            payload: {
+                error: serializeError(error),
+            },
+        });
         recorder.markFailure(message);
         await recorder.finalize('failed');
         throw error;

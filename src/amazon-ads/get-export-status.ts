@@ -54,7 +54,7 @@ export interface GetExportStatusOptions {
  * @returns The export status response
  */
 export async function getExportStatus(options: GetExportStatusOptions, region: ApiRegion = 'na'): Promise<ExportStatusResponse> {
-    return withTracking({ apiName: 'getExportStatus', region }, async () => {
+    return withTracking({ apiName: 'getExportStatus', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 
@@ -77,6 +77,7 @@ export async function getExportStatus(options: GetExportStatusOptions, region: A
             headers,
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            onMetrics: recordRequestMetrics,
         });
 
         // Store status code for tracking (even if error)

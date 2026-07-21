@@ -6,6 +6,7 @@
  */
 
 import Bottleneck from 'bottleneck';
+import { loadRateLimitState, saveRateLimitState } from './rate-limit-store';
 
 type RetryOptions = {
     attempts: number;
@@ -19,6 +20,20 @@ type RetryOptions = {
 type ThrottledFetchOptions = RequestInit & {
     retry?: RetryOptions;
     timeoutMs?: number;
+    throttle?: {
+        group?: 'default' | 'report-create';
+        key?: string;
+        priority?: number;
+    };
+    onMetrics?: (metrics: ThrottledFetchMetrics) => void;
+};
+
+export type ThrottledFetchMetrics = {
+    attemptCount: number;
+    queueWaitMs: number;
+    rateLimitCount: number;
+    retryAfterMs: number | null;
+    retryCount: number;
 };
 
 const DEFAULT_RETRYABLE_STATUS_CODES = [408, 409, 429, 500, 502, 503, 504];
@@ -35,15 +50,20 @@ export const AMAZON_ADS_API_RETRY: RetryOptions = {
     retryOnNetworkError: true,
 };
 
-// Singleton bottleneck instance shared across all API calls
-const limiter = new Bottleneck({
-    maxConcurrent: 2, // Allow 2 concurrent requests
-    minTime: 500, // Minimum 500ms between requests (~2 req/sec baseline)
-});
-
-// Track the last Retry-After value to gradually reduce back to default
-let lastRetryAfter: number | null = null;
 const DEFAULT_MIN_TIME = 500;
+const MAX_FALLBACK_RETRY_AFTER_MS = 60_000;
+
+type LimiterState = {
+    cooldownUntil: number;
+    hydration: Promise<void>;
+    key: string;
+    lastRateLimitAt: number;
+    lastRetryAfterMs: number | null;
+    limiter: Bottleneck;
+    nextStartAt: number;
+};
+
+const limiterStates = new Map<string, LimiterState>();
 
 /**
  * Throttled fetch wrapper that respects rate limits and Retry-After headers.
@@ -53,69 +73,157 @@ const DEFAULT_MIN_TIME = 500;
  * @returns Promise resolving to Response
  */
 export async function throttledFetch(url: string | URL | Request, options?: ThrottledFetchOptions): Promise<Response> {
-    const { retry, timeoutMs, ...fetchOptions } = options ?? {};
+    const { retry, timeoutMs, throttle, onMetrics, ...fetchOptions } = options ?? {};
     const resolvedRetry = retry ? normalizeRetryOptions(retry) : null;
     const resolvedTimeoutMs = normalizeTimeoutMs(timeoutMs);
     const urlString = typeof url === 'string' ? url : url instanceof URL ? url.toString() : url.url;
     const method = fetchOptions.method || 'GET';
+    const limiterState = getLimiterState(throttle?.group ?? 'default', throttle?.key ?? 'global');
+    const priority = normalizePriority(throttle?.priority);
+    const metrics: ThrottledFetchMetrics = {
+        attemptCount: 0,
+        queueWaitMs: 0,
+        rateLimitCount: 0,
+        retryAfterMs: null,
+        retryCount: 0,
+    };
 
     let attempt = 1;
     let lastNetworkError: Error | null = null;
 
-    while (attempt <= (resolvedRetry?.attempts ?? 1)) {
-        try {
-            const response = await limiter.schedule(async () => {
-                const { options: attemptFetchOptions, cleanup } = createAttemptFetchOptions(fetchOptions, resolvedTimeoutMs);
-                try {
-                    return await fetch(url, attemptFetchOptions);
-                } finally {
-                    cleanup();
+    try {
+        while (attempt <= (resolvedRetry?.attempts ?? 1)) {
+            metrics.attemptCount = attempt;
+            try {
+                const queuedAt = performance.now();
+                const response = await limiterState.limiter.schedule({ priority }, async () => {
+                    await limiterState.hydration;
+                    await waitForStartSlot(limiterState);
+                    metrics.queueWaitMs += Math.round(performance.now() - queuedAt);
+                    const { options: attemptFetchOptions, cleanup } = createAttemptFetchOptions(fetchOptions, resolvedTimeoutMs);
+                    try {
+                        return await fetch(url, attemptFetchOptions);
+                    } finally {
+                        cleanup();
+                    }
+                });
+
+                if (response.status === 429) {
+                    metrics.rateLimitCount += 1;
+                    const retryAfter = response.headers.get('Retry-After');
+                    const retryAfterMs = parseRetryAfter(retryAfter);
+                    const cooldownMs = retryAfterMs ?? withJitter(getFallbackRetryAfterMs(limiterState));
+                    metrics.retryAfterMs = Math.max(metrics.retryAfterMs ?? 0, cooldownMs);
+                    await applyCooldown(limiterState, cooldownMs);
+                } else if (response.ok && Date.now() >= limiterState.cooldownUntil && limiterState.lastRateLimitAt !== 0) {
+                    limiterState.lastRateLimitAt = 0;
+                    limiterState.lastRetryAfterMs = null;
+                    await persistLimiterState(limiterState);
                 }
-            });
 
-            if (response.status === 429) {
-                const retryAfter = response.headers.get('Retry-After');
-                const retryAfterMs = parseRetryAfter(retryAfter);
+                if (!(resolvedRetry && shouldRetryResponse(response.status, resolvedRetry, attempt))) {
+                    return response;
+                }
 
-                if (retryAfterMs !== null) {
-                    handleRetryAfter(retryAfterMs);
-                } else {
-                    const backoffMs = lastRetryAfter ? lastRetryAfter * 2 : 5000;
-                    handleRetryAfter(backoffMs);
+                metrics.retryCount += 1;
+                await drainResponseBody(response);
+                const retryDelayMs = getRetryDelayMs(response.headers, resolvedRetry, attempt);
+                if (retryDelayMs > 0) {
+                    await sleep(retryDelayMs);
+                }
+            } catch (error) {
+                const wrappedError = wrapNetworkError(error, method, urlString);
+                lastNetworkError = wrappedError;
+
+                if (!(resolvedRetry && shouldRetryNetworkError(resolvedRetry, attempt))) {
+                    throw wrappedError;
+                }
+
+                metrics.retryCount += 1;
+                const retryDelayMs = getRetryDelayMs(null, resolvedRetry, attempt);
+                if (retryDelayMs > 0) {
+                    await sleep(retryDelayMs);
                 }
             }
 
-            if (!(resolvedRetry && shouldRetryResponse(response.status, resolvedRetry, attempt))) {
-                return response;
-            }
-
-            await drainResponseBody(response);
-            const retryDelayMs = getRetryDelayMs(response.headers, resolvedRetry, attempt);
-            if (retryDelayMs > 0) {
-                await sleep(retryDelayMs);
-            }
-        } catch (error) {
-            const wrappedError = wrapNetworkError(error, method, urlString);
-            lastNetworkError = wrappedError;
-
-            if (!(resolvedRetry && shouldRetryNetworkError(resolvedRetry, attempt))) {
-                throw wrappedError;
-            }
-
-            const retryDelayMs = getRetryDelayMs(null, resolvedRetry, attempt);
-            if (retryDelayMs > 0) {
-                await sleep(retryDelayMs);
-            }
+            attempt += 1;
         }
 
-        attempt += 1;
+        if (lastNetworkError) {
+            throw lastNetworkError;
+        }
+
+        throw new Error(`Amazon Ads request failed after ${resolvedRetry?.attempts ?? 1} attempts without a response.`);
+    } finally {
+        onMetrics?.(metrics);
+    }
+}
+
+function getLimiterState(group: 'default' | 'report-create', key: string): LimiterState {
+    const stateKey = `${group}:${key}`;
+    const existingState = limiterStates.get(stateKey);
+    if (existingState) {
+        return existingState;
     }
 
-    if (lastNetworkError) {
-        throw lastNetworkError;
-    }
+    const state: LimiterState = {
+        cooldownUntil: 0,
+        hydration: Promise.resolve(),
+        key: stateKey,
+        lastRateLimitAt: 0,
+        lastRetryAfterMs: null,
+        limiter: new Bottleneck({
+            maxConcurrent: 2,
+        }),
+        nextStartAt: 0,
+    };
+    state.hydration = hydrateLimiterState(state);
+    limiterStates.set(stateKey, state);
+    return state;
+}
 
-    throw new Error(`Amazon Ads request failed after ${resolvedRetry?.attempts ?? 1} attempts without a response.`);
+async function hydrateLimiterState(state: LimiterState): Promise<void> {
+    const stored = await loadRateLimitState(state.key);
+    if (!stored) {
+        return;
+    }
+    state.cooldownUntil = Math.max(state.cooldownUntil, stored.cooldownUntil);
+    state.lastRateLimitAt = Math.max(state.lastRateLimitAt, stored.lastRateLimitAt);
+    state.lastRetryAfterMs = stored.lastRetryAfterMs;
+}
+
+function normalizePriority(priority?: number): number {
+    if (priority === undefined || !Number.isFinite(priority)) {
+        return 5;
+    }
+    return Math.min(9, Math.max(0, Math.trunc(priority)));
+}
+
+function getFallbackRetryAfterMs(state: LimiterState): number {
+    if (state.lastRetryAfterMs === null || Date.now() - state.lastRateLimitAt > 5 * 60 * 1000) {
+        return 5000;
+    }
+    return Math.min(state.lastRetryAfterMs * 2, MAX_FALLBACK_RETRY_AFTER_MS);
+}
+
+function withJitter(delayMs: number): number {
+    return Math.max(1, Math.round(delayMs * (0.8 + Math.random() * 0.4)));
+}
+
+async function waitForStartSlot(state: LimiterState): Promise<void> {
+    while (true) {
+        const now = Date.now();
+        const startAt = Math.max(now, state.nextStartAt, state.cooldownUntil);
+        state.nextStartAt = startAt + DEFAULT_MIN_TIME;
+        const waitMs = startAt - now;
+        if (waitMs > 0) {
+            await sleep(waitMs);
+        }
+
+        if (Date.now() >= state.cooldownUntil) {
+            return;
+        }
+    }
 }
 
 function normalizeRetryOptions(options: RetryOptions): RetryOptions {
@@ -267,23 +375,27 @@ function parseRetryAfter(retryAfter: string | null): number | null {
 }
 
 /**
- * Update bottleneck settings based on Retry-After header.
- * Temporarily increases minTime to respect the wait period.
+ * Move the request start gate forward based on Retry-After.
+ * The latest deadline wins, so overlapping 429s cannot shorten a cooldown.
  * @param retryAfterMs - Milliseconds to wait from Retry-After header
  */
-function handleRetryAfter(retryAfterMs: number): void {
-    lastRetryAfter = retryAfterMs;
+async function applyCooldown(state: LimiterState, retryAfterMs: number): Promise<void> {
+    const observedAt = Date.now();
+    state.lastRateLimitAt = observedAt;
+    const cooldownUntil = observedAt + retryAfterMs + DEFAULT_RETRY_AFTER_BUFFER_MS;
+    if (cooldownUntil <= state.cooldownUntil) {
+        await persistLimiterState(state);
+        return;
+    }
 
-    // Update bottleneck to respect the retry-after period
-    // Add a small buffer to ensure we don't retry too early
-    const minTime = retryAfterMs + DEFAULT_RETRY_AFTER_BUFFER_MS;
-
-    limiter.updateSettings({ minTime });
-
-    // Gradually reduce back to default after the retry period
-    // This allows us to resume normal operation once the rate limit window passes
-    setTimeout(() => {
-        limiter.updateSettings({ minTime: DEFAULT_MIN_TIME });
-        lastRetryAfter = null;
-    }, retryAfterMs);
+    state.lastRetryAfterMs = retryAfterMs;
+    state.cooldownUntil = cooldownUntil;
+    await persistLimiterState(state);
 }
+
+const persistLimiterState = (state: LimiterState): Promise<void> =>
+    saveRateLimitState(state.key, {
+        cooldownUntil: state.cooldownUntil,
+        lastRateLimitAt: state.lastRateLimitAt,
+        lastRetryAfterMs: state.lastRetryAfterMs ?? 0,
+    });

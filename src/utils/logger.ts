@@ -1,3 +1,5 @@
+import { serializeError } from '@/utils/errors';
+
 type LogLevel = 'info' | 'warn' | 'error';
 
 interface SimpleLogger {
@@ -24,7 +26,8 @@ const serialize = (value: unknown) => {
     }
     if (typeof value === 'object') {
         try {
-            return JSON.stringify(value);
+            const serialized = JSON.stringify(value, (_key, nestedValue) => (nestedValue instanceof Error ? serializeError(nestedValue) : nestedValue));
+            return serialized.length <= 8000 ? serialized : `${serialized.slice(0, 7999)}…`;
         } catch {
             return '[object]';
         }
@@ -46,7 +49,7 @@ const createLogger = (context?: Record<string, unknown>): SimpleLogger => {
             }
 
             if (typeof args[0] === 'object' && typeof args[1] === 'string') {
-                writer(`${prefix}${args[1]}`, args[0]);
+                writer(`${prefix}${args[1]}`, normalizeObject(args[0]));
                 return;
             }
 
@@ -66,6 +69,15 @@ const createLogger = (context?: Record<string, unknown>): SimpleLogger => {
         error: write('error'),
         child,
     };
+};
+
+const normalizeObject = (value: object | null): unknown => {
+    const serialized = serialize(value);
+    try {
+        return JSON.parse(serialized);
+    } catch {
+        return serialized;
+    }
 };
 
 export const createJobLogger = (jobName: string, jobId: string, context?: Record<string, unknown>) =>

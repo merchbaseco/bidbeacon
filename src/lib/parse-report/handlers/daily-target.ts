@@ -4,7 +4,8 @@ import { eq, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { dailyReportRowSchema } from '@/config/reports/daily-target';
 import { db } from '@/db/index';
-import { performanceDaily, reportDatasetErrorMetrics, reportDatasetMetadata } from '@/db/schema';
+import { withDatabaseRetry } from '@/db/retry';
+import { performanceDaily, reportDatasetMetadata } from '@/db/schema';
 import { emitEvent } from '@/utils/events';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { parseDailyTimestamp } from '../utils/parse-period-start-timestamp';
@@ -34,7 +35,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
     const targetCache = await TargetCache.build(uniqueAdGroupIds);
 
     const valuesToInsert: (typeof performanceDaily.$inferInsert)[] = [];
-    const errors: { row: Record<string, unknown>; error: string }[] = [];
+    const errors: { error: string }[] = [];
 
     for (const row of rows) {
         try {
@@ -58,7 +59,6 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
             });
         } catch (error) {
             errors.push({
-                row: row as unknown as Record<string, unknown>,
                 error: error instanceof Error ? error.message : String(error),
             });
         }
@@ -69,43 +69,40 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
 
     // Set total upfront so progress bar starts at 0%
     await updateProgress(input.reportUid, valuesToInsert.length, 0, errors.length);
+    valuesToInsert.sort((left, right) =>
+        [left.bucketDate, left.adId, left.entityType, left.entityId].join('|').localeCompare([right.bucketDate, right.adId, right.entityType, right.entityId].join('|'))
+    );
 
     for (let i = 0; i < valuesToInsert.length; i += BATCH_SIZE) {
         const batch = valuesToInsert.slice(i, i + BATCH_SIZE);
-        await db
-            .insert(performanceDaily)
-            .values(batch)
-            .onConflictDoUpdate({
-                target: [performanceDaily.accountId, performanceDaily.bucketDate, performanceDaily.adId, performanceDaily.entityType, performanceDaily.entityId],
-                set: {
-                    campaignId: sql`excluded.campaign_id`,
-                    adGroupId: sql`excluded.ad_group_id`,
-                    impressions: sql`excluded.impressions`,
-                    clicks: sql`excluded.clicks`,
-                    spend: sql`excluded.spend`,
-                    sales: sql`excluded.sales`,
-                    purchases: sql`excluded.purchases`,
-                },
-            });
+        await withDatabaseRetry(() =>
+            db
+                .insert(performanceDaily)
+                .values(batch)
+                .onConflictDoUpdate({
+                    target: [performanceDaily.accountId, performanceDaily.bucketDate, performanceDaily.adId, performanceDaily.entityType, performanceDaily.entityId],
+                    set: {
+                        campaignId: sql`excluded.campaign_id`,
+                        adGroupId: sql`excluded.ad_group_id`,
+                        impressions: sql`excluded.impressions`,
+                        clicks: sql`excluded.clicks`,
+                        spend: sql`excluded.spend`,
+                        sales: sql`excluded.sales`,
+                        purchases: sql`excluded.purchases`,
+                    },
+                })
+        );
 
         insertedCount += batch.length;
         await updateProgress(input.reportUid, valuesToInsert.length, insertedCount, errors.length);
     }
 
-    if (errors.length > 0) {
-        for (let i = 0; i < errors.length; i += BATCH_SIZE) {
-            const batch = errors.slice(i, i + BATCH_SIZE);
-            await db.insert(reportDatasetErrorMetrics).values(
-                batch.map(e => ({
-                    reportDatasetMetadataId: input.reportUid,
-                    row: e.row,
-                    error: e.error,
-                }))
-            );
-        }
-    }
-
-    return { successCount: valuesToInsert.length, errorCount: errors.length, rowsProcessed: valuesToInsert.length + errors.length };
+    return {
+        successCount: valuesToInsert.length,
+        errorCount: errors.length,
+        rowsProcessed: valuesToInsert.length + errors.length,
+        errorSamples: [...new Set(errors.map(error => error.error))].slice(0, 5),
+    };
 }
 
 async function updateProgress(reportUid: string, totalRecords: number, successRecords: number, errorRecords: number) {

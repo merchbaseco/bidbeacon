@@ -73,7 +73,8 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
                     },
                 ],
             },
-            'na'
+            'na',
+            getReportPriority(date)
         );
 
         if (!response.success || response.success.length === 0) {
@@ -99,3 +100,15 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
 
     return reportId;
 }
+
+const getReportPriority = (periodStart: Date): number => {
+    const ageMs = Math.max(0, Date.now() - periodStart.getTime());
+    const ageDays = ageMs / (24 * 60 * 60 * 1000);
+    if (ageDays <= 3) {
+        return 0;
+    }
+    if (ageDays <= 14) {
+        return 4;
+    }
+    return 8;
+};

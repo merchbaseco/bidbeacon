@@ -97,7 +97,7 @@ export interface RetrieveReportOptions {
  * @returns The retrieved report response
  */
 export async function retrieveReport(options: RetrieveReportOptions, region: ApiRegion = 'na'): Promise<RetrieveReportResponse> {
-    return withTracking({ apiName: 'retrieveReport', region }, async () => {
+    return withTracking({ apiName: 'retrieveReport', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 
@@ -128,6 +128,7 @@ export async function retrieveReport(options: RetrieveReportOptions, region: Api
             body: JSON.stringify(validatedRequestBody),
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            onMetrics: recordRequestMetrics,
         });
 
         // Store status code for tracking (even if error)

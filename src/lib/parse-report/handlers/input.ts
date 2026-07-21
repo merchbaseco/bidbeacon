@@ -13,4 +13,5 @@ export type ParseReportOutput = {
     successCount: number;
     errorCount: number;
     rowsProcessed: number;
+    errorSamples: string[];
 };

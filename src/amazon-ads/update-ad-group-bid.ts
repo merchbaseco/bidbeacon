@@ -50,7 +50,7 @@ const assertUpdateSuccess = (results: Array<{ adGroupId?: string; code?: string;
 };
 
 export async function updateAdGroupBid(options: UpdateAdGroupBidOptions, region: ApiRegion = 'na') {
-    return withTracking({ apiName: 'updateAdGroupBid', region }, async () => {
+    return withTracking({ apiName: 'updateAdGroupBid', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 
@@ -82,6 +82,7 @@ export async function updateAdGroupBid(options: UpdateAdGroupBidOptions, region:
             body: JSON.stringify(requestBody),
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            onMetrics: recordRequestMetrics,
         });
 
         const statusCode = response.status;

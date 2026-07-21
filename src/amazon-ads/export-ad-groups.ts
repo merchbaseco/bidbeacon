@@ -62,7 +62,7 @@ export interface ExportAdGroupsOptions {
  * @returns The export response with exportId and status
  */
 export async function exportAdGroups(options: ExportAdGroupsOptions, region: ApiRegion = 'na'): Promise<ExportAdGroupsResponse> {
-    return withTracking({ apiName: 'exportAdGroups', region }, async () => {
+    return withTracking({ apiName: 'exportAdGroups', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 
@@ -99,6 +99,7 @@ export async function exportAdGroups(options: ExportAdGroupsOptions, region: Api
             body: JSON.stringify(validatedRequestBody),
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            onMetrics: recordRequestMetrics,
         });
 
         // Store status code for tracking (even if error)

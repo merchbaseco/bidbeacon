@@ -21,6 +21,11 @@ type Event =
               statusCode: number | null;
               success: boolean;
               durationMs: number;
+              attemptCount: number;
+              retryCount: number;
+              rateLimitCount: number;
+              retryAfterMs: number | null;
+              queueWaitMs: number;
               timestamp: string;
               error: string | null;
           };

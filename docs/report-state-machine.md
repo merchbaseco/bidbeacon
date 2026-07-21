@@ -23,7 +23,7 @@ The `reportDatasetMetadata` table tracks the state of each report dataset:
 The `update-report-datasets` job runs every 5 minutes and performs two functions:
 
 1. **Creates new metadata rows** for time periods within the retention window (via `update-report-dataset-for-account`)
-2. **Polls for due records** by querying `nextRefreshAt <= now AND refreshing = false`, then enqueuing `update-report-status` jobs
+2. **Polls for due records** by querying `nextRefreshAt <= now AND refreshing = false`, then enqueuing `update-report-status` jobs across hourly and daily data. In-flight reports go first; new reports are newest-first so historical backfills yield to fresher data.
 
 This polling mechanism ensures:
 - Pending reports are checked every ~5 minutes until they complete
@@ -113,4 +113,8 @@ flowchart TD
 
 3. **Short polling interval for pending reports**: When a report is created or still pending, `nextRefreshAt` is set to 5 minutes in the future. This ensures users see data quickly without excessive API calls.
 
-4. **Eligibility based on creation time**: The `lastReportCreatedAt` timestamp determines eligibility, not when the report was processed. This ensures we don't miss eligibility windows even if processing takes a long time.
+4. **Atomic work claims**: `update-report-status` changes `refreshing` from false to true in one conditional update. Duplicate jobs therefore cannot issue duplicate Amazon API calls for the same dataset row.
+
+5. **Eligibility based on creation time**: The `lastReportCreatedAt` timestamp determines eligibility, not when the report was processed. This ensures we don't miss eligibility windows even if processing takes a long time.
+
+6. **Bounded parse diagnostics**: Report processing records counts and up to five distinct error messages with the job event. Raw failed report rows are not retained.

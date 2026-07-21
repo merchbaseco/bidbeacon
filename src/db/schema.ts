@@ -215,15 +215,6 @@ export const reportDatasetMetadata = pgTable(
     table => [uniqueIndex('report_dataset_metadata_unique_idx').on(table.accountId, table.periodStart, table.aggregation, table.entityType)]
 );
 
-export const reportDatasetErrorMetrics = pgTable('report_dataset_metrics', {
-    uid: uuid('uid').primaryKey().defaultRandom(),
-    reportDatasetMetadataId: uuid('report_dataset_metadata_id')
-        .notNull()
-        .references(() => reportDatasetMetadata.uid, { onDelete: 'cascade' }),
-    row: jsonb('row').notNull(),
-    error: text('error').notNull(),
-});
-
 /**
  * =====================================================================================
  * Performance Tables
@@ -304,7 +295,6 @@ export const performanceHourly = pgTable(
         index('idx_perf_hourly_adgroup_time').on(table.adGroupId, table.bucketStart),
         index('idx_perf_hourly_ad_time').on(table.adId, table.bucketStart),
         index('idx_perf_hourly_entity_time').on(table.entityType, table.entityId, table.bucketStart),
-        index('idx_perf_hourly_local').on(table.accountId, table.bucketDate, table.bucketHour),
     ]
 );
 
@@ -562,7 +552,7 @@ export const amsSpTraffic = pgTable(
         impressions: bigint('impressions', { mode: 'number' }).notNull(),
         cost: doublePrecision('cost').notNull(),
     },
-    table => [primaryKey({ columns: [table.idempotencyId] })]
+    table => [primaryKey({ columns: [table.idempotencyId] }), index('ams_sp_traffic_time_window_start_idx').on(table.timeWindowStart)]
 );
 
 export const amsSpConversion = pgTable(
@@ -623,7 +613,7 @@ export const amsSpConversion = pgTable(
             mode: 'number',
         }),
     },
-    table => [primaryKey({ columns: [table.idempotencyId] })]
+    table => [primaryKey({ columns: [table.idempotencyId] }), index('ams_sp_conversion_time_window_start_idx').on(table.timeWindowStart)]
 );
 
 export const amsBudgetUsage = pgTable(
@@ -726,6 +716,11 @@ export const apiMetrics = pgTable(
         statusCode: integer('status_code'), // HTTP status code (null if request failed before response)
         success: boolean('success').notNull(), // Whether the request succeeded
         durationMs: integer('duration_ms').notNull(), // Request duration in milliseconds
+        attemptCount: integer('attempt_count').notNull().default(1), // Total HTTP attempts, including the initial request
+        retryCount: integer('retry_count').notNull().default(0), // Retry attempts after the initial request
+        rateLimitCount: integer('rate_limit_count').notNull().default(0), // 429 responses across all attempts
+        retryAfterMs: integer('retry_after_ms'), // Largest Retry-After or fallback cooldown observed
+        queueWaitMs: integer('queue_wait_ms').notNull().default(0), // Total time spent waiting in the API governor
         timestamp: timestamp('timestamp', {
             withTimezone: true,
             mode: 'date',
@@ -739,6 +734,14 @@ export const apiMetrics = pgTable(
         index('api_metrics_timestamp_idx').on(table.timestamp),
     ]
 );
+
+export const apiRateLimitState = pgTable('api_rate_limit_state', {
+    key: text('key').primaryKey(),
+    cooldownUntil: timestamp('cooldown_until', { withTimezone: true, mode: 'date' }).notNull(),
+    lastRateLimitAt: timestamp('last_rate_limit_at', { withTimezone: true, mode: 'date' }).notNull(),
+    lastRetryAfterMs: integer('last_retry_after_ms').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
+});
 
 /**
  * ----------------------------------------------------------------------------
@@ -760,7 +763,7 @@ export const jobMetrics = pgTable(
         error: text('error'),
         input: jsonb('input'),
     },
-    table => [index('job_metrics_job_name_started_idx').on(table.jobName, table.startedAt)]
+    table => [index('job_metrics_job_name_started_idx').on(table.jobName, table.startedAt), index('job_metrics_finished_idx').on(table.finishedAt)]
 );
 
 export const events = pgTable(
@@ -769,7 +772,7 @@ export const events = pgTable(
         id: uuid('id').primaryKey().defaultRandom(),
         jobMetricId: uuid('job_metric_id')
             .notNull()
-            .references(() => jobMetrics.id),
+            .references(() => jobMetrics.id, { onDelete: 'cascade' }),
         jobName: text('job_name').notNull(),
         accountId: text('account_id'),
         countryCode: text('country_code'),
@@ -783,6 +786,7 @@ export const events = pgTable(
         index('events_account_created_idx').on(table.accountId, table.createdAt),
         index('events_job_name_created_idx').on(table.jobName, table.createdAt),
         index('events_created_at_idx').on(table.createdAt),
+        index('events_job_metric_idx').on(table.jobMetricId),
     ]
 );
 

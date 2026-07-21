@@ -115,8 +115,8 @@ export interface CreateReportOptions {
  * @param region - API region (default: 'na' for North America)
  * @returns The created report response
  */
-export async function createReport(options: CreateReportOptions, region: ApiRegion = 'na'): Promise<CreateReportResponse> {
-    return withTracking({ apiName: 'createReport', region }, async () => {
+export async function createReport(options: CreateReportOptions, region: ApiRegion = 'na', priority = 5): Promise<CreateReportResponse> {
+    return withTracking({ apiName: 'createReport', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 
@@ -148,6 +148,12 @@ export async function createReport(options: CreateReportOptions, region: ApiRegi
             body: JSON.stringify(validatedRequestBody),
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            throttle: {
+                group: 'report-create',
+                key: region,
+                priority,
+            },
+            onMetrics: recordRequestMetrics,
         });
 
         // Store status code for tracking (even if error)

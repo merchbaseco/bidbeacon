@@ -50,27 +50,23 @@ async function processMessage(message: { Body?: string; ReceiptHandle?: string; 
     }
 
     const messageId = message.MessageId || 'unknown';
-
-    const messageLogger = logger.child({ messageId });
+    let datasetId = 'unknown';
 
     try {
         // Parse AMS payload directly (AMS uses Raw Message Delivery, no SNS envelope)
         const payload = parseAmsPayload(message.Body);
 
         // Extract datasetId for logging (AMS uses snake_case: dataset_id)
-        const datasetId = typeof payload === 'object' && payload !== null && 'dataset_id' in payload ? String(payload.dataset_id) : 'unknown';
-
-        messageLogger.info({ datasetId }, 'Processing message');
+        datasetId = typeof payload === 'object' && payload !== null && 'dataset_id' in payload ? String(payload.dataset_id) : 'unknown';
 
         // Route to appropriate handler
         await routePayload(payload);
 
         // Success - delete message from queue
         await deleteMessage(message.ReceiptHandle);
-        messageLogger.info('Successfully processed message');
     } catch (error) {
         // Log error but don't delete message - SQS will retry
-        messageLogger.error({ err: error }, 'Failed to process message');
+        logger.error({ err: error, messageId, datasetId }, 'Failed to process message');
         // Don't delete - let SQS handle retries and DLQ routing
         throw error;
     }

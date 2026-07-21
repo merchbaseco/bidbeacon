@@ -15,6 +15,15 @@ const STATUS_PREFIX_REGEX = /^(\d{3})\s/;
 export interface ApiCallOptions {
     apiName: string;
     region: string;
+    requestMetrics?: ApiRequestMetrics;
+}
+
+export interface ApiRequestMetrics {
+    attemptCount?: number;
+    queueWaitMs?: number;
+    rateLimitCount?: number;
+    retryAfterMs?: number | null;
+    retryCount?: number;
 }
 
 /**
@@ -40,6 +49,11 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
                 statusCode: statusCode ?? null,
                 success,
                 durationMs,
+                attemptCount: options.requestMetrics?.attemptCount ?? 0,
+                retryCount: options.requestMetrics?.retryCount ?? 0,
+                rateLimitCount: options.requestMetrics?.rateLimitCount ?? 0,
+                retryAfterMs: options.requestMetrics?.retryAfterMs ?? null,
+                queueWaitMs: options.requestMetrics?.queueWaitMs ?? 0,
                 timestamp,
                 error: error ?? null,
             })
@@ -56,6 +70,11 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
                 statusCode: insertedRow.statusCode,
                 success: insertedRow.success,
                 durationMs: insertedRow.durationMs,
+                attemptCount: insertedRow.attemptCount,
+                retryCount: insertedRow.retryCount,
+                rateLimitCount: insertedRow.rateLimitCount,
+                retryAfterMs: insertedRow.retryAfterMs,
+                queueWaitMs: insertedRow.queueWaitMs,
                 timestamp: insertedRow.timestamp.toISOString(),
                 error: insertedRow.error,
             },
@@ -73,14 +92,16 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
  * @param fn - The function to wrap (should return a Response-like object with status, or the actual result)
  * @returns The result of the wrapped function
  */
-export async function withTracking<T>(options: ApiCallOptions, fn: () => Promise<T>): Promise<T> {
+export async function withTracking<T>(options: ApiCallOptions, fn: (recordRequestMetrics: (metrics: ApiRequestMetrics) => void) => Promise<T>): Promise<T> {
+    const requestMetrics: ApiRequestMetrics = {};
+    const trackedOptions = { ...options, requestMetrics };
     const startTime = performance.now();
     let success = false;
     let statusCode: number | undefined;
     let error: string | undefined;
 
     try {
-        const result = await fn();
+        const result = await fn(metrics => Object.assign(requestMetrics, metrics));
         success = true;
 
         // Try to extract status code from result object if available
@@ -109,6 +130,6 @@ export async function withTracking<T>(options: ApiCallOptions, fn: () => Promise
         throw err;
     } finally {
         // Track the call - await to ensure metrics are written before events are emitted
-        await trackApiCall(options, startTime, success, statusCode, error);
+        await trackApiCall(trackedOptions, startTime, success, statusCode, error);
     }
 }

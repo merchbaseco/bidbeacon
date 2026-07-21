@@ -8,6 +8,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
+import { withDatabaseRetry } from '@/db/retry';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceDaily } from '@/db/schema';
 import { boss } from '@/jobs/boss';
 import { zonedNow, zonedStartOfDay } from '@/utils/date';
@@ -157,26 +158,31 @@ async function summarizeDailyForAccount(accountId: string, countryCode: string, 
         sales: String(row.sales),
         purchases: row.purchases,
     }));
+    insertValues.sort((left, right) =>
+        [left.bucketDate, left.adId, left.entityType, left.entityId].join('|').localeCompare([right.bucketDate, right.adId, right.entityType, right.entityId].join('|'))
+    );
 
     const batchSize = 1000;
     for (let i = 0; i < insertValues.length; i += batchSize) {
         const batch = insertValues.slice(i, i + batchSize);
-        await db
-            .insert(performanceDaily)
-            .values(batch)
-            .onConflictDoUpdate({
-                target: [performanceDaily.accountId, performanceDaily.bucketDate, performanceDaily.adId, performanceDaily.entityType, performanceDaily.entityId],
-                set: {
-                    campaignId: sql`excluded.campaign_id`,
-                    adGroupId: sql`excluded.ad_group_id`,
-                    targetMatchType: sql`excluded.target_match_type`,
-                    impressions: sql`excluded.impressions`,
-                    clicks: sql`excluded.clicks`,
-                    spend: sql`excluded.spend`,
-                    sales: sql`excluded.sales`,
-                    purchases: sql`excluded.purchases`,
-                },
-            });
+        await withDatabaseRetry(() =>
+            db
+                .insert(performanceDaily)
+                .values(batch)
+                .onConflictDoUpdate({
+                    target: [performanceDaily.accountId, performanceDaily.bucketDate, performanceDaily.adId, performanceDaily.entityType, performanceDaily.entityId],
+                    set: {
+                        campaignId: sql`excluded.campaign_id`,
+                        adGroupId: sql`excluded.ad_group_id`,
+                        targetMatchType: sql`excluded.target_match_type`,
+                        impressions: sql`excluded.impressions`,
+                        clicks: sql`excluded.clicks`,
+                        spend: sql`excluded.spend`,
+                        sales: sql`excluded.sales`,
+                        purchases: sql`excluded.purchases`,
+                    },
+                })
+        );
     }
 
     recorder.addEvent({

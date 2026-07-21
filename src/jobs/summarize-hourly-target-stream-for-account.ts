@@ -8,6 +8,7 @@ import { formatInTimeZone } from 'date-fns-tz';
 import { and, eq, gte, lte, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
+import { withDatabaseRetry } from '@/db/retry';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceHourly } from '@/db/schema';
 import { boss } from '@/jobs/boss';
 import { zonedTopOfHour } from '@/utils/date';
@@ -166,28 +167,33 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
             purchases: row.purchases,
         };
     });
+    insertValues.sort((left, right) =>
+        [left.bucketStart.toISOString(), left.adId, left.entityType, left.entityId].join('|').localeCompare([right.bucketStart.toISOString(), right.adId, right.entityType, right.entityId].join('|'))
+    );
 
     const batchSize = 1000;
     for (let i = 0; i < insertValues.length; i += batchSize) {
         const batch = insertValues.slice(i, i + batchSize);
-        await db
-            .insert(performanceHourly)
-            .values(batch)
-            .onConflictDoUpdate({
-                target: [performanceHourly.accountId, performanceHourly.bucketStart, performanceHourly.adId, performanceHourly.entityType, performanceHourly.entityId],
-                set: {
-                    bucketDate: sql`excluded.bucket_date`,
-                    bucketHour: sql`excluded.bucket_hour`,
-                    campaignId: sql`excluded.campaign_id`,
-                    adGroupId: sql`excluded.ad_group_id`,
-                    targetMatchType: sql`excluded.target_match_type`,
-                    impressions: sql`excluded.impressions`,
-                    clicks: sql`excluded.clicks`,
-                    spend: sql`excluded.spend`,
-                    sales: sql`excluded.sales`,
-                    purchases: sql`excluded.purchases`,
-                },
-            });
+        await withDatabaseRetry(() =>
+            db
+                .insert(performanceHourly)
+                .values(batch)
+                .onConflictDoUpdate({
+                    target: [performanceHourly.accountId, performanceHourly.bucketStart, performanceHourly.adId, performanceHourly.entityType, performanceHourly.entityId],
+                    set: {
+                        bucketDate: sql`excluded.bucket_date`,
+                        bucketHour: sql`excluded.bucket_hour`,
+                        campaignId: sql`excluded.campaign_id`,
+                        adGroupId: sql`excluded.ad_group_id`,
+                        targetMatchType: sql`excluded.target_match_type`,
+                        impressions: sql`excluded.impressions`,
+                        clicks: sql`excluded.clicks`,
+                        spend: sql`excluded.spend`,
+                        sales: sql`excluded.sales`,
+                        purchases: sql`excluded.purchases`,
+                    },
+                })
+        );
     }
 
     recorder.addEvent({

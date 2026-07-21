@@ -62,7 +62,7 @@ export interface ExportCampaignsOptions {
  * @returns The export response with exportId and status
  */
 export async function exportCampaigns(options: ExportCampaignsOptions, region: ApiRegion = 'na'): Promise<ExportCampaignsResponse> {
-    return withTracking({ apiName: 'exportCampaigns', region }, async () => {
+    return withTracking({ apiName: 'exportCampaigns', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 
@@ -99,6 +99,7 @@ export async function exportCampaigns(options: ExportCampaignsOptions, region: A
             body: JSON.stringify(validatedRequestBody),
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            onMetrics: recordRequestMetrics,
         });
 
         // Store status code for tracking (even if error)

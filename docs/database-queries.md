@@ -49,6 +49,24 @@ Task with prompt: "Query the database to find all API calls to 'create-report'
 in the last hour. Show success rate and average duration."
 ```
 
+### Check Governor Impact
+
+```sql
+SELECT
+    api_name,
+    count(*) AS calls,
+    sum(retry_count) AS retries,
+    sum(rate_limit_count) AS rate_limits,
+    round(avg(queue_wait_ms)) AS avg_queue_wait_ms,
+    max(retry_after_ms) AS max_retry_after_ms
+FROM api_metrics
+WHERE timestamp >= now() - interval '24 hours'
+GROUP BY api_name
+ORDER BY rate_limits DESC, calls DESC;
+```
+
+For report freshness, filter `events` to `job_name = 'update-report-status'`. Report lifecycle payloads contain `periodAgeMs`, `refreshDueAt`, and `refreshDelayMs`; group `refreshDelayMs` by aggregation and outcome to compare p50/p95 delay before and after governor changes.
+
 ### Check Performance Data
 ```typescript
 Task with prompt: "Query performance_hourly to get the last 24 hours of metrics
@@ -76,8 +94,12 @@ Key tables (see `src/db/schema.ts` for complete schema):
 ### Tracking Tables
 - `job_metrics` - Background job runs (job_name, boss_job_id, started_at, finished_at, status, input, error)
 - `events` - Timeline of operational milestones (job_metric_id, outcome, message, badges, payload)
-- `api_metrics` - API call tracking (api_name, timestamp, success, duration_ms)
+- `api_metrics` - API call tracking, including final status plus attempt, retry, 429, `Retry-After`, and governor queue-wait metrics
 - `ams_metrics` - AMS stream processing metrics
+
+Operational telemetry and raw AMS stream rows use 30-day retention. `ams_metrics` uses 1-day retention. The hourly cleanup job deletes bounded batches so retention cannot monopolize the database.
+
+`pg_stat_statements` is enabled in PostgreSQL for aggregate query-cost analysis. Use it to validate an index against representative queries before removal; low `pg_stat_user_indexes.idx_scan` counts alone are not sufficient evidence.
 
 ### Ad Entities
 - `campaign` / `ad_group` / `ad` / `target` - Synced Amazon Ads entities

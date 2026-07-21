@@ -15,7 +15,7 @@ type SpRequestOptions<T> = {
 };
 
 export const spRequest = async <T>(options: SpRequestOptions<T>, region: ApiRegion = 'na') => {
-    return withTracking({ apiName: options.apiName, region }, async () => {
+    return withTracking({ apiName: options.apiName, region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 
@@ -40,6 +40,7 @@ export const spRequest = async <T>(options: SpRequestOptions<T>, region: ApiRegi
             body: JSON.stringify(options.body),
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            onMetrics: recordRequestMetrics,
         });
 
         if (!response.ok) {

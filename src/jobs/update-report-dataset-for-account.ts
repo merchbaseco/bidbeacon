@@ -54,9 +54,8 @@ export const updateReportDatasetForAccountJob = boss
                         const dailyInsert = await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
                         const hourlyInsert = await insertMissingMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
 
-                        const dailyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'daily', 'target');
-                        const hourlyResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'hourly', 'target');
-                        const totalDatasets = dailyResult.count + hourlyResult.count;
+                        const enqueueResult = await enqueueUpdateReportStatusJobs(accountId, countryCode, now, 'target');
+                        const totalDatasets = enqueueResult.count;
 
                         emitEvent({
                             type: 'reports:refreshed',
@@ -93,8 +92,8 @@ export const updateReportDatasetForAccountJob = boss
                                     },
                                 },
                                 enqueued: {
-                                    daily: dailyResult.count,
-                                    hourly: hourlyResult.count,
+                                    daily: enqueueResult.dailyCount,
+                                    hourly: enqueueResult.hourlyCount,
                                     total: totalDatasets,
                                 },
                             },
@@ -223,25 +222,21 @@ async function insertMetadata(args: {
 }
 
 /**
- * Enqueue update-report-status jobs for records that are due for refresh.
- *
- * We only enqueue jobs such that the total number of concurrent jobs is less than MAX_CONCURRENT_REPORTS.
- * If already at capacity, the function returns early without enqueueing any more jobs.
- *
- * Eligible rows are sorted to prioritize rows with report IDs (in-progress reports that need continued
- * processing), then by most recent period, then by nextRefreshAt. This ensures rows with report IDs always
- * get included before the limit is applied.
+ * Enqueue due report work across aggregations. In-flight reports go first, followed by
+ * new reports ordered by newest period, so historical backfills cannot jump ahead of
+ * data that is closer to becoming current.
  */
 async function enqueueUpdateReportStatusJobs(
     accountId: string,
     countryCode: string,
     now: Date,
-    aggregation: AggregationType,
     entityType: EntityType
 ): Promise<{
     count: number;
+    dailyCount: number;
+    hourlyCount: number;
 }> {
-    const MAX_CONCURRENT_REPORTS = 5;
+    const MAX_NEW_REPORT_JOBS = 10;
 
     // Enqueue update-report-status jobs for records that already have a reportId and nextRefreshAt
     // is overdue..
@@ -252,8 +247,8 @@ async function enqueueUpdateReportStatusJobs(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
                 eq(reportDatasetMetadata.countryCode, countryCode),
-                eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType),
+                eq(reportDatasetMetadata.refreshing, false),
                 isNotNull(reportDatasetMetadata.reportId),
                 lte(reportDatasetMetadata.nextRefreshAt, now)
             )
@@ -269,7 +264,6 @@ async function enqueueUpdateReportStatusJobs(
             and(
                 eq(reportDatasetMetadata.accountId, accountId),
                 eq(reportDatasetMetadata.countryCode, countryCode),
-                eq(reportDatasetMetadata.aggregation, aggregation),
                 eq(reportDatasetMetadata.entityType, entityType),
                 eq(reportDatasetMetadata.refreshing, false),
                 isNull(reportDatasetMetadata.reportId),
@@ -277,11 +271,11 @@ async function enqueueUpdateReportStatusJobs(
             )
         )
         .orderBy(desc(reportDatasetMetadata.periodStart))
-        .limit(Math.max(0, MAX_CONCURRENT_REPORTS - recordsWithActiveReport.length));
+        .limit(MAX_NEW_REPORT_JOBS);
 
     const recordsNeedingWork = [...recordsWithActiveReport, ...recordsDueForNewReport];
     if (recordsNeedingWork.length === 0) {
-        return { count: 0, actions: [] };
+        return { count: 0, dailyCount: 0, hourlyCount: 0 };
     }
 
     const jobIds = await Promise.all(
@@ -297,8 +291,12 @@ async function enqueueUpdateReportStatusJobs(
     );
 
     const enqueuedCount = jobIds.filter(Boolean).length;
+    const dailyCount = jobIds.filter((jobId, index) => jobId && recordsNeedingWork[index]?.aggregation === 'daily').length;
+    const hourlyCount = jobIds.filter((jobId, index) => jobId && recordsNeedingWork[index]?.aggregation === 'hourly').length;
 
     return {
         count: enqueuedCount,
+        dailyCount,
+        hourlyCount,
     };
 }

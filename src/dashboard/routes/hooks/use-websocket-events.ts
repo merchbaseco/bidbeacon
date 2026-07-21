@@ -11,7 +11,20 @@ type Event =
           type: 'api-metrics:updated';
           apiName: string;
           timestamp: string;
-          data: { apiName: string; region: string; statusCode: number | null; success: boolean; durationMs: number; timestamp: string; error: string | null };
+          data: {
+              apiName: string;
+              region: string;
+              statusCode: number | null;
+              success: boolean;
+              durationMs: number;
+              attemptCount: number;
+              retryCount: number;
+              rateLimitCount: number;
+              retryAfterMs: number | null;
+              queueWaitMs: number;
+              timestamp: string;
+              error: string | null;
+          };
       }
     | { type: 'job-metrics:updated'; jobName: string; timestamp: string }
     | {

@@ -90,14 +90,15 @@ export const metricsRouter = router({
                 .groupBy(sql`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`, apiMetrics.apiName)
                 .orderBy(sql`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`, sql`${apiMetrics.apiName}`);
 
-            // Query for 429s aggregated per 5-minute interval (all APIs combined)
+            // Query for 429 attempts aggregated per 5-minute interval (all APIs combined).
+            // Older rows predate per-attempt tracking, so fall back to the final status code.
             const rateLimitedData = await db
                 .select({
                     interval: sql<string>`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`.as('interval'),
-                    count: sql<number>`count(*)`.as('count'),
+                    count: sql<number>`sum(case when ${apiMetrics.rateLimitCount} > 0 then ${apiMetrics.rateLimitCount} when ${apiMetrics.statusCode} = 429 then 1 else 0 end)`.as('count'),
                 })
                 .from(apiMetrics)
-                .where(and(...conditions, eq(apiMetrics.statusCode, 429)))
+                .where(and(...conditions, sql`(${apiMetrics.rateLimitCount} > 0 or ${apiMetrics.statusCode} = 429)`))
                 .groupBy(sql`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`)
                 .orderBy(sql`date_trunc('hour', ${apiMetrics.timestamp}) + floor(extract(minute from ${apiMetrics.timestamp}) / 5) * interval '5 minutes'`);
 
@@ -1353,7 +1354,9 @@ export const metricsRouter = router({
                 total: sql<number>`count(*)`.as('total'),
                 successCount: sql<number>`sum(case when ${apiMetrics.success} then 1 else 0 end)`.as('success_count'),
                 errorCount: sql<number>`sum(case when ${apiMetrics.success} then 0 else 1 end)`.as('error_count'),
-                rateLimitCount: sql<number>`sum(case when ${apiMetrics.statusCode} = 429 then 1 else 0 end)`.as('rate_limit_count'),
+                rateLimitCount: sql<number>`sum(case when ${apiMetrics.rateLimitCount} > 0 then ${apiMetrics.rateLimitCount} when ${apiMetrics.statusCode} = 429 then 1 else 0 end)`.as(
+                    'rate_limit_count'
+                ),
             })
             .from(apiMetrics)
             .where(and(gte(apiMetrics.timestamp, oneHourAgo), lte(apiMetrics.timestamp, now)));

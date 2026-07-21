@@ -69,7 +69,7 @@ export interface ListAdsAccountsOptions {
  * @returns Response with accounts and optional nextToken
  */
 export async function listAdvertiserAccounts(options?: ListAdsAccountsOptions, region: ApiRegion = 'na'): Promise<{ adsAccounts: AdsAccountWithMetadata[]; nextToken?: string }> {
-    return withTracking({ apiName: 'listAdvertiserAccounts', region }, async () => {
+    return withTracking({ apiName: 'listAdvertiserAccounts', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 
@@ -100,6 +100,7 @@ export async function listAdvertiserAccounts(options?: ListAdsAccountsOptions, r
             body: JSON.stringify(requestBody),
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            onMetrics: recordRequestMetrics,
         });
 
         // Store status code for tracking (even if error)

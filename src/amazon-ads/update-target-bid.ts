@@ -50,7 +50,7 @@ const assertUpdateSuccess = (results: Array<{ targetId?: string; code?: string; 
 };
 
 export async function updateTargetBid(options: UpdateTargetBidOptions, region: ApiRegion = 'na') {
-    return withTracking({ apiName: 'updateTargetBid', region }, async () => {
+    return withTracking({ apiName: 'updateTargetBid', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 
@@ -82,6 +82,7 @@ export async function updateTargetBid(options: UpdateTargetBidOptions, region: A
             body: JSON.stringify(requestBody),
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            onMetrics: recordRequestMetrics,
         });
 
         const statusCode = response.status;

@@ -33,6 +33,8 @@ The dashboard's *Event Stream* listens to `events:updated` WebSocket payloads. E
 
 Example: for `update-report-status`, each report bucket emits a badge so you can see which report window is being processed at a glance.
 
+Report lifecycle payloads also include `periodAgeMs`, `refreshDueAt`, and `refreshDelayMs`. Use `refreshDelayMs` to verify that governor or scheduler changes do not delay due data; compare successful creation and processing events by aggregation and report ID for end-to-end freshness.
+
 ## When to add a new event
 
 - A job queues work, processes data, or changes state.

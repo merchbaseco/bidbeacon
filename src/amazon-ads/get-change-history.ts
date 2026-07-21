@@ -99,7 +99,7 @@ export const DEFAULT_CHANGE_HISTORY_EVENT_TYPES: z.infer<typeof historyEventType
 };
 
 export const getChangeHistory = async (options: GetChangeHistoryOptions, region: ApiRegion = 'na'): Promise<GetChangeHistoryResponse> => {
-    return withTracking({ apiName: 'getChangeHistory', region }, async () => {
+    return withTracking({ apiName: 'getChangeHistory', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
         const baseUrl = getApiBaseUrl(region);
@@ -133,6 +133,7 @@ export const getChangeHistory = async (options: GetChangeHistoryOptions, region:
             body: JSON.stringify(requestBody),
             timeoutMs: 30_000,
             retry: AMAZON_ADS_API_RETRY,
+            onMetrics: recordRequestMetrics,
         });
 
         if (!response.ok) {
