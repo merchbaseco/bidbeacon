@@ -31,7 +31,23 @@ export const dispatchDueReportsJob = boss
                             .from(advertiserAccount)
                             .where(eq(advertiserAccount.enabled, true));
 
-                        const results = await Promise.all(accounts.map(account => dispatchAccountDueReports(account.accountId, account.countryCode)));
+                        const accountsById = new Map<string, typeof accounts>();
+                        for (const account of accounts) {
+                            const accountCountries = accountsById.get(account.accountId) ?? [];
+                            accountCountries.push(account);
+                            accountsById.set(account.accountId, accountCountries);
+                        }
+                        const results = (
+                            await Promise.all(
+                                [...accountsById.values()].map(async accountCountries => {
+                                    const accountResults: Array<{ claimedCount: number }> = [];
+                                    for (const account of accountCountries) {
+                                        accountResults.push(await dispatchAccountDueReports(account.accountId, account.countryCode));
+                                    }
+                                    return accountResults;
+                                })
+                            )
+                        ).flat();
                         recorder.addEvent({
                             message: null,
                             payload: {
@@ -61,12 +77,20 @@ const dispatchAccountDueReports = async (accountId: string, countryCode: string)
         .where(and(...baseConditions, isNotNull(reportDatasetMetadata.reportId)))
         .orderBy(desc(reportDatasetMetadata.periodStart));
 
-    const newReports = await db
-        .select()
+    const [newReportInProgress] = await db
+        .select({ uid: reportDatasetMetadata.uid })
         .from(reportDatasetMetadata)
-        .where(and(...baseConditions, isNull(reportDatasetMetadata.reportId)))
-        .orderBy(desc(reportDatasetMetadata.periodStart))
-        .limit(MAX_NEW_REPORT_JOBS_PER_ACCOUNT);
+        .where(and(eq(reportDatasetMetadata.accountId, accountId), eq(reportDatasetMetadata.entityType, 'target'), eq(reportDatasetMetadata.refreshing, true), isNull(reportDatasetMetadata.reportId)))
+        .limit(1);
+
+    const newReports = newReportInProgress
+        ? []
+        : await db
+              .select()
+              .from(reportDatasetMetadata)
+              .where(and(...baseConditions, isNull(reportDatasetMetadata.reportId)))
+              .orderBy(desc(reportDatasetMetadata.periodStart))
+              .limit(MAX_NEW_REPORT_JOBS_PER_ACCOUNT);
 
     const claimed = await Promise.all([...activeReports, ...newReports].map(claimAndEnqueue));
     return { claimedCount: claimed.filter(Boolean).length };
