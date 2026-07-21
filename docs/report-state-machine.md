@@ -23,7 +23,7 @@ The `reportDatasetMetadata` table tracks the state of each report dataset:
 The scheduler uses two intentionally separate jobs:
 
 1. **`update-report-datasets` every 5 minutes** creates and cleans up metadata rows within each report retention window (via `update-report-dataset-for-account`).
-2. **`dispatch-due-reports` every minute** only queries `nextRefreshAt <= now AND refreshing = false`, atomically claims rows, and enqueues `update-report-status`. In-flight reports go first; new reports are newest-first and limited to 10 per account per pass.
+2. **`dispatch-due-reports` every minute** only queries `nextRefreshAt <= now AND refreshing = false`, atomically claims rows, and enqueues `update-report-status`. In-flight reports go first; new reports are newest-first and limited to one per account per pass so report creation cannot build a burst behind Amazon's endpoint-wide cooldown.
 
 This polling mechanism ensures:
 - Due work begins within about one minute; pending Amazon reports are checked every ~5 minutes until they complete

@@ -6,7 +6,7 @@ import { emitEvent } from '@/utils/events';
 import { withJobMetrics } from '@/utils/job-metrics';
 import { updateReportStatusJob } from './update-report-status';
 
-const MAX_NEW_REPORT_JOBS_PER_ACCOUNT = 10;
+const MAX_NEW_REPORT_JOBS_PER_ACCOUNT = 1;
 
 export const dispatchDueReportsJob = boss
     .createJob('dispatch-due-reports')
