@@ -127,6 +127,12 @@ export function zonedTopOfHour(date: Date, timezone: string): Date {
 }
 
 /**
+ * Oldest complete hourly bucket owned by the trailing Marketing Stream window.
+ * Reports own strictly older buckets, so both writers use the same boundary.
+ */
+export const getHourlyStreamOwnershipStart = (now: Date, timezone: string): Date => zonedTopOfHour(utcSubtractHours(now, 24), timezone);
+
+/**
  * Get the start of the day in the specified timezone for a given date.
  */
 export function zonedStartOfDay(date: Date, timezone: string): Date {

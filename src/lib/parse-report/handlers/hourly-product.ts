@@ -70,5 +70,5 @@ export async function handleHourlyProduct(input: ParseReportInput): Promise<Pars
         insertedCount++;
     }
 
-    return { rowsProcessed: insertedCount, successCount: insertedCount, errorCount: rows.length - insertedCount, errorSamples: [] };
+    return { rowsProcessed: insertedCount, successCount: insertedCount, changedCount: insertedCount, errorCount: rows.length - insertedCount, errorSamples: [] };
 }

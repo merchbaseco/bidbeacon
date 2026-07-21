@@ -54,6 +54,22 @@ describe('createReportForDataset', () => {
         });
     });
 
+    it('requests one complete local date for hourly-grain reports', async () => {
+        await createReportForDataset({
+            accountId: 'amzn-account',
+            countryCode: 'US',
+            timestamp: '2026-07-19T07:00:00.000Z',
+            aggregation: 'hourly',
+            entityType: 'target',
+        });
+
+        const request = createReportMock.mock.calls[0]?.[0];
+        expect(request?.reports?.[0]?.periods?.[0]?.datePeriod).toEqual({
+            startDate: '2026-07-19',
+            endDate: '2026-07-19',
+        });
+    });
+
     it('prioritizes fresh periods ahead of historical backfills', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-01-05T12:00:00.000Z'));

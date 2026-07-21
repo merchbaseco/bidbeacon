@@ -1,67 +1,81 @@
 import { fromZonedTime } from 'date-fns-tz';
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getNextRefreshTime, isEligibleForReport } from '@/lib/report-status-state-machine/eligibility';
+import { describe, expect, it } from 'vitest';
+import { getNextRefreshTime, getRefreshSchedule, isEligibleForReport } from '@/lib/report-status-state-machine/eligibility';
 
-describe('report eligibility timezone handling', () => {
-    // Sample timestamps mirror production report_dataset_metadata rows for hourly US targets.
-    afterEach(() => {
-        vi.useRealTimers();
+const PACIFIC = 'America/Los_Angeles';
+
+describe('report refresh scheduling', () => {
+    it('reconciles an hourly-grain date every three hours during its first post-close day', () => {
+        const periodStart = localDate(2026, 7, 19);
+        const schedule = getRefreshSchedule(periodStart, 'hourly', 'US');
+
+        expect(schedule.slice(0, 8).map(date => date.toISOString())).toEqual([
+            '2026-07-20T10:00:00.000Z',
+            '2026-07-20T13:00:00.000Z',
+            '2026-07-20T16:00:00.000Z',
+            '2026-07-20T19:00:00.000Z',
+            '2026-07-20T22:00:00.000Z',
+            '2026-07-21T01:00:00.000Z',
+            '2026-07-21T04:00:00.000Z',
+            '2026-07-21T07:00:00.000Z',
+        ]);
     });
 
-    it('schedules the next hourly refresh at the 72h offset for a completed hourly row', () => {
-        vi.useFakeTimers();
+    it('adds the 3-day, 7-day, and just-inside-14-day hourly reconciliations', () => {
+        const schedule = getRefreshSchedule(localDate(2026, 7, 19), 'hourly', 'US');
 
-        const timezone = 'America/Los_Angeles';
-        const countryCode = 'US';
-        const periodStart = new Date(Date.UTC(2025, 11, 29, 17, 0, 0));
-        const lastReportCreatedAt = new Date(2025, 11, 30, 17, 0, 2);
-        const now = fromZonedTime(new Date(2025, 11, 30, 17, 0, 2), timezone);
-
-        vi.setSystemTime(now);
-
-        const nextRefreshAt = getNextRefreshTime({
-            reportId: null,
-            periodStart,
-            aggregation: 'hourly',
-            lastReportCreatedAt,
-            countryCode,
-        });
-
-        const expected = new Date(Date.UTC(2026, 0, 1, 17, 0, 0));
-        expect(nextRefreshAt?.getTime()).toBe(expected.getTime());
+        expect(schedule.slice(8).map(date => date.toISOString())).toEqual(['2026-07-22T07:00:00.000Z', '2026-07-26T07:00:00.000Z', '2026-08-02T04:00:00.000Z']);
     });
 
-    it('does not mark hourly data as eligible when a 24h report was already created', () => {
-        const timezone = 'America/Los_Angeles';
-        const countryCode = 'US';
-        const periodStart = new Date(Date.UTC(2025, 11, 30, 1, 0, 0));
-        const lastReportCreatedAt = new Date(2025, 11, 30, 17, 25, 8);
-        const now = new Date(Date.UTC(2025, 11, 31, 2, 0, 0));
+    it('advances to the first milestone after the last report creation', () => {
+        const periodStart = localDate(2026, 7, 19);
+        const firstMilestone = getRefreshSchedule(periodStart, 'hourly', 'US')[0] ?? null;
 
-        const eligible = isEligibleForReport(periodStart, 'hourly', lastReportCreatedAt, countryCode, now);
+        const nextRefreshAt = getNextRefreshTime(
+            {
+                reportId: null,
+                periodStart,
+                aggregation: 'hourly',
+                lastReportCreatedAt: firstMilestone,
+                countryCode: 'US',
+            },
+            new Date('2026-07-20T10:01:00.000Z')
+        );
 
-        expect(eligible).toBe(false);
+        expect(nextRefreshAt?.toISOString()).toBe('2026-07-20T13:00:00.000Z');
     });
 
-    it('keeps hourly offsets stable across spring-forward transitions', () => {
-        vi.useFakeTimers();
+    it('marks overdue milestones eligible until a report covers them', () => {
+        const periodStart = localDate(2026, 7, 19);
+        const schedule = getRefreshSchedule(periodStart, 'hourly', 'US');
 
-        const countryCode = 'US';
-        const periodStart = new Date(Date.UTC(2025, 2, 9, 9, 0, 0)); // 2025-03-09 01:00 PST
-        const lastReportCreatedAt = new Date(2025, 2, 10, 1, 0, 0); // 2025-03-10 01:00 local (PDT)
-        const now = new Date(Date.UTC(2025, 2, 10, 10, 0, 0)); // 25h after periodStart
+        expect(isEligibleForReport(periodStart, 'hourly', schedule[0] ?? null, 'US', new Date('2026-07-20T14:00:00.000Z'))).toBe(true);
+        expect(isEligibleForReport(periodStart, 'hourly', schedule[1] ?? null, 'US', new Date('2026-07-20T14:00:00.000Z'))).toBe(false);
+    });
 
-        vi.setSystemTime(now);
+    it('uses account-local calendar days across daylight-saving changes', () => {
+        const periodStart = localDate(2026, 3, 7);
+        const schedule = getRefreshSchedule(periodStart, 'daily', 'US');
 
-        const nextRefreshAt = getNextRefreshTime({
-            reportId: null,
-            periodStart,
-            aggregation: 'hourly',
-            lastReportCreatedAt,
-            countryCode,
-        });
+        expect(schedule[0]?.toISOString()).toBe('2026-03-08T08:00:00.000Z');
+        expect(schedule[1]?.toISOString()).toBe('2026-03-10T07:00:00.000Z');
+    });
 
-        const expected = new Date(Date.UTC(2025, 2, 10, 9, 0, 0)); // periodStart + 24h
-        expect(nextRefreshAt?.getTime()).toBe(expected.getTime());
+    it('polls an in-flight report five minutes from now', () => {
+        const now = new Date('2026-07-20T10:01:00.000Z');
+        const nextRefreshAt = getNextRefreshTime(
+            {
+                reportId: 'report-id',
+                periodStart: localDate(2026, 7, 19),
+                aggregation: 'hourly',
+                lastReportCreatedAt: null,
+                countryCode: 'US',
+            },
+            now
+        );
+
+        expect(nextRefreshAt?.toISOString()).toBe('2026-07-20T10:06:00.000Z');
     });
 });
+
+const localDate = (year: number, month: number, day: number): Date => fromZonedTime(new Date(year, month - 1, day), PACIFIC);

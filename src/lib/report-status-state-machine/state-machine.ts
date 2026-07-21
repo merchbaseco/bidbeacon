@@ -8,7 +8,8 @@ import type { NextAction } from './types';
  *
  * State machine logic:
  * 1. If report exists AND status is COMPLETED → 'process'
- * 2. If report exists AND status is NOT COMPLETED → 'none'
+ * 2. If report exists AND status is terminal → 'fail'
+ * 3. If report exists AND status is still pending → 'none'
  * 3. If no report AND eligible AND (target + daily) → 'create'
  * 4. If no report AND not eligible OR not (target + daily) → 'none'
  *
@@ -49,6 +50,9 @@ export async function getNextAction(
             // Report exists - check its status
             if (report.status === 'COMPLETED') {
                 return 'process';
+            }
+            if (report.failureCode || report.failureReason || ['FAILED', 'CANCELLED'].includes(report.status)) {
+                return 'fail';
             }
             // Report exists but not ready
             return 'none';

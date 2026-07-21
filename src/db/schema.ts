@@ -196,7 +196,7 @@ export const reportDatasetMetadata = pgTable(
         uid: uuid('uid').primaryKey().defaultRandom(),
         accountId: text('account_id').notNull(),
         countryCode: text('country_code').notNull(),
-        periodStart: timestamp('period_start', { withTimezone: false, mode: 'date' }).notNull(), // utc
+        periodStart: timestamp('period_start', { withTimezone: true, mode: 'date' }).notNull(),
         aggregation: text('aggregation').notNull(), // hourly, daily
         entityType: text('entity_type').notNull(), // target, product
 
@@ -206,13 +206,16 @@ export const reportDatasetMetadata = pgTable(
         successRecords: integer('success_records').notNull().default(0),
         errorRecords: integer('error_records').notNull().default(0),
 
-        nextRefreshAt: timestamp('next_refresh_at', { withTimezone: false, mode: 'date' }), // utc - when the next refresh should occur based on eligibility
-        lastReportCreatedAt: timestamp('last_report_created_at', { withTimezone: false, mode: 'date' }), // timezone-less, represents local time in country's timezone
+        nextRefreshAt: timestamp('next_refresh_at', { withTimezone: true, mode: 'date' }),
+        lastReportCreatedAt: timestamp('last_report_created_at', { withTimezone: true, mode: 'date' }),
         reportId: text('report_id'),
         lastProcessedReportId: text('last_processed_report_id'),
         error: text('error'),
     },
-    table => [uniqueIndex('report_dataset_metadata_unique_idx').on(table.accountId, table.periodStart, table.aggregation, table.entityType)]
+    table => [
+        uniqueIndex('report_dataset_metadata_unique_idx').on(table.accountId, table.periodStart, table.aggregation, table.entityType),
+        index('report_dataset_metadata_due_idx').on(table.refreshing, table.nextRefreshAt),
+    ]
 );
 
 /**

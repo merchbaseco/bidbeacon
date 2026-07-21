@@ -14,19 +14,19 @@ The `reportDatasetMetadata` table tracks the state of each report dataset:
 - **`refreshing`**: Whether a refresh is currently in progress (prevents concurrent processing)
 - **`nextRefreshAt`**: When this record should be checked next (drives polling)
 - **`lastReportCreatedAt`**: When the last report was created (used for eligibility calculations)
-- **`timestamp`**: The report dataset timestamp (UTC)
+- **`periodStart`**: The UTC instant for the account-local report date's midnight
 - **`aggregation`**: Report type (`hourly` or `daily`)
 - **`entityType`**: Entity type (`target` or `product`)
 
 ## Scheduled Job and Polling
 
-The `update-report-datasets` job runs every 5 minutes and performs two functions:
+The scheduler uses two intentionally separate jobs:
 
-1. **Creates new metadata rows** for time periods within the retention window (via `update-report-dataset-for-account`)
-2. **Polls for due records** by querying `nextRefreshAt <= now AND refreshing = false`, then enqueuing `update-report-status` jobs across hourly and daily data. In-flight reports go first; new reports are newest-first so historical backfills yield to fresher data.
+1. **`update-report-datasets` every 5 minutes** creates and cleans up metadata rows within each report retention window (via `update-report-dataset-for-account`).
+2. **`dispatch-due-reports` every minute** only queries `nextRefreshAt <= now AND refreshing = false`, atomically claims rows, and enqueues `update-report-status`. In-flight reports go first; new reports are newest-first and limited to 10 per account per pass.
 
 This polling mechanism ensures:
-- Pending reports are checked every ~5 minutes until they complete
+- Due work begins within about one minute; pending Amazon reports are checked every ~5 minutes until they complete
 - Completed reports wait until the next eligibility offset before creating a new report
 - Only records that are actually due get processed (efficient)
 
@@ -36,7 +36,8 @@ The `getNextAction` function determines what action to take:
 
 1. **If `reportId` exists**: Fetch status from Amazon Ads API
    - If `COMPLETED` → return `'process'`
-   - If not completed → return `'none'` (wait)
+   - If Amazon marks it failed or cancelled → return `'fail'`, clear the dead report ID, and advance to the next reconciliation milestone
+   - If still pending → return `'none'` (wait)
 2. **If no `reportId`**: Check eligibility
    - If eligible → return `'create'`
    - If not eligible → return `'none'`
@@ -62,12 +63,14 @@ The `getNextAction` function determines what action to take:
 - If report is pending (reportId exists but not completed): Sets `nextRefreshAt = now + 5 minutes` (poll again soon)
 - If not eligible: Sets `nextRefreshAt` to the next eligibility offset
 
-## Eligibility Offsets
+## Refresh Milestones
 
 Reports are eligible for refresh at specific time offsets after the dataset timestamp:
 
-- **Daily reports**: T+1, T+3, T+5, T+7, T+14, T+30, T+60 days
-- **Hourly reports**: T+24, T+72, T+312 hours
+- **Daily reports**: local-calendar T+1, T+3, T+5, T+7, T+14, T+30, T+60 days
+- **Hourly-grain reports**: every 3 hours during the first day after the local date closes, then local-calendar T+3 days, T+7 days, and T+13 days 21 hours
+
+All milestones are constructed in the account timezone and stored as UTC instants. They therefore remain on the intended local clock across daylight-saving transitions.
 
 A report is eligible if:
 1. The age (NOW - timestamp) has reached or exceeded one of the eligible offsets
@@ -77,11 +80,14 @@ A report is eligible if:
 
 ```mermaid
 flowchart TD
-    subgraph scheduledJob [update-report-datasets - every 5min]
+    subgraph maintenanceJob [update-report-datasets - every 5min]
         CreateRows[Create new metadata rows per account]
+    end
+    subgraph dispatchJob [dispatch-due-reports - every 1min]
         QueryDue["Query: nextRefreshAt <= now AND refreshing = false"]
+        Claim[Atomically claim due rows]
         EnqueueStatus[Enqueue update-report-status jobs]
-        CreateRows --> QueryDue --> EnqueueStatus
+        QueryDue --> Claim --> EnqueueStatus
     end
     
     subgraph stateMachine [update-report-status job]
@@ -113,7 +119,7 @@ flowchart TD
 
 3. **Short polling interval for pending reports**: When a report is created or still pending, `nextRefreshAt` is set to 5 minutes in the future. This ensures users see data quickly without excessive API calls.
 
-4. **Atomic work claims**: `update-report-status` changes `refreshing` from false to true in one conditional update. Duplicate jobs therefore cannot issue duplicate Amazon API calls for the same dataset row.
+4. **Atomic work claims**: The dispatcher changes `refreshing` from false to true before enqueueing. Manual refresh jobs claim inside `update-report-status`. Duplicate jobs therefore cannot issue duplicate Amazon API calls for the same dataset row.
 
 5. **Eligibility based on creation time**: The `lastReportCreatedAt` timestamp determines eligibility, not when the report was processed. This ensures we don't miss eligibility windows even if processing takes a long time.
 

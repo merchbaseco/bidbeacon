@@ -4,7 +4,7 @@
  * report creation, parsing, and status updates.
  */
 
-import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import { formatInTimeZone } from 'date-fns-tz';
 import { and, eq, type InferSelectModel } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
@@ -31,6 +31,7 @@ const jobInputSchema = z.object({
     timestamp: z.string(),
     aggregation: z.enum(AGGREGATION_TYPES),
     entityType: z.enum(ENTITY_TYPES),
+    claimed: z.boolean().optional(),
 });
 
 export const updateReportStatusJob = boss
@@ -45,7 +46,7 @@ export const updateReportStatusJob = boss
         // in case batchSize is increased in the future
         await Promise.all(
             jobs.map(job => {
-                const { accountId, countryCode, timestamp, aggregation, entityType } = job.data;
+                const { accountId, countryCode, timestamp, aggregation, entityType, claimed = false } = job.data;
                 const date = new Date(timestamp);
 
                 return withJobMetrics(
@@ -96,11 +97,17 @@ export const updateReportStatusJob = boss
                             }
 
                             // Atomically claim the row so duplicate jobs cannot issue duplicate API calls.
-                            const claimedReport = await claimReport(reportDatum);
-                            if (!claimedReport) {
-                                return;
+                            if (claimed) {
+                                if (!reportDatum.refreshing) {
+                                    return;
+                                }
+                            } else {
+                                const claimedReport = await claimReport(reportDatum);
+                                if (!claimedReport) {
+                                    return;
+                                }
+                                reportDatum = claimedReport;
                             }
-                            reportDatum = claimedReport;
 
                             // Determine next action using state machine
                             // The state machine will fetch report status if reportId exists
@@ -154,7 +161,7 @@ export const updateReportStatusJob = boss
                                     await setRefreshing(processedRow, false);
 
                                     recorder.addEvent({
-                                        message: `Report {{badges}} processed. ${parseResult.rowsProcessed} rows, ${parseResult.errorCount} errors.`,
+                                        message: `Report {{badges}} processed. ${parseResult.rowsProcessed} rows, ${parseResult.changedCount} changed, ${parseResult.errorCount} errors.`,
                                         badges: buildBadges(reportDatum.reportId ?? null),
                                         payload: {
                                             accountId,
@@ -165,6 +172,7 @@ export const updateReportStatusJob = boss
                                             reportId: reportDatum.reportId ?? null,
                                             rowsProcessed: parseResult.rowsProcessed,
                                             successCount: parseResult.successCount,
+                                            changedCount: parseResult.changedCount,
                                             errorCount: parseResult.errorCount,
                                             errorSamples: parseResult.errorSamples,
                                             ...buildFreshnessMetrics(reportDatum),
@@ -173,11 +181,34 @@ export const updateReportStatusJob = boss
                                     break;
                                 }
 
+                                case 'fail': {
+                                    const failedReportId = reportDatum.reportId;
+                                    const failedRow = await markReportFailed(reportDatum, `Amazon marked report ${failedReportId} as failed.`);
+                                    await setNextRefreshAt(failedRow, getNextRefreshTime(failedRow));
+                                    await setRefreshing(failedRow, false);
+
+                                    recorder.setErrorEvent({
+                                        message: 'Report {{badges}} failed in Amazon.',
+                                        badges: buildBadges(failedReportId),
+                                        payload: {
+                                            accountId,
+                                            countryCode,
+                                            aggregation,
+                                            entityType,
+                                            periodStart: date.toISOString(),
+                                            reportId: failedReportId,
+                                            ...buildFreshnessMetrics(reportDatum),
+                                        },
+                                    });
+                                    recorder.markFailure(`Amazon marked report ${failedReportId} as failed.`);
+                                    break;
+                                }
+
                                 default:
                                     throw new Error(`Unknown action received from state machine: ${action}`);
                             }
 
-                            if (reportDatum.error) {
+                            if (reportDatum.error && action !== 'fail') {
                                 await clearError(reportDatum);
                             }
                         } catch (error) {
@@ -319,6 +350,25 @@ async function markReportProcessed(row: InferSelectModel<typeof reportDatasetMet
     return updatedRow;
 }
 
+const markReportFailed = async (row: InferSelectModel<typeof reportDatasetMetadata>, error: string): Promise<InferSelectModel<typeof reportDatasetMetadata>> => {
+    const [updatedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({
+            status: 'error',
+            reportId: null,
+            error,
+        })
+        .where(eq(reportDatasetMetadata.uid, row.uid))
+        .returning();
+
+    if (!updatedRow) {
+        throw new Error(`Failed to record Amazon report failure for ${row.accountId}`);
+    }
+
+    emitEvent({ type: 'report:refreshed', row: updatedRow });
+    return updatedRow;
+};
+
 async function setNextRefreshAt(row: InferSelectModel<typeof reportDatasetMetadata>, nextRefreshAt: Date | null): Promise<void> {
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
@@ -346,17 +396,11 @@ async function setNextRefreshAt(row: InferSelectModel<typeof reportDatasetMetada
  * Returns the updated row.
  */
 async function setReport(row: InferSelectModel<typeof reportDatasetMetadata>, reportId: string): Promise<InferSelectModel<typeof reportDatasetMetadata>> {
-    // Convert current UTC time to country's timezone and store as timezone-less timestamp
-    const timezone = getTimezoneForCountry(row.countryCode);
-    const nowUtc = utcNow();
-    const zonedTime = toZonedTime(nowUtc, timezone);
-    const lastReportCreatedAt = new Date(zonedTime.getFullYear(), zonedTime.getMonth(), zonedTime.getDate(), zonedTime.getHours(), zonedTime.getMinutes(), zonedTime.getSeconds());
-
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
         .set({
             reportId,
-            lastReportCreatedAt,
+            lastReportCreatedAt: utcNow(),
         })
         .where(
             and(
@@ -436,6 +480,6 @@ const formatReportBadge = (reportId?: string | null) => {
 };
 
 const formatDatasetBadge = (periodStart: Date, aggregation: string, entityType: string, timezone: string) => {
-    const dateLabel = aggregation === 'hourly' ? formatInTimeZone(periodStart, timezone, 'MMM d HH:mm') : formatInTimeZone(periodStart, timezone, 'MMM d');
+    const dateLabel = formatInTimeZone(periodStart, timezone, 'MMM d');
     return `${aggregation} ${entityType} · ${dateLabel}`;
 };

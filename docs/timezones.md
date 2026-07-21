@@ -25,13 +25,14 @@ Notes:
 
 - `performance_hourly.bucket_start` is UTC `timestamptz` (canonical). `bucket_date` and `bucket_hour` are account-local labels.
 - `performance_daily.bucket_start` is UTC `timestamptz`. `bucket_date` is account-local label.
-- `report_dataset_metadata.period_start` is a timezone-less timestamp but represents a UTC instant (start of hour/day in account timezone).
-- `report_dataset_metadata.last_report_created_at` is a timezone-less timestamp that represents local time in the account timezone.
+- `report_dataset_metadata.period_start`, `next_refresh_at`, and `last_report_created_at` are UTC `timestamptz` instants.
+- Hourly-grain report metadata uses one `period_start` per account-local date. Daily and hourly-grain report dates both begin at account-local midnight.
 
 ### Report ingestion flow (Amazon Ads Reports API)
 
-- `update-report-dataset-for-account` creates report metadata windows using `zonedTopOfHour` / `zonedStartOfDay` with the account timezone.
+- `update-report-dataset-for-account` creates report metadata dates using `zonedStartOfDay` with the account timezone.
 - `createReportForDataset` converts `period_start` to `startDate`/`endDate` using `formatInTimeZone(..., accountTimezone, 'yyyy-MM-dd')` so report windows match the account-local day.
+- Refresh milestones use account-local calendar addition, then store the resulting UTC instant. This avoids one-hour drift across daylight-saving transitions.
 - `parse-report/*` converts report `date.value` + `hour.value` into:
   - `bucketStart` (UTC instant)
   - `bucketDate` / `bucketHour` (account-local labels)
@@ -46,7 +47,7 @@ Notes:
 ### UI / API usage
 
 - Event stream API returns `timezone: getTimezoneForCountry(countryCode)` and UI formats events in that timezone.
-- Hourly chart (`metrics.hourlyPerformance`) uses **browser timezone** for daily boundaries and for hour labels, grouping via `AT TIME ZONE` in SQL. This is **intentional** to match advertising.amazon.com behavior (viewer-local “today”).
+- Hourly chart (`metrics.hourlyPerformance`) uses the account timezone for daily boundaries and hour labels, matching Amazon report dates rather than the viewer's browser timezone.
 
 ## Consistency review (vs Amazon Ads console)
 

@@ -5,6 +5,10 @@ BidBeacon stores two primary performance datasets that come from different Amazo
 - `performance_hourly`: Hourly report data (target-level) used for intra-day charts (e.g. Today/Yesterday).
 - `performance_daily`: Daily report data used for day/month ranges (e.g. This Week/This Month/Custom > 1 day).
 
+Marketing Stream data is rolled into `performance_hourly` every five minutes over a trailing 24-hour window, rounded outward to the oldest whole hour bucket. Existing rows are updated only when their values change, keeping live data fresh without rewriting unchanged buckets. Stream owns buckets at or after that boundary; hourly-grain report parsing skips those buckets so a report cannot be immediately overwritten by the next Stream rollup. Reports own strictly older buckets.
+
+Amazon hourly-grain reports reconcile Stream data after an account-local date closes. Each metadata row and API request covers one local date (the report still returns `hour.value` rows). Reconciliation runs every three hours during the first post-close day, then at 3 days, 7 days, and 13 days 21 hours. This keeps Stream as the low-latency source while using reports to catch late or corrected data without requesting the same full-day report once per hour.
+
 These datasets **do not always reconcile** 1:1. Amazon’s hourly and daily reports are generated from different pipelines and can differ because of:
 
 - Reporting cadence and backfill timing (hourly is more volatile).

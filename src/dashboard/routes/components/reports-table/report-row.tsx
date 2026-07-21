@@ -3,16 +3,17 @@ import AlarmClockIcon from '@merchbaseco/icons/core-solid-rounded/AlarmClockIcon
 import ChartColumnIcon from '@merchbaseco/icons/core-solid-rounded/ChartColumnIcon';
 import Clock05Icon from '@merchbaseco/icons/core-solid-rounded/Clock05Icon';
 import TimeScheduleIcon from '@merchbaseco/icons/core-solid-rounded/TimeScheduleIcon';
+import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo } from 'react';
 import { Progress } from '@/dashboard/components/ui/progress.js';
 import { Spinner } from '@/dashboard/components/ui/spinner.js';
+import { getTimezoneForCountry } from '@/utils/timezones';
 import { Badge } from '../../../components/ui/badge.js';
 import { TableCell, TableRow } from '../../../components/ui/table.js';
 import { Tooltip, TooltipPopup, TooltipTrigger } from '../../../components/ui/tooltip.js';
 import { useReport } from '../../hooks/use-report.js';
 import type { ReportSummary } from '../../hooks/use-reports.js';
 import { useSelectedAccountId } from '../../hooks/use-selected-accountid.js';
-import { formatDate } from '../../utils.js';
 import { ErrorDialog } from './error-dialog.js';
 import { ReportIdDialog } from './report-id-dialog.js';
 import { ReportRefreshButton } from './report-refresh-button.js';
@@ -74,7 +75,8 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
 
     const rowKey = `${report.periodStart}-${report.aggregation}-${report.entityType}`;
 
-    const reportDate = formatDate(summary.periodStart, summary.aggregation === 'hourly');
+    const timezone = getTimezoneForCountry(report.countryCode);
+    const reportDate = formatInTimeZone(summary.periodStart, timezone, 'MMM d, yyyy');
     const isParsingStatus = report.status === 'parsing';
     const isRefreshing = report.refreshing;
     const { time: nextRefreshTime, severity: nextRefreshSeverity } = formatNextRefreshTime(report.nextRefreshAt);
@@ -129,7 +131,7 @@ export const ReportRow = ({ summary }: ReportRowProps) => {
                                     <span className={`cursor-help ${nextRefreshSeverity !== 'overdue' ? 'text-muted-foreground' : ''}`}>{nextRefreshTime}</span>
                                 </div>
                             </TooltipTrigger>
-                            <TooltipPopup>{formatDate(report.nextRefreshAt)}</TooltipPopup>
+                            <TooltipPopup>{formatInTimeZone(report.nextRefreshAt, timezone, 'MMM d, yyyy h:mm a zzz')}</TooltipPopup>
                         </Tooltip>
                     )}
                 </div>

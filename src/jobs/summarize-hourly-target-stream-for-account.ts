@@ -11,7 +11,7 @@ import { db } from '@/db/index';
 import { withDatabaseRetry } from '@/db/retry';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceHourly } from '@/db/schema';
 import { boss } from '@/jobs/boss';
-import { zonedTopOfHour } from '@/utils/date';
+import { getHourlyStreamOwnershipStart, zonedTopOfHour } from '@/utils/date';
 import { type JobMetricsRecorder, withJobMetrics } from '@/utils/job-metrics';
 import { getTimezoneForCountry } from '@/utils/timezones';
 
@@ -62,8 +62,8 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
 
     const entityId = accountRecord[0]?.entityId;
     const windowEnd = new Date();
-    const windowStart = new Date(windowEnd.getTime() - 24 * 60 * 60 * 1000);
     const timezone = getTimezoneForCountry(countryCode);
+    const windowStart = getHourlyStreamOwnershipStart(windowEnd, timezone);
     const windowEndHourStart = zonedTopOfHour(windowEnd, timezone);
     const datasetBadge = `hourly target · ${formatInTimeZone(windowEndHourStart, timezone, 'MMM d HH:mm')}`;
 
@@ -192,6 +192,29 @@ async function summarizeHourlyForAccount(accountId: string, countryCode: string,
                         sales: sql`excluded.sales`,
                         purchases: sql`excluded.purchases`,
                     },
+                    setWhere: sql`(
+                        ${performanceHourly.bucketDate},
+                        ${performanceHourly.bucketHour},
+                        ${performanceHourly.campaignId},
+                        ${performanceHourly.adGroupId},
+                        ${performanceHourly.targetMatchType},
+                        ${performanceHourly.impressions},
+                        ${performanceHourly.clicks},
+                        ${performanceHourly.spend},
+                        ${performanceHourly.sales},
+                        ${performanceHourly.purchases}
+                    ) IS DISTINCT FROM (
+                        excluded.bucket_date,
+                        excluded.bucket_hour,
+                        excluded.campaign_id,
+                        excluded.ad_group_id,
+                        excluded.target_match_type,
+                        excluded.impressions,
+                        excluded.clicks,
+                        excluded.spend,
+                        excluded.sales,
+                        excluded.purchases
+                    )`,
                 })
         );
     }

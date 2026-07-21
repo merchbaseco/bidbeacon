@@ -1,6 +1,6 @@
 /**
  * Job: Enqueues summarize-hourly-target-stream-for-account jobs for all enabled accounts.
- * Runs every 15 minutes and enqueues summarize-hourly-target-stream-for-account jobs
+ * Runs every 5 minutes and enqueues summarize-hourly-target-stream-for-account jobs
  * for each enabled account.
  */
 
@@ -18,7 +18,7 @@ import { summarizeHourlyTargetStreamForAccountJob } from './summarize-hourly-tar
 export const summarizeHourlyTargetStreamJob = boss
     .createJob('summarize-hourly-target-stream')
     .schedule({
-        cron: '*/15 * * * *', // Run every 15 minutes
+        cron: '*/5 * * * *', // Run every 5 minutes
     })
     .work(async jobs => {
         await Promise.all(

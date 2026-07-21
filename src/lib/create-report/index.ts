@@ -5,7 +5,6 @@ import { reportConfigs } from '@/config/reports/configs.js';
 import { db } from '@/db/index.js';
 import { advertiserAccount } from '@/db/schema.js';
 import type { AggregationType, EntityType } from '@/types/reports.js';
-import { utcAddHours } from '@/utils/date.js';
 import { getTimezoneForCountry } from '@/utils/timezones';
 
 export type CreateReportForDatasetInput = {
@@ -38,13 +37,12 @@ export async function createReportForDataset(input: CreateReportForDatasetInput)
 
     // Calculate date window
     const windowStart = new Date(input.timestamp);
-    const windowEnd = input.aggregation === 'hourly' ? utcAddHours(windowStart, 1) : windowStart;
 
     const timezone = getTimezoneForCountry(input.countryCode);
     const formatDate = (date: Date): string => formatInTimeZone(date, timezone, 'yyyy-MM-dd');
 
     const startDate = formatDate(windowStart);
-    const endDate = formatDate(windowEnd);
+    const endDate = startDate;
 
     // Create the report via Amazon Ads API
     let reportId: string;

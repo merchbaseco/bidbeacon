@@ -66,6 +66,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
 
     const BATCH_SIZE = 1000;
     let insertedCount = 0;
+    let changedCount = 0;
 
     // Set total upfront so progress bar starts at 0%
     await updateProgress(input.reportUid, valuesToInsert.length, 0, errors.length);
@@ -75,7 +76,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
 
     for (let i = 0; i < valuesToInsert.length; i += BATCH_SIZE) {
         const batch = valuesToInsert.slice(i, i + BATCH_SIZE);
-        await withDatabaseRetry(() =>
+        const changedRows = await withDatabaseRetry(() =>
             db
                 .insert(performanceDaily)
                 .values(batch)
@@ -90,8 +91,28 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
                         sales: sql`excluded.sales`,
                         purchases: sql`excluded.purchases`,
                     },
+                    setWhere: sql`(
+                        ${performanceDaily.campaignId},
+                        ${performanceDaily.adGroupId},
+                        ${performanceDaily.impressions},
+                        ${performanceDaily.clicks},
+                        ${performanceDaily.spend},
+                        ${performanceDaily.sales},
+                        ${performanceDaily.purchases}
+                    ) IS DISTINCT FROM (
+                        excluded.campaign_id,
+                        excluded.ad_group_id,
+                        excluded.impressions,
+                        excluded.clicks,
+                        excluded.spend,
+                        excluded.sales,
+                        excluded.purchases
+                    )`,
                 })
+                .returning({ accountId: performanceDaily.accountId })
         );
+
+        changedCount += changedRows.length;
 
         insertedCount += batch.length;
         await updateProgress(input.reportUid, valuesToInsert.length, insertedCount, errors.length);
@@ -99,6 +120,7 @@ export async function handleDailyTarget(input: ParseReportInput): Promise<ParseR
 
     return {
         successCount: valuesToInsert.length,
+        changedCount,
         errorCount: errors.length,
         rowsProcessed: valuesToInsert.length + errors.length,
         errorSamples: [...new Set(errors.map(error => error.error))].slice(0, 5),

@@ -7,6 +7,7 @@ import { boss } from './boss.js';
 import './update-report-status';
 import './update-report-dataset-for-account';
 import './update-report-datasets';
+import './dispatch-due-reports';
 import './sync-ad-entities';
 import './sync-ad-entities-for-account';
 import './summarize-daily-target-stream-for-account';

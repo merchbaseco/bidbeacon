@@ -69,5 +69,5 @@ export async function handleDailyProduct(input: ParseReportInput): Promise<Parse
         insertedCount++;
     }
 
-    return { rowsProcessed: insertedCount, successCount: insertedCount, errorCount: rows.length - insertedCount, errorSamples: [] };
+    return { rowsProcessed: insertedCount, successCount: insertedCount, changedCount: insertedCount, errorCount: rows.length - insertedCount, errorSamples: [] };
 }

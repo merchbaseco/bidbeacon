@@ -35,6 +35,7 @@ const SUPPORTED_APIS = [
     'spDeleteTargets',
 ] as const;
 const SUPPORTED_JOBS = [
+    'dispatch-due-reports',
     'update-report-datasets',
     'update-report-dataset-for-account',
     'sync-ad-entities',

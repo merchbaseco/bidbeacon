@@ -7,12 +7,12 @@ import type { AggregationType, EntityType } from '@/types/reports';
 export interface ReportDatum {
     accountId: string;
     countryCode: string;
-    timestamp: Date; // timezone-less, represents local time in country's timezone
+    timestamp: Date;
     aggregation: AggregationType;
     entityType: EntityType;
     status: string; // missing, fetching, parsing, completed, failed
     nextRefreshAt: Date | null;
-    lastReportCreatedAt: Date | null; // timezone-less, represents local time in country's timezone
+    lastReportCreatedAt: Date | null;
     reportId: string | null;
     error: string | null;
 }
@@ -27,4 +27,4 @@ export interface ReportStatus {
 /**
  * Next action to take for a report datum.
  */
-export type NextAction = 'process' | 'create' | 'none';
+export type NextAction = 'process' | 'create' | 'fail' | 'none';

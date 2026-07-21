@@ -11,6 +11,7 @@ export type ParseReportInput = {
 
 export type ParseReportOutput = {
     successCount: number;
+    changedCount: number;
     errorCount: number;
     rowsProcessed: number;
     errorSamples: string[];
