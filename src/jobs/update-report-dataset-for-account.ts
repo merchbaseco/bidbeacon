@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { db } from '@/db/index';
 import { reportDatasetMetadata } from '@/db/schema';
 import { boss } from '@/jobs/boss';
+import { getHourlyReportRetentionWindow } from '@/lib/report-retention';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
 import type { AggregationType, EntityType } from '@/types/reports';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractMonths } from '@/utils/date';
@@ -11,7 +12,6 @@ import { withJobMetrics } from '@/utils/job-metrics';
 import { getTimezoneForCountry } from '@/utils/timezones';
 
 // Amazon Ads API data retention periods
-const HOURLY_RETENTION_DAYS = 14;
 const DAILY_RETENTION_MONTHS = 15;
 
 // ============================================================================
@@ -112,8 +112,9 @@ async function insertMissingMetadataRecords(
     timezone: string
 ): Promise<{ insertedCount: number; totalPeriods: number; earliestPeriodStart: Date; latestPeriodStart: Date }> {
     const isHourly = aggregation === 'hourly';
-    const currentPeriodStart = zonedStartOfDay(now, timezone);
-    const earliestPeriodStart = isHourly ? zonedSubtractDays(currentPeriodStart, HOURLY_RETENTION_DAYS, timezone) : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
+    const hourlyRetentionWindow = getHourlyReportRetentionWindow(now, timezone);
+    const currentPeriodStart = isHourly ? hourlyRetentionWindow.latestPeriodStart : zonedStartOfDay(now, timezone);
+    const earliestPeriodStart = isHourly ? hourlyRetentionWindow.earliestPeriodStart : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
     let insertedCount = 0;
     let totalPeriods = 0;
 
@@ -158,7 +159,7 @@ async function cleanupOutOfBoundsMetadataRecords(
 ): Promise<{ deletedCount: number; cutoff: Date }> {
     const isHourly = aggregation === 'hourly';
     const currentPeriodStart = zonedStartOfDay(now, timezone);
-    const cutoff = isHourly ? zonedSubtractDays(currentPeriodStart, HOURLY_RETENTION_DAYS, timezone) : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
+    const cutoff = isHourly ? getHourlyReportRetentionWindow(now, timezone).earliestPeriodStart : zonedSubtractMonths(currentPeriodStart, DAILY_RETENTION_MONTHS, timezone);
 
     const deletedRows = await db
         .delete(reportDatasetMetadata)
