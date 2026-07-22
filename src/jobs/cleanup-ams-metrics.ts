@@ -31,9 +31,9 @@ export const cleanupAmsMetricsJob = boss
                         input: job.data,
                     },
                     async recorder => {
-                        const amsMetricsCutoff = new Date(Date.now() - AMS_METRICS_RETENTION_DAYS * DAY_MS);
-                        const operationalCutoff = new Date(Date.now() - OPERATIONAL_RETENTION_DAYS * DAY_MS);
-                        const rawStreamCutoff = new Date(Date.now() - RAW_STREAM_RETENTION_DAYS * DAY_MS);
+                        const amsMetricsCutoff = new Date(Date.now() - AMS_METRICS_RETENTION_DAYS * DAY_MS).toISOString();
+                        const operationalCutoff = new Date(Date.now() - OPERATIONAL_RETENTION_DAYS * DAY_MS).toISOString();
+                        const rawStreamCutoff = new Date(Date.now() - RAW_STREAM_RETENTION_DAYS * DAY_MS).toISOString();
 
                         const deleted = {
                             amsMetrics: await deleteBatches(
@@ -108,9 +108,9 @@ export const cleanupAmsMetricsJob = boss
                             payload: {
                                 deleted,
                                 cutoffs: {
-                                    amsMetrics: amsMetricsCutoff.toISOString(),
-                                    operational: operationalCutoff.toISOString(),
-                                    rawStream: rawStreamCutoff.toISOString(),
+                                    amsMetrics: amsMetricsCutoff,
+                                    operational: operationalCutoff,
+                                    rawStream: rawStreamCutoff,
                                 },
                             },
                         });
