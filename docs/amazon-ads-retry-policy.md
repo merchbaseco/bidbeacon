@@ -18,7 +18,7 @@
 - The API stays synchronous for these operations; no early success responses.
 - A 429 applies its `Retry-After` cooldown only to the affected limiter. Overlapping cooldowns retain the latest deadline; an older reset cannot shorten a newer cooldown.
 - Cooldown state is persisted by limiter key, so a server restart cannot erase an active Amazon cooldown.
-- If Amazon omits `Retry-After`, the governor starts near 5s, adds ±20% jitter, and doubles subsequent cooldowns up to 60s.
+- If Amazon omits `Retry-After`, the governor starts near 5s, adds ±20% jitter, and doubles subsequent cooldowns up to 60s. Intermittent successes preserve the learned cooldown; it resets after five minutes without another 429.
 
 ## Metrics
 

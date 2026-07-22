@@ -19,6 +19,7 @@ describe('throttledFetch retries', () => {
     afterEach(() => {
         vi.useRealTimers();
         vi.unstubAllGlobals();
+        vi.restoreAllMocks();
     });
 
     it('retries retryable responses with backoff and eventually succeeds', async () => {
@@ -157,5 +158,39 @@ describe('throttledFetch retries', () => {
         const thirdResponse = await thirdPromise;
         expect(thirdResponse.status).toBe(200);
         expect(fetchMock).toHaveBeenCalledTimes(3);
+    });
+
+    it('retains a learned fallback through an intermittent success', async () => {
+        const fetchMock = vi.mocked(global.fetch);
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        vi.mocked(saveRateLimitState).mockClear();
+        fetchMock
+            .mockResolvedValueOnce(new Response('<html>Too Many Requests</html>', { status: 429 }))
+            .mockResolvedValueOnce(new Response('<html>Too Many Requests</html>', { status: 429 }))
+            .mockResolvedValueOnce(new Response('<html>Too Many Requests</html>', { status: 429 }))
+            .mockResolvedValueOnce(new Response('ok', { status: 200 }))
+            .mockResolvedValueOnce(new Response('<html>Too Many Requests</html>', { status: 429 }));
+
+        const throttled = throttledFetch('https://example.com/throttled', {
+            retry: AMAZON_ADS_API_RETRY,
+            throttle: { group: 'report-create', key: 'intermittent-success-test' },
+        });
+        await vi.runAllTimersAsync();
+        await expect(throttled).resolves.toHaveProperty('status', 429);
+
+        const recovered = throttledFetch('https://example.com/recovered', {
+            throttle: { group: 'report-create', key: 'intermittent-success-test' },
+        });
+        await vi.runAllTimersAsync();
+        await expect(recovered).resolves.toHaveProperty('status', 200);
+
+        const throttledAgain = throttledFetch('https://example.com/throttled-again', {
+            throttle: { group: 'report-create', key: 'intermittent-success-test' },
+        });
+        await vi.runAllTimersAsync();
+        await expect(throttledAgain).resolves.toHaveProperty('status', 429);
+
+        const lastState = vi.mocked(saveRateLimitState).mock.calls.at(-1)?.[1];
+        expect(lastState?.lastRetryAfterMs).toBe(40_000);
     });
 });

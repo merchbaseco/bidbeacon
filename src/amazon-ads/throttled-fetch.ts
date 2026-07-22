@@ -115,10 +115,6 @@ export async function throttledFetch(url: string | URL | Request, options?: Thro
                     const cooldownMs = retryAfterMs ?? withJitter(getFallbackRetryAfterMs(limiterState));
                     metrics.retryAfterMs = Math.max(metrics.retryAfterMs ?? 0, cooldownMs);
                     await applyCooldown(limiterState, cooldownMs);
-                } else if (response.ok && Date.now() >= limiterState.cooldownUntil && limiterState.lastRateLimitAt !== 0) {
-                    limiterState.lastRateLimitAt = 0;
-                    limiterState.lastRetryAfterMs = null;
-                    await persistLimiterState(limiterState);
                 }
 
                 if (!(resolvedRetry && shouldRetryResponse(response.status, resolvedRetry, attempt))) {
