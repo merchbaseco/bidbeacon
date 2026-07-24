@@ -4,6 +4,7 @@ import { apiRateLimitState } from '@/db/schema';
 
 export type StoredRateLimitState = {
     cooldownUntil: number;
+    exhaustionCount: number;
     lastRateLimitAt: number;
     lastRetryAfterMs: number;
 };
@@ -18,6 +19,7 @@ export const loadRateLimitState = async (key: string): Promise<StoredRateLimitSt
         }
         return {
             cooldownUntil: row.cooldownUntil.getTime(),
+            exhaustionCount: row.exhaustionCount,
             lastRateLimitAt: row.lastRateLimitAt.getTime(),
             lastRetryAfterMs: row.lastRetryAfterMs,
         };
@@ -33,6 +35,7 @@ export const saveRateLimitState = async (key: string, state: StoredRateLimitStat
             .values({
                 key,
                 cooldownUntil: new Date(state.cooldownUntil),
+                exhaustionCount: state.exhaustionCount,
                 lastRateLimitAt: new Date(state.lastRateLimitAt),
                 lastRetryAfterMs: state.lastRetryAfterMs,
                 updatedAt: new Date(),
@@ -41,6 +44,7 @@ export const saveRateLimitState = async (key: string, state: StoredRateLimitStat
                 target: apiRateLimitState.key,
                 set: {
                     cooldownUntil: new Date(state.cooldownUntil),
+                    exhaustionCount: state.exhaustionCount,
                     lastRateLimitAt: new Date(state.lastRateLimitAt),
                     lastRetryAfterMs: state.lastRetryAfterMs,
                     updatedAt: new Date(),

@@ -117,6 +117,7 @@ describe('throttledFetch retries', () => {
         const fetchMock = vi.mocked(global.fetch).mockResolvedValue(new Response('ok', { status: 200 }));
         vi.mocked(loadRateLimitState).mockResolvedValueOnce({
             cooldownUntil: Date.now() + 10_000,
+            exhaustionCount: 0,
             lastRateLimitAt: Date.now(),
             lastRetryAfterMs: 10_000,
         });
@@ -140,16 +141,16 @@ describe('throttledFetch retries', () => {
             .mockResolvedValueOnce(new Response('ok', { status: 200 }));
 
         const firstPromise = throttledFetch('https://example.com/first', {
-            throttle: { group: 'report-create', key: 'overlap-test' },
+            throttle: { group: 'default', key: 'overlap-test' },
         });
         const secondPromise = throttledFetch('https://example.com/second', {
-            throttle: { group: 'report-create', key: 'overlap-test' },
+            throttle: { group: 'default', key: 'overlap-test' },
         });
         await vi.advanceTimersByTimeAsync(10_200);
         await Promise.all([firstPromise, secondPromise]);
 
         const thirdPromise = throttledFetch('https://example.com/third', {
-            throttle: { group: 'report-create', key: 'overlap-test' },
+            throttle: { group: 'default', key: 'overlap-test' },
         });
         await vi.advanceTimersByTimeAsync(10_000);
         expect(fetchMock).toHaveBeenCalledTimes(2);
@@ -173,24 +174,196 @@ describe('throttledFetch retries', () => {
 
         const throttled = throttledFetch('https://example.com/throttled', {
             retry: AMAZON_ADS_API_RETRY,
-            throttle: { group: 'report-create', key: 'intermittent-success-test' },
+            throttle: { group: 'default', key: 'intermittent-success-test' },
         });
         await vi.runAllTimersAsync();
         await expect(throttled).resolves.toHaveProperty('status', 429);
 
         const recovered = throttledFetch('https://example.com/recovered', {
-            throttle: { group: 'report-create', key: 'intermittent-success-test' },
+            throttle: { group: 'default', key: 'intermittent-success-test' },
         });
         await vi.runAllTimersAsync();
         await expect(recovered).resolves.toHaveProperty('status', 200);
 
         const throttledAgain = throttledFetch('https://example.com/throttled-again', {
-            throttle: { group: 'report-create', key: 'intermittent-success-test' },
+            throttle: { group: 'default', key: 'intermittent-success-test' },
         });
         await vi.runAllTimersAsync();
         await expect(throttledAgain).resolves.toHaveProperty('status', 429);
 
         const lastState = vi.mocked(saveRateLimitState).mock.calls.at(-1)?.[1];
         expect(lastState?.lastRetryAfterMs).toBe(40_000);
+    });
+
+    it('opens a ten-minute report creation gate after retries exhaust 429s', async () => {
+        const fetchMock = vi.mocked(global.fetch);
+        const onMetrics = vi.fn();
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        vi.mocked(saveRateLimitState).mockClear();
+        fetchMock.mockResolvedValue(new Response('<html>Too Many Requests</html>', { status: 429 }));
+
+        const promise = throttledFetch('https://example.com/exhausted', {
+            retry: AMAZON_ADS_API_RETRY,
+            throttle: { group: 'report-create', key: 'exhausted-test' },
+            onMetrics,
+        });
+        await vi.runAllTimersAsync();
+        await expect(promise).resolves.toHaveProperty('status', 429);
+
+        const lastState = vi.mocked(saveRateLimitState).mock.calls.at(-1)?.[1];
+        expect(lastState).toMatchObject({ exhaustionCount: 1 });
+        expect((lastState?.cooldownUntil ?? 0) - (lastState?.lastRateLimitAt ?? 0)).toBe(600_100);
+        expect(onMetrics).toHaveBeenCalledWith(expect.objectContaining({ retryAfterMs: 600_000 }));
+    });
+
+    it('escalates exhausted report creation gates from ten to thirty minutes', async () => {
+        const fetchMock = vi.mocked(global.fetch);
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        vi.mocked(saveRateLimitState).mockClear();
+        fetchMock.mockResolvedValue(new Response('', { status: 429 }));
+
+        for (const [index, expectedCooldownMs] of [600_000, 1_200_000, 1_800_000, 1_800_000].entries()) {
+            const promise = throttledFetch(`https://example.com/exhausted-${index}`, {
+                retry: AMAZON_ADS_API_RETRY,
+                throttle: { group: 'report-create', key: 'escalation-test' },
+            });
+            await vi.runAllTimersAsync();
+            await expect(promise).resolves.toHaveProperty('status', 429);
+
+            const lastState = vi.mocked(saveRateLimitState).mock.calls.at(-1)?.[1];
+            expect(lastState?.exhaustionCount).toBe(Math.min(index + 1, 3));
+            expect((lastState?.cooldownUntil ?? 0) - (lastState?.lastRateLimitAt ?? 0)).toBe(expectedCooldownMs + 100);
+        }
+    });
+
+    it('paces report creation for five minutes after a recovery probe', async () => {
+        const fetchMock = vi.mocked(global.fetch);
+        const requestTimes: number[] = [];
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        fetchMock
+            .mockImplementationOnce(async () => {
+                requestTimes.push(Date.now());
+                return new Response('', { status: 429 });
+            })
+            .mockImplementationOnce(async () => {
+                requestTimes.push(Date.now());
+                return new Response('', { status: 429 });
+            })
+            .mockImplementationOnce(async () => {
+                requestTimes.push(Date.now());
+                return new Response('', { status: 429 });
+            })
+            .mockImplementationOnce(async () => {
+                requestTimes.push(Date.now());
+                return new Response('ok', { status: 200 });
+            })
+            .mockImplementationOnce(async () => {
+                requestTimes.push(Date.now());
+                return new Response('ok', { status: 200 });
+            });
+
+        const exhausted = throttledFetch('https://example.com/exhausted', {
+            retry: AMAZON_ADS_API_RETRY,
+            throttle: { group: 'report-create', key: 'recovery-test' },
+        });
+        await vi.runAllTimersAsync();
+        await expect(exhausted).resolves.toHaveProperty('status', 429);
+
+        const recovered = throttledFetch('https://example.com/recovered', {
+            retry: AMAZON_ADS_API_RETRY,
+            throttle: { group: 'report-create', key: 'recovery-test' },
+        });
+        await vi.runAllTimersAsync();
+        await expect(recovered).resolves.toHaveProperty('status', 200);
+
+        const next = throttledFetch('https://example.com/next', {
+            retry: AMAZON_ADS_API_RETRY,
+            throttle: { group: 'report-create', key: 'recovery-test' },
+        });
+        await vi.runAllTimersAsync();
+        await expect(next).resolves.toHaveProperty('status', 200);
+
+        expect(requestTimes[3] - requestTimes[2]).toBe(600_100);
+        expect(requestTimes[4] - requestTimes[3]).toBe(300_000);
+    });
+
+    it('continues report creation escalation after limiter startup', async () => {
+        const fetchMock = vi.mocked(global.fetch);
+        vi.spyOn(Math, 'random').mockReturnValue(0.5);
+        vi.mocked(loadRateLimitState).mockResolvedValueOnce({
+            cooldownUntil: Date.now() + 10_000,
+            exhaustionCount: 2,
+            lastRateLimitAt: Date.now(),
+            lastRetryAfterMs: 60_000,
+        });
+        fetchMock.mockResolvedValue(new Response('', { status: 429 }));
+
+        const promise = throttledFetch('https://example.com/persisted-exhaustion', {
+            retry: AMAZON_ADS_API_RETRY,
+            throttle: { group: 'report-create', key: 'persisted-exhaustion-test' },
+        });
+        await vi.runAllTimersAsync();
+        await expect(promise).resolves.toHaveProperty('status', 429);
+
+        const lastState = vi.mocked(saveRateLimitState).mock.calls.at(-1)?.[1];
+        expect(lastState?.exhaustionCount).toBe(3);
+        expect((lastState?.cooldownUntil ?? 0) - (lastState?.lastRateLimitAt ?? 0)).toBe(1_800_100);
+    });
+
+    it('runs only one report creation request per region at a time', async () => {
+        const fetchMock = vi.mocked(global.fetch);
+        let releaseFirstRequest: () => void = () => undefined;
+        fetchMock
+            .mockImplementationOnce(
+                async () =>
+                    await new Promise<Response>(resolve => {
+                        releaseFirstRequest = () => resolve(new Response('ok', { status: 200 }));
+                    })
+            )
+            .mockResolvedValueOnce(new Response('ok', { status: 200 }));
+
+        const first = throttledFetch('https://example.com/first', {
+            throttle: { group: 'report-create', key: 'single-flight-test' },
+        });
+        const second = throttledFetch('https://example.com/second', {
+            throttle: { group: 'report-create', key: 'single-flight-test' },
+        });
+        await vi.advanceTimersByTimeAsync(10);
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+
+        releaseFirstRequest();
+        await vi.advanceTimersByTimeAsync(500);
+        await expect(Promise.all([first, second])).resolves.toHaveLength(2);
+        expect(fetchMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears stale report creation exhaustion after thirty inactive minutes', async () => {
+        const fetchMock = vi.mocked(global.fetch);
+        const requestTimes: number[] = [];
+        vi.mocked(loadRateLimitState).mockResolvedValueOnce({
+            cooldownUntil: Date.now() - 1,
+            exhaustionCount: 3,
+            lastRateLimitAt: Date.now() - 31 * 60_000,
+            lastRetryAfterMs: 1_800_000,
+        });
+        fetchMock.mockImplementation(async () => {
+            requestTimes.push(Date.now());
+            return new Response('ok', { status: 200 });
+        });
+
+        const first = throttledFetch('https://example.com/after-quiet-period', {
+            throttle: { group: 'report-create', key: 'stale-exhaustion-test' },
+        });
+        await vi.runAllTimersAsync();
+        await expect(first).resolves.toHaveProperty('status', 200);
+
+        const second = throttledFetch('https://example.com/normal-pacing', {
+            throttle: { group: 'report-create', key: 'stale-exhaustion-test' },
+        });
+        await vi.runAllTimersAsync();
+        await expect(second).resolves.toHaveProperty('status', 200);
+
+        expect(requestTimes[1] - requestTimes[0]).toBe(500);
+        expect(vi.mocked(saveRateLimitState).mock.calls.at(-1)?.[1].exhaustionCount).toBe(0);
     });
 });

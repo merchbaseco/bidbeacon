@@ -1,0 +1,1 @@
+ALTER TABLE "api_rate_limit_state" ADD COLUMN "exhaustion_count" integer DEFAULT 0 NOT NULL;
