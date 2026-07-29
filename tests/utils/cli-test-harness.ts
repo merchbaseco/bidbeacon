@@ -46,7 +46,7 @@ const buildTestCaller = async (accountId: string) => {
     const context = {
         user: { sub: 'test-user' },
         accessibleAccountIds: [accountId],
-        authType: 'dev',
+        authType: 'clerk',
         request: null,
     };
 

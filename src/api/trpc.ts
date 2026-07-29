@@ -10,7 +10,7 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 
 /**
- * API procedure that requires authentication (Clerk, API key, or dev).
+ * API procedure that requires authentication (Clerk or API key).
  * Provides assertAccountAccess helper to validate account access.
  */
 export const apiProcedure = t.procedure.use(({ ctx, next }) => {
@@ -35,10 +35,10 @@ export const apiProcedure = t.procedure.use(({ ctx, next }) => {
 });
 
 /**
- * Private procedure that requires a Clerk user (or dev override).
+ * Private procedure that requires a Clerk user.
  */
 export const privateProcedure = apiProcedure.use(({ ctx, next }) => {
-    if (ctx.authType !== 'clerk' && ctx.authType !== 'dev') {
+    if (ctx.authType !== 'clerk') {
         throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Clerk authentication required' });
     }
 

@@ -4,9 +4,9 @@ import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 import { db } from '@/db/index';
 import { userAccountAccess } from '@/db/schema';
-import { registerWebSocketConnection } from '@/utils/events.js';
+import { registerWebSocketConnection } from '@/utils/events';
 
-export function registerWebSocketRoute(fastify: FastifyInstance) {
+export const registerWebSocketRoute = (fastify: FastifyInstance) => {
     fastify.get('/api/events', { websocket: true }, async (socket: WebSocket, req) => {
         socket.on('error', error => {
             console.error('WebSocket connection error', error);
@@ -17,13 +17,6 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
         }
 
         const url = new URL(req.url, `http://${req.headers.host}`);
-        const devUserId = getDevUserId(url.searchParams.get('devUserId'));
-        if (devUserId) {
-            const accessibleAccountIds = await fetchAccessibleAccountIds(devUserId);
-            registerWebSocketConnection(socket, accessibleAccountIds);
-            return;
-        }
-
         // Extract token from query string
         const token = url.searchParams.get('token');
 
@@ -63,16 +56,11 @@ export function registerWebSocketRoute(fastify: FastifyInstance) {
             }
         });
     });
-}
+};
 
 // ============================================================================
 // Helpers
 // ============================================================================
-
-const getDevUserId = (override?: string | null) => {
-    const trimmedOverride = typeof override === 'string' ? override.trim() : '';
-    return trimmedOverride ? trimmedOverride : null;
-};
 
 const fetchAccessibleAccountIds = async (clerkUserId: string) => {
     const accessibleAccounts = await db.select({ adsAccountId: userAccountAccess.adsAccountId }).from(userAccountAccess).where(eq(userAccountAccess.clerkUserId, clerkUserId));

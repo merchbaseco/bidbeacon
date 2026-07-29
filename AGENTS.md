@@ -66,8 +66,8 @@ API keys are scoped to advertiser accounts and are used by the `bb` CLI and any 
 ### Procedures & Routers
 
 - `publicProcedure` - no auth
-- `privateProcedure` - Clerk (or dev override) only
-- `apiProcedure` - Clerk/dev/API key auth
+- `privateProcedure` - Clerk only
+- `apiProcedure` - Clerk/API key auth
 
 **Router split:**
 - Clerk/private routers live in `src/api/app/*`

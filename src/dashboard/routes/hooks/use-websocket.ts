@@ -71,7 +71,6 @@ type Event =
     | { type: 'pong' };
 
 const WS_BASE_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
-const DEV_USER_ID = import.meta.env.VITE_DEV_USER_ID?.trim();
 
 export const useWebSocket = () => {
     const { getToken } = useAuth();
@@ -81,11 +80,6 @@ export const useWebSocket = () => {
 
     // Get token and build WebSocket URL with auth
     useEffect(() => {
-        if (DEV_USER_ID) {
-            setWsUrl(`${WS_BASE_URL}?devUserId=${encodeURIComponent(DEV_USER_ID)}`);
-            return;
-        }
-
         const updateToken = async () => {
             const token = await getToken();
             if (token) {

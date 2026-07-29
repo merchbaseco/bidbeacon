@@ -13,12 +13,6 @@ const API_KEY_TOKEN_PREFIX = `${API_KEY_PREFIX}_`;
  * This is where you can add request-specific data like user info, database connections, etc.
  */
 export async function createContext({ req }: CreateFastifyContextOptions) {
-    const devUserId = getDevUserId(getHeaderValue(req.headers['x-bidbeacon-dev-user-id']));
-    if (devUserId) {
-        const accessibleAccountIds = await fetchAccessibleAccountIds(devUserId);
-        return { user: { sub: devUserId }, accessibleAccountIds, authType: 'dev', request: req as unknown };
-    }
-
     const apiKeyToken = getApiKeyToken(req.headers);
     if (apiKeyToken) {
         const apiKeyContext = await getApiKeyContext(apiKeyToken);
@@ -59,11 +53,6 @@ export type Context = Awaited<ReturnType<typeof createContext>>;
 // ============================================================================
 // Helpers
 // ============================================================================
-
-const getDevUserId = (override?: string | null) => {
-    const trimmedOverride = typeof override === 'string' ? override.trim() : '';
-    return trimmedOverride ? trimmedOverride : null;
-};
 
 const getHeaderValue = (value?: string | string[]) => {
     if (Array.isArray(value)) {

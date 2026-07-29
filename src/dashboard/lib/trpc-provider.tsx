@@ -5,8 +5,6 @@ import { useState } from 'react';
 import { apiBaseUrl } from '../router';
 import { api } from './trpc';
 
-const DEV_USER_ID = import.meta.env.VITE_DEV_USER_ID?.trim();
-
 export const TRPCProvider = ({ children }: { children: React.ReactNode }) => {
     const { getToken } = useAuth();
 
@@ -21,10 +19,6 @@ export const TRPCProvider = ({ children }: { children: React.ReactNode }) => {
                 httpLink({
                     url: `${apiBaseUrl}/api`,
                     async headers() {
-                        if (DEV_USER_ID) {
-                            return { 'x-bidbeacon-dev-user-id': DEV_USER_ID };
-                        }
-
                         const token = await getToken();
                         return token ? { Authorization: `Bearer ${token}` } : {};
                     },
