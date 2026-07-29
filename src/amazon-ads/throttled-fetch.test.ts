@@ -236,7 +236,7 @@ describe('throttledFetch retries', () => {
         }
     });
 
-    it('paces report creation for five minutes after a recovery probe', async () => {
+    it('paces report creation for ten minutes after a recovery probe', async () => {
         const fetchMock = vi.mocked(global.fetch);
         const requestTimes: number[] = [];
         vi.spyOn(Math, 'random').mockReturnValue(0.5);
@@ -284,7 +284,7 @@ describe('throttledFetch retries', () => {
         await expect(next).resolves.toHaveProperty('status', 200);
 
         expect(requestTimes[3] - requestTimes[2]).toBe(600_100);
-        expect(requestTimes[4] - requestTimes[3]).toBe(300_000);
+        expect(requestTimes[4] - requestTimes[3]).toBe(600_000);
     });
 
     it('continues report creation escalation after limiter startup', async () => {

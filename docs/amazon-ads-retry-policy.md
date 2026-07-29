@@ -20,7 +20,7 @@
 - Cooldown state is persisted by limiter key, so a server restart cannot erase an active Amazon cooldown.
 - If Amazon omits `Retry-After`, the governor starts near 5s, adds ±20% jitter, and doubles subsequent cooldowns up to 60s. Intermittent successes preserve the learned cooldown; it resets after five minutes without another 429.
 - Report creation is single-flight per API region. When a logical report-creation call exhausts all retries on 429 responses, the shared region gate backs off for 10 minutes, then 20 minutes, then 30 minutes for subsequent exhausted calls.
-- A successful recovery probe reduces the exhaustion count by one and holds the report-creation gate for five minutes before the next report. Exhaustion state expires after 30 minutes of inactivity outside an active gate.
+- A successful recovery probe reduces the exhaustion count by one and holds the report-creation gate for ten minutes before the next report. Exhaustion state expires after 30 minutes of inactivity outside an active gate.
 
 ## Metrics
 
