@@ -1,0 +1,1 @@
+ALTER TABLE "api_rate_limit_state" ADD COLUMN "recovery_probes_remaining" integer DEFAULT 0 NOT NULL;

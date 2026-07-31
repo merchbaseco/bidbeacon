@@ -744,6 +744,7 @@ export const apiRateLimitState = pgTable('api_rate_limit_state', {
     lastRateLimitAt: timestamp('last_rate_limit_at', { withTimezone: true, mode: 'date' }).notNull(),
     lastRetryAfterMs: integer('last_retry_after_ms').notNull(),
     exhaustionCount: integer('exhaustion_count').notNull().default(0),
+    recoveryProbesRemaining: integer('recovery_probes_remaining').notNull().default(0),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
 });
 

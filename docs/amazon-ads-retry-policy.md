@@ -19,8 +19,18 @@
 - A 429 applies its `Retry-After` cooldown only to the affected limiter. Overlapping cooldowns retain the latest deadline; an older reset cannot shorten a newer cooldown.
 - Cooldown state is persisted by limiter key, so a server restart cannot erase an active Amazon cooldown.
 - If Amazon omits `Retry-After`, the governor starts near 5s, adds ±20% jitter, and doubles subsequent cooldowns up to 60s. Intermittent successes preserve the learned cooldown; it resets after five minutes without another 429.
-- Report creation is single-flight per API region. When a logical report-creation call exhausts all retries on 429 responses, the shared region gate backs off for 10 minutes, then 20 minutes, then 30 minutes for subsequent exhausted calls.
-- A successful recovery probe reduces the exhaustion count by one and holds the report-creation gate for ten minutes before the next report. Exhaustion state expires after 30 minutes of inactivity outside an active gate.
+
+## Report creation recovery
+
+Report creation has a separate, adaptive governor because Amazon can accept a few reports and then temporarily reject the next one even when requests are serialized.
+
+- The governor is single-flight and isolated per Amazon API region (`report-create:na`, `report-create:eu`, or `report-create:fe`). The same policy applies to every region.
+- Marketing Stream processing and non-report Amazon API calls use separate limiters and are not delayed by report recovery.
+- Any report-creation 429 starts a recovery phase requiring three consecutive clean logical report creations. A call that encounters a 429 and later succeeds on retry is successful, but not clean.
+- When a logical call exhausts all three attempts on 429 responses, the region gate waits 10 minutes. Consecutive exhausted calls escalate that gate to 20 minutes, then 30 minutes.
+- Each clean recovery probe reduces the remaining probe count by one. Probes stay ten minutes apart until three succeed consecutively; normal single-flight pacing then resumes.
+- Any 429 during recovery resets the clean-probe requirement to three. A successful probe also reduces the exhaustion count by one.
+- Recovery and exhaustion state expire after 30 minutes without another 429. The state is persisted in `api_rate_limit_state`, including `exhaustion_count` and `recovery_probes_remaining`, so deployments and restarts preserve active recovery.
 
 ## Metrics
 
@@ -31,7 +41,9 @@ Each `api_metrics` row records the final result plus per-attempt governor data:
 - `retry_after_ms`, using the largest Amazon-provided or fallback cooldown
 - `queue_wait_ms`, covering time spent waiting for governor capacity
 
-The API health rate-limit count sums attempt-level 429s. Rows recorded before these fields existed fall back to a final 429 status.
+The API health rate-limit count sums attempt-level 429s, so one logical call can contribute up to three. Rows recorded before these fields existed fall back to a final 429 status.
+
+For an exhausted report-creation call, `retry_after_ms` can contain the governor's 10-, 20-, or 30-minute exhaustion gate. It does not prove Amazon sent a `Retry-After` header.
 
 ## Implementation
 

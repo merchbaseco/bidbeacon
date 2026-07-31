@@ -54,6 +54,7 @@ const DEFAULT_MIN_TIME = 500;
 const MAX_FALLBACK_RETRY_AFTER_MS = 60_000;
 const REPORT_CREATE_EXHAUSTION_BACKOFF_MS = [10 * 60_000, 20 * 60_000, 30 * 60_000] as const;
 const REPORT_CREATE_EXHAUSTION_RESET_MS = 30 * 60_000;
+const REPORT_CREATE_RECOVERY_PROBE_COUNT = 3;
 const REPORT_CREATE_RECOVERY_MIN_TIME_MS = 10 * 60_000;
 
 type LimiterState = {
@@ -66,6 +67,7 @@ type LimiterState = {
     lastRetryAfterMs: number | null;
     limiter: Bottleneck;
     nextStartAt: number;
+    recoveryProbesRemaining: number;
 };
 
 const limiterStates = new Map<string, LimiterState>();
@@ -117,6 +119,9 @@ export async function throttledFetch(url: string | URL | Request, options?: Thro
                 const shouldRetry = Boolean(resolvedRetry && shouldRetryResponse(response.status, resolvedRetry, attempt));
                 if (response.status === 429) {
                     metrics.rateLimitCount += 1;
+                    if (throttleGroup === 'report-create') {
+                        limiterState.recoveryProbesRemaining = REPORT_CREATE_RECOVERY_PROBE_COUNT;
+                    }
                     const retryAfter = response.headers.get('Retry-After');
                     const retryAfterMs = parseRetryAfter(retryAfter);
                     const cooldownMs = retryAfterMs ?? withJitter(getFallbackRetryAfterMs(limiterState));
@@ -188,6 +193,7 @@ function getLimiterState(group: 'default' | 'report-create', key: string): Limit
             maxConcurrent: group === 'report-create' ? 1 : 2,
         }),
         nextStartAt: 0,
+        recoveryProbesRemaining: 0,
     };
     state.hydration = hydrateLimiterState(state);
     limiterStates.set(stateKey, state);
@@ -203,6 +209,7 @@ async function hydrateLimiterState(state: LimiterState): Promise<void> {
     state.exhaustionCount = Math.max(state.exhaustionCount, stored.exhaustionCount);
     state.lastRateLimitAt = Math.max(state.lastRateLimitAt, stored.lastRateLimitAt);
     state.lastRetryAfterMs = stored.lastRetryAfterMs;
+    state.recoveryProbesRemaining = Math.max(state.recoveryProbesRemaining, stored.recoveryProbesRemaining);
 }
 
 function normalizePriority(priority?: number): number {
@@ -226,7 +233,7 @@ function withJitter(delayMs: number): number {
 async function waitForStartSlot(state: LimiterState): Promise<void> {
     while (true) {
         const now = Date.now();
-        await resetStaleReportCreateExhaustions(state, now);
+        await resetStaleReportCreateRecovery(state, now);
         const startAt = Math.max(now, state.nextStartAt, state.cooldownUntil);
         state.nextStartAt = startAt + DEFAULT_MIN_TIME;
         const waitMs = startAt - now;
@@ -419,21 +426,32 @@ async function applyReportCreateExhaustionCooldown(state: LimiterState): Promise
 }
 
 async function applyReportCreateRecoveryCooldown(state: LimiterState, recoveredFromRateLimit: boolean): Promise<void> {
-    if (state.exhaustionCount === 0 && !recoveredFromRateLimit) {
+    const hadRecoveryState = state.exhaustionCount > 0 || state.recoveryProbesRemaining > 0 || recoveredFromRateLimit;
+    if (!hadRecoveryState) {
         return;
     }
 
+    if (recoveredFromRateLimit) {
+        state.recoveryProbesRemaining = REPORT_CREATE_RECOVERY_PROBE_COUNT;
+    } else if (state.recoveryProbesRemaining > 0) {
+        state.recoveryProbesRemaining -= 1;
+    }
+
     state.exhaustionCount = Math.max(0, state.exhaustionCount - 1);
-    state.cooldownUntil = Math.max(state.cooldownUntil, Date.now() + REPORT_CREATE_RECOVERY_MIN_TIME_MS);
+    if (state.recoveryProbesRemaining > 0) {
+        state.cooldownUntil = Math.max(state.cooldownUntil, Date.now() + REPORT_CREATE_RECOVERY_MIN_TIME_MS);
+    }
     await persistLimiterState(state);
 }
 
-async function resetStaleReportCreateExhaustions(state: LimiterState, now: number): Promise<void> {
-    if (state.group !== 'report-create' || state.exhaustionCount === 0 || now - state.lastRateLimitAt < REPORT_CREATE_EXHAUSTION_RESET_MS) {
+async function resetStaleReportCreateRecovery(state: LimiterState, now: number): Promise<void> {
+    const hasRecoveryState = state.exhaustionCount > 0 || state.recoveryProbesRemaining > 0;
+    if (state.group !== 'report-create' || !hasRecoveryState || now - state.lastRateLimitAt < REPORT_CREATE_EXHAUSTION_RESET_MS) {
         return;
     }
 
     state.exhaustionCount = 0;
+    state.recoveryProbesRemaining = 0;
     await persistLimiterState(state);
 }
 
@@ -443,4 +461,5 @@ const persistLimiterState = (state: LimiterState): Promise<void> =>
         exhaustionCount: state.exhaustionCount,
         lastRateLimitAt: state.lastRateLimitAt,
         lastRetryAfterMs: state.lastRetryAfterMs ?? 0,
+        recoveryProbesRemaining: state.recoveryProbesRemaining,
     });

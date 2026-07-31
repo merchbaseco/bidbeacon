@@ -7,6 +7,7 @@ export type StoredRateLimitState = {
     exhaustionCount: number;
     lastRateLimitAt: number;
     lastRetryAfterMs: number;
+    recoveryProbesRemaining: number;
 };
 
 export const loadRateLimitState = async (key: string): Promise<StoredRateLimitState | null> => {
@@ -22,6 +23,7 @@ export const loadRateLimitState = async (key: string): Promise<StoredRateLimitSt
             exhaustionCount: row.exhaustionCount,
             lastRateLimitAt: row.lastRateLimitAt.getTime(),
             lastRetryAfterMs: row.lastRetryAfterMs,
+            recoveryProbesRemaining: row.recoveryProbesRemaining,
         };
     } catch {
         return null;
@@ -38,6 +40,7 @@ export const saveRateLimitState = async (key: string, state: StoredRateLimitStat
                 exhaustionCount: state.exhaustionCount,
                 lastRateLimitAt: new Date(state.lastRateLimitAt),
                 lastRetryAfterMs: state.lastRetryAfterMs,
+                recoveryProbesRemaining: state.recoveryProbesRemaining,
                 updatedAt: new Date(),
             })
             .onConflictDoUpdate({
@@ -47,6 +50,7 @@ export const saveRateLimitState = async (key: string, state: StoredRateLimitStat
                     exhaustionCount: state.exhaustionCount,
                     lastRateLimitAt: new Date(state.lastRateLimitAt),
                     lastRetryAfterMs: state.lastRetryAfterMs,
+                    recoveryProbesRemaining: state.recoveryProbesRemaining,
                     updatedAt: new Date(),
                 },
             });
