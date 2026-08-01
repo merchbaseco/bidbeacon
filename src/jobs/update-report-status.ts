@@ -212,6 +212,26 @@ export const updateReportStatusJob = boss
                                 await clearError(reportDatum);
                             }
                         } catch (error) {
+                            const governorRetryAt = getGovernorRetryAt(error);
+                            if (reportDatum && governorRetryAt) {
+                                await deferReport(reportDatum, new Date(governorRetryAt));
+                                recorder.addEvent({
+                                    message: 'Report {{badges}} creation deferred until the next governor slot.',
+                                    badges: buildBadges(reportDatum.reportId ?? null),
+                                    payload: {
+                                        accountId,
+                                        countryCode,
+                                        aggregation,
+                                        entityType,
+                                        periodStart: date.toISOString(),
+                                        reportId: reportDatum.reportId ?? null,
+                                        retryAt: new Date(governorRetryAt).toISOString(),
+                                        ...buildFreshnessMetrics(reportDatum),
+                                    },
+                                });
+                                return;
+                            }
+
                             const message = formatError(error);
                             recorder.setErrorEvent({
                                 message: `Report {{badges}} failed: ${message}`,
@@ -450,6 +470,23 @@ async function setError(reportDatum: typeof reportDatasetMetadata.$inferSelect, 
     }
 }
 
+const deferReport = async (row: InferSelectModel<typeof reportDatasetMetadata>, nextRefreshAt: Date): Promise<void> => {
+    const [updatedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({
+            error: null,
+            nextRefreshAt,
+            refreshing: false,
+            status: row.lastProcessedReportId ? 'completed' : 'missing',
+        })
+        .where(eq(reportDatasetMetadata.uid, row.uid))
+        .returning();
+
+    if (updatedRow) {
+        emitEvent({ type: 'report:refreshed', row: updatedRow });
+    }
+};
+
 async function clearError(row: InferSelectModel<typeof reportDatasetMetadata>): Promise<void> {
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
@@ -470,6 +507,22 @@ async function clearError(row: InferSelectModel<typeof reportDatasetMetadata>): 
         });
     }
 }
+
+const getGovernorRetryAt = (error: unknown): number | null => {
+    let current = error;
+    const visited = new Set<unknown>();
+
+    while (current instanceof Error && !visited.has(current)) {
+        visited.add(current);
+        const retryAt = (current as Error & { governorRetryAt?: unknown }).governorRetryAt;
+        if (typeof retryAt === 'number' && Number.isFinite(retryAt) && retryAt > Date.now()) {
+            return retryAt;
+        }
+        current = (current as Error & { cause?: unknown }).cause;
+    }
+
+    return null;
+};
 
 const formatReportBadge = (reportId?: string | null) => {
     if (!reportId) {

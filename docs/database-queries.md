@@ -54,14 +54,16 @@ in the last hour. Show success rate and average duration."
 ```sql
 SELECT
     api_name,
+    region,
     count(*) AS calls,
     sum(retry_count) AS retries,
     sum(rate_limit_count) AS rate_limits,
     round(avg(queue_wait_ms)) AS avg_queue_wait_ms,
-    max(retry_after_ms) AS max_retry_after_ms
+    max(amazon_retry_after_ms) AS max_amazon_retry_after_ms,
+    max(governor_cooldown_ms) AS max_governor_cooldown_ms
 FROM api_metrics
 WHERE timestamp >= now() - interval '24 hours'
-GROUP BY api_name
+GROUP BY api_name, region
 ORDER BY rate_limits DESC, calls DESC;
 ```
 

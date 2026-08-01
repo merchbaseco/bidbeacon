@@ -49,6 +49,7 @@ The `getNextAction` function determines what action to take:
 - Creates a new report via Amazon Ads API
 - Sets `reportId`, `status = 'fetching'`, `lastReportCreatedAt`
 - Sets `nextRefreshAt = now + 5 minutes` (poll for completion)
+- If the regional report governor is pacing or cooling down, releases the job immediately and sets `nextRefreshAt` to the gate deadline. The dataset returns to `completed` when it has prior processed data or `missing` otherwise; an expected governor deferral is not a dataset error.
 
 ### `'process'` Action
 
@@ -124,3 +125,5 @@ flowchart TD
 5. **Eligibility based on creation time**: The `lastReportCreatedAt` timestamp determines eligibility, not when the report was processed. This ensures we don't miss eligibility windows even if processing takes a long time.
 
 6. **Bounded parse diagnostics**: Report processing records counts and up to five distinct error messages with the job event. Raw failed report rows are not retained.
+
+7. **Regional report creation gate**: Accounts in one Amazon API region share a single report-creation gate. A 429 pauses creation for that region, but status polling, downloads, Marketing Stream processing, summaries, and other Amazon API operations continue.

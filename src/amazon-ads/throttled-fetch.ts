@@ -29,14 +29,19 @@ type ThrottledFetchOptions = RequestInit & {
 };
 
 export type ThrottledFetchMetrics = {
+    amazonRetryAfterMs: number | null;
     attemptCount: number;
+    governorCooldownMs: number | null;
     queueWaitMs: number;
     rateLimitCount: number;
-    retryAfterMs: number | null;
+    rateLimitRequestId: string | null;
+    rateLimitResponseContentType: string | null;
+    rateLimitResponseServer: string | null;
     retryCount: number;
 };
 
 const DEFAULT_RETRYABLE_STATUS_CODES = [408, 409, 429, 500, 502, 503, 504];
+const REPORT_CREATE_RETRYABLE_STATUS_CODES = DEFAULT_RETRYABLE_STATUS_CODES.filter(status => status !== 429);
 const DEFAULT_BACKOFF_MULTIPLIER = 2;
 const DEFAULT_RETRY_AFTER_BUFFER_MS = 100;
 const noop = () => undefined;
@@ -50,24 +55,39 @@ export const AMAZON_ADS_API_RETRY: RetryOptions = {
     retryOnNetworkError: true,
 };
 
+export const AMAZON_ADS_REPORT_CREATE_RETRY: RetryOptions = {
+    ...AMAZON_ADS_API_RETRY,
+    retryableStatusCodes: REPORT_CREATE_RETRYABLE_STATUS_CODES,
+};
+
 const DEFAULT_MIN_TIME = 500;
 const MAX_FALLBACK_RETRY_AFTER_MS = 60_000;
-const REPORT_CREATE_EXHAUSTION_BACKOFF_MS = [10 * 60_000, 20 * 60_000, 30 * 60_000] as const;
-const REPORT_CREATE_EXHAUSTION_RESET_MS = 30 * 60_000;
-const REPORT_CREATE_RECOVERY_PROBE_COUNT = 3;
-const REPORT_CREATE_RECOVERY_MIN_TIME_MS = 10 * 60_000;
+const REPORT_CREATE_MIN_TIME_MS = 5 * 60_000;
+const REPORT_CREATE_FALLBACK_COOLDOWN_MS = 60 * 60_000;
 
 type LimiterState = {
     cooldownUntil: number;
-    exhaustionCount: number;
     group: 'default' | 'report-create';
     hydration: Promise<void>;
     key: string;
     lastRateLimitAt: number;
-    lastRetryAfterMs: number | null;
+    lastGovernorCooldownMs: number | null;
     limiter: Bottleneck;
     nextStartAt: number;
-    recoveryProbesRemaining: number;
+};
+
+class GovernorDeferredError extends Error {
+    readonly governorRetryAt: number;
+
+    constructor(governorRetryAt: number) {
+        super(`Amazon Ads request deferred by the local governor until ${new Date(governorRetryAt).toISOString()}.`);
+        this.name = 'GovernorDeferredError';
+        this.governorRetryAt = governorRetryAt;
+    }
+}
+
+export type ThrottledResponse = Response & {
+    governorRetryAt?: number;
 };
 
 const limiterStates = new Map<string, LimiterState>();
@@ -79,7 +99,7 @@ const limiterStates = new Map<string, LimiterState>();
  * @param options - Fetch options (same as native fetch)
  * @returns Promise resolving to Response
  */
-export async function throttledFetch(url: string | URL | Request, options?: ThrottledFetchOptions): Promise<Response> {
+export async function throttledFetch(url: string | URL | Request, options?: ThrottledFetchOptions): Promise<ThrottledResponse> {
     const { retry, timeoutMs, throttle, onMetrics, ...fetchOptions } = options ?? {};
     const throttleGroup = throttle?.group ?? 'default';
     const resolvedRetry = retry ? normalizeRetryOptions(retry) : null;
@@ -89,10 +109,14 @@ export async function throttledFetch(url: string | URL | Request, options?: Thro
     const limiterState = getLimiterState(throttleGroup, throttle?.key ?? 'global');
     const priority = normalizePriority(throttle?.priority);
     const metrics: ThrottledFetchMetrics = {
+        amazonRetryAfterMs: null,
         attemptCount: 0,
+        governorCooldownMs: null,
         queueWaitMs: 0,
         rateLimitCount: 0,
-        retryAfterMs: null,
+        rateLimitRequestId: null,
+        rateLimitResponseContentType: null,
+        rateLimitResponseServer: null,
         retryCount: 0,
     };
 
@@ -101,13 +125,13 @@ export async function throttledFetch(url: string | URL | Request, options?: Thro
 
     try {
         while (attempt <= (resolvedRetry?.attempts ?? 1)) {
-            metrics.attemptCount = attempt;
             try {
                 const queuedAt = performance.now();
                 const response = await limiterState.limiter.schedule({ priority }, async () => {
                     await limiterState.hydration;
-                    await waitForStartSlot(limiterState);
+                    await waitForStartSlot(limiterState, attempt === 1);
                     metrics.queueWaitMs += Math.round(performance.now() - queuedAt);
+                    metrics.attemptCount = attempt;
                     const { options: attemptFetchOptions, cleanup } = createAttemptFetchOptions(fetchOptions, resolvedTimeoutMs);
                     try {
                         return await fetch(url, attemptFetchOptions);
@@ -119,25 +143,23 @@ export async function throttledFetch(url: string | URL | Request, options?: Thro
                 const shouldRetry = Boolean(resolvedRetry && shouldRetryResponse(response.status, resolvedRetry, attempt));
                 if (response.status === 429) {
                     metrics.rateLimitCount += 1;
-                    if (throttleGroup === 'report-create') {
-                        limiterState.recoveryProbesRemaining = REPORT_CREATE_RECOVERY_PROBE_COUNT;
-                    }
                     const retryAfter = response.headers.get('Retry-After');
                     const retryAfterMs = parseRetryAfter(retryAfter);
-                    const cooldownMs = retryAfterMs ?? withJitter(getFallbackRetryAfterMs(limiterState));
-                    metrics.retryAfterMs = Math.max(metrics.retryAfterMs ?? 0, cooldownMs);
-                    await applyCooldown(limiterState, cooldownMs);
-
-                    if (throttleGroup === 'report-create' && !shouldRetry) {
-                        const exhaustionCooldownMs = await applyReportCreateExhaustionCooldown(limiterState);
-                        metrics.retryAfterMs = Math.max(metrics.retryAfterMs ?? 0, exhaustionCooldownMs);
-                    }
+                    const cooldownMs = retryAfterMs ?? withJitter(throttleGroup === 'report-create' ? REPORT_CREATE_FALLBACK_COOLDOWN_MS : getFallbackRetryAfterMs(limiterState));
+                    const effectiveCooldownMs = throttleGroup === 'report-create' ? Math.max(cooldownMs, REPORT_CREATE_MIN_TIME_MS) : cooldownMs;
+                    metrics.amazonRetryAfterMs = retryAfterMs === null ? metrics.amazonRetryAfterMs : Math.max(metrics.amazonRetryAfterMs ?? 0, retryAfterMs);
+                    metrics.governorCooldownMs = Math.max(metrics.governorCooldownMs ?? 0, effectiveCooldownMs);
+                    metrics.rateLimitRequestId = getRequestId(response.headers) ?? metrics.rateLimitRequestId;
+                    metrics.rateLimitResponseContentType = response.headers.get('Content-Type') ?? metrics.rateLimitResponseContentType;
+                    metrics.rateLimitResponseServer = response.headers.get('Server') ?? metrics.rateLimitResponseServer;
+                    await applyCooldown(limiterState, effectiveCooldownMs);
+                    (response as ThrottledResponse).governorRetryAt = limiterState.cooldownUntil;
                 } else if (response.ok && throttleGroup === 'report-create') {
-                    await applyReportCreateRecoveryCooldown(limiterState, metrics.rateLimitCount > 0);
+                    await persistReportCreatePacing(limiterState);
                 }
 
                 if (!(shouldRetry && resolvedRetry)) {
-                    return response;
+                    return response as ThrottledResponse;
                 }
 
                 metrics.retryCount += 1;
@@ -147,6 +169,10 @@ export async function throttledFetch(url: string | URL | Request, options?: Thro
                     await sleep(retryDelayMs);
                 }
             } catch (error) {
+                if (error instanceof GovernorDeferredError) {
+                    metrics.governorCooldownMs = Math.max(metrics.governorCooldownMs ?? 0, error.governorRetryAt - Date.now());
+                    throw error;
+                }
                 const wrappedError = wrapNetworkError(error, method, urlString);
                 lastNetworkError = wrappedError;
 
@@ -183,17 +209,15 @@ function getLimiterState(group: 'default' | 'report-create', key: string): Limit
 
     const state: LimiterState = {
         cooldownUntil: 0,
-        exhaustionCount: 0,
         group,
         hydration: Promise.resolve(),
         key: stateKey,
         lastRateLimitAt: 0,
-        lastRetryAfterMs: null,
+        lastGovernorCooldownMs: null,
         limiter: new Bottleneck({
             maxConcurrent: group === 'report-create' ? 1 : 2,
         }),
         nextStartAt: 0,
-        recoveryProbesRemaining: 0,
     };
     state.hydration = hydrateLimiterState(state);
     limiterStates.set(stateKey, state);
@@ -206,10 +230,8 @@ async function hydrateLimiterState(state: LimiterState): Promise<void> {
         return;
     }
     state.cooldownUntil = Math.max(state.cooldownUntil, stored.cooldownUntil);
-    state.exhaustionCount = Math.max(state.exhaustionCount, stored.exhaustionCount);
     state.lastRateLimitAt = Math.max(state.lastRateLimitAt, stored.lastRateLimitAt);
-    state.lastRetryAfterMs = stored.lastRetryAfterMs;
-    state.recoveryProbesRemaining = Math.max(state.recoveryProbesRemaining, stored.recoveryProbesRemaining);
+    state.lastGovernorCooldownMs = stored.lastGovernorCooldownMs;
 }
 
 function normalizePriority(priority?: number): number {
@@ -220,23 +242,30 @@ function normalizePriority(priority?: number): number {
 }
 
 function getFallbackRetryAfterMs(state: LimiterState): number {
-    if (state.lastRetryAfterMs === null || Date.now() - state.lastRateLimitAt > 5 * 60 * 1000) {
+    if (state.lastGovernorCooldownMs === null || Date.now() - state.lastRateLimitAt > 5 * 60 * 1000) {
         return 5000;
     }
-    return Math.min(state.lastRetryAfterMs * 2, MAX_FALLBACK_RETRY_AFTER_MS);
+    return Math.min(state.lastGovernorCooldownMs * 2, MAX_FALLBACK_RETRY_AFTER_MS);
 }
 
 function withJitter(delayMs: number): number {
     return Math.max(1, Math.round(delayMs * (0.8 + Math.random() * 0.4)));
 }
 
-async function waitForStartSlot(state: LimiterState): Promise<void> {
+async function waitForStartSlot(state: LimiterState, applyReportPacing: boolean): Promise<void> {
+    if (state.group === 'report-create' && !applyReportPacing) {
+        return;
+    }
+
     while (true) {
         const now = Date.now();
-        await resetStaleReportCreateRecovery(state, now);
         const startAt = Math.max(now, state.nextStartAt, state.cooldownUntil);
-        state.nextStartAt = startAt + DEFAULT_MIN_TIME;
         const waitMs = startAt - now;
+        if (state.group === 'report-create' && waitMs > 0) {
+            throw new GovernorDeferredError(startAt);
+        }
+
+        state.nextStartAt = startAt + (state.group === 'report-create' ? REPORT_CREATE_MIN_TIME_MS : DEFAULT_MIN_TIME);
         if (waitMs > 0) {
             await sleep(waitMs);
         }
@@ -409,57 +438,21 @@ async function applyCooldown(state: LimiterState, retryAfterMs: number): Promise
         return;
     }
 
-    state.lastRetryAfterMs = retryAfterMs;
+    state.lastGovernorCooldownMs = retryAfterMs;
     state.cooldownUntil = cooldownUntil;
     await persistLimiterState(state);
 }
 
-async function applyReportCreateExhaustionCooldown(state: LimiterState): Promise<number> {
-    state.exhaustionCount = Math.min(state.exhaustionCount + 1, REPORT_CREATE_EXHAUSTION_BACKOFF_MS.length);
-    const cooldownMs = REPORT_CREATE_EXHAUSTION_BACKOFF_MS[state.exhaustionCount - 1];
-    const observedAt = Date.now();
-    state.lastRateLimitAt = observedAt;
-    state.lastRetryAfterMs = Math.max(state.lastRetryAfterMs ?? 0, cooldownMs);
-    state.cooldownUntil = Math.max(state.cooldownUntil, observedAt + cooldownMs + DEFAULT_RETRY_AFTER_BUFFER_MS);
+const persistReportCreatePacing = async (state: LimiterState): Promise<void> => {
+    state.cooldownUntil = Math.max(state.cooldownUntil, state.nextStartAt);
     await persistLimiterState(state);
-    return cooldownMs;
-}
-
-async function applyReportCreateRecoveryCooldown(state: LimiterState, recoveredFromRateLimit: boolean): Promise<void> {
-    const hadRecoveryState = state.exhaustionCount > 0 || state.recoveryProbesRemaining > 0 || recoveredFromRateLimit;
-    if (!hadRecoveryState) {
-        return;
-    }
-
-    if (recoveredFromRateLimit) {
-        state.recoveryProbesRemaining = REPORT_CREATE_RECOVERY_PROBE_COUNT;
-    } else if (state.recoveryProbesRemaining > 0) {
-        state.recoveryProbesRemaining -= 1;
-    }
-
-    state.exhaustionCount = Math.max(0, state.exhaustionCount - 1);
-    if (state.recoveryProbesRemaining > 0) {
-        state.cooldownUntil = Math.max(state.cooldownUntil, Date.now() + REPORT_CREATE_RECOVERY_MIN_TIME_MS);
-    }
-    await persistLimiterState(state);
-}
-
-async function resetStaleReportCreateRecovery(state: LimiterState, now: number): Promise<void> {
-    const hasRecoveryState = state.exhaustionCount > 0 || state.recoveryProbesRemaining > 0;
-    if (state.group !== 'report-create' || !hasRecoveryState || now - state.lastRateLimitAt < REPORT_CREATE_EXHAUSTION_RESET_MS) {
-        return;
-    }
-
-    state.exhaustionCount = 0;
-    state.recoveryProbesRemaining = 0;
-    await persistLimiterState(state);
-}
+};
 
 const persistLimiterState = (state: LimiterState): Promise<void> =>
     saveRateLimitState(state.key, {
         cooldownUntil: state.cooldownUntil,
-        exhaustionCount: state.exhaustionCount,
         lastRateLimitAt: state.lastRateLimitAt,
-        lastRetryAfterMs: state.lastRetryAfterMs ?? 0,
-        recoveryProbesRemaining: state.recoveryProbesRemaining,
+        lastGovernorCooldownMs: state.lastGovernorCooldownMs ?? 0,
     });
+
+const getRequestId = (headers: Headers): string | null => headers.get('Amazon-Advertising-API-Request-Id') ?? headers.get('x-amzn-requestid') ?? headers.get('x-amz-request-id');

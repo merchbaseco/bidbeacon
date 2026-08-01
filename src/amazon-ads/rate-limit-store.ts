@@ -4,10 +4,8 @@ import { apiRateLimitState } from '@/db/schema';
 
 export type StoredRateLimitState = {
     cooldownUntil: number;
-    exhaustionCount: number;
+    lastGovernorCooldownMs: number;
     lastRateLimitAt: number;
-    lastRetryAfterMs: number;
-    recoveryProbesRemaining: number;
 };
 
 export const loadRateLimitState = async (key: string): Promise<StoredRateLimitState | null> => {
@@ -20,10 +18,8 @@ export const loadRateLimitState = async (key: string): Promise<StoredRateLimitSt
         }
         return {
             cooldownUntil: row.cooldownUntil.getTime(),
-            exhaustionCount: row.exhaustionCount,
+            lastGovernorCooldownMs: row.lastGovernorCooldownMs,
             lastRateLimitAt: row.lastRateLimitAt.getTime(),
-            lastRetryAfterMs: row.lastRetryAfterMs,
-            recoveryProbesRemaining: row.recoveryProbesRemaining,
         };
     } catch {
         return null;
@@ -37,20 +33,16 @@ export const saveRateLimitState = async (key: string, state: StoredRateLimitStat
             .values({
                 key,
                 cooldownUntil: new Date(state.cooldownUntil),
-                exhaustionCount: state.exhaustionCount,
+                lastGovernorCooldownMs: state.lastGovernorCooldownMs,
                 lastRateLimitAt: new Date(state.lastRateLimitAt),
-                lastRetryAfterMs: state.lastRetryAfterMs,
-                recoveryProbesRemaining: state.recoveryProbesRemaining,
                 updatedAt: new Date(),
             })
             .onConflictDoUpdate({
                 target: apiRateLimitState.key,
                 set: {
                     cooldownUntil: new Date(state.cooldownUntil),
-                    exhaustionCount: state.exhaustionCount,
+                    lastGovernorCooldownMs: state.lastGovernorCooldownMs,
                     lastRateLimitAt: new Date(state.lastRateLimitAt),
-                    lastRetryAfterMs: state.lastRetryAfterMs,
-                    recoveryProbesRemaining: state.recoveryProbesRemaining,
                     updatedAt: new Date(),
                 },
             });

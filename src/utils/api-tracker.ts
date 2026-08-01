@@ -19,10 +19,14 @@ export interface ApiCallOptions {
 }
 
 export interface ApiRequestMetrics {
+    amazonRetryAfterMs?: number | null;
     attemptCount?: number;
+    governorCooldownMs?: number | null;
     queueWaitMs?: number;
     rateLimitCount?: number;
-    retryAfterMs?: number | null;
+    rateLimitRequestId?: string | null;
+    rateLimitResponseContentType?: string | null;
+    rateLimitResponseServer?: string | null;
     retryCount?: number;
 }
 
@@ -52,7 +56,11 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
                 attemptCount: options.requestMetrics?.attemptCount ?? 0,
                 retryCount: options.requestMetrics?.retryCount ?? 0,
                 rateLimitCount: options.requestMetrics?.rateLimitCount ?? 0,
-                retryAfterMs: options.requestMetrics?.retryAfterMs ?? null,
+                amazonRetryAfterMs: options.requestMetrics?.amazonRetryAfterMs ?? null,
+                governorCooldownMs: options.requestMetrics?.governorCooldownMs ?? null,
+                rateLimitRequestId: options.requestMetrics?.rateLimitRequestId ?? null,
+                rateLimitResponseContentType: options.requestMetrics?.rateLimitResponseContentType ?? null,
+                rateLimitResponseServer: options.requestMetrics?.rateLimitResponseServer ?? null,
                 queueWaitMs: options.requestMetrics?.queueWaitMs ?? 0,
                 timestamp,
                 error: error ?? null,
@@ -73,7 +81,11 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
                 attemptCount: insertedRow.attemptCount,
                 retryCount: insertedRow.retryCount,
                 rateLimitCount: insertedRow.rateLimitCount,
-                retryAfterMs: insertedRow.retryAfterMs,
+                amazonRetryAfterMs: insertedRow.amazonRetryAfterMs,
+                governorCooldownMs: insertedRow.governorCooldownMs,
+                rateLimitRequestId: insertedRow.rateLimitRequestId,
+                rateLimitResponseContentType: insertedRow.rateLimitResponseContentType,
+                rateLimitResponseServer: insertedRow.rateLimitResponseServer,
                 queueWaitMs: insertedRow.queueWaitMs,
                 timestamp: insertedRow.timestamp.toISOString(),
                 error: insertedRow.error,

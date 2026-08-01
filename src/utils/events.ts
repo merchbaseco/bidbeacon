@@ -52,7 +52,11 @@ export interface ApiMetricsUpdatedEvent extends BaseEvent {
         attemptCount: number;
         retryCount: number;
         rateLimitCount: number;
-        retryAfterMs: number | null;
+        amazonRetryAfterMs: number | null;
+        governorCooldownMs: number | null;
+        rateLimitRequestId: string | null;
+        rateLimitResponseContentType: string | null;
+        rateLimitResponseServer: string | null;
         queueWaitMs: number;
         timestamp: string;
         error: string | null;

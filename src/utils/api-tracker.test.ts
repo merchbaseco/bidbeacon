@@ -48,10 +48,30 @@ describe('API tracker request metrics', () => {
 
     it('records attempt metrics supplied by throttledFetch', async () => {
         await withTracking({ apiName: 'createReport', region: 'na' }, async recordRequestMetrics => {
-            recordRequestMetrics({ attemptCount: 2, retryCount: 1, rateLimitCount: 1 });
+            recordRequestMetrics({
+                amazonRetryAfterMs: null,
+                attemptCount: 1,
+                governorCooldownMs: 3_600_000,
+                rateLimitCount: 1,
+                rateLimitRequestId: 'request-123',
+                rateLimitResponseContentType: 'text/html',
+                rateLimitResponseServer: 'openresty',
+                retryCount: 0,
+            });
             return { statusCode: 200 };
         });
 
-        expect(recordedValues).toEqual(expect.objectContaining({ attemptCount: 2, retryCount: 1, rateLimitCount: 1 }));
+        expect(recordedValues).toEqual(
+            expect.objectContaining({
+                amazonRetryAfterMs: null,
+                attemptCount: 1,
+                governorCooldownMs: 3_600_000,
+                rateLimitCount: 1,
+                rateLimitRequestId: 'request-123',
+                rateLimitResponseContentType: 'text/html',
+                rateLimitResponseServer: 'openresty',
+                retryCount: 0,
+            })
+        );
     });
 });

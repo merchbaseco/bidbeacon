@@ -365,6 +365,13 @@
       "when": 1785461043244,
       "tag": "0051_steady_sasquatch",
       "breakpoints": true
+    },
+    {
+      "idx": 52,
+      "version": "7",
+      "when": 1785606500773,
+      "tag": "0052_robust_monster_badoon",
+      "breakpoints": true
     }
   ]
 }

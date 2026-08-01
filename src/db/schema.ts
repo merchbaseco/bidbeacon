@@ -722,7 +722,11 @@ export const apiMetrics = pgTable(
         attemptCount: integer('attempt_count').notNull().default(1), // Total HTTP attempts, including the initial request
         retryCount: integer('retry_count').notNull().default(0), // Retry attempts after the initial request
         rateLimitCount: integer('rate_limit_count').notNull().default(0), // 429 responses across all attempts
-        retryAfterMs: integer('retry_after_ms'), // Largest Retry-After or fallback cooldown observed
+        amazonRetryAfterMs: integer('amazon_retry_after_ms'), // Largest Retry-After value Amazon actually returned
+        governorCooldownMs: integer('governor_cooldown_ms'), // Largest effective local cooldown applied
+        rateLimitRequestId: text('rate_limit_request_id'), // Amazon request ID from the latest 429
+        rateLimitResponseContentType: text('rate_limit_response_content_type'), // Distinguishes API JSON from edge HTML responses
+        rateLimitResponseServer: text('rate_limit_response_server'), // Identifies the server layer that issued the latest 429
         queueWaitMs: integer('queue_wait_ms').notNull().default(0), // Total time spent waiting in the API governor
         timestamp: timestamp('timestamp', {
             withTimezone: true,
@@ -742,9 +746,7 @@ export const apiRateLimitState = pgTable('api_rate_limit_state', {
     key: text('key').primaryKey(),
     cooldownUntil: timestamp('cooldown_until', { withTimezone: true, mode: 'date' }).notNull(),
     lastRateLimitAt: timestamp('last_rate_limit_at', { withTimezone: true, mode: 'date' }).notNull(),
-    lastRetryAfterMs: integer('last_retry_after_ms').notNull(),
-    exhaustionCount: integer('exhaustion_count').notNull().default(0),
-    recoveryProbesRemaining: integer('recovery_probes_remaining').notNull().default(0),
+    lastGovernorCooldownMs: integer('last_governor_cooldown_ms').notNull(),
     updatedAt: timestamp('updated_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
 });
 

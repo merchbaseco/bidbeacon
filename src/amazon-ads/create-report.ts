@@ -7,7 +7,7 @@ import { z } from 'zod';
 import { withTracking } from '@/utils/api-tracker.js';
 import { type ApiRegion, getApiBaseUrl } from './config.js';
 import { refreshAccessToken } from './reauth.js';
-import { AMAZON_ADS_API_RETRY, throttledFetch } from './throttled-fetch.js';
+import { AMAZON_ADS_REPORT_CREATE_RETRY, type ThrottledResponse, throttledFetch } from './throttled-fetch.js';
 
 // ============================================================================
 // Schemas
@@ -147,7 +147,7 @@ export async function createReport(options: CreateReportOptions, region: ApiRegi
             headers,
             body: JSON.stringify(validatedRequestBody),
             timeoutMs: 30_000,
-            retry: AMAZON_ADS_API_RETRY,
+            retry: AMAZON_ADS_REPORT_CREATE_RETRY,
             throttle: {
                 group: 'report-create',
                 key: region,
@@ -162,8 +162,9 @@ export async function createReport(options: CreateReportOptions, region: ApiRegi
         if (!response.ok) {
             const errorText = await response.text();
             const error = new Error(`Failed to create report: ${response.status} ${response.statusText}. ${errorText}`);
-            // Attach status code to error for tracking
-            (error as Error & { statusCode?: number }).statusCode = statusCode;
+            const trackedError = error as Error & { governorRetryAt?: number; statusCode?: number };
+            trackedError.statusCode = statusCode;
+            trackedError.governorRetryAt = (response as ThrottledResponse).governorRetryAt;
             throw error;
         }
 
