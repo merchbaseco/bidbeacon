@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import SecondBracketSquareIcon from '@merchbaseco/icons/core-solid-rounded/SecondBracketSquareIcon';
+import { SecondBracketSquareIcon } from '@hugeicons-pro/core-solid-rounded';
 import { useState } from 'react';
 import { Button } from '../../../components/ui/button';
 import { Dialog, DialogClose, DialogDescription, DialogFooter, DialogHeader, DialogPanel, DialogPopup, DialogTitle, DialogTrigger } from '../../../components/ui/dialog';

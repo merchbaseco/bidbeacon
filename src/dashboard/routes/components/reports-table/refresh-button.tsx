@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
+import { ArrowReloadHorizontalIcon } from '@hugeicons-pro/core-solid-rounded';
 import { Button } from '../../../components/ui/button';
 import { ButtonGroup } from '../../../components/ui/button-group';
 import { Spinner } from '../../../components/ui/spinner';

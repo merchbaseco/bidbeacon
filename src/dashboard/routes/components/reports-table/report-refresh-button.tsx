@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
+import { ArrowReloadHorizontalIcon } from '@hugeicons-pro/core-solid-rounded';
 import { Button } from '@/dashboard/components/ui/button.js';
 import { api } from '../../../lib/trpc.js';
 import type { ReportDatasetMetadata } from '../../hooks/use-reports';

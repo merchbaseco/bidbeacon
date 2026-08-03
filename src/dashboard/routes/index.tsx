@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import ChartBarLineIcon from '@merchbaseco/icons/core-stroke-rounded/ChartBarLineIcon';
+import { ChartBarLineIcon } from '@hugeicons-pro/core-stroke-rounded';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from '../components/ui/empty';
 import { AccountDataCard } from './components/account-data-card';
 import { AmsMetricsCard } from './components/ams-metrics-card';

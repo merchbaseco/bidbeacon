@@ -34,7 +34,7 @@ services:
       dockerfile: Dockerfile
       target: runtime
       args:
-        - MERCHBASE_NPM_TOKEN=${MERCHBASE_NPM_TOKEN}
+        - HUGEICONS_LICENSE_KEY=${HUGEICONS_LICENSE_KEY}
         - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
     image: bidbeacon-server:local
     container_name: bidbeacon-server
@@ -106,7 +106,7 @@ services:
       dockerfile: Dockerfile
       target: caddy
       args:
-        - MERCHBASE_NPM_TOKEN=${MERCHBASE_NPM_TOKEN}
+        - HUGEICONS_LICENSE_KEY=${HUGEICONS_LICENSE_KEY}
         - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
     image: bidbeacon-caddy:local
     container_name: bidbeacon-caddy

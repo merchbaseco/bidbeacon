@@ -1,6 +1,6 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import CircleIcon from '@merchbaseco/icons/core-solid-rounded/CircleIcon';
-import CircleIconStroke from '@merchbaseco/icons/core-stroke-rounded/CircleIcon';
+import { CircleIcon } from '@hugeicons-pro/core-solid-rounded';
+import { CircleIcon as CircleIconStroke } from '@hugeicons-pro/core-stroke-rounded';
 import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from '../../../components/ui/select';
 import { useSelectedAccount } from '../../hooks/use-selected-account';
 

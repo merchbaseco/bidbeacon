@@ -1,6 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import CircleArrowDown02Icon from '@merchbaseco/icons/core-solid-rounded/CircleArrowDown02Icon';
-import FilterResetIcon from '@merchbaseco/icons/core-solid-rounded/FilterResetIcon';
+import { CircleArrowDown02Icon, FilterResetIcon } from '@hugeicons-pro/core-solid-rounded';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useAtomValue } from 'jotai';
 import { Eye, EyeOff, RefreshCw } from 'lucide-react';

@@ -1,9 +1,6 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import Moon02Icon from '@merchbaseco/icons/core-solid-rounded/Moon02Icon';
-import MoreVerticalIcon from '@merchbaseco/icons/core-solid-rounded/MoreVerticalIcon';
-import Sun03Icon from '@merchbaseco/icons/core-solid-rounded/Sun03Icon';
-import DatabaseSync01Icon from '@merchbaseco/icons/core-stroke-rounded/DatabaseSync01Icon';
-import Key01Icon from '@merchbaseco/icons/core-stroke-rounded/Key01Icon';
+import { Moon02Icon, MoreVerticalIcon, Sun03Icon } from '@hugeicons-pro/core-solid-rounded';
+import { DatabaseSync01Icon, Key01Icon } from '@hugeicons-pro/core-stroke-rounded';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';

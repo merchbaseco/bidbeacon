@@ -1,11 +1,7 @@
 'use client';
 
 import { HugeiconsIcon } from '@hugeicons/react';
-import AlertCircleIcon from '@merchbaseco/icons/core-solid-rounded/AlertCircleIcon';
-import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
-import CheckmarkCircle04Icon from '@merchbaseco/icons/core-solid-rounded/CheckmarkCircle04Icon';
-import InformationCircleIcon from '@merchbaseco/icons/core-solid-rounded/InformationCircleIcon';
-import RemoveCircleIcon from '@merchbaseco/icons/core-solid-rounded/RemoveCircleIcon';
+import { AlertCircleIcon, ArrowReloadHorizontalIcon, CheckmarkCircle04Icon, InformationCircleIcon, RemoveCircleIcon } from '@hugeicons-pro/core-solid-rounded';
 import { useTheme } from 'next-themes';
 import { Toaster as Sonner, type ToasterProps } from 'sonner';
 

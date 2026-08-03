@@ -5,3 +5,6 @@ auto = "disable"
 ignoreScripts = true
 saveTextLockfile = true
 minimumReleaseAge = 259200
+
+[install.scopes]
+"@hugeicons-pro" = { token = "$HUGEICONS_LICENSE_KEY", url = "https://npm.hugeicons.com/" }

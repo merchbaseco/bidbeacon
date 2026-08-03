@@ -11,7 +11,7 @@ import '@fontsource/geist-mono/600.css';
 import '@fontsource/geist-mono/700.css';
 import './global.css';
 import { HugeiconsIcon } from '@hugeicons/react';
-import LighthouseIcon from '@merchbaseco/icons/core-solid-rounded/LighthouseIcon';
+import { LighthouseIcon } from '@hugeicons-pro/core-solid-rounded';
 import { Outlet } from 'react-router';
 import { MoreMenu } from './components/more-menu';
 import { Toaster } from './components/ui/toast';

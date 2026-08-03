@@ -1,5 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import ArrowReloadHorizontalIcon from '@merchbaseco/icons/core-solid-rounded/ArrowReloadHorizontalIcon';
+import { ArrowReloadHorizontalIcon } from '@hugeicons-pro/core-solid-rounded';
 import { useAtom } from 'jotai';
 import { Button } from '../../components/ui/button';
 import { Card } from '../../components/ui/card';

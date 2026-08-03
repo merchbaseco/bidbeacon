@@ -1,8 +1,5 @@
 import { HugeiconsIcon } from '@hugeicons/react';
-import AlarmClockIcon from '@merchbaseco/icons/core-solid-rounded/AlarmClockIcon';
-import ChartColumnIcon from '@merchbaseco/icons/core-solid-rounded/ChartColumnIcon';
-import Clock05Icon from '@merchbaseco/icons/core-solid-rounded/Clock05Icon';
-import TimeScheduleIcon from '@merchbaseco/icons/core-solid-rounded/TimeScheduleIcon';
+import { AlarmClockIcon, ChartColumnIcon, Clock05Icon, TimeScheduleIcon } from '@hugeicons-pro/core-solid-rounded';
 import { formatInTimeZone } from 'date-fns-tz';
 import { useMemo } from 'react';
 import { Progress } from '@/dashboard/components/ui/progress.js';
