@@ -8,7 +8,11 @@ read_when:
 
 # Centralized Merchbase Access cutover
 
-This is an operator runbook for a future production change. The implementation task does not run any step against production, create Clerk credentials, take a backup, stop services, or start a migration. Every production step below requires explicit approval from the operator and a named database owner.
+This cutover completed in production on August 3, 2026, at
+`cd1128f831012cb1327144a3cf3f5b12e1e2bbe9`. The procedure below is retained as
+the acceptance and rollback record; do not rerun it as a routine deployment.
+Any future production migration, backfill, or rollback still requires explicit
+operator approval and a named database owner.
 
 The target state has one authentication contract: the shared `@merchbaseco/access` package with fixed service `bidbeacon`. BidBeacon accepts Clerk web sessions, suite `ak_...` API keys, and the shared OAuth credential path. Authorization resolves a stable `mbu_...` Merchbase User through the product-local `user_account_access` projection. The old `bbk_` issuer/verifier, header, routes, UI, environment variable, and tables do not exist after cutover.
 
