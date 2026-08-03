@@ -1,49 +1,26 @@
+# syntax=docker/dockerfile:1.10
 FROM oven/bun:1.3.5-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
 FROM base AS deps
-ARG HUGEICONS_LICENSE_KEY
-ARG MERCHBASE_NPM_TOKEN
 COPY package.json bun.lock bunfig.toml .npmrc ./
-RUN : > .env && \
-    if [ -n "$HUGEICONS_LICENSE_KEY" ]; then \
-      printf "HUGEICONS_LICENSE_KEY=%s\n" "$HUGEICONS_LICENSE_KEY" >> .env; \
-    fi && \
-    if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
-      printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" >> .env; \
-    fi && \
-    bun install --frozen-lockfile && \
-    rm -f .env
+RUN --mount=type=secret,id=hugeicons_license_key,env=HUGEICONS_LICENSE_KEY,required=true \
+    --mount=type=secret,id=merchbase_npm_token,env=MERCHBASE_NPM_TOKEN,required=true \
+    bun install --frozen-lockfile
 
 FROM deps AS build
-ARG HUGEICONS_LICENSE_KEY
-ARG MERCHBASE_NPM_TOKEN
-ARG VITE_CLERK_PUBLISHABLE_KEY
+ARG VITE_CLERK_PUBLISHABLE
 COPY . .
-RUN : > .env && \
-    { \
-      [ -n "$HUGEICONS_LICENSE_KEY" ] && printf "HUGEICONS_LICENSE_KEY=%s\n" "$HUGEICONS_LICENSE_KEY"; \
-      [ -n "$MERCHBASE_NPM_TOKEN" ] && printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN"; \
-      [ -n "$VITE_CLERK_PUBLISHABLE_KEY" ] && printf "VITE_CLERK_PUBLISHABLE_KEY=%s\n" "$VITE_CLERK_PUBLISHABLE_KEY"; \
-    } >> .env && \
+RUN export VITE_CLERK_PUBLISHABLE_KEY="$VITE_CLERK_PUBLISHABLE" && \
     bun run build && \
-    bun run build:dashboard && \
-    rm -f .env
+    bun run build:dashboard
 
 # Production dependencies only - prune dev deps from node_modules
 FROM deps AS prod-deps
-ARG HUGEICONS_LICENSE_KEY
-ARG MERCHBASE_NPM_TOKEN
-RUN : > .env && \
-    if [ -n "$HUGEICONS_LICENSE_KEY" ]; then \
-      printf "HUGEICONS_LICENSE_KEY=%s\n" "$HUGEICONS_LICENSE_KEY" >> .env; \
-    fi && \
-    if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
-      printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" >> .env; \
-    fi && \
-    bun install --frozen-lockfile --production && \
-    rm -f .env
+RUN --mount=type=secret,id=hugeicons_license_key,env=HUGEICONS_LICENSE_KEY,required=true \
+    --mount=type=secret,id=merchbase_npm_token,env=MERCHBASE_NPM_TOKEN,required=true \
+    bun install --frozen-lockfile --production
 
 FROM node:20-alpine AS runtime
 WORKDIR /app

@@ -34,9 +34,10 @@ services:
       dockerfile: Dockerfile
       target: runtime
       args:
-        - HUGEICONS_LICENSE_KEY=${HUGEICONS_LICENSE_KEY}
-        - MERCHBASE_NPM_TOKEN=${MERCHBASE_NPM_TOKEN}
-        - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
+        - VITE_CLERK_PUBLISHABLE=${VITE_CLERK_PUBLISHABLE_KEY}
+      secrets:
+        - hugeicons_license_key
+        - merchbase_npm_token
     image: bidbeacon-server:local
     container_name: bidbeacon-server
     restart: unless-stopped
@@ -118,9 +119,10 @@ services:
       dockerfile: Dockerfile
       target: caddy
       args:
-        - HUGEICONS_LICENSE_KEY=${HUGEICONS_LICENSE_KEY}
-        - MERCHBASE_NPM_TOKEN=${MERCHBASE_NPM_TOKEN}
-        - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
+        - VITE_CLERK_PUBLISHABLE=${VITE_CLERK_PUBLISHABLE_KEY}
+      secrets:
+        - hugeicons_license_key
+        - merchbase_npm_token
     image: bidbeacon-caddy:local
     container_name: bidbeacon-caddy
     restart: unless-stopped
@@ -147,6 +149,12 @@ volumes:
   postgres_data:
   caddy_data:
   caddy_config:
+
+secrets:
+  hugeicons_license_key:
+    environment: HUGEICONS_LICENSE_KEY
+  merchbase_npm_token:
+    environment: MERCHBASE_NPM_TOKEN
 
 networks:
   bidbeacon:
