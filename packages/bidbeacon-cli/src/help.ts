@@ -56,14 +56,14 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         usage: 'bb auth [options] [command]',
         summary: 'Manage CLI authentication',
         commands: [
-            { left: 'set [bbk_...]', right: 'Save an API key in the platform secure store' },
+            { left: 'set [ak_...]', right: 'Save a Merchbase API key in the platform secure store' },
             { left: 'set --stdin', right: 'Read an API key from stdin and save it' },
             { left: 'status', right: 'Show whether auth resolves from env or the secure store' },
             { left: 'clear', right: 'Remove the stored API key from the secure store' },
         ],
         notes: [
             'Local secrets live in the platform secure store (macOS Keychain on macOS).',
-            'The `BB_API_KEY` environment variable overrides the secure-store value and is intended for automation, CI, and agent runtimes.',
+            'The `MERCHBASE_API_KEY` environment variable overrides the secure-store value and is intended for automation, CI, and agent runtimes.',
             'Auth commands never print the raw API key.',
         ],
     },

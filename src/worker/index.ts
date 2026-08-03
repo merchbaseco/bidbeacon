@@ -2,7 +2,11 @@ import Bottleneck from 'bottleneck';
 import { eq } from 'drizzle-orm';
 import { db, testConnection } from '@/db/index';
 import { workerControl } from '@/db/schema';
+import { hasCurrentAccountAccess } from '@/jobs/account-access-gate';
 import { createContextLogger } from '@/utils/logger';
+import { resolveAmsAccountIds } from './account-resolution';
+import { createDatabaseAmsAccountLookup } from './database-account-resolution';
+import { type AmsMessage, processAmsMessage } from './message-processor';
 import { routePayload } from './router';
 import { deleteMessage, receiveMessages, testAwsConnection } from './sqs-client';
 
@@ -13,64 +17,33 @@ logger.info('Starting Amazon Marketing Stream worker');
 // Graceful shutdown flag
 let shuttingDown = false;
 
-/**
- * Parse AMS payload from SQS message body
- *
- * Amazon Marketing Stream delivers messages directly to SQS with Raw Message Delivery enabled,
- * so messages are NOT wrapped in SNS envelopes. The message body contains the AMS payload directly.
- */
-function parseAmsPayload(body: string | undefined): unknown {
-    if (!body) {
-        throw new Error('Message body is empty');
-    }
+const accountLookup = createDatabaseAmsAccountLookup(db);
 
+const processMessage = async (message: AmsMessage): Promise<void> => {
     try {
-        const payload = JSON.parse(body);
+        const result = await processAmsMessage(message, {
+            checkAccountAccess: hasCurrentAccountAccess,
+            deleteMessage,
+            resolveAccountIds: payload => resolveAmsAccountIds(payload, accountLookup),
+            routePayload,
+        });
 
-        // Verify this looks like an AMS payload (should have datasetId)
-        if (!payload || typeof payload !== 'object') {
-            throw new Error('Message body is not a valid JSON object');
+        if (result.status === 'skipped') {
+            logger.warn(
+                {
+                    accountIds: result.accountIds,
+                    datasetId: result.datasetId,
+                    messageId: message.MessageId || 'unknown',
+                    reason: result.reason,
+                },
+                'Skipped AMS message; it remains queued for a future retry'
+            );
         }
-
-        return payload;
     } catch (error) {
-        // Log the actual body for debugging
-        const bodyPreview = body.length > 500 ? `${body.substring(0, 500)}...` : body;
-        logger.error({ err: error, bodyPreview }, 'Failed to parse message body');
-        throw new Error(`Failed to parse AMS payload: ${error instanceof Error ? error.message : String(error)}`);
-    }
-}
-
-/**
- * Process a single SQS message
- */
-async function processMessage(message: { Body?: string; ReceiptHandle?: string; MessageId?: string }): Promise<void> {
-    if (!message.ReceiptHandle) {
-        throw new Error('Message missing ReceiptHandle');
-    }
-
-    const messageId = message.MessageId || 'unknown';
-    let datasetId = 'unknown';
-
-    try {
-        // Parse AMS payload directly (AMS uses Raw Message Delivery, no SNS envelope)
-        const payload = parseAmsPayload(message.Body);
-
-        // Extract datasetId for logging (AMS uses snake_case: dataset_id)
-        datasetId = typeof payload === 'object' && payload !== null && 'dataset_id' in payload ? String(payload.dataset_id) : 'unknown';
-
-        // Route to appropriate handler
-        await routePayload(payload);
-
-        // Success - delete message from queue
-        await deleteMessage(message.ReceiptHandle);
-    } catch (error) {
-        // Log error but don't delete message - SQS will retry
-        logger.error({ err: error, messageId, datasetId }, 'Failed to process message');
-        // Don't delete - let SQS handle retries and DLQ routing
+        logger.error({ errorType: error instanceof Error ? error.name : 'unknown', messageId: message.MessageId || 'unknown' }, 'Failed to process AMS message; it remains queued for retry');
         throw error;
     }
-}
+};
 
 /**
  * Get worker configuration from the database

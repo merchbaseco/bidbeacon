@@ -8,33 +8,33 @@ describe('bidbeacon cli auth', () => {
     });
 
     it('prefers the env api key over the secure-store value', () => {
-        vi.stubEnv(API_KEY_ENV_VAR, 'bbk_env');
-        const secureStore = createMockSecureStore({ secret: 'bbk_stored' });
+        vi.stubEnv(API_KEY_ENV_VAR, 'ak_env');
+        const secureStore = createMockSecureStore({ secret: 'ak_stored' });
 
         const auth = loadAuthState({ secureStore });
 
         expect(auth.source).toBe('env');
-        expect(auth.apiKey).toBe('bbk_env');
+        expect(auth.apiKey).toBe('ak_env');
         expect(auth.envOverride).toBe(true);
         expect(auth.secureStore.configured).toBe(true);
     });
 
     it('falls back to the secure store when no env override exists', () => {
-        const secureStore = createMockSecureStore({ secret: 'bbk_stored' });
+        const secureStore = createMockSecureStore({ secret: 'ak_stored' });
 
         const auth = loadAuthState({ env: {}, secureStore });
 
         expect(auth.source).toBe('secure-store');
-        expect(auth.apiKey).toBe('bbk_stored');
+        expect(auth.apiKey).toBe('ak_stored');
         expect(auth.envOverride).toBe(false);
     });
 
     it('writes and clears the stored api key without exposing it', () => {
         const secureStore = createMockSecureStore();
 
-        const saved = setStoredApiKey('  bbk_saved  ', { env: {}, secureStore });
+        const saved = setStoredApiKey('  ak_saved  ', { env: {}, secureStore });
         expect(saved.source).toBe('secure-store');
-        expect(saved.apiKey).toBe('bbk_saved');
+        expect(saved.apiKey).toBe('ak_saved');
 
         const cleared = clearStoredApiKey({ env: {}, secureStore });
         expect(cleared.cleared).toBe(true);
@@ -45,7 +45,7 @@ describe('bidbeacon cli auth', () => {
     it('rejects auth set when the secure store is unavailable', () => {
         const secureStore = createMockSecureStore({ available: false, detail: 'No backend.' });
 
-        expect(() => setStoredApiKey('bbk_saved', { secureStore })).toThrow('Secure-store auth is unavailable');
+        expect(() => setStoredApiKey('ak_saved', { secureStore })).toThrow('Secure-store auth is unavailable');
     });
 });
 

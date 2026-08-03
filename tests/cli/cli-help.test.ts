@@ -23,9 +23,9 @@ describe('bb help topics', () => {
 
     it('renders auth and config setup commands', () => {
         const authOutput = renderHelp('auth', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
-        expect(authOutput).toContain('set [bbk_...]');
+        expect(authOutput).toContain('set [ak_...]');
         expect(authOutput).toContain('set --stdin');
-        expect(authOutput).toContain('BB_API_KEY');
+        expect(authOutput).toContain('MERCHBASE_API_KEY');
 
         const configOutput = renderHelp('config', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
         expect(configOutput).toContain('get <key>');

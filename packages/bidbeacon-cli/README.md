@@ -30,9 +30,9 @@ Authentication defaults to the platform secure store and keeps secrets out of `c
 
 `bb config set storage-dir <path>` persists a custom directory for CLI config/data. After you set it once, future `bb` commands use `<path>/config.json` instead of `~/.bidbeacon/config.json`.
 
-Env overrides still work and take precedence over saved defaults. `BB_API_KEY` is intended for automation, CI, and agent runtimes:
+Env overrides still work and take precedence over saved defaults. `MERCHBASE_API_KEY` is intended for automation, CI, and agent runtimes:
 
-- `BB_API_KEY`
+- `MERCHBASE_API_KEY`
 - `BB_STORAGE_DIR`
 - `BB_BASE_URL`
 - `BB_ACCOUNT_ID`

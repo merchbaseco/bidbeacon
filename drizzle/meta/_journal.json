@@ -372,6 +372,13 @@
       "when": 1785606500773,
       "tag": "0052_robust_monster_badoon",
       "breakpoints": true
+    },
+    {
+      "idx": 53,
+      "version": "7",
+      "when": 1785770794324,
+      "tag": "0053_modern_rafael_vega",
+      "breakpoints": true
     }
   ]
 }

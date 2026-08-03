@@ -9,6 +9,7 @@ import { and, eq, type InferSelectModel } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { reportDatasetMetadata } from '@/db/schema';
+import { gateAccountWork } from '@/jobs/account-access-gate';
 import { createReportForDataset } from '@/lib/create-report/index';
 import { parseReport } from '@/lib/parse-report/index';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
@@ -58,6 +59,13 @@ export const updateReportStatusJob = boss
                         countryCode,
                     },
                     async recorder => {
+                        if (!(await gateAccountWork({ accountId, countryCode, recorder }))) {
+                            if (claimed) {
+                                await releaseClaimedReport({ accountId, aggregation, countryCode, date, entityType });
+                            }
+                            return;
+                        }
+
                         const timezone = getTimezoneForCountry(countryCode);
                         const datasetBadge = formatDatasetBadge(date, aggregation, entityType, timezone);
                         const buildBadges = (reportId?: string | null) => {
@@ -263,6 +271,26 @@ export const updateReportStatusJob = boss
 // ============================================================================
 // Helper Functions
 // ============================================================================
+
+const releaseClaimedReport = async (input: { accountId: string; aggregation: (typeof AGGREGATION_TYPES)[number]; countryCode: string; date: Date; entityType: (typeof ENTITY_TYPES)[number] }) => {
+    const [releasedRow] = await db
+        .update(reportDatasetMetadata)
+        .set({ refreshing: false })
+        .where(
+            and(
+                eq(reportDatasetMetadata.accountId, input.accountId),
+                eq(reportDatasetMetadata.countryCode, input.countryCode),
+                eq(reportDatasetMetadata.periodStart, input.date),
+                eq(reportDatasetMetadata.aggregation, input.aggregation),
+                eq(reportDatasetMetadata.entityType, input.entityType)
+            )
+        )
+        .returning();
+
+    if (releasedRow) {
+        emitEvent({ type: 'report:refreshed', row: releasedRow });
+    }
+};
 
 /**
  * Atomically claims a report row and emits an update event.

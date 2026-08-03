@@ -1,6 +1,7 @@
+import { MERCHBASE_API_KEY_ENV } from '@merchbaseco/access';
 import { createSecureStore, type SecureStore, type SecureStoreStatus } from './secure-store';
 
-export const API_KEY_ENV_VAR = 'BB_API_KEY';
+export const API_KEY_ENV_VAR = MERCHBASE_API_KEY_ENV;
 
 export type AuthSource = 'env' | 'secure-store' | 'none';
 
@@ -85,7 +86,7 @@ export const clearStoredApiKey = (options: { env?: NodeJS.ProcessEnv; secureStor
 };
 
 export const getMissingApiKeyMessage = () => {
-    return `Missing BidBeacon auth. Run \`bb auth set\` for local use or set ${API_KEY_ENV_VAR} for automation, CI, and agent runtimes.`;
+    return `Missing Merchbase auth. Run \`bb auth set\` for local use or set ${API_KEY_ENV_VAR} for automation, CI, and agent runtimes.`;
 };
 
 const getSecureStoreUnavailableMessage = (status: SecureStoreStatus) => {

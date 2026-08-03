@@ -6,6 +6,7 @@ import type { ApiRegion } from '@/amazon-ads/config';
 import { type ChangeHistoryEvent, DEFAULT_CHANGE_HISTORY_EVENT_TYPES, getChangeHistory } from '@/amazon-ads/get-change-history';
 import { db } from '@/db/index';
 import { advertiserAccount, changeHistorySyncState, entityChangeHistory } from '@/db/schema';
+import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays } from '@/utils/date';
 import { type JobMetricsRecorder, withJobMetrics } from '@/utils/job-metrics';
@@ -58,7 +59,12 @@ export const syncChangeHistoryForAccountJob = boss
                         accountId: job.data.accountId,
                         countryCode: job.data.countryCode,
                     },
-                    recorder => syncChangeHistoryForAccount(job.data.accountId, job.data.countryCode, recorder)
+                    async recorder => {
+                        if (!(await gateAccountWork({ accountId: job.data.accountId, countryCode: job.data.countryCode, recorder }))) {
+                            return;
+                        }
+                        return syncChangeHistoryForAccount(job.data.accountId, job.data.countryCode, recorder);
+                    }
                 )
             )
         );

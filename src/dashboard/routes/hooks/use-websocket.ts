@@ -1,11 +1,12 @@
-import { useAuth } from '@clerk/clerk-react';
 import { useSetAtom } from 'jotai';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect } from 'react';
 import useWebSocketLib, { ReadyState } from 'react-use-websocket';
 import { toast } from 'sonner';
+import { BIDBEACON_REALTIME_PROTOCOL } from '@/realtime-protocol';
 import { api } from '../../lib/trpc';
 import { apiBaseUrl } from '../../router';
 import { type ConnectionStatus, connectionStatusAtom } from '../atoms';
+import { useRealtimeTicket } from './use-realtime-ticket';
 
 type Event =
     | { type: 'error'; message: string; details?: string; timestamp: string }
@@ -77,24 +78,9 @@ type Event =
 const WS_BASE_URL = `${apiBaseUrl.replace(/^https?/, (m: string) => (m === 'https' ? 'wss' : 'ws'))}/api/events`;
 
 export const useWebSocket = () => {
-    const { getToken } = useAuth();
     const utils = api.useUtils();
     const setConnectionStatus = useSetAtom(connectionStatusAtom);
-    const [wsUrl, setWsUrl] = useState<string | null>(null);
-
-    // Get token and build WebSocket URL with auth
-    useEffect(() => {
-        const updateToken = async () => {
-            const token = await getToken();
-            if (token) {
-                setWsUrl(`${WS_BASE_URL}?token=${encodeURIComponent(token)}`);
-            }
-        };
-        updateToken();
-        // Refresh token periodically (Clerk tokens expire)
-        const interval = setInterval(updateToken, 50_000);
-        return () => clearInterval(interval);
-    }, [getToken]);
+    const { refresh, ticket } = useRealtimeTicket();
 
     const handleMessage = useCallback(
         (event: MessageEvent) => {
@@ -151,17 +137,19 @@ export const useWebSocket = () => {
         [utils]
     );
 
-    const { readyState } = useWebSocketLib(wsUrl, {
+    const { readyState } = useWebSocketLib(ticket ? WS_BASE_URL : null, {
         onMessage: handleMessage,
-        shouldReconnect: () => true,
-        reconnectAttempts: 5,
-        reconnectInterval: attemptNumber => Math.min(1000 * 2 ** attemptNumber, 30_000),
+        onClose: () => {
+            refresh().catch(() => undefined);
+        },
+        protocols: ticket ? [BIDBEACON_REALTIME_PROTOCOL, ticket] : undefined,
         heartbeat: {
             message: JSON.stringify({ type: 'ping' }),
             returnMessage: JSON.stringify({ type: 'pong' }),
             timeout: 60_000,
             interval: 30_000,
         },
+        shouldReconnect: () => false,
         share: true,
     });
 

@@ -2,7 +2,9 @@ import type { InferSelectModel } from 'drizzle-orm';
 import { useRef } from 'react';
 import useWebSocketLib from 'react-use-websocket';
 import type { reportDatasetMetadata } from '@/db/schema';
+import { BIDBEACON_REALTIME_PROTOCOL } from '@/realtime-protocol';
 import { apiBaseUrl } from '../../router';
+import { useRealtimeTicket } from './use-realtime-ticket';
 
 const API_PROTOCOL_REGEX = /^https?/;
 
@@ -61,14 +63,15 @@ type Event =
  * @param eventType - The type of event to listen for
  * @param handler - Callback function that receives the event data
  */
-export function useWebSocketEvents<T extends Event['type']>(eventType: T, handler: (event: Extract<Event, { type: T }>) => void): void {
+export const useWebSocketEvents = <T extends Event['type']>(eventType: T, handler: (event: Extract<Event, { type: T }>) => void): void => {
     const handlerRef = useRef(handler);
     handlerRef.current = handler;
+    const { refresh, ticket } = useRealtimeTicket();
 
     // Compute WebSocket URL lazily inside the hook to avoid initialization order issues
     const wsUrl = `${apiBaseUrl.replace(API_PROTOCOL_REGEX, (match: string) => (match === 'https' ? 'wss' : 'ws'))}/api/events`;
 
-    useWebSocketLib(wsUrl, {
+    useWebSocketLib(ticket ? wsUrl : null, {
         onMessage: event => {
             try {
                 const data: Event = JSON.parse(event.data);
@@ -79,9 +82,11 @@ export function useWebSocketEvents<T extends Event['type']>(eventType: T, handle
                 // Ignore malformed messages
             }
         },
-        shouldReconnect: () => true,
-        reconnectAttempts: 5,
-        reconnectInterval: attemptNumber => Math.min(1000 * 2 ** attemptNumber, 30_000),
+        onClose: () => {
+            refresh().catch(() => undefined);
+        },
+        protocols: ticket ? [BIDBEACON_REALTIME_PROTOCOL, ticket] : undefined,
+        shouldReconnect: () => false,
         share: true, // Share connection with other hooks
     });
-}
+};

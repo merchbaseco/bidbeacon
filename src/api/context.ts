@@ -1,147 +1,70 @@
-import { createHash, timingSafeEqual } from 'node:crypto';
-import { verifyToken } from '@clerk/backend';
+import { ServiceAccessError } from '@merchbaseco/access';
 import type { CreateFastifyContextOptions } from '@trpc/server/adapters/fastify';
-import { eq } from 'drizzle-orm';
-import { db } from '@/db/index';
-import { apiKey, apiKeyAccountAccess, userAccountAccess } from '@/db/schema';
+import { authorizeBidBeaconCredential, getBidBeaconAccess } from '@/services/access/bidbeacon-access';
 
-const API_KEY_PREFIX = 'bbk';
-const API_KEY_TOKEN_PREFIX = `${API_KEY_PREFIX}_`;
+export type AuthenticatedUser = {
+    merchbaseUserId: string;
+};
 
-/**
- * Creates the tRPC context for each request.
- * This is where you can add request-specific data like user info, database connections, etc.
- */
-export async function createContext({ req }: CreateFastifyContextOptions) {
-    const apiKeyToken = getApiKeyToken(req.headers);
-    if (apiKeyToken) {
-        const apiKeyContext = await getApiKeyContext(apiKeyToken);
-        if (apiKeyContext) {
-            return { ...apiKeyContext, request: req as unknown };
-        }
-        return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req as unknown };
-    }
+export type AuthType = 'access' | 'none';
+export type CredentialKind = 'api_key' | 'oauth' | 'session';
 
-    const token = getBearerToken(req.headers);
-    if (!token) {
-        return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req as unknown };
+export type Context = {
+    accessError: 'access_denied' | 'access_unavailable' | null;
+    accessibleAccountIds: string[];
+    authType: AuthType;
+    credentialKind: CredentialKind | null;
+    request: unknown;
+    user: AuthenticatedUser | null;
+};
+
+export const createContext = async ({ req }: CreateFastifyContextOptions): Promise<Context> => {
+    const credential = getBearerToken(req.headers.authorization);
+    const unauthenticated = createUnauthenticatedContext(req as unknown);
+
+    if (!credential) {
+        return unauthenticated;
     }
 
     try {
-        const secretKey = process.env.CLERK_SECRET_KEY;
-        if (!secretKey) {
-            console.warn('CLERK_SECRET_KEY not configured');
-            return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req as unknown };
+        const access = getBidBeaconAccess();
+        const resolved = await authorizeBidBeaconCredential(access, credential);
+
+        return {
+            accessError: null,
+            accessibleAccountIds: resolved.principal.accessibleAccountIds,
+            authType: 'access',
+            credentialKind: resolved.credentialKind,
+            request: req as unknown,
+            user: { merchbaseUserId: resolved.merchbaseUserId },
+        };
+    } catch (error) {
+        if (error instanceof ServiceAccessError && (error.code === 'access_denied' || error.code === 'access_unavailable')) {
+            return {
+                ...unauthenticated,
+                accessError: error.code,
+            };
         }
 
-        const payload = await verifyToken(token, { secretKey });
-        const user: { sub: string; email?: string } = {
-            sub: payload.sub,
-            email: payload.email as string | undefined,
-        };
-
-        const accessibleAccountIds = await fetchAccessibleAccountIds(payload.sub);
-
-        return { user, accessibleAccountIds, authType: 'clerk', request: req as unknown };
-    } catch {
-        return { user: null, accessibleAccountIds: [] as string[], authType: 'none', request: req as unknown };
+        return unauthenticated;
     }
-}
-
-export type Context = Awaited<ReturnType<typeof createContext>>;
-
-// ============================================================================
-// Helpers
-// ============================================================================
-
-const getHeaderValue = (value?: string | string[]) => {
-    if (Array.isArray(value)) {
-        return value[0];
-    }
-    return value;
 };
 
-const getBearerToken = (headers: CreateFastifyContextOptions['req']['headers']) => {
-    const authHeader = headers.authorization;
-    const token = authHeader?.replace('Bearer ', '').trim();
-    if (!token || token.startsWith(API_KEY_TOKEN_PREFIX)) {
+const createUnauthenticatedContext = (request: unknown): Context => ({
+    accessError: null,
+    accessibleAccountIds: [],
+    authType: 'none',
+    credentialKind: null,
+    request,
+    user: null,
+});
+
+const getBearerToken = (authorization?: string | string[]) => {
+    const value = Array.isArray(authorization) ? authorization[0] : authorization;
+    if (!value?.startsWith('Bearer ')) {
         return null;
     }
-    return token;
+
+    const credential = value.slice('Bearer '.length).trim();
+    return credential.length > 0 ? credential : null;
 };
-
-const getApiKeyToken = (headers: CreateFastifyContextOptions['req']['headers']) => {
-    const directToken = getHeaderValue(headers['x-bidbeacon-api-key']);
-    if (directToken) {
-        return directToken.trim();
-    }
-
-    const authHeader = headers.authorization;
-    const token = authHeader?.replace('Bearer ', '').trim();
-    if (token?.startsWith(API_KEY_TOKEN_PREFIX)) {
-        return token;
-    }
-
-    return null;
-};
-
-const fetchAccessibleAccountIds = async (clerkUserId: string) => {
-    const accessibleAccounts = await db.select({ adsAccountId: userAccountAccess.adsAccountId }).from(userAccountAccess).where(eq(userAccountAccess.clerkUserId, clerkUserId));
-
-    return accessibleAccounts.map(account => account.adsAccountId);
-};
-
-const getApiKeyContext = async (token: string) => {
-    const parsed = parseApiKeyToken(token);
-    if (!parsed) {
-        return null;
-    }
-
-    const record = await db.query.apiKey.findFirst({
-        where: eq(apiKey.id, parsed.apiKeyId),
-    });
-
-    if (!record) {
-        return null;
-    }
-
-    const secretHash = hashApiKeySecret(parsed.secret);
-    if (record.secretHash.length !== secretHash.length) {
-        return null;
-    }
-    if (!timingSafeEqual(Buffer.from(secretHash), Buffer.from(record.secretHash))) {
-        return null;
-    }
-
-    const accessibleAccounts = await db.select({ adsAccountId: apiKeyAccountAccess.adsAccountId }).from(apiKeyAccountAccess).where(eq(apiKeyAccountAccess.apiKeyId, parsed.apiKeyId));
-
-    await db.update(apiKey).set({ lastUsedAt: new Date() }).where(eq(apiKey.id, parsed.apiKeyId));
-
-    return {
-        user: { sub: record.createdBy },
-        accessibleAccountIds: accessibleAccounts.map(account => account.adsAccountId),
-        authType: 'apiKey',
-        apiKeyId: record.id,
-    };
-};
-
-const parseApiKeyToken = (token: string) => {
-    const trimmedToken = token.trim();
-    if (!trimmedToken.startsWith(API_KEY_TOKEN_PREFIX)) {
-        return null;
-    }
-
-    const parts = trimmedToken.split('_');
-    if (parts.length !== 3) {
-        return null;
-    }
-
-    const [, apiKeyId, secret] = parts;
-    if (!(apiKeyId && secret)) {
-        return null;
-    }
-
-    return { apiKeyId, secret };
-};
-
-const hashApiKeySecret = (secret: string) => createHash('sha256').update(secret).digest('hex');

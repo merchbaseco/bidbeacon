@@ -19,7 +19,7 @@ export type PublicRouterOutputs = RouterOutputs;
 
 export type BidBeaconClientOptions = {
     baseUrl: string;
-    apiKey?: string;
+    credential?: string;
     headers?: Record<string, string>;
     batch?: boolean;
     batchMaxItems?: number;
@@ -32,7 +32,7 @@ export type BidBeaconClient = CliProxyClient;
 
 export const createBidBeaconClient = ({
     baseUrl,
-    apiKey,
+    credential,
     headers,
     batch = true,
     batchMaxItems = DEFAULT_BATCH_MAX_ITEMS,
@@ -40,7 +40,7 @@ export const createBidBeaconClient = ({
 }: BidBeaconClientOptions): BidBeaconClient => {
     const url = `${normalizeBaseUrl(baseUrl)}/api`;
     const resolveHeaders = () => ({
-        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+        ...(credential ? { Authorization: `Bearer ${credential}` } : {}),
         ...(headers ?? {}),
     });
     const transportFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(encodeTrpcProcedurePath(getRequestUrl(input)), init);

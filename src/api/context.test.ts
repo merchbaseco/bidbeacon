@@ -1,39 +1,29 @@
+import { ServiceAccessError } from '@merchbaseco/access';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createContext } from './context';
-import { privateProcedure, router } from './trpc';
+import { apiProcedure, privateProcedure, router } from './trpc';
 
 const authMocks = vi.hoisted(() => {
-    const selectWhere = vi.fn();
-    const selectFrom = vi.fn(() => ({ where: selectWhere }));
-
     return {
-        selectFrom,
-        selectWhere,
-        verifyToken: vi.fn(),
-        db: {
-            select: vi.fn(() => ({ from: selectFrom })),
-            query: {
-                apiKey: {
-                    findFirst: vi.fn(),
-                },
-            },
-        },
+        authorize: vi.fn(),
     };
 });
 
-vi.mock('@clerk/backend', () => ({
-    verifyToken: authMocks.verifyToken,
-}));
-
-vi.mock('@/db/index', () => ({
-    db: authMocks.db,
+vi.mock('@/services/access/bidbeacon-access', () => ({
+    authorizeBidBeaconCredential: authMocks.authorize,
+    getBidBeaconAccess: () => ({ authorize: authMocks.authorize }),
 }));
 
 const authTestRouter = router({
     viewer: privateProcedure.query(({ ctx }) => ({
-        userId: ctx.user.sub,
+        userId: ctx.user.merchbaseUserId,
+        accountIds: ctx.accessibleAccountIds,
+    })),
+    apiViewer: apiProcedure.query(({ ctx }) => ({
+        credentialKind: ctx.credentialKind,
+        userId: ctx.user.merchbaseUserId,
         accountIds: ctx.accessibleAccountIds,
     })),
 });
@@ -43,9 +33,19 @@ describe('HTTP authentication', () => {
 
     beforeEach(async () => {
         vi.clearAllMocks();
-        vi.stubEnv('CLERK_SECRET_KEY', 'test-clerk-secret');
-        authMocks.selectWhere.mockResolvedValue([{ adsAccountId: 'account-1' }]);
-        authMocks.verifyToken.mockResolvedValue({ sub: 'clerk-user' });
+        authMocks.authorize.mockImplementation(async (_access: unknown, credential: string) => {
+            if (credential.startsWith('bbk_')) {
+                throw new Error('unauthenticated');
+            }
+            return {
+                credentialKind: credential.startsWith('ak_') ? 'api_key' : credential.startsWith('oat_') ? 'oauth' : 'session',
+                merchbaseUserId: 'mbu_one',
+                principal: {
+                    accessibleAccountIds: ['account-1', 'account-2'],
+                    merchbaseUserId: 'mbu_one',
+                },
+            };
+        });
         app = await createAuthTestServer();
     });
 
@@ -64,16 +64,15 @@ describe('HTTP authentication', () => {
         });
 
         expect(response.statusCode).toBe(401);
-        expect(authMocks.verifyToken).not.toHaveBeenCalled();
-        expect(authMocks.db.select).not.toHaveBeenCalled();
+        expect(authMocks.authorize).not.toHaveBeenCalled();
     });
 
-    it('authenticates a legitimate Clerk bearer token', async () => {
+    it('authenticates a web session into a stable Merchbase User', async () => {
         const response = await app.inject({
             method: 'GET',
             url: '/api/viewer',
             headers: {
-                authorization: 'Bearer clerk-token',
+                authorization: 'Bearer session.jwt.token',
             },
         });
 
@@ -81,14 +80,52 @@ describe('HTTP authentication', () => {
         expect(response.json()).toEqual({
             result: {
                 data: {
-                    userId: 'clerk-user',
-                    accountIds: ['account-1'],
+                    userId: 'mbu_one',
+                    accountIds: ['account-1', 'account-2'],
                 },
             },
         });
-        expect(authMocks.verifyToken).toHaveBeenCalledWith('clerk-token', {
-            secretKey: 'test-clerk-secret',
+        expect(authMocks.authorize).toHaveBeenCalledWith(expect.anything(), 'session.jwt.token');
+    });
+
+    it.each([
+        ['api key', 'ak_suite-key', 'api_key'],
+        ['OAuth token', 'oat_oauth-token', 'oauth'],
+    ])('accepts a suite %s through the generic bearer header', async (_label, credential, credentialKind) => {
+        const response = await app.inject({
+            method: 'GET',
+            url: '/api/apiViewer',
+            headers: { authorization: `Bearer ${credential}` },
         });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json().result.data.credentialKind).toBe(credentialKind);
+    });
+
+    it('does not accept the retired API-key header or local key prefix', async () => {
+        const headerResponse = await app.inject({
+            method: 'GET',
+            url: '/api/apiViewer',
+            headers: { 'x-bidbeacon-api-key': 'ak_suite-key' },
+        });
+        const legacyResponse = await app.inject({
+            method: 'GET',
+            url: '/api/apiViewer',
+            headers: { authorization: 'Bearer bbk_legacy-key' },
+        });
+
+        expect(headerResponse.statusCode).toBe(401);
+        expect(legacyResponse.statusCode).toBe(401);
+    });
+
+    it('preserves denied and unavailable access outcomes', async () => {
+        authMocks.authorize.mockRejectedValueOnce(new ServiceAccessError('access_denied')).mockRejectedValueOnce(new ServiceAccessError('access_unavailable'));
+
+        const denied = await app.inject({ method: 'GET', url: '/api/apiViewer', headers: { authorization: 'Bearer session.jwt.token' } });
+        const unavailable = await app.inject({ method: 'GET', url: '/api/apiViewer', headers: { authorization: 'Bearer session.jwt.token' } });
+
+        expect(denied.statusCode).toBe(403);
+        expect(unavailable.statusCode).toBe(500);
     });
 });
 

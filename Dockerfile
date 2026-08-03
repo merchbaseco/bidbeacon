@@ -4,21 +4,27 @@ RUN apk add --no-cache libc6-compat
 
 FROM base AS deps
 ARG HUGEICONS_LICENSE_KEY
+ARG MERCHBASE_NPM_TOKEN
 COPY package.json bun.lock bunfig.toml .npmrc ./
 RUN : > .env && \
     if [ -n "$HUGEICONS_LICENSE_KEY" ]; then \
       printf "HUGEICONS_LICENSE_KEY=%s\n" "$HUGEICONS_LICENSE_KEY" >> .env; \
+    fi && \
+    if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
+      printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" >> .env; \
     fi && \
     bun install --frozen-lockfile && \
     rm -f .env
 
 FROM deps AS build
 ARG HUGEICONS_LICENSE_KEY
+ARG MERCHBASE_NPM_TOKEN
 ARG VITE_CLERK_PUBLISHABLE_KEY
 COPY . .
 RUN : > .env && \
     { \
       [ -n "$HUGEICONS_LICENSE_KEY" ] && printf "HUGEICONS_LICENSE_KEY=%s\n" "$HUGEICONS_LICENSE_KEY"; \
+      [ -n "$MERCHBASE_NPM_TOKEN" ] && printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN"; \
       [ -n "$VITE_CLERK_PUBLISHABLE_KEY" ] && printf "VITE_CLERK_PUBLISHABLE_KEY=%s\n" "$VITE_CLERK_PUBLISHABLE_KEY"; \
     } >> .env && \
     bun run build && \
@@ -27,7 +33,17 @@ RUN : > .env && \
 
 # Production dependencies only - prune dev deps from node_modules
 FROM deps AS prod-deps
-RUN bun install --frozen-lockfile --production
+ARG HUGEICONS_LICENSE_KEY
+ARG MERCHBASE_NPM_TOKEN
+RUN : > .env && \
+    if [ -n "$HUGEICONS_LICENSE_KEY" ]; then \
+      printf "HUGEICONS_LICENSE_KEY=%s\n" "$HUGEICONS_LICENSE_KEY" >> .env; \
+    fi && \
+    if [ -n "$MERCHBASE_NPM_TOKEN" ]; then \
+      printf "MERCHBASE_NPM_TOKEN=%s\n" "$MERCHBASE_NPM_TOKEN" >> .env; \
+    fi && \
+    bun install --frozen-lockfile --production && \
+    rm -f .env
 
 FROM node:20-alpine AS runtime
 WORKDIR /app

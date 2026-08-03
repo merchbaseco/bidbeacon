@@ -1162,7 +1162,7 @@ const resolveAuthSetInput = async (value: string | undefined, flags: ParsedFlags
     }
 
     return {
-        apiKey: await readSecretFromPrompt('BidBeacon API key: '),
+        apiKey: await readSecretFromPrompt('Merchbase API key: '),
         source: 'prompt',
     };
 };
@@ -1315,7 +1315,7 @@ const createApiClient = (config: CliConfig) => {
     const apiConfig = resolveApiConfig(config);
     return createBidBeaconClient({
         baseUrl: apiConfig.baseUrl,
-        apiKey: apiConfig.apiKey,
+        credential: apiConfig.apiKey,
         batch: false,
     });
 };

@@ -47,7 +47,7 @@ describe('bidbeacon cli build', () => {
         const outputFile = join(tempDir, 'bb.js');
         const homeDir = join(tempDir, 'home');
         const customStorageDir = join(tempDir, 'custom-storage');
-        const cliEnv = { BB_API_KEY: 'bbk_test' };
+        const cliEnv = { MERCHBASE_API_KEY: 'ak_test' };
 
         await mkdir(homeDir, { recursive: true });
 
@@ -132,7 +132,7 @@ describe('bidbeacon cli build', () => {
         });
 
         const showOutput = runCli(outputFile, homeDir, ['config', 'show'], {
-            BB_API_KEY: 'bbk_test',
+            MERCHBASE_API_KEY: 'ak_test',
             BB_STORAGE_DIR: envStorageDir,
             BB_BASE_URL: 'https://env.example',
             BB_ACCOUNT_ID: '333',
@@ -159,7 +159,7 @@ const createTempDir = async (prefix: string) => {
 };
 
 const runCli = (outputFile: string, homeDir: string, args: string[], extraEnv?: Record<string, string>) => {
-    const { BB_ACCOUNT_ID: _bbAccountId, BB_API_KEY: _bbApiKey, BB_BASE_URL: _bbBaseUrl, BB_COUNTRY_CODE: _bbCountryCode, BB_STORAGE_DIR: _bbStorageDir, ...baseEnv } = process.env;
+    const { BB_ACCOUNT_ID: _bbAccountId, MERCHBASE_API_KEY: _merchbaseApiKey, BB_BASE_URL: _bbBaseUrl, BB_COUNTRY_CODE: _bbCountryCode, BB_STORAGE_DIR: _bbStorageDir, ...baseEnv } = process.env;
 
     return execFileSync(outputFile, args, {
         cwd: repoRoot,

@@ -23,11 +23,12 @@ This spec defines the public npm client package that exposes typed access to the
 
 ## Client Surface
 
-- Primary entrypoint: `createBidBeaconClient({ baseUrl, apiKey, headers, batch, batchMaxItems, batchMaxURLLength })`
+- Primary entrypoint: `createBidBeaconClient({ baseUrl, credential, headers, batch, batchMaxItems, batchMaxURLLength })`
+- `credential` is the generic bearer credential field. It accepts suite-issued `ak_...` keys, Clerk web-session tokens, and OAuth tokens.
 - Usage returns the CLI surface directly, for example:
 
 ```ts
-const client = createBidBeaconClient({ baseUrl, apiKey });
+const client = createBidBeaconClient({ baseUrl, credential });
 const accounts = await client['accounts/list'].query();
 ```
 

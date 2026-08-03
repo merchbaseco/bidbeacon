@@ -15,6 +15,7 @@ import { exportTargets } from '@/amazon-ads/export-targets';
 import { type ExportContentType, type ExportStatusResponse, getExportStatus } from '@/amazon-ads/get-export-status';
 import { db } from '@/db/index';
 import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, target } from '@/db/schema';
+import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
 import { utcNow } from '@/utils/date';
 import { emitEvent } from '@/utils/events';
@@ -198,6 +199,10 @@ export const syncAdEntitiesForAccountJob = boss
                     countryCode: job.data.countryCode,
                 },
                 async recorder => {
+                    if (!(await gateAccountWork({ accountId, countryCode, recorder }))) {
+                        return;
+                    }
+
                     // Update metadata to indicate sync is starting
                     await db
                         .insert(accountDatasetMetadata)

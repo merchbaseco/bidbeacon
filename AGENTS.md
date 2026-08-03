@@ -28,19 +28,22 @@ Both share the same PostgreSQL database.
 
 ### Authentication & Multi-Tenancy
 
-Uses **Clerk** for authentication with a custom multi-tenancy layer:
+Uses the shared `@merchbaseco/access` package for Clerk web sessions, suite API keys, and OAuth credentials. BidBeacon keeps a product-local Access Projection and resolves stable Merchbase Users to advertiser memberships:
 
 ```
-Clerk User (clerk_user_id)
+Merchbase User (merchbase_user_id)
     └── user_account_access (M:N join table)
             └── Advertiser Account (ads_account_id)
                     └── All data (campaigns, reports, metrics, etc.)
 ```
 
 **Key files:**
-- `src/api/context.ts` - Verifies Clerk token, loads `accessibleAccountIds` into context
-- `src/api/trpc.ts` - `protectedProcedure` provides `assertAccountAccess(accountId)` helper
-- `src/db/schema.ts` - `userAccountAccess` table links users to accounts
+- `src/services/access/bidbeacon-access.ts` - Fixed `bidbeacon` shared-access adapters and stable-user membership resolver
+- `src/services/access/access-projection-store.ts` - Verified, idempotent, monotonic Clerk projection persistence
+- `src/api/context.ts` - Normalizes shared credentials and loads `accessibleAccountIds` into context
+- `src/api/trpc.ts` - `apiProcedure` provides `assertAccountAccess(accountId)` helper
+- `src/db/schema.ts` - Stable-user memberships and Access Projection/event tables
+- `src/api/access/clerk-webhook-route.ts` - Signed Clerk projection webhook
 
 **Access control pattern:**
 ```typescript
@@ -51,14 +54,13 @@ Clerk User (clerk_user_id)
 })
 ```
 
-**New accounts:** When `accounts.sync` discovers new accounts from Amazon Ads API, they're automatically linked to the current user.
+**New accounts:** When `accounts.sync` discovers new accounts from Amazon Ads API, they're automatically linked to the authenticated stable Merchbase User. Centralized account membership remains the source of truth for future cutover work.
 
 ### API Keys & CLI
 
-API keys are scoped to advertiser accounts and are used by the `bb` CLI and any API-key automation.
-- `src/db/schema.ts` - `api_key` and `api_key_account_access` tables (hashed secrets, revocable keys)
-- `src/api/context.ts` - API key auth (`Authorization: Bearer bbk_...` or `x-bidbeacon-api-key`)
-- `src/api/app/api-keys.ts` - create/list/revoke keys (creating a new key deletes prior keys)
+Suite API keys are managed by Merchbase Account Center, use the shared `ak_...` convention, and are used by the `bb` CLI and API-key automation. BidBeacon has no product-local key issuer, verifier, route, table, or header.
+- `src/services/access/bidbeacon-access.ts` - Shared session, OAuth, and API-key adapters for fixed service `bidbeacon`
+- `packages/bidbeacon-cli/src/auth.ts` - `MERCHBASE_API_KEY` and shared Keychain convention
 - `packages/bidbeacon-cli/src/index.ts` - CLI entrypoint for the globally installed `bb` binary (`@bidbeacon/cli`)
 
 **CLI defaults:** If no `--account` is provided, `bb` uses the dashboard-selected account from `api.users.getSelectedAccount`, then falls back to the first accessible account.
@@ -66,12 +68,12 @@ API keys are scoped to advertiser accounts and are used by the `bb` CLI and any 
 ### Procedures & Routers
 
 - `publicProcedure` - no auth
-- `privateProcedure` - Clerk only
-- `apiProcedure` - Clerk/API key auth
+- `privateProcedure` - Clerk web session only
+- `apiProcedure` - shared session, OAuth, or API-key auth
 
 **Router split:**
 - Clerk/private routers live in `src/api/app/*`
-- Public API key routers live in `src/api/public/*` and are mounted under `api.*`
+- Public shared-credential routers live in `src/api/public/*` and are mounted under `api.*`
 
 ---
 

@@ -1,6 +1,5 @@
 import { accountsRouter } from './app/accounts';
 import { adsRouter } from './app/ads';
-import { apiKeysRouter } from './app/api-keys';
 import { metricsRouter } from './app/metrics';
 import { performanceRouter } from './app/performance';
 import { reportsRouter } from './app/reports';
@@ -15,7 +14,6 @@ export const appRouter = router({
     accounts: accountsRouter,
     ads: adsRouter,
     api: publicApiRouter,
-    apiKeys: apiKeysRouter,
     metrics: metricsRouter,
     performance: performanceRouter,
     users: usersRouter,

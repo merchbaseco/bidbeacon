@@ -14,7 +14,7 @@ describe('bb id validation', () => {
             JSON.stringify(
                 {
                     baseUrl: 'http://127.0.0.1:1',
-                    apiKey: 'bbk_test',
+                    credential: 'ak_test',
                     accountId: '123',
                     countryCode: 'US',
                     range: 'today',

@@ -53,7 +53,8 @@ Secrets are stored outside the config file.
 
 Auth behavior:
 - On macOS, `bb auth set` stores the API key in Keychain.
-- `BB_API_KEY` overrides the secure-store value and is intended for automation, CI, and agent runtimes.
+- `MERCHBASE_API_KEY` overrides the secure-store value and is intended for automation, CI, and agent runtimes.
+- macOS Keychain uses service `co.merchbase.cli` and account `api-key`.
 - Auth commands never print the raw API key.
 
 **Config**

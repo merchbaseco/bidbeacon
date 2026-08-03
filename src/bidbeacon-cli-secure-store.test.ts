@@ -57,8 +57,8 @@ describe('bidbeacon cli secure store', () => {
             configured: false,
         });
 
-        secureStore.writeSecret('bbk_saved');
-        expect(secureStore.readSecret()).toBe('bbk_saved');
+        secureStore.writeSecret('ak_saved');
+        expect(secureStore.readSecret()).toBe('ak_saved');
         expect(secureStore.getStatus().configured).toBe(true);
         expect(secureStore.clearSecret()).toBe(true);
         expect(secureStore.getStatus().configured).toBe(false);

@@ -77,7 +77,7 @@ export const accountsRouter = router({
                 await db
                     .insert(userAccountAccess)
                     .values({
-                        clerkUserId: ctx.user.sub,
+                        merchbaseUserId: ctx.user.merchbaseUserId,
                         adsAccountId: account.adsAccountId,
                     })
                     .onConflictDoNothing();

@@ -33,7 +33,7 @@ describe('api client batching defaults', () => {
 
         const client = createBidBeaconClient({
             baseUrl: 'https://bidbeacon.merchbase.co',
-            apiKey: 'bbk_test',
+            credential: 'ak_test',
         });
 
         await Promise.all([client['accounts/list'].query(), client['accounts/list'].query()]);
@@ -55,7 +55,7 @@ describe('api client batching defaults', () => {
 
         const client = createBidBeaconClient({
             baseUrl: 'https://bidbeacon.merchbase.co',
-            apiKey: 'bbk_test',
+            credential: 'ak_test',
             batch: false,
         });
 
@@ -82,7 +82,7 @@ describe('api client batching defaults', () => {
 
         const client = createBidBeaconClient({
             baseUrl: 'https://bidbeacon.merchbase.co',
-            apiKey: 'bbk_test',
+            credential: 'ak_test',
             batch: true,
             batchMaxURLLength: 2000,
             batchMaxItems: 50,

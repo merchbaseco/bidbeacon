@@ -1,8 +1,9 @@
 import { spawnSync } from 'node:child_process';
+import { MERCHBASE_API_KEY_KEYCHAIN_ACCOUNT, MERCHBASE_API_KEY_KEYCHAIN_SERVICE } from '@merchbaseco/access';
 
-const SECURE_STORE_SERVICE = 'com.bidbeacon.cli';
-const SECURE_STORE_ACCOUNT = 'api-key';
-const SECURE_STORE_LABEL = 'BidBeacon CLI API key';
+const SECURE_STORE_SERVICE = MERCHBASE_API_KEY_KEYCHAIN_SERVICE;
+const SECURE_STORE_ACCOUNT = MERCHBASE_API_KEY_KEYCHAIN_ACCOUNT;
+const SECURE_STORE_LABEL = 'Merchbase API key';
 
 export type SecureStoreBackend = 'macos-keychain' | 'linux-secret-service' | 'unsupported';
 
@@ -203,7 +204,7 @@ const createUnsupportedStore = (platform: NodeJS.Platform): SecureStore => {
         }),
         readSecret: () => undefined,
         writeSecret: () => {
-            throw new Error(`Secure-store auth is unsupported on ${platform}. Use BB_API_KEY for automation.`);
+            throw new Error(`Secure-store auth is unsupported on ${platform}. Use MERCHBASE_API_KEY for automation.`);
         },
         clearSecret: () => false,
     };

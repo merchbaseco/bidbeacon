@@ -19,7 +19,8 @@
     "node": ">=18.0.0"
   },
   "dependencies": {
-    "@bidbeacon/http-client": "0.7.0"
+    "@bidbeacon/http-client": "0.7.0",
+    "@merchbaseco/access": "0.3.0"
   },
   "files": [
     "dist",

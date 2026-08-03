@@ -2,6 +2,7 @@ import { and, eq, lt } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { reportDatasetMetadata } from '@/db/schema';
+import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
 import { getHourlyReportRetentionWindow } from '@/lib/report-retention';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
@@ -43,6 +44,9 @@ export const updateReportDatasetForAccountJob = boss
                     },
                     async recorder => {
                         const { accountId, countryCode } = job.data;
+                        if (!(await gateAccountWork({ accountId, countryCode, recorder }))) {
+                            return;
+                        }
 
                         const timezone = getTimezoneForCountry(countryCode);
                         const now = zonedNow(timezone);

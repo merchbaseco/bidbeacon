@@ -1,6 +1,7 @@
 import { and, desc, eq, isNotNull, isNull, lte } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { advertiserAccount, reportDatasetMetadata } from '@/db/schema';
+import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
 import { emitEvent } from '@/utils/events';
 import { withJobMetrics } from '@/utils/job-metrics';
@@ -40,6 +41,11 @@ export const dispatchDueReportsJob = boss
                         const results = (
                             await Promise.all(
                                 [...accountsById.values()].map(async accountCountries => {
+                                    const firstAccount = accountCountries[0];
+                                    if (!(firstAccount && (await gateAccountWork({ ...firstAccount, recorder })))) {
+                                        return [];
+                                    }
+
                                     const accountResults: Array<{ claimedCount: number }> = [];
                                     for (const account of accountCountries) {
                                         accountResults.push(await dispatchAccountDueReports(account.accountId, account.countryCode));

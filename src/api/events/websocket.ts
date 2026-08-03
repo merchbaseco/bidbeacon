@@ -1,13 +1,15 @@
-import { verifyToken } from '@clerk/backend';
+import { ServiceAccessError } from '@merchbaseco/access';
 import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
 import { db } from '@/db/index';
 import { userAccountAccess } from '@/db/schema';
+import type { BidBeaconAccess } from '@/services/access/bidbeacon-access';
 import { registerWebSocketConnection } from '@/utils/events';
+import { type BidBeaconRealtimeTicketStore, REALTIME_PROTOCOL, REALTIME_ROUTE } from './realtime';
 
-export const registerWebSocketRoute = (fastify: FastifyInstance) => {
-    fastify.get('/api/events', { websocket: true }, async (socket: WebSocket, req) => {
+export const registerWebSocketRoute = (fastify: FastifyInstance, options: { access: BidBeaconAccess; ticketStore: BidBeaconRealtimeTicketStore }) => {
+    fastify.get(REALTIME_ROUTE, { websocket: true }, async (socket: WebSocket, request) => {
         socket.on('error', error => {
             console.error('WebSocket connection error', error);
         });
@@ -16,31 +18,29 @@ export const registerWebSocketRoute = (fastify: FastifyInstance) => {
             return;
         }
 
-        const url = new URL(req.url, `http://${req.headers.host}`);
-        // Extract token from query string
-        const token = url.searchParams.get('token');
-
-        if (!token) {
-            socket.close(4001, 'Authentication required');
+        const ticket = getTicketFromProtocols(request.headers['sec-websocket-protocol']);
+        if (!ticket) {
+            socket.close(4001, 'Realtime ticket required');
             return;
         }
 
-        // Verify token and load accessible accounts
+        const binding = options.ticketStore.consume(ticket, {
+            route: REALTIME_ROUTE,
+            service: 'bidbeacon',
+        });
+        if (!binding) {
+            socket.close(4003, 'Realtime ticket invalid or expired');
+            return;
+        }
+
         try {
-            const secretKey = process.env.CLERK_SECRET_KEY;
-            if (!secretKey) {
-                socket.close(4002, 'Server configuration error');
-                return;
-            }
-
-            const payload = await verifyToken(token, { secretKey });
-
-            // Load accessible account IDs for this user
-            const accessibleAccountIds = await fetchAccessibleAccountIds(payload.sub);
-
+            const resolved = await options.access.sessionAccess.evaluateAccess(binding.merchbaseUserId);
+            const accessibleAccountIds = await fetchAccessibleAccountIds(resolved.merchbaseUserId);
             registerWebSocketConnection(socket, accessibleAccountIds);
         } catch (error) {
-            console.error('WebSocket authentication failed', error);
+            if (!(error instanceof ServiceAccessError)) {
+                console.error('WebSocket authorization failed', error);
+            }
             socket.close(4003, 'Authentication failed');
             return;
         }
@@ -52,18 +52,22 @@ export const registerWebSocketRoute = (fastify: FastifyInstance) => {
                     socket.send(JSON.stringify({ type: 'pong' }));
                 }
             } catch {
-                // Ignore malformed messages
+                // Ignore malformed messages.
             }
         });
     });
 };
 
-// ============================================================================
-// Helpers
-// ============================================================================
+const getTicketFromProtocols = (header: string | string[] | undefined) => {
+    const values = Array.isArray(header) ? header : header?.split(',');
+    if (!values?.some(value => value.trim() === REALTIME_PROTOCOL)) {
+        return null;
+    }
+    return values?.map(value => value.trim()).find(value => value.length > 0 && value !== REALTIME_PROTOCOL);
+};
 
-const fetchAccessibleAccountIds = async (clerkUserId: string) => {
-    const accessibleAccounts = await db.select({ adsAccountId: userAccountAccess.adsAccountId }).from(userAccountAccess).where(eq(userAccountAccess.clerkUserId, clerkUserId));
+const fetchAccessibleAccountIds = async (merchbaseUserId: string) => {
+    const rows = await db.select({ adsAccountId: userAccountAccess.adsAccountId }).from(userAccountAccess).where(eq(userAccountAccess.merchbaseUserId, merchbaseUserId));
 
-    return accessibleAccounts.map(account => account.adsAccountId);
+    return [...new Set(rows.map(row => row.adsAccountId))];
 };

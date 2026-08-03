@@ -35,6 +35,7 @@ services:
       target: runtime
       args:
         - HUGEICONS_LICENSE_KEY=${HUGEICONS_LICENSE_KEY}
+        - MERCHBASE_NPM_TOKEN=${MERCHBASE_NPM_TOKEN}
         - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
     image: bidbeacon-server:local
     container_name: bidbeacon-server
@@ -54,7 +55,13 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AMS_QUEUE_URL: ${AMS_QUEUE_URL}
+      CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES}
+      CLERK_ISSUER: ${CLERK_ISSUER}
+      CLERK_JWT_KEY: ${CLERK_JWT_KEY}
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
       CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
+      CLERK_WEBHOOK_SIGNING_SECRET: ${CLERK_WEBHOOK_SIGNING_SECRET}
+      DISABLE_SERVER_JOB_RUNNER: ${DISABLE_SERVER_JOB_RUNNER:-false}
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,6 +92,11 @@ services:
       AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
       AWS_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
       AMS_QUEUE_URL: ${AMS_QUEUE_URL}
+      CLERK_AUTHORIZED_PARTIES: ${CLERK_AUTHORIZED_PARTIES}
+      CLERK_ISSUER: ${CLERK_ISSUER}
+      CLERK_JWT_KEY: ${CLERK_JWT_KEY}
+      CLERK_PUBLISHABLE_KEY: ${CLERK_PUBLISHABLE_KEY}
+      CLERK_SECRET_KEY: ${CLERK_SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -107,6 +119,7 @@ services:
       target: caddy
       args:
         - HUGEICONS_LICENSE_KEY=${HUGEICONS_LICENSE_KEY}
+        - MERCHBASE_NPM_TOKEN=${MERCHBASE_NPM_TOKEN}
         - VITE_CLERK_PUBLISHABLE_KEY=${VITE_CLERK_PUBLISHABLE_KEY}
     image: bidbeacon-caddy:local
     container_name: bidbeacon-caddy

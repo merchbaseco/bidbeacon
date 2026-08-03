@@ -13,6 +13,7 @@
         "@fastify/cors": "11.2.0",
         "@fastify/helmet": "13.0.2",
         "@fastify/websocket": "11.2.0",
+        "@merchbaseco/access": "0.3.0",
         "@trpc/client": "11.8.1",
         "@trpc/react-query": "11.8.1",
         "@trpc/server": "11.8.1",
@@ -333,6 +334,8 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
+
+    "@merchbaseco/access": ["@merchbaseco/access@0.3.0", "https://npm.pkg.github.com/download/@merchbaseco/access/0.3.0/1ac4f0594c56c04d7b76055aa8fe17cefb103829", { "dependencies": { "@clerk/backend": "2.33.3" } }, "sha512-Dh3cHASW3q7I02eTMhnP40fN6WQOTWFE2RGub/UuOkbOccq19/qPs3rEUhfcGigQMEDQujkplmBAkqfvBIMAwg=="],
 
     "@mui/base": ["@mui/base@5.0.0-beta.70", "", { "dependencies": { "@babel/runtime": "^7.26.0", "@floating-ui/react-dom": "^2.1.1", "@mui/types": "~7.2.24", "@mui/utils": "^6.4.8", "@popperjs/core": "^2.11.8", "clsx": "^2.1.1", "prop-types": "^15.8.1" }, "peerDependencies": { "@types/react": "^17.0.0 || ^18.0.0 || ^19.0.0", "react": "^17.0.0 || ^18.0.0 || ^19.0.0", "react-dom": "^17.0.0 || ^18.0.0 || ^19.0.0" }, "optionalPeers": ["@types/react"] }, "sha512-Tb/BIhJzb0pa5zv/wu7OdokY9ZKEDqcu1BDFnohyvGCoHuSXbEr90rPq1qeNW3XvTBIbNWHEF7gqge+xpUo6tQ=="],
 

@@ -15,7 +15,7 @@ import { createBidBeaconClient } from '@bidbeacon/http-client';
 
 const client = createBidBeaconClient({
   baseUrl: 'https://bidbeacon.merchbase.co',
-  apiKey: 'bbk_...'
+  credential: 'ak_...'
 });
 
 const accounts = await client['accounts/list'].query();
@@ -27,7 +27,7 @@ You can tune or disable batching:
 ```ts
 const client = createBidBeaconClient({
   baseUrl: 'https://bidbeacon.merchbase.co',
-  apiKey: 'bbk_...',
+  credential: 'ak_...',
   batch: true, // default
   batchMaxItems: 20, // default when batching
   batchMaxURLLength: 2000, // default when batching
@@ -35,7 +35,7 @@ const client = createBidBeaconClient({
 
 const unbatchedClient = createBidBeaconClient({
   baseUrl: 'https://bidbeacon.merchbase.co',
-  apiKey: 'bbk_...',
+  credential: 'ak_...',
   batch: false, // optional
 });
 ```

@@ -7,7 +7,7 @@ import { privateProcedure, router } from '../trpc';
 export const usersRouter = router({
     me: privateProcedure.query(async ({ ctx }) => {
         return {
-            clerkUserId: ctx.user.sub,
+            merchbaseUserId: ctx.user.merchbaseUserId,
             accessibleAccountIds: ctx.accessibleAccountIds,
         };
     }),
@@ -25,7 +25,7 @@ export const usersRouter = router({
         await db
             .insert(userAccountAccess)
             .values({
-                clerkUserId: ctx.user.sub,
+                merchbaseUserId: ctx.user.merchbaseUserId,
                 adsAccountId: input.adsAccountId,
             })
             .onConflictDoNothing();
@@ -34,14 +34,14 @@ export const usersRouter = router({
     }),
 
     unlinkAccount: privateProcedure.input(z.object({ adsAccountId: z.string() })).mutation(async ({ ctx, input }) => {
-        await db.delete(userAccountAccess).where(and(eq(userAccountAccess.clerkUserId, ctx.user.sub), eq(userAccountAccess.adsAccountId, input.adsAccountId)));
+        await db.delete(userAccountAccess).where(and(eq(userAccountAccess.merchbaseUserId, ctx.user.merchbaseUserId), eq(userAccountAccess.adsAccountId, input.adsAccountId)));
 
         return true;
     }),
 
     getSelectedAccount: privateProcedure.query(async ({ ctx }) => {
         const prefs = await db.query.userPreferences.findFirst({
-            where: eq(userPreferences.clerkUserId, ctx.user.sub),
+            where: eq(userPreferences.merchbaseUserId, ctx.user.merchbaseUserId),
         });
 
         if (!prefs?.selectedAdsAccountId) {
@@ -73,13 +73,13 @@ export const usersRouter = router({
             await db
                 .insert(userPreferences)
                 .values({
-                    clerkUserId: ctx.user.sub,
+                    merchbaseUserId: ctx.user.merchbaseUserId,
                     selectedAdsAccountId: input.adsAccountId,
                     selectedProfileId: input.profileId,
                     updatedAt: new Date(),
                 })
                 .onConflictDoUpdate({
-                    target: userPreferences.clerkUserId,
+                    target: userPreferences.merchbaseUserId,
                     set: {
                         selectedAdsAccountId: input.adsAccountId,
                         selectedProfileId: input.profileId,

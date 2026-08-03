@@ -802,57 +802,18 @@ export const events = pgTable(
  * User Account Access
  * ----------------------------------------------------------------------------
  *
- * Links Clerk users to advertiser accounts they can access.
+ * Links stable Merchbase Users to shared advertiser accounts they can access.
  * A user can access multiple accounts, and an account can be accessed by multiple users.
  */
 export const userAccountAccess = pgTable(
     'user_account_access',
     {
         id: uuid('id').defaultRandom().primaryKey(),
-        clerkUserId: text('clerk_user_id').notNull(),
+        merchbaseUserId: text('merchbase_user_id').notNull(),
         adsAccountId: text('ads_account_id').notNull(),
         createdAt: timestamp('created_at').notNull().defaultNow(),
     },
-    table => [uniqueIndex('user_account_access_user_account_idx').on(table.clerkUserId, table.adsAccountId), index('user_account_access_user_idx').on(table.clerkUserId)]
-);
-
-/**
- * ----------------------------------------------------------------------------
- * API Keys
- * ----------------------------------------------------------------------------
- *
- * API keys are created by a Clerk user and grant scoped access to advertiser
- * accounts. The raw secret is never stored; only a hash + suffix is kept.
- */
-export const apiKey = pgTable(
-    'api_key',
-    {
-        id: uuid('id').defaultRandom().primaryKey(),
-        label: text('label').notNull(),
-        secretHash: text('secret_hash').notNull(),
-        secretSuffix: text('secret_suffix').notNull(),
-        createdBy: text('created_by').notNull(),
-        createdAt: timestamp('created_at').notNull().defaultNow(),
-        lastUsedAt: timestamp('last_used_at'),
-    },
-    table => [index('api_key_created_by_idx').on(table.createdBy)]
-);
-
-export const apiKeyAccountAccess = pgTable(
-    'api_key_account_access',
-    {
-        id: uuid('id').defaultRandom().primaryKey(),
-        apiKeyId: uuid('api_key_id')
-            .notNull()
-            .references(() => apiKey.id, { onDelete: 'cascade' }),
-        adsAccountId: text('ads_account_id').notNull(),
-        createdAt: timestamp('created_at').notNull().defaultNow(),
-    },
-    table => [
-        uniqueIndex('api_key_account_access_unique_idx').on(table.apiKeyId, table.adsAccountId),
-        index('api_key_account_access_api_key_idx').on(table.apiKeyId),
-        index('api_key_account_access_account_idx').on(table.adsAccountId),
-    ]
+    table => [uniqueIndex('user_account_access_user_account_idx').on(table.merchbaseUserId, table.adsAccountId), index('user_account_access_user_idx').on(table.merchbaseUserId)]
 );
 
 /**
@@ -861,11 +822,52 @@ export const apiKeyAccountAccess = pgTable(
  * ----------------------------------------------------------------------------
  *
  * Stores per-user preferences like last selected account/profile.
- * One row per Clerk user.
+ * One row per stable Merchbase User.
  */
 export const userPreferences = pgTable('user_preferences', {
-    clerkUserId: text('clerk_user_id').primaryKey(),
+    merchbaseUserId: text('merchbase_user_id').primaryKey(),
     selectedAdsAccountId: text('selected_ads_account_id'),
     selectedProfileId: text('selected_profile_id'),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+/**
+ * ----------------------------------------------------------------------------
+ * Merchbase Access Projection
+ * ----------------------------------------------------------------------------
+ *
+ * Verified Clerk webhook events and local cold-load reconciliation project the
+ * shared Access Profile into this product database. The event table makes
+ * deliveries idempotent; the projection source timestamp is monotonic.
+ */
+export const accessProjectionEvent = pgTable(
+    'access_projection_event',
+    {
+        eventId: text('event_id').primaryKey(),
+        issuer: text('issuer').notNull(),
+        subject: text('subject').notNull(),
+        sourceUpdatedAt: bigint('source_updated_at', { mode: 'number' }).notNull(),
+        receivedAt: timestamp('received_at', { withTimezone: true }).notNull().defaultNow(),
+    },
+    table => [index('access_projection_event_identity_idx').on(table.issuer, table.subject, table.receivedAt)]
+);
+
+export const accessProjection = pgTable(
+    'access_projection',
+    {
+        issuer: text('issuer').notNull(),
+        subject: text('subject').notNull(),
+        state: text('state', { enum: ['active', 'tombstone'] }).notNull(),
+        merchbaseUserId: text('merchbase_user_id'),
+        access: text('access', { enum: ['granted', 'not_granted'] }),
+        accessValidUntil: bigint('access_valid_until', { mode: 'number' }),
+        sourceUpdatedAt: bigint('source_updated_at', { mode: 'number' }).notNull(),
+        lastEventId: text('last_event_id').notNull(),
+        createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+        updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+    },
+    table => [
+        primaryKey({ columns: [table.issuer, table.subject], name: 'access_projection_issuer_subject_pk' }),
+        index('access_projection_merchbase_user_idx').on(table.merchbaseUserId, table.sourceUpdatedAt),
+    ]
+);

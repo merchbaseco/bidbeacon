@@ -10,6 +10,7 @@ import { z } from 'zod';
 import { db } from '@/db/index';
 import { withDatabaseRetry } from '@/db/retry';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceDaily } from '@/db/schema';
+import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
 import { zonedNow, zonedStartOfDay } from '@/utils/date';
 import { type JobMetricsRecorder, withJobMetrics } from '@/utils/job-metrics';
@@ -34,7 +35,12 @@ export const summarizeDailyTargetStreamForAccountJob = boss
                         accountId: job.data.accountId,
                         countryCode: job.data.countryCode,
                     },
-                    recorder => summarizeDailyForAccount(job.data.accountId, job.data.countryCode, recorder)
+                    async recorder => {
+                        if (!(await gateAccountWork({ accountId: job.data.accountId, countryCode: job.data.countryCode, recorder }))) {
+                            return;
+                        }
+                        return summarizeDailyForAccount(job.data.accountId, job.data.countryCode, recorder);
+                    }
                 )
             )
         );

@@ -4,7 +4,10 @@ import websocket from '@fastify/websocket';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import { eq, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
+import { registerClerkAccessWebhookRoute } from '@/api/access/clerk-webhook-route';
 import { createContext } from '@/api/context.js';
+import { createBidBeaconRealtimeTicketStore, registerRealtimeTicketRoute } from '@/api/events/realtime';
+import { registerWebSocketRoute } from '@/api/events/websocket';
 import { appRouter } from '@/api/router.js';
 import { db, testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
@@ -12,6 +15,7 @@ import { accountDatasetMetadata, reportDatasetMetadata } from '@/db/schema.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
 import { createServer } from '@/server-config.js';
 import { getServerRuntimeFlags } from '@/server-runtime';
+import { getBidBeaconAccess } from '@/services/access/bidbeacon-access';
 import { emitEvent } from '@/utils/events.js';
 
 const PORT = Number(process.env.PORT) || 8080;
@@ -138,6 +142,9 @@ async function registerPlugins(fastify: FastifyInstance) {
 }
 
 async function registerRoutes(fastify: FastifyInstance) {
+    const access = getBidBeaconAccess();
+    const ticketStore = createBidBeaconRealtimeTicketStore();
+
     // Health check endpoint
     fastify.get('/api/health', async () => ({
         status: 'ok',
@@ -145,9 +152,15 @@ async function registerRoutes(fastify: FastifyInstance) {
         service: 'bidbeacon-server',
     }));
 
-    // WebSocket events endpoint (must be registered BEFORE tRPC to avoid route conflicts)
-    const { registerWebSocketRoute } = await import('@/api/events/websocket.js');
-    await registerWebSocketRoute(fastify);
+    // Auth, realtime ticket, and WebSocket endpoints are registered before tRPC.
+    await registerClerkAccessWebhookRoute(fastify, {
+        issuer: requireEnvironment('CLERK_ISSUER'),
+        onIdentityChanged: identity => access.authenticator.invalidateApiKeys(identity),
+        signingSecret: requireEnvironment('CLERK_WEBHOOK_SIGNING_SECRET'),
+        store: access.projections,
+    });
+    registerRealtimeTicketRoute(fastify, { access, ticketStore });
+    registerWebSocketRoute(fastify, { access, ticketStore });
 
     // tRPC API routes
     await fastify.register(fastifyTRPCPlugin, {
@@ -158,6 +171,14 @@ async function registerRoutes(fastify: FastifyInstance) {
         },
     });
 }
+
+const requireEnvironment = (name: string) => {
+    const value = process.env[name]?.trim();
+    if (!value) {
+        throw new Error(`${name} is required for BidBeacon server startup.`);
+    }
+    return value;
+};
 
 function registerErrorHandlers(fastify: FastifyInstance) {
     fastify.setNotFoundHandler(async (_request, reply) => {

@@ -122,7 +122,7 @@ export const resolveAccountContext = async (config: PublicConfig): Promise<Accou
     if (!account) {
         throw new TRPCError({
             code: 'NOT_FOUND',
-            message: 'Account not found for this API key.',
+            message: 'Account not found for this credential.',
         });
     }
 

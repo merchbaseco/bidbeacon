@@ -10,12 +10,20 @@ export const router = t.router;
 export const publicProcedure = t.procedure;
 
 /**
- * API procedure that requires authentication (Clerk or API key).
+ * API procedure that requires a shared Merchbase credential.
  * Provides assertAccountAccess helper to validate account access.
  */
 export const apiProcedure = t.procedure.use(({ ctx, next }) => {
+    if (ctx.accessError === 'access_denied') {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Merchbase Access denied' });
+    }
+
+    if (ctx.accessError === 'access_unavailable') {
+        throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Merchbase Access unavailable' });
+    }
+
     if (!ctx.user) {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'You must be logged in to access this resource' });
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'You must be authenticated to access this resource' });
     }
 
     const assertAccountAccess = (accountId: string) => {
@@ -35,11 +43,11 @@ export const apiProcedure = t.procedure.use(({ ctx, next }) => {
 });
 
 /**
- * Private procedure that requires a Clerk user.
+ * Private procedure that requires a Clerk web session.
  */
 export const privateProcedure = apiProcedure.use(({ ctx, next }) => {
-    if (ctx.authType !== 'clerk') {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'Clerk authentication required' });
+    if (ctx.authType !== 'access' || ctx.credentialKind !== 'session') {
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'A Clerk web session is required' });
     }
 
     return next({ ctx });
