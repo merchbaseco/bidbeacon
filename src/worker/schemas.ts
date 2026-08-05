@@ -297,7 +297,7 @@ export const adSchema = baseAmsPayloadSchema
         // Nested status object
         status: z
             .object({
-                delivery_status: z.string().optional(), // enum: Delivering / Not delivering
+                delivery_status: z.string().nullable().optional(), // Amazon can omit the aggregate status while returning delivery reasons
                 delivery_reasons: z.array(z.string()).nullable().optional(), // enum[]: Delivery reasons, can be null
                 marketplace_settings: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(), // Can be object or array
             })
