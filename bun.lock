@@ -32,6 +32,7 @@
       "devDependencies": {
         "@base-ui-components/react": "1.0.0-rc.0",
         "@biomejs/biome": "2.3.13",
+        "@electric-sql/pglite": "0.5.4",
         "@fontsource/aclonica": "5.2.8",
         "@fontsource/geist-mono": "5.2.7",
         "@hugeicons-pro/core-solid-rounded": "4.1.0",
@@ -232,6 +233,8 @@
     "@clerk/types": ["@clerk/types@4.101.23", "", { "dependencies": { "@clerk/shared": "^3.47.5" } }, "sha512-t5ypYYDkT5TPaNIDjLnYk9GpkJgwNTBiS7h6FuUTjoySQtf7amNDS1A1eOu7NOcVpqiSeKg+0wzGxxcre00kMA=="],
 
     "@drizzle-team/brocli": ["@drizzle-team/brocli@0.10.2", "", {}, "sha512-z33Il7l5dKjUgGULTqBsQBQwckHh5AbIuxhdsIxDDiZAzBOrZO6q9ogcWC65kU382AfynTfgNumVcNIjuIua6w=="],
+
+    "@electric-sql/pglite": ["@electric-sql/pglite@0.5.4", "", {}, "sha512-yYZUyyXrHU7tPlCjwZQJ6hIG9DscdCCn7Uk0mYKwC1FeHX286AbcmFveMiRBEak8e9iPupjsoVImN3yJZVed2g=="],
 
     "@esbuild-kit/core-utils": ["@esbuild-kit/core-utils@3.3.2", "", { "dependencies": { "esbuild": "~0.18.20", "source-map-support": "^0.5.21" } }, "sha512-sPRAnw9CdSsRmEtnsl2WXWdyquogVpB3yZ3dgwJfe8zrOzTsV7cJvmwrKVa+0ma5BoiGJ+BoqkMvawbayKUsqQ=="],
 
