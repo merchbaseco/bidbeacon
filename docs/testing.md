@@ -20,4 +20,12 @@ Use the builders in `src/operations/testing/fixtures.ts` for advertiser access, 
 
 The account acceptance harness builds a shared operation principal from the product access projection and verifies both Clerk-session and suite-API-key credential kinds. It lists only authorized marketplace-specific Advertiser Account UUIDs, returns the canonical metadata contract, ignores dashboard selection, and rejects Amazon account/profile identifiers or cross-account UUIDs. The access-migration test loads a legacy `ads_account_id` membership and verifies that the migration expands it to every matching `advertiser_account.id` without granting an unrelated account.
 
+Campaign mutation acceptance lives at the same shared operation seam in
+`src/operations/campaign-mutations.test.ts`. It uses the PGlite database and the programmable
+Amazon gateway to assert public-to-Amazon mappings for every Campaign control, account-local date
+conversion, placement omission versus zero removal, canonical responses, archive reconciliation,
+immediate Change events, stable Amazon errors, and cross-account isolation. Campaign-specific
+builders live in `src/operations/testing/campaign-mutation-fixtures.ts`; do not add Campaign
+mutation data to the shared fixture module.
+
 Auth tests must not use production credentials or database writes. Use the shared package's fake Clerk client/projection store patterns and assert that legacy `bbk_`, `BB_API_KEY`, query-string WebSocket credentials, and product-local API-key routes remain absent.

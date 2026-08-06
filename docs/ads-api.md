@@ -159,3 +159,40 @@ Search matches:
 
 - `NOT_FOUND` when entity is missing for the account.
 - `BAD_REQUEST` for invalid bid updates (non-SP, negative target, campaign-level target).
+
+## Shared Campaign mutation operations
+
+The accepted public Campaign write contract lives in the shared operation layer under
+`src/operations/`. The legacy routers above remain dashboard-facing during migration and do not
+define the public mutation vocabulary.
+
+### `create_campaign`
+
+`create_campaign` requires an explicit BidBeacon Advertiser Account UUID, name, `ENABLED` or
+`PAUSED` state, `dailyBudget`, public `bidStrategy` (`FIXED`, `DYNAMIC_DOWN_ONLY`, or
+`DYNAMIC_UP_AND_DOWN`), `targetingMode` (`AUTO`, `MANUAL_KEYWORD`, or `MANUAL_PRODUCT`), and
+account-local `startDate`. `endDate` is optional and must not precede `startDate`. Placement
+adjustments are optional percentage-point increases for `topOfSearch`, `restOfSearch`,
+`productPages`, and `amazonBusiness`; values are integers from 0 through 900.
+
+The operation resolves the account UUID to its Amazon profile, marketplace, currency, timezone,
+and API region. It maps the public controls to the Amazon Sponsored Products Campaign payload,
+waits for the real gateway response, maps the response back to the canonical Campaign shape, and
+reconciles the successful result into the local Campaign archive. Creation also records immediate
+`bidbeacon` Change events for state, budget, bid strategy, and placement controls when values are
+present.
+
+### `update_campaign`
+
+`update_campaign` requires an explicit Account UUID, an existing Campaign ID in that account, and
+a non-empty `changes` object. The object is limited to absolute `state`, `dailyBudget`,
+`bidStrategy`, and `placementBidAdjustments` values. `ARCHIVED` is accepted only here, for an
+existing Campaign. An omitted placement key remains unchanged at Amazon; a placement value of
+`0` removes that adjustment. The gateway call is synchronous, so the operation does not return
+until Amazon's normal throttling and retry policy has completed.
+
+Successful updates reconcile the Campaign archive and write immediate `bidbeacon` Change events.
+Amazon rejection, exhausted unavailability, invalid input, missing Campaigns, and denied Account
+UUIDs are translated to the stable shared operation error codes rather than leaking transport
+exceptions. Amazon account/profile identifiers, transport bid-strategy enums, and raw credentials
+are never accepted as public routing or control vocabulary.

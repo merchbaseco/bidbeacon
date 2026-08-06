@@ -60,3 +60,4 @@ The API health rate-limit count sums attempt-level 429s. Rows recorded before th
 
 - `src/amazon-ads/throttled-fetch.ts` defines the ordinary and report-creation retry policies and handles isolation, priority, backoff, cooldowns, and telemetry.
 - Amazon Ads wrappers use `AMAZON_ADS_API_RETRY`; report creation uses `AMAZON_ADS_REPORT_CREATE_RETRY`. Both use a 30-second timeout per attempt.
+- Shared Campaign mutations call `createCampaigns` and `updateCampaigns` through the production gateway's `spRequest` wrapper. They therefore remain synchronous and inherit request tracking, the ordinary limiter, 30-second attempt timeouts, and the three-attempt retry policy; operation errors are mapped only after that gateway call has definitively completed.

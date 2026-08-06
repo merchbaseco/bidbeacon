@@ -1,4 +1,12 @@
-export type OperationErrorCode = 'ACCOUNT_ACCESS_DENIED' | 'AUTHENTICATION_REQUIRED' | 'CURSOR_INVALID' | 'INVALID_INPUT';
+export type OperationErrorCode =
+    | 'ACCOUNT_ACCESS_DENIED'
+    | 'AMAZON_REJECTED'
+    | 'AMAZON_UNAVAILABLE'
+    | 'AUTHENTICATION_REQUIRED'
+    | 'CURSOR_INVALID'
+    | 'INTERNAL_ERROR'
+    | 'INVALID_INPUT'
+    | 'RESOURCE_NOT_FOUND';
 
 export class OperationError extends Error {
     readonly code: OperationErrorCode;
