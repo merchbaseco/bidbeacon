@@ -225,3 +225,24 @@ creative and returns the canonical Ad.
 `ARCHIVED` is accepted for an existing Ad. Successful updates reconcile the Ad archive and write
 an immediate `state_change` event. Amazon rejection, exhausted unavailability, invalid input,
 missing ancestry, and denied Account UUIDs use the stable shared operation error codes.
+
+### Target mutations
+
+Target primitive operations require Sponsored Products Campaign/Ad-group ancestry before calling
+Amazon. Positive keyword targets accept `BROAD`, `PHRASE`, or `EXACT` with an explicit state
+and bid. Positive product targets accept one ASIN with an explicit state and bid. Negative
+keyword targets accept `PHRASE` or `EXACT`, and negative product targets accept one ASIN; both
+require an explicit Campaign ID and Ad-group ID for local ownership proof and never accept a bid.
+Category targets and refinement expressions are not part of this surface.
+
+`update_target` requires an existing Target in the explicit Advertiser Account and a non-empty
+absolute patch containing `state` and/or `bid`. Bids are accepted only for positive ad-group
+Targets. Negative Targets reject bid changes. Existing campaign-level negatives may be archived
+by ID, and cannot be created; their archive update includes the Campaign ID at the Amazon
+boundary. `ARCHIVED` remains terminal.
+
+Each successful Target mutation waits for the synchronous Amazon gateway response, returns the
+canonical Target representation, upserts the Target archive, and records immediate `bidbeacon`
+Change events for accepted state and bid changes. Amazon rejection, exhausted unavailability,
+invalid input, missing ancestry, and denied Account UUIDs use the stable shared operation error
+codes.

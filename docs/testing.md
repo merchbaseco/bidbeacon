@@ -46,4 +46,13 @@ production projection and verifies source normalization, normalized-key aggregat
 accounting, authoritative stale-row reconciliation, marketplace-scoped metadata, idempotence,
 account-local dates, and changed-row counts.
 
+Target mutation acceptance lives at the same seam in `src/operations/target-mutations.test.ts`.
+It asserts positive keyword/product and ad-group negative keyword/product creation, broad/phrase/
+exact keyword match types, individual-ASIN-only product targeting, explicit Campaign/Ad-group
+ancestry, exact gateway payloads, canonical response mappings, positive bid eligibility, terminal
+archive enforcement, campaign-level-negative archival by ID, archive reconciliation, immediate
+Change events, stable Amazon errors, and cross-account isolation. Target-mutation builders live
+in `src/operations/testing/target-mutation-fixtures.ts`; keep them target-specific and use the
+production operation path with embedded PGlite and the programmable gateway.
+
 Auth tests must not use production credentials or database writes. Use the shared package's fake Clerk client/projection store patterns and assert that legacy `bbk_`, `BB_API_KEY`, query-string WebSocket credentials, and product-local API-key routes remain absent.

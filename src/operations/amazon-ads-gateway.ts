@@ -8,6 +8,7 @@ type AmazonAdsRequest = {
 type AmazonAdsGatewayResponse = {
     success?: Record<string, unknown>[];
     error?: Record<string, unknown>[];
+    partialSuccess?: Record<string, unknown>[];
 };
 
 export type AmazonAdsGateway = {

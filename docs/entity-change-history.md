@@ -43,7 +43,8 @@ Current normalization rules:
 
 ### BidBeacon-triggered writes (immediate)
 - Shared operation mutations (`createCampaign`, `updateCampaign`, `createAdGroup`,
-  `updateAdGroup`, `createAd`, and `updateAd`) plus the legacy public mutation helpers
+  `updateAdGroup`, `createAd`, `updateAd`, `createKeywordTarget`, `createProductTarget`,
+  `createNegativeKeyword`, `createNegativeProductTarget`, and `updateTarget`) plus the legacy public mutation helpers
   (`updateCampaignRow`, `updateAdGroupRow`, `updateAdRow`, `updateTargetRow`) write history rows
   with `source = 'bidbeacon'`.
 - Shared ad-group and target bid mutation routers also write `bid_change` rows.

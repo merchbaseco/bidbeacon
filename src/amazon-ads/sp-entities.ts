@@ -5,6 +5,7 @@ import { spRequest } from './sp-api';
 const multiStatusSchema = z.object({
     success: z.array(z.record(z.any())).optional(),
     error: z.array(z.record(z.any())).optional(),
+    partialSuccess: z.array(z.record(z.any())).optional(),
 });
 
 type MultiStatusResponse = z.infer<typeof multiStatusSchema>;
