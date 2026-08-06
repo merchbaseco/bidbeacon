@@ -4,8 +4,8 @@ import type { OperationContext } from './operation-context';
 import { OperationError } from './operation-errors';
 import { queryCampaignSearchCoverage } from './search-coverage';
 import { decodeSearchCursor, encodeSearchCursor } from './search-cursor';
-import { planCampaignSearch, searchOutputSchema } from './search-planner';
-import { compareSearchRowToBoundary, filterCampaignSearchRows, queryCampaignSearchRows, sortCampaignSearchRows } from './search-query';
+import { planSearch, searchOutputSchema } from './search-planner';
+import { compareSearchRowToBoundary, filterSearchRows, querySearchRows, sortSearchRows } from './search-query';
 
 export type SearchExecutionOptions = {
     now?: Date;
@@ -15,19 +15,19 @@ export const search = async (context: OperationContext, input: unknown, options:
     const accountId = input && typeof input === 'object' && 'accountId' in input ? (input as { accountId?: unknown }).accountId : undefined;
     const account = await resolveAdvertiserAccount(context, { accountId });
     const metadata = getAdvertiserAccountMetadata(account.countryCode);
-    const plan = planCampaignSearch(input, { timezone: metadata.timezone, now: options.now });
+    const plan = planSearch(input, { timezone: metadata.timezone, now: options.now });
     const cursorBoundary = plan.cursor ? decodeSearchCursor(plan.cursor, plan.fingerprint).boundary : undefined;
     if (cursorBoundary && cursorBoundary.length !== plan.orderBy.length) {
         throw new OperationError('CURSOR_INVALID', 'The Search cursor is malformed or bound to a different query.');
     }
 
     const [queriedRows, coverage] = await Promise.all([
-        queryCampaignSearchRows(context, account, plan),
+        querySearchRows(context, account, plan),
         plan.dateRange ? queryCampaignSearchCoverage(context, account, plan.dateRange, metadata.timezone) : Promise.resolve(undefined),
     ]);
 
-    const filteredRows = filterCampaignSearchRows(queriedRows, plan.filters, plan.segmented);
-    const sortedRows = sortCampaignSearchRows(filteredRows, plan.orderBy);
+    const filteredRows = filterSearchRows(queriedRows, plan.filters, plan.segmentFields);
+    const sortedRows = sortSearchRows(filteredRows, plan.orderBy);
     const rowsAfterCursor = cursorBoundary ? sortedRows.filter(row => compareSearchRowToBoundary(row, cursorBoundary, plan.orderBy) > 0) : sortedRows;
     const pageRows = rowsAfterCursor.slice(0, plan.limit);
     const hasNextPage = rowsAfterCursor.length > pageRows.length;

@@ -418,7 +418,7 @@ describe('Campaign Search operation', () => {
         await expect(
             search(createSearchContext(database), { accountId: SEARCH_ACCOUNT_ID, resource: 'campaign', fields: ['campaign.id'], dateRange: { startDate: '2026-08-01', endDate: '2026-08-02' } })
         ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
-        await expect(search(createSearchContext(database), { accountId: SEARCH_ACCOUNT_ID, resource: 'ad_group' })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+        await expect(search(createSearchContext(database), { accountId: SEARCH_ACCOUNT_ID, resource: 'target' })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 });
 

@@ -6,9 +6,9 @@ read_when:
 
 # BidBeacon MCP and CLI specification
 
-**Status:** Accepted design; account discovery and UUID authorization plus Campaign, Ad group, and
-Ad mutation slices and the Campaign Search operation are implemented in the shared operation layer;
-the remaining Search resources, Target mutations, and operation adapters are pending.
+**Status:** Accepted design; account discovery and UUID authorization plus Campaign, Ad-group, and
+Ad Search and mutation slices are implemented in the shared operation layer; the remaining Search
+resources, Target mutations, and operation adapters are pending.
 
 This specification defines one public operation layer projected through:
 
@@ -178,7 +178,7 @@ campaign | ad_group | ad | target | product | change_event
 
 The resource determines row grain. A row may select fields from that resource and its ancestors, never its children. `product` is a read-only ASIN-grain view aggregated across matching ads.
 
-The first delivered operation slice supports `resource: campaign`. It accepts Campaign settings, standard metrics, optional `metrics.cvr`, and `segments.date`; Search rejects fields owned by later resource slices, `segments.hour`, and `segments.placement` until their archive projections are delivered.
+The delivered Search slice supports `resource: campaign`, `resource: ad_group`, and `resource: ad`. Each resource accepts its own fields, compatible Campaign ancestry, standard metrics, and the segments supported by its archive projection. `segments.hour` requires `segments.date` and is available for Ad-group and Ad Search. Search still rejects fields owned by the pending Target, Product, and Change-event slices and does not expose `segments.placement` in this slice.
 
 ### Filters
 
@@ -207,10 +207,10 @@ The complete field vocabulary lives in [search-field-catalog.md](search-field-ca
 - Omitting `fields` selects the resource's documented Default fields.
 - Supplying `fields` replaces the Default fields.
 - Selecting a metric or segment makes the request a Performance search.
-- Campaign Search accepts `segments.date`; `segments.hour` and `segments.placement` are reserved for later archive-backed Search slices.
+- Campaign Search accepts `segments.date`; Ad-group and Ad Search also accept account-local `segments.hour`, which requires `segments.date`. `segments.placement` remains reserved for its separate archive-backed slice.
 - A validation error names incompatible fields and the fields permitted for that resource.
 
-Campaign performance uses the daily advertised-ASIN archive (`entity_type = product`) as its one canonical source grain. Date-segmented Campaign rows are account-local and zero-filled across the requested inclusive dates. Coverage is derived from retained daily Product report metadata, including valid completed zero-record reports.
+Campaign, Ad-group, and Ad performance use the advertised-ASIN archive (`entity_type = product`) as their one canonical source grain. Aggregate and date-segmented searches use the daily archive; hour-segmented Ad-group and Ad searches use the hourly archive. Component rows are aggregated once at the selected resource grain, and date/hour rows are account-local and zero-filled across the requested range. Coverage is derived from retained daily Product report metadata, including valid completed zero-record reports.
 
 The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` include the nine Standard performance metrics. A default campaign Search therefore behaves like the campaign table in the Amazon Ads dashboard: it returns campaign settings and recent performance together.
 
@@ -232,7 +232,7 @@ The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` inc
 - settings-only Product searches order by title and then ASIN ascending;
 - `change_event` searches order by `changeEvent.changedAt desc`.
 
-BidBeacon appends Campaign ID, Ad-group ID, Ad ID, Target ID, Product ASIN, or Change-event ID ascending as the final deterministic tie-breaker.
+BidBeacon preserves requested ordering and ensures the selected segment Fields plus Campaign ID, Ad-group ID, Ad ID, Target ID, Product ASIN, or Change-event ID are present as deterministic continuation keys.
 
 ### Pagination
 

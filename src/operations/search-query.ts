@@ -1,8 +1,9 @@
 import { addDays } from 'date-fns';
 import { and, asc, eq, gt, gte, inArray, lt, lte, sql } from 'drizzle-orm';
-import { campaign, performanceDaily, target } from '@/db/schema';
+import { ad, adGroup, campaign, performanceDaily, performanceHourly, target } from '@/db/schema';
 import type { OperationContext } from './operation-context';
-import type { CampaignSearchPlan, SearchFilter, SearchOrder } from './search-planner';
+import { isSearchSegmentField } from './search-field-registry';
+import type { CampaignSearchPlan, SearchFilter, SearchOrder, SearchPlan } from './search-planner';
 
 type CampaignRow = typeof campaign.$inferSelect;
 type CampaignSettings = Pick<CampaignRow, 'campaignId' | 'name' | 'state' | 'deliveryStatus' | 'budgetAmount' | 'targetingSettings' | 'bidStrategy' | 'startDate' | 'endDate'>;
@@ -15,8 +16,669 @@ type MetricTotals = {
     sales: number;
 };
 
-export type CampaignSearchRow = {
+export type SearchRow = {
     values: Record<string, string | number | null>;
+};
+
+export type CampaignSearchRow = SearchRow;
+
+export const querySearchRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, plan: SearchPlan): Promise<SearchRow[]> => {
+    if (plan.resource === 'campaign') {
+        return queryCampaignSearchRows(context, account, plan as CampaignSearchPlan);
+    }
+    if (plan.resource === 'ad_group') {
+        return queryAdGroupSearchRows(context, account, plan);
+    }
+    return queryAdSearchRows(context, account, plan);
+};
+
+type SearchAncestorSettings = {
+    campaignId: string;
+    campaignName: string;
+    campaignState: string;
+    campaignDeliveryStatus: string;
+    campaignDailyBudget: string | null;
+    campaignTargetingSettings: string;
+    campaignBidStrategy: string | null;
+    campaignStartDate: string;
+    campaignEndDate: string | null;
+};
+
+type AdGroupSearchSettings = SearchAncestorSettings & {
+    adGroupId: string;
+    adGroupName: string;
+    adGroupState: string;
+    adGroupDeliveryStatus: string;
+    adGroupDefaultBid: string | null;
+};
+
+type AdSearchSettings = AdGroupSearchSettings & {
+    adId: string;
+    adState: string;
+    adDeliveryStatus: string;
+    adAsin: string | null;
+    adProductTitle: string | null;
+    adType: string;
+};
+
+type SearchPerformanceDatabaseRow<TSettings> = TSettings & {
+    bucketDate: string | null;
+    bucketHour: number | null;
+    impressions: number | string | null;
+    clicks: number | string | null;
+    spend: number | string | null;
+    orders: number | string | null;
+    sales: number | string | null;
+};
+
+const queryAdGroupSearchRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, plan: SearchPlan): Promise<SearchRow[]> => {
+    const rows = plan.performance ? await queryAdGroupPerformanceRows(context, account, plan) : await queryAdGroupSettingsRows(context, account);
+    const targetingModes = await queryManualTargetingModes(context, rows, plan);
+    if (!plan.segmented) {
+        return rows.map(row => buildAdGroupSearchRow(row, plan.performance ? toMetricTotals(row) : emptyMetrics(), null, null, targetingModes.get(row.campaignId)));
+    }
+
+    const dates = getDateSequence(plan.dateRange?.startDate ?? '', plan.dateRange?.endDate ?? '');
+    const rowsBySegment = new Map(rows.map(row => [`${row.adGroupId}\u0000${row.bucketDate}\u0000${row.bucketHour}`, row]));
+    const rowsByAdGroup = new Map<string, (typeof rows)[number]>();
+    for (const row of rows) {
+        if (!rowsByAdGroup.has(row.adGroupId)) {
+            rowsByAdGroup.set(row.adGroupId, row);
+        }
+    }
+
+    return [...rowsByAdGroup.values()].flatMap(row => {
+        if (plan.segmentFields.includes('segments.hour')) {
+            return dates.flatMap(date =>
+                Array.from({ length: 24 }, (_, hour) => {
+                    const segment = rowsBySegment.get(`${row.adGroupId}\u0000${date}\u0000${hour}`);
+                    return buildAdGroupSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptyMetrics(), date, hour, targetingModes.get(row.campaignId));
+                })
+            );
+        }
+        return dates.map(date => {
+            const segment = rowsBySegment.get(`${row.adGroupId}\u0000${date}\u0000null`);
+            return buildAdGroupSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptyMetrics(), date, null, targetingModes.get(row.campaignId));
+        });
+    });
+};
+
+const queryAdSearchRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, plan: SearchPlan): Promise<SearchRow[]> => {
+    const rows = plan.performance ? await queryAdPerformanceRows(context, account, plan) : await queryAdSettingsRows(context, account);
+    const targetingModes = await queryManualTargetingModes(context, rows, plan);
+    if (!plan.segmented) {
+        return rows.map(row => buildAdSearchRow(row, plan.performance ? toMetricTotals(row) : emptyMetrics(), null, null, targetingModes.get(row.campaignId)));
+    }
+
+    const dates = getDateSequence(plan.dateRange?.startDate ?? '', plan.dateRange?.endDate ?? '');
+    const rowsBySegment = new Map(rows.map(row => [`${row.adId}\u0000${row.bucketDate}\u0000${row.bucketHour}`, row]));
+    const rowsByAd = new Map<string, (typeof rows)[number]>();
+    for (const row of rows) {
+        if (!rowsByAd.has(row.adId)) {
+            rowsByAd.set(row.adId, row);
+        }
+    }
+
+    return [...rowsByAd.values()].flatMap(row => {
+        if (plan.segmentFields.includes('segments.hour')) {
+            return dates.flatMap(date =>
+                Array.from({ length: 24 }, (_, hour) => {
+                    const segment = rowsBySegment.get(`${row.adId}\u0000${date}\u0000${hour}`);
+                    return buildAdSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptyMetrics(), date, hour, targetingModes.get(row.campaignId));
+                })
+            );
+        }
+        return dates.map(date => {
+            const segment = rowsBySegment.get(`${row.adId}\u0000${date}\u0000null`);
+            return buildAdSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptyMetrics(), date, null, targetingModes.get(row.campaignId));
+        });
+    });
+};
+
+const queryAdGroupSettingsRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }): Promise<SearchPerformanceDatabaseRow<AdGroupSearchSettings>[]> => {
+    const rows = await context.db
+        .select({
+            adGroupId: adGroup.adGroupId,
+            adGroupName: adGroup.name,
+            adGroupState: adGroup.state,
+            adGroupDeliveryStatus: adGroup.deliveryStatus,
+            adGroupDefaultBid: adGroup.bidAmount,
+            campaignId: campaign.campaignId,
+            campaignName: campaign.name,
+            campaignState: campaign.state,
+            campaignDeliveryStatus: campaign.deliveryStatus,
+            campaignDailyBudget: campaign.budgetAmount,
+            campaignTargetingSettings: campaign.targetingSettings,
+            campaignBidStrategy: campaign.bidStrategy,
+            campaignStartDate: campaign.startDate,
+            campaignEndDate: campaign.endDate,
+            bucketDate: sql<string | null>`NULL`.as('bucket_date'),
+            bucketHour: sql<number | null>`NULL`.as('bucket_hour'),
+            impressions: sql<number>`0`.as('impressions'),
+            clicks: sql<number>`0`.as('clicks'),
+            spend: sql<number>`0`.as('spend'),
+            orders: sql<number>`0`.as('orders'),
+            sales: sql<number>`0`.as('sales'),
+        })
+        .from(adGroup)
+        .innerJoin(
+            campaign,
+            and(eq(campaign.campaignId, adGroup.campaignId), eq(campaign.accountId, account.adsAccountId), eq(campaign.countryCode, account.countryCode), eq(campaign.adProduct, 'SPONSORED_PRODUCTS'))
+        )
+        .where(eq(adGroup.adProduct, 'SPONSORED_PRODUCTS'))
+        .orderBy(asc(adGroup.adGroupId));
+    return rows;
+};
+
+const queryAdSettingsRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }): Promise<SearchPerformanceDatabaseRow<AdSearchSettings>[]> => {
+    const rows = await context.db
+        .select({
+            adId: ad.adId,
+            adState: ad.state,
+            adDeliveryStatus: ad.deliveryStatus,
+            adAsin: ad.productAsin,
+            adProductTitle: ad.productTitle,
+            adType: ad.adType,
+            adGroupId: adGroup.adGroupId,
+            adGroupName: adGroup.name,
+            adGroupState: adGroup.state,
+            adGroupDeliveryStatus: adGroup.deliveryStatus,
+            adGroupDefaultBid: adGroup.bidAmount,
+            campaignId: campaign.campaignId,
+            campaignName: campaign.name,
+            campaignState: campaign.state,
+            campaignDeliveryStatus: campaign.deliveryStatus,
+            campaignDailyBudget: campaign.budgetAmount,
+            campaignTargetingSettings: campaign.targetingSettings,
+            campaignBidStrategy: campaign.bidStrategy,
+            campaignStartDate: campaign.startDate,
+            campaignEndDate: campaign.endDate,
+            bucketDate: sql<string | null>`NULL`.as('bucket_date'),
+            bucketHour: sql<number | null>`NULL`.as('bucket_hour'),
+            impressions: sql<number>`0`.as('impressions'),
+            clicks: sql<number>`0`.as('clicks'),
+            spend: sql<number>`0`.as('spend'),
+            orders: sql<number>`0`.as('orders'),
+            sales: sql<number>`0`.as('sales'),
+        })
+        .from(ad)
+        .innerJoin(adGroup, eq(adGroup.adGroupId, ad.adGroupId))
+        .innerJoin(
+            campaign,
+            and(eq(campaign.campaignId, ad.campaignId), eq(campaign.accountId, account.adsAccountId), eq(campaign.countryCode, account.countryCode), eq(campaign.adProduct, 'SPONSORED_PRODUCTS'))
+        )
+        .where(and(eq(ad.adProduct, 'SPONSORED_PRODUCTS'), eq(adGroup.adProduct, 'SPONSORED_PRODUCTS')))
+        .orderBy(asc(ad.adId));
+    return rows;
+};
+
+const queryAdGroupPerformanceRows = async (
+    context: OperationContext,
+    account: { adsAccountId: string; countryCode: string },
+    plan: SearchPlan
+): Promise<SearchPerformanceDatabaseRow<AdGroupSearchSettings>[]> => {
+    if (plan.hourly) {
+        const metrics = {
+            impressions: sql<number>`coalesce(sum(${performanceHourly.impressions}), 0)`.as('impressions'),
+            clicks: sql<number>`coalesce(sum(${performanceHourly.clicks}), 0)`.as('clicks'),
+            spend: sql<number>`coalesce(sum(${performanceHourly.spend}), 0)`.as('spend'),
+            orders: sql<number>`coalesce(sum(${performanceHourly.purchases}), 0)`.as('orders'),
+            sales: sql<number>`coalesce(sum(${performanceHourly.sales}), 0)`.as('sales'),
+        };
+        const archiveJoin = and(
+            eq(performanceHourly.accountId, account.adsAccountId),
+            eq(performanceHourly.adGroupId, adGroup.adGroupId),
+            eq(performanceHourly.entityType, 'product'),
+            gte(performanceHourly.bucketDate, plan.dateRange?.startDate ?? ''),
+            lte(performanceHourly.bucketDate, plan.dateRange?.endDate ?? ''),
+            ...plan.filters.filter(filter => isSearchSegmentField(filter.field)).map(buildHourlySegmentCondition)
+        );
+        const rows = await context.db
+            .select({
+                adGroupId: adGroup.adGroupId,
+                adGroupName: adGroup.name,
+                adGroupState: adGroup.state,
+                adGroupDeliveryStatus: adGroup.deliveryStatus,
+                adGroupDefaultBid: adGroup.bidAmount,
+                campaignId: campaign.campaignId,
+                campaignName: campaign.name,
+                campaignState: campaign.state,
+                campaignDeliveryStatus: campaign.deliveryStatus,
+                campaignDailyBudget: campaign.budgetAmount,
+                campaignTargetingSettings: campaign.targetingSettings,
+                campaignBidStrategy: campaign.bidStrategy,
+                campaignStartDate: campaign.startDate,
+                campaignEndDate: campaign.endDate,
+                bucketDate: plan.segmentFields.includes('segments.date') ? performanceHourly.bucketDate : sql<string | null>`NULL`.as('bucket_date'),
+                bucketHour: plan.segmentFields.includes('segments.hour') ? performanceHourly.bucketHour : sql<number | null>`NULL`.as('bucket_hour'),
+                impressions: metrics.impressions,
+                clicks: metrics.clicks,
+                spend: metrics.spend,
+                orders: metrics.orders,
+                sales: metrics.sales,
+            })
+            .from(adGroup)
+            .innerJoin(
+                campaign,
+                and(
+                    eq(campaign.campaignId, adGroup.campaignId),
+                    eq(campaign.accountId, account.adsAccountId),
+                    eq(campaign.countryCode, account.countryCode),
+                    eq(campaign.adProduct, 'SPONSORED_PRODUCTS')
+                )
+            )
+            .leftJoin(performanceHourly, archiveJoin)
+            .where(eq(adGroup.adProduct, 'SPONSORED_PRODUCTS'))
+            .groupBy(
+                adGroup.adGroupId,
+                adGroup.name,
+                adGroup.state,
+                adGroup.deliveryStatus,
+                adGroup.bidAmount,
+                campaign.campaignId,
+                campaign.name,
+                campaign.state,
+                campaign.deliveryStatus,
+                campaign.budgetAmount,
+                campaign.targetingSettings,
+                campaign.bidStrategy,
+                campaign.startDate,
+                campaign.endDate,
+                ...(plan.segmentFields.includes('segments.date') ? [performanceHourly.bucketDate] : []),
+                ...(plan.segmentFields.includes('segments.hour') ? [performanceHourly.bucketHour] : [])
+            )
+            .orderBy(
+                asc(adGroup.adGroupId),
+                ...(plan.segmentFields.includes('segments.date') ? [asc(performanceHourly.bucketDate)] : []),
+                ...(plan.segmentFields.includes('segments.hour') ? [asc(performanceHourly.bucketHour)] : [])
+            );
+        return rows;
+    }
+
+    const metrics = {
+        impressions: sql<number>`coalesce(sum(${performanceDaily.impressions}), 0)`.as('impressions'),
+        clicks: sql<number>`coalesce(sum(${performanceDaily.clicks}), 0)`.as('clicks'),
+        spend: sql<number>`coalesce(sum(${performanceDaily.spend}), 0)`.as('spend'),
+        orders: sql<number>`coalesce(sum(${performanceDaily.purchases}), 0)`.as('orders'),
+        sales: sql<number>`coalesce(sum(${performanceDaily.sales}), 0)`.as('sales'),
+    };
+    const archiveJoin = and(
+        eq(performanceDaily.accountId, account.adsAccountId),
+        eq(performanceDaily.adGroupId, adGroup.adGroupId),
+        eq(performanceDaily.entityType, 'product'),
+        gte(performanceDaily.bucketDate, plan.dateRange?.startDate ?? ''),
+        lte(performanceDaily.bucketDate, plan.dateRange?.endDate ?? ''),
+        ...plan.filters.filter(filter => filter.field === 'segments.date').map(buildDailySegmentCondition)
+    );
+    const rows = await context.db
+        .select({
+            adGroupId: adGroup.adGroupId,
+            adGroupName: adGroup.name,
+            adGroupState: adGroup.state,
+            adGroupDeliveryStatus: adGroup.deliveryStatus,
+            adGroupDefaultBid: adGroup.bidAmount,
+            campaignId: campaign.campaignId,
+            campaignName: campaign.name,
+            campaignState: campaign.state,
+            campaignDeliveryStatus: campaign.deliveryStatus,
+            campaignDailyBudget: campaign.budgetAmount,
+            campaignTargetingSettings: campaign.targetingSettings,
+            campaignBidStrategy: campaign.bidStrategy,
+            campaignStartDate: campaign.startDate,
+            campaignEndDate: campaign.endDate,
+            bucketDate: plan.segmented ? performanceDaily.bucketDate : sql<string | null>`NULL`.as('bucket_date'),
+            bucketHour: sql<number | null>`NULL`.as('bucket_hour'),
+            impressions: metrics.impressions,
+            clicks: metrics.clicks,
+            spend: metrics.spend,
+            orders: metrics.orders,
+            sales: metrics.sales,
+        })
+        .from(adGroup)
+        .innerJoin(
+            campaign,
+            and(eq(campaign.campaignId, adGroup.campaignId), eq(campaign.accountId, account.adsAccountId), eq(campaign.countryCode, account.countryCode), eq(campaign.adProduct, 'SPONSORED_PRODUCTS'))
+        )
+        .leftJoin(performanceDaily, archiveJoin)
+        .where(eq(adGroup.adProduct, 'SPONSORED_PRODUCTS'))
+        .groupBy(
+            adGroup.adGroupId,
+            adGroup.name,
+            adGroup.state,
+            adGroup.deliveryStatus,
+            adGroup.bidAmount,
+            campaign.campaignId,
+            campaign.name,
+            campaign.state,
+            campaign.deliveryStatus,
+            campaign.budgetAmount,
+            campaign.targetingSettings,
+            campaign.bidStrategy,
+            campaign.startDate,
+            campaign.endDate,
+            ...(plan.segmented ? [performanceDaily.bucketDate] : [])
+        )
+        .orderBy(asc(adGroup.adGroupId), ...(plan.segmented ? [asc(performanceDaily.bucketDate)] : []));
+    return rows;
+};
+
+const queryAdPerformanceRows = async (
+    context: OperationContext,
+    account: { adsAccountId: string; countryCode: string },
+    plan: SearchPlan
+): Promise<SearchPerformanceDatabaseRow<AdSearchSettings>[]> => {
+    if (plan.hourly) {
+        const metrics = {
+            impressions: sql<number>`coalesce(sum(${performanceHourly.impressions}), 0)`.as('impressions'),
+            clicks: sql<number>`coalesce(sum(${performanceHourly.clicks}), 0)`.as('clicks'),
+            spend: sql<number>`coalesce(sum(${performanceHourly.spend}), 0)`.as('spend'),
+            orders: sql<number>`coalesce(sum(${performanceHourly.purchases}), 0)`.as('orders'),
+            sales: sql<number>`coalesce(sum(${performanceHourly.sales}), 0)`.as('sales'),
+        };
+        const archiveJoin = and(
+            eq(performanceHourly.accountId, account.adsAccountId),
+            eq(performanceHourly.adId, ad.adId),
+            eq(performanceHourly.entityType, 'product'),
+            gte(performanceHourly.bucketDate, plan.dateRange?.startDate ?? ''),
+            lte(performanceHourly.bucketDate, plan.dateRange?.endDate ?? ''),
+            ...plan.filters.filter(filter => isSearchSegmentField(filter.field)).map(buildHourlySegmentCondition)
+        );
+        const rows = await context.db
+            .select({
+                adId: ad.adId,
+                adState: ad.state,
+                adDeliveryStatus: ad.deliveryStatus,
+                adAsin: ad.productAsin,
+                adProductTitle: ad.productTitle,
+                adType: ad.adType,
+                adGroupId: adGroup.adGroupId,
+                adGroupName: adGroup.name,
+                adGroupState: adGroup.state,
+                adGroupDeliveryStatus: adGroup.deliveryStatus,
+                adGroupDefaultBid: adGroup.bidAmount,
+                campaignId: campaign.campaignId,
+                campaignName: campaign.name,
+                campaignState: campaign.state,
+                campaignDeliveryStatus: campaign.deliveryStatus,
+                campaignDailyBudget: campaign.budgetAmount,
+                campaignTargetingSettings: campaign.targetingSettings,
+                campaignBidStrategy: campaign.bidStrategy,
+                campaignStartDate: campaign.startDate,
+                campaignEndDate: campaign.endDate,
+                bucketDate: plan.segmentFields.includes('segments.date') ? performanceHourly.bucketDate : sql<string | null>`NULL`.as('bucket_date'),
+                bucketHour: plan.segmentFields.includes('segments.hour') ? performanceHourly.bucketHour : sql<number | null>`NULL`.as('bucket_hour'),
+                impressions: metrics.impressions,
+                clicks: metrics.clicks,
+                spend: metrics.spend,
+                orders: metrics.orders,
+                sales: metrics.sales,
+            })
+            .from(ad)
+            .innerJoin(adGroup, eq(adGroup.adGroupId, ad.adGroupId))
+            .innerJoin(
+                campaign,
+                and(eq(campaign.campaignId, ad.campaignId), eq(campaign.accountId, account.adsAccountId), eq(campaign.countryCode, account.countryCode), eq(campaign.adProduct, 'SPONSORED_PRODUCTS'))
+            )
+            .leftJoin(performanceHourly, archiveJoin)
+            .where(and(eq(ad.adProduct, 'SPONSORED_PRODUCTS'), eq(adGroup.adProduct, 'SPONSORED_PRODUCTS')))
+            .groupBy(
+                ad.adId,
+                ad.state,
+                ad.deliveryStatus,
+                ad.productAsin,
+                ad.productTitle,
+                ad.adType,
+                adGroup.adGroupId,
+                adGroup.name,
+                adGroup.state,
+                adGroup.deliveryStatus,
+                adGroup.bidAmount,
+                campaign.campaignId,
+                campaign.name,
+                campaign.state,
+                campaign.deliveryStatus,
+                campaign.budgetAmount,
+                campaign.targetingSettings,
+                campaign.bidStrategy,
+                campaign.startDate,
+                campaign.endDate,
+                ...(plan.segmentFields.includes('segments.date') ? [performanceHourly.bucketDate] : []),
+                ...(plan.segmentFields.includes('segments.hour') ? [performanceHourly.bucketHour] : [])
+            )
+            .orderBy(
+                asc(ad.adId),
+                ...(plan.segmentFields.includes('segments.date') ? [asc(performanceHourly.bucketDate)] : []),
+                ...(plan.segmentFields.includes('segments.hour') ? [asc(performanceHourly.bucketHour)] : [])
+            );
+        return rows;
+    }
+
+    const metrics = {
+        impressions: sql<number>`coalesce(sum(${performanceDaily.impressions}), 0)`.as('impressions'),
+        clicks: sql<number>`coalesce(sum(${performanceDaily.clicks}), 0)`.as('clicks'),
+        spend: sql<number>`coalesce(sum(${performanceDaily.spend}), 0)`.as('spend'),
+        orders: sql<number>`coalesce(sum(${performanceDaily.purchases}), 0)`.as('orders'),
+        sales: sql<number>`coalesce(sum(${performanceDaily.sales}), 0)`.as('sales'),
+    };
+    const archiveJoin = and(
+        eq(performanceDaily.accountId, account.adsAccountId),
+        eq(performanceDaily.adId, ad.adId),
+        eq(performanceDaily.entityType, 'product'),
+        gte(performanceDaily.bucketDate, plan.dateRange?.startDate ?? ''),
+        lte(performanceDaily.bucketDate, plan.dateRange?.endDate ?? ''),
+        ...plan.filters.filter(filter => filter.field === 'segments.date').map(buildDailySegmentCondition)
+    );
+    const rows = await context.db
+        .select({
+            adId: ad.adId,
+            adState: ad.state,
+            adDeliveryStatus: ad.deliveryStatus,
+            adAsin: ad.productAsin,
+            adProductTitle: ad.productTitle,
+            adType: ad.adType,
+            adGroupId: adGroup.adGroupId,
+            adGroupName: adGroup.name,
+            adGroupState: adGroup.state,
+            adGroupDeliveryStatus: adGroup.deliveryStatus,
+            adGroupDefaultBid: adGroup.bidAmount,
+            campaignId: campaign.campaignId,
+            campaignName: campaign.name,
+            campaignState: campaign.state,
+            campaignDeliveryStatus: campaign.deliveryStatus,
+            campaignDailyBudget: campaign.budgetAmount,
+            campaignTargetingSettings: campaign.targetingSettings,
+            campaignBidStrategy: campaign.bidStrategy,
+            campaignStartDate: campaign.startDate,
+            campaignEndDate: campaign.endDate,
+            bucketDate: plan.segmented ? performanceDaily.bucketDate : sql<string | null>`NULL`.as('bucket_date'),
+            bucketHour: sql<number | null>`NULL`.as('bucket_hour'),
+            impressions: metrics.impressions,
+            clicks: metrics.clicks,
+            spend: metrics.spend,
+            orders: metrics.orders,
+            sales: metrics.sales,
+        })
+        .from(ad)
+        .innerJoin(adGroup, eq(adGroup.adGroupId, ad.adGroupId))
+        .innerJoin(
+            campaign,
+            and(eq(campaign.campaignId, ad.campaignId), eq(campaign.accountId, account.adsAccountId), eq(campaign.countryCode, account.countryCode), eq(campaign.adProduct, 'SPONSORED_PRODUCTS'))
+        )
+        .leftJoin(performanceDaily, archiveJoin)
+        .where(and(eq(ad.adProduct, 'SPONSORED_PRODUCTS'), eq(adGroup.adProduct, 'SPONSORED_PRODUCTS')))
+        .groupBy(
+            ad.adId,
+            ad.state,
+            ad.deliveryStatus,
+            ad.productAsin,
+            ad.productTitle,
+            ad.adType,
+            adGroup.adGroupId,
+            adGroup.name,
+            adGroup.state,
+            adGroup.deliveryStatus,
+            adGroup.bidAmount,
+            campaign.campaignId,
+            campaign.name,
+            campaign.state,
+            campaign.deliveryStatus,
+            campaign.budgetAmount,
+            campaign.targetingSettings,
+            campaign.bidStrategy,
+            campaign.startDate,
+            campaign.endDate,
+            ...(plan.segmented ? [performanceDaily.bucketDate] : [])
+        )
+        .orderBy(asc(ad.adId), ...(plan.segmented ? [asc(performanceDaily.bucketDate)] : []));
+    return rows;
+};
+
+const buildAdGroupSearchRow = (
+    row: SearchPerformanceDatabaseRow<AdGroupSearchSettings>,
+    totals: MetricTotals,
+    date: string | null,
+    hour: number | null,
+    inferredTargetingMode?: 'MANUAL_KEYWORD' | 'MANUAL_PRODUCT'
+): SearchRow => {
+    const metrics = buildMetricValues(totals);
+    return {
+        values: {
+            'adGroup.id': row.adGroupId,
+            'adGroup.name': row.adGroupName,
+            'adGroup.state': row.adGroupState,
+            'adGroup.deliveryStatus': row.adGroupDeliveryStatus,
+            'adGroup.defaultBid': row.adGroupDefaultBid === null ? null : toNumber(row.adGroupDefaultBid),
+            'campaign.id': row.campaignId,
+            'campaign.name': row.campaignName,
+            'campaign.state': row.campaignState,
+            'campaign.deliveryStatus': row.campaignDeliveryStatus,
+            'campaign.dailyBudget': row.campaignDailyBudget === null ? null : toNumber(row.campaignDailyBudget),
+            'campaign.targetingMode': normalizeTargetingMode(row.campaignTargetingSettings, inferredTargetingMode),
+            'campaign.bidStrategy': normalizeBidStrategy(row.campaignBidStrategy),
+            'campaign.startDate': toDateString(row.campaignStartDate),
+            'campaign.endDate': row.campaignEndDate ? toDateString(row.campaignEndDate) : null,
+            'metrics.impressions': metrics.impressions,
+            'metrics.clicks': metrics.clicks,
+            'metrics.spend': metrics.spend,
+            'metrics.orders': metrics.orders,
+            'metrics.sales': metrics.sales,
+            'metrics.acos': metrics.acos,
+            'metrics.cpc': metrics.cpc,
+            'metrics.ctr': metrics.ctr,
+            'metrics.roas': metrics.roas,
+            'metrics.cvr': metrics.cvr,
+            'segments.date': date,
+            'segments.hour': hour,
+        },
+    };
+};
+
+const buildAdSearchRow = (
+    row: SearchPerformanceDatabaseRow<AdSearchSettings>,
+    totals: MetricTotals,
+    date: string | null,
+    hour: number | null,
+    inferredTargetingMode?: 'MANUAL_KEYWORD' | 'MANUAL_PRODUCT'
+): SearchRow => {
+    const metrics = buildMetricValues(totals);
+    return {
+        values: {
+            'ad.id': row.adId,
+            'ad.state': row.adState,
+            'ad.deliveryStatus': row.adDeliveryStatus,
+            'ad.asin': row.adAsin,
+            'ad.productTitle': row.adProductTitle,
+            'ad.type': row.adType,
+            'adGroup.id': row.adGroupId,
+            'adGroup.name': row.adGroupName,
+            'adGroup.state': row.adGroupState,
+            'adGroup.deliveryStatus': row.adGroupDeliveryStatus,
+            'adGroup.defaultBid': row.adGroupDefaultBid === null ? null : toNumber(row.adGroupDefaultBid),
+            'campaign.id': row.campaignId,
+            'campaign.name': row.campaignName,
+            'campaign.state': row.campaignState,
+            'campaign.deliveryStatus': row.campaignDeliveryStatus,
+            'campaign.dailyBudget': row.campaignDailyBudget === null ? null : toNumber(row.campaignDailyBudget),
+            'campaign.targetingMode': normalizeTargetingMode(row.campaignTargetingSettings, inferredTargetingMode),
+            'campaign.bidStrategy': normalizeBidStrategy(row.campaignBidStrategy),
+            'campaign.startDate': toDateString(row.campaignStartDate),
+            'campaign.endDate': row.campaignEndDate ? toDateString(row.campaignEndDate) : null,
+            'metrics.impressions': metrics.impressions,
+            'metrics.clicks': metrics.clicks,
+            'metrics.spend': metrics.spend,
+            'metrics.orders': metrics.orders,
+            'metrics.sales': metrics.sales,
+            'metrics.acos': metrics.acos,
+            'metrics.cpc': metrics.cpc,
+            'metrics.ctr': metrics.ctr,
+            'metrics.roas': metrics.roas,
+            'metrics.cvr': metrics.cvr,
+            'segments.date': date,
+            'segments.hour': hour,
+        },
+    };
+};
+
+const buildDailySegmentCondition = (filter: SearchFilter) => {
+    if (filter.field !== 'segments.date') {
+        throw new Error('Only segments.date filters can constrain the daily advertised-ASIN archive.');
+    }
+    switch (filter.operator) {
+        case 'eq':
+            return eq(performanceDaily.bucketDate, filter.value as string);
+        case 'in':
+            return inArray(performanceDaily.bucketDate, filter.value as string[]);
+        case 'gt':
+            return gt(performanceDaily.bucketDate, filter.value as string);
+        case 'gte':
+            return gte(performanceDaily.bucketDate, filter.value as string);
+        case 'lt':
+            return lt(performanceDaily.bucketDate, filter.value as string);
+        case 'lte':
+            return lte(performanceDaily.bucketDate, filter.value as string);
+        default:
+            throw new Error('The daily advertised-ASIN archive does not support this segment operator.');
+    }
+};
+
+const buildHourlySegmentCondition = (filter: SearchFilter) => {
+    if (filter.field === 'segments.date') {
+        switch (filter.operator) {
+            case 'eq':
+                return eq(performanceHourly.bucketDate, filter.value as string);
+            case 'in':
+                return inArray(performanceHourly.bucketDate, filter.value as string[]);
+            case 'gt':
+                return gt(performanceHourly.bucketDate, filter.value as string);
+            case 'gte':
+                return gte(performanceHourly.bucketDate, filter.value as string);
+            case 'lt':
+                return lt(performanceHourly.bucketDate, filter.value as string);
+            case 'lte':
+                return lte(performanceHourly.bucketDate, filter.value as string);
+            default:
+                throw new Error('The hourly advertised-ASIN archive does not support this date operator.');
+        }
+    }
+    if (filter.field === 'segments.hour') {
+        switch (filter.operator) {
+            case 'eq':
+                return eq(performanceHourly.bucketHour, filter.value as number);
+            case 'in':
+                return inArray(performanceHourly.bucketHour, filter.value as number[]);
+            case 'gt':
+                return gt(performanceHourly.bucketHour, filter.value as number);
+            case 'gte':
+                return gte(performanceHourly.bucketHour, filter.value as number);
+            case 'lt':
+                return lt(performanceHourly.bucketHour, filter.value as number);
+            case 'lte':
+                return lte(performanceHourly.bucketHour, filter.value as number);
+            default:
+                throw new Error('The hourly advertised-ASIN archive does not support this hour operator.');
+        }
+    }
+    throw new Error('Only segments.date and segments.hour filters can constrain the hourly advertised-ASIN archive.');
 };
 
 export const queryCampaignSearchRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, plan: CampaignSearchPlan): Promise<CampaignSearchRow[]> => {
@@ -113,12 +775,16 @@ export const queryCampaignSearchRows = async (context: OperationContext, account
     );
 };
 
-export const filterCampaignSearchRows = (rows: readonly CampaignSearchRow[], filters: readonly SearchFilter[], segmented: boolean) =>
-    rows.filter(row => filters.every(filter => (!segmented && filter.field === 'segments.date') || matchesFilter(row.values[filter.field], filter)));
+export const filterSearchRows = (rows: readonly SearchRow[], filters: readonly SearchFilter[], segmentFields: readonly string[]) =>
+    rows.filter(row => filters.every(filter => (isSearchSegmentField(filter.field) && !segmentFields.includes(filter.field)) || matchesFilter(row.values[filter.field], filter)));
 
-export const sortCampaignSearchRows = (rows: readonly CampaignSearchRow[], orderBy: readonly SearchOrder[]) => [...rows].sort((left, right) => compareSearchRows(left, right, orderBy));
+export const filterCampaignSearchRows = (rows: readonly CampaignSearchRow[], filters: readonly SearchFilter[], segmentFields: readonly string[]) => filterSearchRows(rows, filters, segmentFields);
 
-export const compareSearchRows = (left: CampaignSearchRow, right: CampaignSearchRow, orderBy: readonly SearchOrder[]) => {
+export const sortSearchRows = (rows: readonly SearchRow[], orderBy: readonly SearchOrder[]) => [...rows].sort((left, right) => compareSearchRows(left, right, orderBy));
+
+export const sortCampaignSearchRows = (rows: readonly CampaignSearchRow[], orderBy: readonly SearchOrder[]) => sortSearchRows(rows, orderBy);
+
+export const compareSearchRows = (left: SearchRow, right: SearchRow, orderBy: readonly SearchOrder[]) => {
     for (const order of orderBy) {
         const comparison = compareValues(left.values[order.field], right.values[order.field]);
         if (comparison !== 0) {
@@ -128,7 +794,7 @@ export const compareSearchRows = (left: CampaignSearchRow, right: CampaignSearch
     return 0;
 };
 
-export const compareSearchRowToBoundary = (row: CampaignSearchRow, boundary: readonly unknown[], orderBy: readonly SearchOrder[]) => {
+export const compareSearchRowToBoundary = (row: SearchRow, boundary: readonly unknown[], orderBy: readonly SearchOrder[]) => {
     for (const [index, order] of orderBy.entries()) {
         const comparison = compareValues(row.values[order.field], boundary[index]);
         if (comparison !== 0) {
@@ -274,7 +940,11 @@ const getDateSequence = (startDate: string, endDate: string) => {
 
 const emptyMetrics = (): MetricTotals => ({ impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 });
 
-const queryManualTargetingModes = async (context: OperationContext, campaignRows: readonly CampaignSettings[], plan: CampaignSearchPlan): Promise<Map<string, 'MANUAL_KEYWORD' | 'MANUAL_PRODUCT'>> => {
+const queryManualTargetingModes = async (
+    context: OperationContext,
+    campaignRows: readonly (Pick<CampaignRow, 'campaignId' | 'targetingSettings'> | Pick<SearchAncestorSettings, 'campaignId' | 'campaignTargetingSettings'>)[],
+    plan: SearchPlan
+): Promise<Map<string, 'MANUAL_KEYWORD' | 'MANUAL_PRODUCT'>> => {
     const targetingModeUsed =
         plan.fields.includes('campaign.targetingMode') ||
         plan.filters.some(filter => filter.field === 'campaign.targetingMode') ||
@@ -283,7 +953,9 @@ const queryManualTargetingModes = async (context: OperationContext, campaignRows
         return new Map();
     }
 
-    const manualCampaignIds = [...new Set(campaignRows.filter(row => row.targetingSettings.toUpperCase() === 'MANUAL').map(row => row.campaignId))];
+    const manualCampaignIds = [
+        ...new Set(campaignRows.filter(row => ('targetingSettings' in row ? row.targetingSettings : row.campaignTargetingSettings).toUpperCase() === 'MANUAL').map(row => row.campaignId)),
+    ];
     if (manualCampaignIds.length === 0) {
         return new Map();
     }

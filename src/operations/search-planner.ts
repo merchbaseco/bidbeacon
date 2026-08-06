@@ -4,15 +4,20 @@ import { z } from 'zod';
 import { OperationError } from './operation-errors';
 import { createSearchQueryFingerprint } from './search-cursor';
 import {
-    CAMPAIGN_DEFAULT_FIELDS,
     type CampaignSearchField,
-    campaignSearchFieldRegistry,
-    getCampaignSearchField,
-    isCampaignPerformanceField,
-    isCampaignSegmentField,
+    getSearchDefaultFields,
+    getSearchField,
+    isSearchFieldCompatible,
+    isSearchHourSegmentField,
+    isSearchPerformanceField,
+    isSearchSegmentField,
+    SEARCH_FIELDS,
     SEARCH_OPERATORS,
+    SEARCH_RESOURCES,
+    type SearchField,
     type SearchFieldDefinition,
     type SearchOperator,
+    type SearchResource,
 } from './search-field-registry';
 
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
@@ -62,7 +67,7 @@ export const searchOutputSchema = z
         context: z
             .object({
                 account: z.object({ id: z.string().uuid(), timezone: z.string(), currency: z.string() }).strict(),
-                resource: z.literal('campaign'),
+                resource: z.enum(SEARCH_RESOURCES),
                 fields: z.array(z.string()),
                 dateRange: z
                     .object({ startDate: z.string(), endDate: z.string(), source: z.enum(['DEFAULT', 'EXPLICIT']) })
@@ -87,20 +92,20 @@ export type SearchDateRange = {
 };
 
 export type SearchFilter = {
-    field: CampaignSearchField;
+    field: SearchField;
     operator: SearchOperator;
     value: string | number | readonly (string | number)[];
 };
 
 export type SearchOrder = {
-    field: CampaignSearchField;
+    field: SearchField;
     direction: 'asc' | 'desc';
 };
 
-export type CampaignSearchPlan = {
+export type SearchPlan = {
     accountId: string;
-    resource: 'campaign';
-    fields: readonly CampaignSearchField[];
+    resource: SearchResource;
+    fields: readonly SearchField[];
     filters: readonly SearchFilter[];
     dateRange?: SearchDateRange;
     orderBy: readonly SearchOrder[];
@@ -108,34 +113,59 @@ export type CampaignSearchPlan = {
     cursor?: string;
     performance: boolean;
     segmented: boolean;
+    segmentFields: readonly SearchField[];
+    hourly: boolean;
     fingerprint: string;
 };
 
-export const planCampaignSearch = (input: unknown, options: { timezone: string; now?: Date }): CampaignSearchPlan => {
+export type CampaignSearchPlan = SearchPlan & {
+    resource: 'campaign';
+    fields: readonly CampaignSearchField[];
+};
+
+export const planSearch = (input: unknown, options: { timezone: string; now?: Date }): SearchPlan => {
     const parsedInput = searchInputSchema.safeParse(input);
     if (!parsedInput.success) {
         throw invalidInput('Search input is invalid.', { issues: parsedInput.error.issues });
     }
-    if (parsedInput.data.resource !== 'campaign') {
-        throw invalidInput('Search resource is not available in this operation slice.', { resource: parsedInput.data.resource, supportedResources: ['campaign'] });
+    if (!isSearchResource(parsedInput.data.resource)) {
+        throw invalidInput('Search resource is not available in this operation slice.', {
+            resource: parsedInput.data.resource,
+            supportedResources: [...SEARCH_RESOURCES],
+        });
     }
 
-    const fields = resolveFields(parsedInput.data.fields);
-    const filters = resolveFilters(parsedInput.data.filters ?? []);
-    const requestedOrder = resolveOrder(parsedInput.data.orderBy ?? []);
-    const performance =
-        fields.some(isCampaignPerformanceField) || filters.some(filter => isCampaignPerformanceField(filter.field)) || requestedOrder.some(order => isCampaignPerformanceField(order.field));
-    const segmented = fields.some(isCampaignSegmentField) || requestedOrder.some(order => isCampaignSegmentField(order.field));
+    const resource = parsedInput.data.resource;
+    const fields = resolveFields(resource, parsedInput.data.fields);
+    const filters = resolveFilters(resource, parsedInput.data.filters ?? []);
+    const requestedOrder = resolveOrder(resource, parsedInput.data.orderBy ?? []);
+    const usedFields = [...fields, ...filters.map(filter => filter.field), ...requestedOrder.map(order => order.field)];
+    const performance = usedFields.some(isSearchPerformanceField);
+    const segmentFields = [...new Set([...fields, ...requestedOrder.map(order => order.field)].filter(isSearchSegmentField))];
+    const segmented = segmentFields.length > 0;
+    const hourly = usedFields.some(isSearchHourSegmentField);
 
+    if (hourly && !usedFields.includes('segments.date')) {
+        throw invalidInput('segments.hour requires the compatible segments.date Field.', {
+            field: 'segments.hour',
+            compatibleFields: fieldsForResource(resource).filter(field => field === 'segments.date' || field === 'segments.hour'),
+        });
+    }
+    if (segmentFields.includes('segments.hour') && !segmentFields.includes('segments.date')) {
+        throw invalidInput('segments.hour requires segments.date at the selected row grain.', {
+            field: 'segments.hour',
+            compatibleFields: fieldsForResource(resource).filter(field => field === 'segments.date' || field === 'segments.hour'),
+        });
+    }
     if (!performance && parsedInput.data.dateRange) {
         throw invalidInput('dateRange requires a metric or segment Field.');
     }
 
     const dateRange = performance ? resolveDateRange(parsedInput.data.dateRange, options) : undefined;
-    const orderBy = appendCampaignTieBreaker(requestedOrder.length > 0 ? requestedOrder : getDefaultOrder(performance, segmented));
+    const orderBy = appendTieBreakers(resource, requestedOrder.length > 0 ? requestedOrder : getDefaultOrder(resource, performance, segmented, segmentFields), segmentFields);
     const fingerprint = createSearchQueryFingerprint({
         accountId: parsedInput.data.accountId,
-        resource: parsedInput.data.resource,
+        resource,
         fields,
         filters,
         dateRange: dateRange ? { startDate: dateRange.startDate, endDate: dateRange.endDate } : null,
@@ -144,7 +174,7 @@ export const planCampaignSearch = (input: unknown, options: { timezone: string; 
 
     return {
         accountId: parsedInput.data.accountId,
-        resource: 'campaign',
+        resource,
         fields,
         filters,
         dateRange,
@@ -153,17 +183,27 @@ export const planCampaignSearch = (input: unknown, options: { timezone: string; 
         cursor: parsedInput.data.cursor,
         performance,
         segmented,
+        segmentFields,
+        hourly,
         fingerprint,
     };
 };
 
-const resolveFields = (fields: readonly string[] | undefined): CampaignSearchField[] => {
-    const resolved = fields ?? CAMPAIGN_DEFAULT_FIELDS;
+export const planCampaignSearch = (input: unknown, options: { timezone: string; now?: Date }): CampaignSearchPlan => {
+    const plan = planSearch(input, options);
+    if (plan.resource !== 'campaign') {
+        throw invalidInput('Search resource is not available in the Campaign Search operation slice.', { resource: plan.resource, supportedResources: ['campaign'] });
+    }
+    return plan as CampaignSearchPlan;
+};
+
+const resolveFields = (resource: SearchResource, fields: readonly string[] | undefined): SearchField[] => {
+    const resolved = fields ?? getSearchDefaultFields(resource);
     const seen = new Set<string>();
     const invalidFields: string[] = [];
 
     for (const field of resolved) {
-        if (!getCampaignSearchField(field)) {
+        if (!isSearchFieldCompatible(resource, field)) {
             invalidFields.push(field);
         }
         if (seen.has(field)) {
@@ -173,79 +213,82 @@ const resolveFields = (fields: readonly string[] | undefined): CampaignSearchFie
     }
 
     if (invalidFields.length > 0) {
-        throw invalidInput('Search contains a Field that is not compatible with campaign.', {
+        throw invalidInput(`Search contains a Field that is not compatible with ${resource}.`, {
             fields: invalidFields,
-            allowedFields: Object.keys(campaignSearchFieldRegistry),
+            allowedFields: fieldsForResource(resource),
         });
     }
 
-    return resolved as CampaignSearchField[];
+    return resolved as SearchField[];
 };
 
-const resolveFilters = (filters: readonly z.infer<typeof searchFilterInputSchema>[]): SearchFilter[] =>
+const resolveFilters = (resource: SearchResource, filters: readonly z.infer<typeof searchFilterInputSchema>[]): SearchFilter[] =>
     filters.map(filter => {
-        const definition = getCampaignSearchField(filter.field);
-        if (!definition) {
-            throw invalidInput('Search filter Field is not compatible with campaign.', { field: filter.field });
+        const field = getSearchField(filter.field);
+        if (!(field && isSearchFieldCompatible(resource, filter.field))) {
+            throw invalidInput(`Search filter Field is not compatible with ${resource}.`, { field: filter.field, allowedFields: fieldsForResource(resource) });
         }
-        if (!definition.filterOperators.includes(filter.operator)) {
+        if (!field.filterOperators.includes(filter.operator)) {
             throw invalidInput('Search filter operator is not valid for the selected Field.', {
                 field: filter.field,
                 operator: filter.operator,
-                allowedOperators: definition.filterOperators,
+                allowedOperators: field.filterOperators,
             });
         }
 
-        const value = validateFilterValue(definition, filter.operator, filter.value);
-        return { field: definition.field, operator: filter.operator, value };
+        const value = validateFilterValue(field, filter.operator, filter.value);
+        return { field: field.field, operator: filter.operator, value };
     });
 
-const resolveOrder = (orderBy: readonly z.infer<typeof searchOrderInputSchema>[]): SearchOrder[] => {
+const resolveOrder = (resource: SearchResource, orderBy: readonly z.infer<typeof searchOrderInputSchema>[]): SearchOrder[] => {
     const seen = new Set<string>();
     return orderBy.map(order => {
-        const definition = getCampaignSearchField(order.field);
-        if (!definition) {
-            throw invalidInput('Search ordering Field is not compatible with campaign.', { field: order.field });
+        const field = getSearchField(order.field);
+        if (!(field && isSearchFieldCompatible(resource, order.field))) {
+            throw invalidInput(`Search ordering Field is not compatible with ${resource}.`, { field: order.field, allowedFields: fieldsForResource(resource) });
         }
         if (seen.has(order.field)) {
             throw invalidInput('Search ordering Fields must be unique.', { field: order.field });
         }
         seen.add(order.field);
-        return { field: definition.field, direction: order.direction };
+        return { field: field.field, direction: order.direction };
     });
 };
 
-const validateFilterValue = (definition: SearchFieldDefinition, operator: SearchOperator, value: unknown): SearchFilter['value'] => {
+const validateFilterValue = (field: SearchFieldDefinition, operator: SearchOperator, value: unknown): SearchFilter['value'] => {
     if (operator === 'in') {
-        if (!Array.isArray(value) || value.length === 0 || value.some(item => !isScalarValue(definition, item))) {
-            throw invalidInput('The in operator requires a non-empty array of values matching the Field type.', { field: definition.field });
+        if (!Array.isArray(value) || value.length === 0 || value.some(item => !(isScalarValue(field, item) && isValidFieldValue(field, item)))) {
+            throw invalidInput('The in operator requires a non-empty array of values matching the Field type.', { field: field.field });
         }
         return value as string[] | number[];
     }
 
     if (operator === 'contains') {
-        if (definition.kind !== 'string' || typeof value !== 'string') {
-            throw invalidInput('The contains operator requires a string Field and string value.', { field: definition.field });
+        if (field.kind !== 'string' || typeof value !== 'string') {
+            throw invalidInput('The contains operator requires a string Field and string value.', { field: field.field });
         }
         return value;
     }
 
-    if (!isScalarValue(definition, value)) {
-        throw invalidInput('Search filter value does not match the Field type.', { field: definition.field });
+    if (!(isScalarValue(field, value) && isValidFieldValue(field, value))) {
+        throw invalidInput('Search filter value does not match the Field type.', { field: field.field });
     }
 
     return value;
 };
 
-const isScalarValue = (definition: SearchFieldDefinition, value: unknown): value is string | number => {
-    if (definition.kind === 'number') {
+const isScalarValue = (field: SearchFieldDefinition, value: unknown): value is string | number => {
+    if (field.kind === 'number') {
         return typeof value === 'number' && Number.isFinite(value);
     }
     if (typeof value !== 'string') {
         return false;
     }
-    return definition.kind !== 'date' || isIsoDate(value);
+    return field.kind !== 'date' || isIsoDate(value);
 };
+
+const isValidFieldValue = (field: SearchFieldDefinition, value: string | number) =>
+    field.field !== 'segments.hour' || (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 23);
 
 const resolveDateRange = (input: z.infer<typeof searchDateRangeInputSchema> | undefined, options: { timezone: string; now?: Date }): SearchDateRange => {
     if (input) {
@@ -267,22 +310,40 @@ const resolveDateRange = (input: z.infer<typeof searchDateRangeInputSchema> | un
     };
 };
 
-const getDefaultOrder = (performance: boolean, segmented: boolean): SearchOrder[] => {
+const getDefaultOrder = (resource: SearchResource, performance: boolean, segmented: boolean, segmentFields: readonly SearchField[]): SearchOrder[] => {
     if (performance && segmented) {
-        return [{ field: 'segments.date', direction: 'asc' }];
+        const order: SearchOrder[] = [];
+        if (segmentFields.includes('segments.date')) {
+            order.push({ field: 'segments.date', direction: 'asc' });
+        }
+        if (segmentFields.includes('segments.hour')) {
+            order.push({ field: 'segments.hour', direction: 'asc' });
+        }
+        return order;
     }
     if (performance) {
         return [{ field: 'metrics.spend', direction: 'desc' }];
     }
-    return [{ field: 'campaign.name', direction: 'asc' }];
+    return [resource === 'ad' ? { field: 'ad.id', direction: 'asc' } : { field: resource === 'campaign' ? 'campaign.name' : 'adGroup.name', direction: 'asc' }];
 };
 
-const appendCampaignTieBreaker = (orderBy: readonly SearchOrder[]): SearchOrder[] => {
-    if (orderBy.some(order => order.field === 'campaign.id')) {
-        return [...orderBy];
+const appendTieBreakers = (resource: SearchResource, orderBy: readonly SearchOrder[], segmentFields: readonly SearchField[]): SearchOrder[] => {
+    const resolved = [...orderBy];
+    for (const field of segmentFields) {
+        if (!resolved.some(order => order.field === field)) {
+            resolved.push({ field, direction: 'asc' });
+        }
     }
-    return [...orderBy, { field: 'campaign.id', direction: 'asc' }];
+    const tieBreaker = resource === 'campaign' ? 'campaign.id' : resource === 'ad_group' ? 'adGroup.id' : 'ad.id';
+    if (!resolved.some(order => order.field === tieBreaker)) {
+        resolved.push({ field: tieBreaker, direction: 'asc' });
+    }
+    return resolved;
 };
+
+const fieldsForResource = (resource: SearchResource) => SEARCH_FIELDS.filter(field => isSearchFieldCompatible(resource, field));
+
+const isSearchResource = (resource: string): resource is SearchResource => (SEARCH_RESOURCES as readonly string[]).includes(resource);
 
 const isIsoDate = (value: string) => {
     if (!ISO_DATE_REGEX.test(value)) {

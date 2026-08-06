@@ -8,11 +8,11 @@ read_when:
 
 BidBeacon exposes a deliberately small, stable field vocabulary. The catalog is shared by the MCP, CLI, and public operation layer; Amazon field names remain internal source mappings.
 
-## Campaign Search implementation status
+## Search implementation status
 
-The first shared Search slice implements `resource: campaign`. It accepts Campaign settings, the standard performance metrics, optional `metrics.cvr`, and the account-local `segments.date` field. Omitting `fields` returns the Campaign default fields plus the standard metrics; supplying `fields` replaces that set. The operation currently rejects fields owned by later Search slices, including other resources, `segments.hour`, and `segments.placement`.
+The shared Search operation implements `resource: campaign`, `resource: ad_group`, and `resource: ad`. Each resource accepts its own fields, compatible Campaign ancestry, the standard performance metrics, and the account-local segments documented below. Omitting `fields` returns the selected resource's Default fields plus the standard metrics; supplying `fields` replaces that set. Descendant fields are rejected with the compatible Field list in the validation details.
 
-Campaign performance reads the canonical daily archive at the advertised-ASIN grain (`performance_daily.entity_type = product`) and aggregates component metrics before deriving ACOS, CPC, CTR, ROAS, and CVR. Date-segmented rows are zero-filled for every Campaign and requested account-local date. Coverage comes from retained daily Product report metadata, so a completed report with zero records is complete while missing metadata remains unknown.
+Campaign, Ad-group, and Ad aggregate component metrics from the canonical advertised-ASIN archive (`entity_type = product`) before deriving ACOS, CPC, CTR, ROAS, and CVR. Aggregate and date-segmented searches use `performance_daily`; hour-segmented searches for Ad groups and Ads use `performance_hourly`. Rows are aggregated at the selected resource grain, so multiple advertised-ASIN archive rows never multiply a resource's metrics. Date- and hour-segmented rows are account-local and zero-filled for each selected resource across the requested range. Coverage comes from retained daily Product report metadata, so a completed report with zero records is complete while missing metadata remains unknown.
 
 ## Resource fields
 
@@ -60,21 +60,19 @@ ACOS, CTR, and CVR are numeric percentage points. ROAS is a numeric multiplier. 
 ## Segments
 
 - `segments.date`: account-local `YYYY-MM-DD`
-- `segments.hour`: account-local hour from `0` through `23`
+- `segments.hour`: account-local hour from `0` through `23`; available for Ad-group and Ad Search and requires `segments.date`
 - `segments.placement`: `TOP_OF_SEARCH`, `REST_OF_SEARCH`, `PRODUCT_PAGE`, or `AMAZON_BUSINESS`
 
 Selecting `segments.hour` also requires `segments.date`, preventing the same clock hour from being aggregated across multiple dates.
 
-`segments.placement` is available only for Campaign Search and may be combined with `segments.date`, but not `segments.hour`. Placement is a Campaign-level reporting and control dimension; BidBeacon does not imply Product-, Ad-, Ad-group-, or Target-grain placement attribution.
+`segments.placement` is not part of this Search slice. Placement is a Campaign-level reporting and control dimension; BidBeacon does not imply Product-, Ad-, Ad-group-, or Target-grain placement attribution.
 
 ## Compatibility
 
-- `campaign`: Campaign fields, metrics, `segments.date`, `segments.hour`, and `segments.placement`
+- `campaign`: Campaign fields, metrics, and `segments.date`
 - `ad_group`: Ad-group and Campaign ancestor fields, metrics, `segments.date`, and `segments.hour`
 - `ad`: Ad, Ad-group, and Campaign ancestor fields, metrics, `segments.date`, and `segments.hour`
-- `target`: Target, Ad-group, and Campaign ancestor fields, metrics, `segments.date`, and `segments.hour`
-- `product`: Product fields, metrics, `segments.date`, and `segments.hour`
-- `change_event`: Change event fields only
+- `target`, `product`, and `change_event`: cataloged but not implemented in this Search slice
 
 Filters and ordering may use any compatible Field even when that Field is not selected for output.
 
