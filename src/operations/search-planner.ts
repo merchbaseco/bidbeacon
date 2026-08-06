@@ -349,6 +349,12 @@ const getDefaultOrder = (resource: SearchResource, performance: boolean, segment
     if (performance) {
         return [{ field: 'metrics.spend', direction: 'desc' }];
     }
+    if (resource === 'product') {
+        return [
+            { field: 'product.title', direction: 'asc' },
+            { field: 'product.asin', direction: 'asc' },
+        ];
+    }
     return [resource === 'ad' ? { field: 'ad.id', direction: 'asc' } : { field: resource === 'campaign' ? 'campaign.name' : 'adGroup.name', direction: 'asc' }];
 };
 
@@ -359,7 +365,7 @@ const appendTieBreakers = (resource: SearchResource, orderBy: readonly SearchOrd
             resolved.push({ field, direction: 'asc' });
         }
     }
-    const tieBreaker = resource === 'campaign' ? 'campaign.id' : resource === 'ad_group' ? 'adGroup.id' : 'ad.id';
+    const tieBreaker = resource === 'campaign' ? 'campaign.id' : resource === 'ad_group' ? 'adGroup.id' : resource === 'ad' ? 'ad.id' : 'product.asin';
     if (!resolved.some(order => order.field === tieBreaker)) {
         resolved.push({ field: tieBreaker, direction: 'asc' });
     }

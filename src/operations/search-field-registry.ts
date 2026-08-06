@@ -1,4 +1,4 @@
-export const SEARCH_RESOURCES = ['campaign', 'ad_group', 'ad'] as const;
+export const SEARCH_RESOURCES = ['campaign', 'ad_group', 'ad', 'product'] as const;
 
 export type SearchResource = (typeof SEARCH_RESOURCES)[number];
 export const SEARCH_OPERATORS = ['eq', 'in', 'contains', 'gt', 'gte', 'lt', 'lte'] as const;
@@ -22,6 +22,8 @@ const AD_GROUP_RESOURCE_FIELDS = ['adGroup.id', 'adGroup.name', 'adGroup.state',
 
 const AD_RESOURCE_FIELDS = ['ad.id', 'ad.state', 'ad.deliveryStatus', 'ad.asin', 'ad.productTitle', 'ad.type'] as const;
 
+const PRODUCT_RESOURCE_FIELDS = ['product.asin', 'product.title'] as const;
+
 const PERFORMANCE_FIELDS = [
     'metrics.impressions',
     'metrics.clicks',
@@ -38,13 +40,15 @@ const PERFORMANCE_FIELDS = [
 export const CAMPAIGN_SEARCH_FIELDS = [...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.placement'] as const;
 export const AD_GROUP_SEARCH_FIELDS = [...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.hour'] as const;
 export const AD_SEARCH_FIELDS = [...AD_RESOURCE_FIELDS, ...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.hour'] as const;
+export const PRODUCT_SEARCH_FIELDS = [...PRODUCT_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.hour'] as const;
 
-export const SEARCH_FIELDS = [...AD_SEARCH_FIELDS, 'segments.placement'] as const;
+export const SEARCH_FIELDS = [...AD_SEARCH_FIELDS, ...PRODUCT_RESOURCE_FIELDS, 'segments.placement'] as const;
 
 export type SearchField = (typeof SEARCH_FIELDS)[number];
 export type CampaignSearchField = (typeof CAMPAIGN_SEARCH_FIELDS)[number];
 export type AdGroupSearchField = (typeof AD_GROUP_SEARCH_FIELDS)[number];
 export type AdSearchField = (typeof AD_SEARCH_FIELDS)[number];
+export type ProductSearchField = (typeof PRODUCT_SEARCH_FIELDS)[number];
 
 export type SearchFieldDefinition = {
     field: SearchField;
@@ -58,8 +62,11 @@ export type SearchFieldDefinition = {
 };
 
 const allResources = SEARCH_RESOURCES;
+const campaignResources = ['campaign', 'ad_group', 'ad'] as const satisfies readonly SearchResource[];
 const childResources = ['ad_group', 'ad'] as const satisfies readonly SearchResource[];
 const adResource = ['ad'] as const satisfies readonly SearchResource[];
+const productResource = ['product'] as const satisfies readonly SearchResource[];
+const productAndChildResources = ['ad_group', 'ad', 'product'] as const satisfies readonly SearchResource[];
 const stringEqualityOperators = ['eq', 'in'] as const satisfies readonly SearchOperator[];
 const nameOperators = ['eq', 'in', 'contains'] as const satisfies readonly SearchOperator[];
 const numericOperators = ['eq', 'in', 'gt', 'gte', 'lt', 'lte'] as const satisfies readonly SearchOperator[];
@@ -84,15 +91,15 @@ const definition = <TField extends SearchField>(
 });
 
 export const searchFieldRegistry: Readonly<Record<SearchField, SearchFieldDefinition>> = {
-    'campaign.id': definition('campaign.id', 'string', stringEqualityOperators, allResources, ['campaign', 'ad_group', 'ad']),
-    'campaign.name': definition('campaign.name', 'string', nameOperators, allResources, ['campaign', 'ad_group', 'ad']),
-    'campaign.state': definition('campaign.state', 'string', stringEqualityOperators, allResources, ['campaign']),
-    'campaign.deliveryStatus': definition('campaign.deliveryStatus', 'string', stringEqualityOperators, allResources, ['campaign']),
-    'campaign.dailyBudget': definition('campaign.dailyBudget', 'number', numericOperators, allResources, ['campaign']),
-    'campaign.targetingMode': definition('campaign.targetingMode', 'string', stringEqualityOperators, allResources),
-    'campaign.bidStrategy': definition('campaign.bidStrategy', 'string', stringEqualityOperators, allResources),
-    'campaign.startDate': definition('campaign.startDate', 'date', dateOperators, allResources),
-    'campaign.endDate': definition('campaign.endDate', 'date', dateOperators, allResources),
+    'campaign.id': definition('campaign.id', 'string', stringEqualityOperators, campaignResources, ['campaign', 'ad_group', 'ad']),
+    'campaign.name': definition('campaign.name', 'string', nameOperators, campaignResources, ['campaign', 'ad_group', 'ad']),
+    'campaign.state': definition('campaign.state', 'string', stringEqualityOperators, campaignResources, ['campaign']),
+    'campaign.deliveryStatus': definition('campaign.deliveryStatus', 'string', stringEqualityOperators, campaignResources, ['campaign']),
+    'campaign.dailyBudget': definition('campaign.dailyBudget', 'number', numericOperators, campaignResources, ['campaign']),
+    'campaign.targetingMode': definition('campaign.targetingMode', 'string', stringEqualityOperators, campaignResources),
+    'campaign.bidStrategy': definition('campaign.bidStrategy', 'string', stringEqualityOperators, campaignResources),
+    'campaign.startDate': definition('campaign.startDate', 'date', dateOperators, campaignResources),
+    'campaign.endDate': definition('campaign.endDate', 'date', dateOperators, campaignResources),
     'adGroup.id': definition('adGroup.id', 'string', stringEqualityOperators, childResources, ['ad_group', 'ad']),
     'adGroup.name': definition('adGroup.name', 'string', nameOperators, childResources, ['ad_group', 'ad']),
     'adGroup.state': definition('adGroup.state', 'string', stringEqualityOperators, childResources, ['ad_group']),
@@ -104,28 +111,32 @@ export const searchFieldRegistry: Readonly<Record<SearchField, SearchFieldDefini
     'ad.asin': definition('ad.asin', 'string', stringEqualityOperators, adResource, ['ad']),
     'ad.productTitle': definition('ad.productTitle', 'string', nameOperators, adResource, ['ad']),
     'ad.type': definition('ad.type', 'string', stringEqualityOperators, adResource),
-    'metrics.impressions': definition('metrics.impressions', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad'], { performance: true }),
-    'metrics.clicks': definition('metrics.clicks', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad'], { performance: true }),
-    'metrics.spend': definition('metrics.spend', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad'], { performance: true }),
-    'metrics.orders': definition('metrics.orders', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad'], { performance: true }),
-    'metrics.sales': definition('metrics.sales', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad'], { performance: true }),
-    'metrics.acos': definition('metrics.acos', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad'], { performance: true }),
-    'metrics.cpc': definition('metrics.cpc', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad'], { performance: true }),
-    'metrics.ctr': definition('metrics.ctr', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad'], { performance: true }),
-    'metrics.roas': definition('metrics.roas', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad'], { performance: true }),
+    'metrics.impressions': definition('metrics.impressions', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad', 'product'], { performance: true }),
+    'metrics.clicks': definition('metrics.clicks', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad', 'product'], { performance: true }),
+    'metrics.spend': definition('metrics.spend', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad', 'product'], { performance: true }),
+    'metrics.orders': definition('metrics.orders', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad', 'product'], { performance: true }),
+    'metrics.sales': definition('metrics.sales', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad', 'product'], { performance: true }),
+    'metrics.acos': definition('metrics.acos', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad', 'product'], { performance: true }),
+    'metrics.cpc': definition('metrics.cpc', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad', 'product'], { performance: true }),
+    'metrics.ctr': definition('metrics.ctr', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad', 'product'], { performance: true }),
+    'metrics.roas': definition('metrics.roas', 'number', numericOperators, allResources, ['campaign', 'ad_group', 'ad', 'product'], { performance: true }),
     'metrics.cvr': definition('metrics.cvr', 'number', numericOperators, allResources, [], { performance: true }),
     'segments.date': definition('segments.date', 'date', dateOperators, allResources, [], { performance: true, segment: true }),
-    'segments.hour': definition('segments.hour', 'number', numericOperators, childResources, [], { performance: true, segment: true }),
+    'segments.hour': definition('segments.hour', 'number', numericOperators, productAndChildResources, [], { performance: true, segment: true }),
     'segments.placement': definition('segments.placement', 'string', stringEqualityOperators, ['campaign'], [], { performance: true, segment: true }),
+    'product.asin': definition('product.asin', 'string', stringEqualityOperators, productResource, ['product']),
+    'product.title': definition('product.title', 'string', nameOperators, productResource, ['product']),
 };
 
 export const CAMPAIGN_DEFAULT_FIELDS = CAMPAIGN_SEARCH_FIELDS.filter(field => searchFieldRegistry[field].defaultResources.includes('campaign')) as CampaignSearchField[];
 export const AD_GROUP_DEFAULT_FIELDS = AD_GROUP_SEARCH_FIELDS.filter(field => searchFieldRegistry[field].defaultResources.includes('ad_group')) as AdGroupSearchField[];
 export const AD_DEFAULT_FIELDS = AD_SEARCH_FIELDS.filter(field => searchFieldRegistry[field].defaultResources.includes('ad')) as AdSearchField[];
+export const PRODUCT_DEFAULT_FIELDS = PRODUCT_SEARCH_FIELDS.filter(field => searchFieldRegistry[field].defaultResources.includes('product')) as ProductSearchField[];
 
 export const getSearchField = (field: string) => (Object.hasOwn(searchFieldRegistry, field) ? searchFieldRegistry[field as SearchField] : undefined);
 
-export const getSearchDefaultFields = (resource: SearchResource) => (resource === 'campaign' ? CAMPAIGN_DEFAULT_FIELDS : resource === 'ad_group' ? AD_GROUP_DEFAULT_FIELDS : AD_DEFAULT_FIELDS);
+export const getSearchDefaultFields = (resource: SearchResource) =>
+    resource === 'campaign' ? CAMPAIGN_DEFAULT_FIELDS : resource === 'ad_group' ? AD_GROUP_DEFAULT_FIELDS : resource === 'ad' ? AD_DEFAULT_FIELDS : PRODUCT_DEFAULT_FIELDS;
 
 export const isSearchFieldCompatible = (resource: SearchResource, field: string) => getSearchField(field)?.compatibleResources.includes(resource) ?? false;
 
