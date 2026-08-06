@@ -160,11 +160,14 @@ Search matches:
 - `NOT_FOUND` when entity is missing for the account.
 - `BAD_REQUEST` for invalid bid updates (non-SP, negative target, campaign-level target).
 
-## Shared Campaign mutation operations
+## Shared operation-layer mutations
 
-The accepted public Campaign write contract lives in the shared operation layer under
-`src/operations/`. The legacy routers above remain dashboard-facing during migration and do not
-define the public mutation vocabulary.
+The accepted public write contract lives in the shared operation layer under `src/operations/`.
+The legacy routers above remain dashboard-facing during migration and do not define the public
+mutation vocabulary. Every operation requires the opaque BidBeacon Advertiser Account UUID,
+proves account-owned ancestry before the Amazon call, waits for the production gateway response,
+returns a canonical resource, reconciles the archive, and records immediate `bidbeacon` Change
+events.
 
 ### `create_campaign`
 
@@ -196,3 +199,29 @@ Amazon rejection, exhausted unavailability, invalid input, missing Campaigns, an
 UUIDs are translated to the stable shared operation error codes rather than leaking transport
 exceptions. Amazon account/profile identifiers, transport bid-strategy enums, and raw credentials
 are never accepted as public routing or control vocabulary.
+
+### `create_ad_group`
+
+`create_ad_group` requires `accountId`, an account-owned `campaignId`, `name`, `ENABLED` or
+`PAUSED` `state`, and `defaultBid`. It maps to the Sponsored Products Ad group create payload
+with `bid.defaultBid` and returns the canonical Ad group.
+
+### `update_ad_group`
+
+`update_ad_group` requires an account-owned `adGroupId` and a non-empty `changes` object limited to
+absolute `state`, `defaultBid` values. `ARCHIVED` is accepted for an existing Ad group. The
+operation writes `state_change` and `bid_change` events for controls present in the patch when the
+accepted value differs from the archive.
+
+### `create_ad`
+
+`create_ad` requires `accountId`, an account-owned `adGroupId`, a 10-character alphanumeric ASIN,
+and `ENABLED` or `PAUSED` `state`. It maps the ASIN into the Sponsored Products product-ad
+creative and returns the canonical Ad.
+
+### `update_ad`
+
+`update_ad` requires an account-owned `adId` and a non-empty `changes` object limited to `state`.
+`ARCHIVED` is accepted for an existing Ad. Successful updates reconcile the Ad archive and write
+an immediate `state_change` event. Amazon rejection, exhausted unavailability, invalid input,
+missing ancestry, and denied Account UUIDs use the stable shared operation error codes.

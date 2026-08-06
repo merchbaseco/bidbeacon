@@ -28,4 +28,13 @@ immediate Change events, stable Amazon errors, and cross-account isolation. Camp
 builders live in `src/operations/testing/campaign-mutation-fixtures.ts`; do not add Campaign
 mutation data to the shared fixture module.
 
+Ad-group and Ad mutation acceptance lives at the same seam in
+`src/operations/ad-mutations.test.ts`. It asserts all four primitive operations, exact gateway
+payloads, ASIN and state validation, terminal archive enforcement, Sponsored Products and
+account-owned Campaign/Ad-group ancestry before Amazon, canonical response mappings, archive
+reconciliation, immediate Change events, stable Amazon errors, and cross-account isolation.
+Ad-mutation builders live in
+`src/operations/testing/ad-mutation-fixtures.ts`; keep them separate from Campaign fixtures and
+do not use an alternate repository or local Postgres service.
+
 Auth tests must not use production credentials or database writes. Use the shared package's fake Clerk client/projection store patterns and assert that legacy `bbk_`, `BB_API_KEY`, query-string WebSocket credentials, and product-local API-key routes remain absent.

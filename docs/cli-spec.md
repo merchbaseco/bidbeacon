@@ -6,7 +6,9 @@ read_when:
 
 # BidBeacon MCP and CLI specification
 
-**Status:** Accepted design; account discovery and UUID authorization plus the Campaign Search operation are implemented in the shared operation layer; the remaining Search resources and operation adapters are pending.
+**Status:** Accepted design; account discovery and UUID authorization plus Campaign, Ad group, and
+Ad mutation slices and the Campaign Search operation are implemented in the shared operation layer;
+the remaining Search resources, Target mutations, and operation adapters are pending.
 
 This specification defines one public operation layer projected through:
 
