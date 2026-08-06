@@ -5,9 +5,18 @@ import type { operationSchema } from './operation-schema';
 
 export type OperationDatabase = PgDatabase<PgQueryResultHKT, typeof operationSchema>;
 
+export type OperationCredentialKind = 'api_key' | 'oauth' | 'session';
+
+export type OperationPrincipal = {
+    accessibleAccountIds: readonly string[];
+    credentialKind: OperationCredentialKind;
+    merchbaseUserId: string;
+};
+
 export type OperationContext = {
     amazonAds: AmazonAdsGateway;
     db: OperationDatabase;
+    principal?: OperationPrincipal;
 };
 
-export const createOperationContext = ({ amazonAds, db }: OperationContext): OperationContext => ({ amazonAds, db });
+export const createOperationContext = ({ amazonAds, db, principal }: OperationContext): OperationContext => ({ amazonAds, db, principal });

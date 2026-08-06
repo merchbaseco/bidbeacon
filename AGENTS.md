@@ -47,28 +47,25 @@ Uses the shared `@merchbaseco/access` package for Clerk web sessions, suite API 
 ```
 Merchbase User (merchbase_user_id)
     └── user_account_access (M:N join table)
-            └── Advertiser Account (ads_account_id)
+            └── Advertiser Account (advertiser_account_id; ads_account_id is a legacy bridge)
                     └── All data (campaigns, reports, metrics, etc.)
 ```
 
 **Key files:**
 - `src/services/access/bidbeacon-access.ts` - Fixed `bidbeacon` shared-access adapters and stable-user membership resolver
 - `src/services/access/access-projection-store.ts` - Verified, idempotent, monotonic Clerk projection persistence
-- `src/api/context.ts` - Normalizes shared credentials and loads `accessibleAccountIds` into context
-- `src/api/trpc.ts` - `apiProcedure` provides `assertAccountAccess(accountId)` helper
+- `src/api/context.ts` - Normalizes shared credentials, exposes canonical Advertiser Account UUIDs, and retains legacy Amazon IDs for the old adapters
+- `src/operations/advertiser-accounts.ts` - Canonical Advertiser Account UUID discovery and authorization
+- `src/api/trpc.ts` - Legacy tRPC adapters use the Amazon-ID `assertAccountAccess(accountId)` bridge through PRD-185
 - `src/db/schema.ts` - Stable-user memberships and Access Projection/event tables
 - `src/api/access/clerk-webhook-route.ts` - Signed Clerk projection webhook
 
-**Access control pattern:**
+**Shared operation access-control pattern:**
 ```typescript
-// In any router that takes accountId
-.query(async ({ ctx, input }) => {
-    ctx.assertAccountAccess(input.accountId);  // Throws FORBIDDEN if no access
-    // ... rest of query
-})
+const account = await resolveAdvertiserAccount(context, { accountId: input.accountId });
 ```
 
-**New accounts:** When `accounts.sync` discovers new accounts from Amazon Ads API, they're automatically linked to the authenticated stable Merchbase User. Centralized account membership remains the source of truth for future cutover work.
+`ctx.assertAccountAccess` and `Context.accessibleAccountIds` remain Amazon-ID compatibility APIs only; do not use them in shared operations. `accounts.sync` propagates a new marketplace-specific row to every stable user who owns the legacy Amazon account plus the authenticated user. `user_account_access.ads_account_id` remains only through the PRD-185 adapter cutover; shared operations authorize with the opaque Advertiser Account UUID and never consult dashboard selection.
 
 ### API Keys & CLI
 
@@ -77,7 +74,7 @@ Suite API keys are managed by Merchbase Account Center, use the shared `ak_...` 
 - `packages/bidbeacon-cli/src/auth.ts` - `MERCHBASE_API_KEY` and shared Keychain convention
 - `packages/bidbeacon-cli/src/index.ts` - CLI entrypoint for the globally installed `bb` binary (`@bidbeacon/cli`)
 
-**CLI defaults:** If no `--account` is provided, `bb` uses the dashboard-selected account from `api.users.getSelectedAccount`, then falls back to the first accessible account.
+**Legacy CLI defaults:** The existing dashboard/API bridge still uses `api.users.getSelectedAccount` when no `--account` is provided. The shared operation layer has no selection fallback: `list_advertiser_accounts` is the only unscoped operation, and every other operation requires an explicit Advertiser Account UUID.
 
 ### Procedures & Routers
 

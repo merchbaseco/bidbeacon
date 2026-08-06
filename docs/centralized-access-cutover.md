@@ -16,6 +16,14 @@ operator approval and a named database owner.
 
 The target state has one authentication contract: the shared `@merchbaseco/access` package with fixed service `bidbeacon`. BidBeacon accepts Clerk web sessions, suite `ak_...` API keys, and the shared OAuth credential path. Authorization resolves a stable `mbu_...` Merchbase User through the product-local `user_account_access` projection. The old `bbk_` issuer/verifier, header, routes, UI, environment variable, and tables do not exist after cutover.
 
+## Advertiser Account UUID projection
+
+The PRD-173 access projection makes `user_account_access.advertiser_account_id` the canonical membership target. Migration `0055_expand_advertiser_account_access` expands each legacy `ads_account_id` membership to every matching marketplace-specific row in `advertiser_account`, then migration `0056_flat_tarantula` makes the UUID non-null. This preserves access across profiles without granting unrelated Amazon accounts; an orphaned legacy membership fails closed.
+
+`user_account_access.ads_account_id` remains a temporary bridge for legacy dashboard and adapter code through the PRD-185 public-contract cutover. Shared operation principals expose Advertiser Account UUIDs for authorization and retain Amazon IDs only for that bridge. Account sync propagates newly discovered marketplace profiles to every stable user already linked through that Amazon ID plus the syncing user. The operation layer never reads `user_preferences`: dashboard account selection remains a UI preference, not an authorization input.
+
+The counts and exact retained membership row IDs in the historical procedure below describe the August 3 centralized-access cleanup before this follow-on projection expansion. Do not use those historical counts as the PRD-173 post-migration inventory; verify the UUID memberships produced by the expansion instead.
+
 This cutover uses one explicit cleanup, not identity relinking: the deleted Clerk subject has exactly three duplicate membership rows, while the retained subject has the four effective memberships, one preference, the one legacy key, and all four former key scopes. Do not add a second stable-user mapping, infer identity from email, merge workspaces, or invent an account hierarchy.
 
 ## Approval gates

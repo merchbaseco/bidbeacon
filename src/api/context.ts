@@ -12,6 +12,7 @@ export type CredentialKind = 'api_key' | 'oauth' | 'session';
 export type Context = {
     accessError: 'access_denied' | 'access_unavailable' | null;
     accessibleAccountIds: string[];
+    accessibleAdvertiserAccountIds: string[];
     authType: AuthType;
     credentialKind: CredentialKind | null;
     request: unknown;
@@ -32,7 +33,8 @@ export const createContext = async ({ req }: CreateFastifyContextOptions): Promi
 
         return {
             accessError: null,
-            accessibleAccountIds: resolved.principal.accessibleAccountIds,
+            accessibleAccountIds: resolved.principal.legacyAdsAccountIds,
+            accessibleAdvertiserAccountIds: resolved.principal.accessibleAccountIds,
             authType: 'access',
             credentialKind: resolved.credentialKind,
             request: req as unknown,
@@ -53,6 +55,7 @@ export const createContext = async ({ req }: CreateFastifyContextOptions): Promi
 const createUnauthenticatedContext = (request: unknown): Context => ({
     accessError: null,
     accessibleAccountIds: [],
+    accessibleAdvertiserAccountIds: [],
     authType: 'none',
     credentialKind: null,
     request,

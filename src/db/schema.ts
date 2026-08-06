@@ -810,10 +810,18 @@ export const userAccountAccess = pgTable(
     {
         id: uuid('id').defaultRandom().primaryKey(),
         merchbaseUserId: text('merchbase_user_id').notNull(),
+        // PRD-185 compatibility bridge for the legacy dashboard and adapters.
         adsAccountId: text('ads_account_id').notNull(),
+        advertiserAccountId: uuid('advertiser_account_id')
+            .notNull()
+            .references(() => advertiserAccount.id, { onDelete: 'cascade' }),
         createdAt: timestamp('created_at').notNull().defaultNow(),
     },
-    table => [uniqueIndex('user_account_access_user_account_idx').on(table.merchbaseUserId, table.adsAccountId), index('user_account_access_user_idx').on(table.merchbaseUserId)]
+    table => [
+        uniqueIndex('user_account_access_user_account_idx').on(table.merchbaseUserId, table.advertiserAccountId),
+        index('user_account_access_user_idx').on(table.merchbaseUserId),
+        index('user_account_access_ads_account_idx').on(table.adsAccountId),
+    ]
 );
 
 /**

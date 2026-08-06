@@ -1,4 +1,5 @@
-import { ad, adGroup, advertiserAccount, campaign, entityChangeHistory, performanceDaily, performanceHourly, reportDatasetMetadata, target, userAccountAccess } from '@/db/schema';
+import { z } from 'zod';
+import { ad, adGroup, advertiserAccount, campaign, entityChangeHistory, performanceDaily, performanceHourly, reportDatasetMetadata, target, userAccountAccess, userPreferences } from '@/db/schema';
 
 export const operationSchema = {
     ad,
@@ -11,4 +12,22 @@ export const operationSchema = {
     reportDatasetMetadata,
     target,
     userAccountAccess,
+    userPreferences,
 };
+
+export const accountIdSchema = z.string().uuid();
+export const accountScopedInputSchema = z.object({ accountId: accountIdSchema }).strict();
+export const listAdvertiserAccountsInputSchema = z.object({}).strict();
+
+export const advertiserAccountOutputSchema = z.object({
+    amazonAdsAccountId: z.string(),
+    countryCode: z.string(),
+    currency: z.string(),
+    id: accountIdSchema,
+    marketplaceId: z.string(),
+    name: z.string(),
+    profileId: z.string().nullable(),
+    timezone: z.string(),
+});
+
+export const listAdvertiserAccountsOutputSchema = z.object({ accounts: z.array(advertiserAccountOutputSchema) });

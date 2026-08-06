@@ -1,8 +1,9 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { advertiserAccount, userAccountAccess } from '@/db/schema';
+import { advertiserAccount } from '@/db/schema';
 import { syncAdEntitiesForAccountJob } from '@/jobs/sync-ad-entities-for-account';
+import { expandAdvertiserAccountMemberships } from '@/services/access/advertiser-account-memberships';
 import { privateProcedure, router } from '../trpc';
 
 export const accountsRouter = router({
@@ -54,33 +55,47 @@ export const accountsRouter = router({
                     continue;
                 }
 
-                const existingAccount = await db
-                    .select()
+                const [existingAccount] = await db
+                    .select({ id: advertiserAccount.id })
                     .from(advertiserAccount)
                     .where(and(eq(advertiserAccount.adsAccountId, account.adsAccountId), eq(advertiserAccount.profileId, profileId.toString())))
                     .limit(1);
 
-                if (existingAccount.length > 0) {
+                let advertiserAccountId = existingAccount?.id;
+                if (!advertiserAccountId) {
+                    const [createdAccount] = await db
+                        .insert(advertiserAccount)
+                        .values({
+                            adsAccountId: account.adsAccountId,
+                            accountName: account.accountName,
+                            status: account.status,
+                            countryCode,
+                            profileId: profileId.toString(),
+                            entityId,
+                        })
+                        .onConflictDoNothing()
+                        .returning({ id: advertiserAccount.id });
+                    advertiserAccountId = createdAccount?.id;
+                }
+
+                if (!advertiserAccountId) {
+                    const [concurrentAccount] = await db
+                        .select({ id: advertiserAccount.id })
+                        .from(advertiserAccount)
+                        .where(and(eq(advertiserAccount.adsAccountId, account.adsAccountId), eq(advertiserAccount.profileId, profileId.toString())))
+                        .limit(1);
+                    advertiserAccountId = concurrentAccount?.id;
+                }
+
+                if (!advertiserAccountId) {
                     continue;
                 }
 
-                await db.insert(advertiserAccount).values({
+                await expandAdvertiserAccountMemberships(db, {
+                    actorMerchbaseUserId: ctx.user.merchbaseUserId,
+                    advertiserAccountId,
                     adsAccountId: account.adsAccountId,
-                    accountName: account.accountName,
-                    status: account.status,
-                    countryCode,
-                    profileId: profileId.toString(),
-                    entityId,
                 });
-
-                // Auto-link the new account to the current user
-                await db
-                    .insert(userAccountAccess)
-                    .values({
-                        merchbaseUserId: ctx.user.merchbaseUserId,
-                        adsAccountId: account.adsAccountId,
-                    })
-                    .onConflictDoNothing();
             }
         }
 

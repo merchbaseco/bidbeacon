@@ -27,6 +27,7 @@ export const buildAdvertiserAccount = (overrides: Partial<AdvertiserAccountInser
 export const buildUserAccountAccess = (overrides: Partial<UserAccountAccessInsert> = {}): UserAccountAccessInsert => ({
     merchbaseUserId: 'user-1',
     adsAccountId: 'ads-account-1',
+    advertiserAccountId: '00000000-0000-4000-8000-000000000001',
     ...overrides,
 });
 

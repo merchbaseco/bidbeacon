@@ -7,6 +7,7 @@ import { createAccessProjectionStore } from './access-projection-store';
 
 export interface BidBeaconPrincipal {
     accessibleAccountIds: string[];
+    legacyAdsAccountIds: string[];
     merchbaseUserId: string;
 }
 
@@ -95,10 +96,18 @@ export const resolveBidBeaconPrincipal = async (database: Database, merchbaseUse
     }
 
     try {
-        const rows = await database.select({ adsAccountId: userAccountAccess.adsAccountId }).from(userAccountAccess).where(eq(userAccountAccess.merchbaseUserId, merchbaseUserId));
+        const rows = await database
+            .select({ advertiserAccountId: userAccountAccess.advertiserAccountId, adsAccountId: userAccountAccess.adsAccountId })
+            .from(userAccountAccess)
+            .where(eq(userAccountAccess.merchbaseUserId, merchbaseUserId));
+
+        if (rows.some(row => !row.advertiserAccountId)) {
+            throw new ServiceAccessError('access_unavailable');
+        }
 
         return {
-            accessibleAccountIds: [...new Set(rows.map(row => row.adsAccountId))],
+            accessibleAccountIds: [...new Set(rows.map(row => row.advertiserAccountId))],
+            legacyAdsAccountIds: [...new Set(rows.map(row => row.adsAccountId))],
             merchbaseUserId,
         };
     } catch {

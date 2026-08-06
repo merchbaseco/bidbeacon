@@ -6,7 +6,7 @@ read_when:
 
 # BidBeacon MCP and CLI specification
 
-**Status:** Accepted design; implementation pending.
+**Status:** Accepted design; account discovery and UUID authorization are implemented in the shared operation layer; the remaining operation adapters are pending.
 
 This specification defines one public operation layer projected through:
 
@@ -124,6 +124,8 @@ Output:
 ```
 
 The descriptive Amazon identifiers never substitute for `id` in another operation.
+
+Discovery resolves the caller's shared-access principal to marketplace-specific Advertiser Account UUID memberships. It does not read `user_preferences` or infer an account from dashboard selection. Every account-scoped operation validates an explicit UUID and authorizes that UUID against the same principal; Amazon account IDs, profile IDs, and marketplace IDs are descriptive metadata only.
 
 ## Search
 

@@ -22,6 +22,7 @@ const authTestRouter = router({
         accountIds: ctx.accessibleAccountIds,
     })),
     apiViewer: apiProcedure.query(({ ctx }) => ({
+        advertiserAccountIds: ctx.accessibleAdvertiserAccountIds,
         credentialKind: ctx.credentialKind,
         userId: ctx.user.merchbaseUserId,
         accountIds: ctx.accessibleAccountIds,
@@ -41,7 +42,8 @@ describe('HTTP authentication', () => {
                 credentialKind: credential.startsWith('ak_') ? 'api_key' : credential.startsWith('oat_') ? 'oauth' : 'session',
                 merchbaseUserId: 'mbu_one',
                 principal: {
-                    accessibleAccountIds: ['account-1', 'account-2'],
+                    accessibleAccountIds: ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002'],
+                    legacyAdsAccountIds: ['account-1', 'account-2'],
                     merchbaseUserId: 'mbu_one',
                 },
             };
@@ -100,6 +102,19 @@ describe('HTTP authentication', () => {
 
         expect(response.statusCode).toBe(200);
         expect(response.json().result.data.credentialKind).toBe(credentialKind);
+    });
+
+    it('keeps canonical Advertiser Account UUIDs separate from legacy adapter IDs', async () => {
+        const response = await app.inject({
+            method: 'GET',
+            url: '/api/apiViewer',
+            headers: { authorization: 'Bearer ak_suite-key' },
+        });
+
+        expect(response.json().result.data).toMatchObject({
+            accountIds: ['account-1', 'account-2'],
+            advertiserAccountIds: ['00000000-0000-4000-8000-000000000001', '00000000-0000-4000-8000-000000000002'],
+        });
     });
 
     it('does not accept the retired API-key header or local key prefix', async () => {

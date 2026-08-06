@@ -1,5 +1,5 @@
 import { db } from '@/db';
-import { createOperationContext } from './operation-context';
+import { createOperationContext, type OperationPrincipal } from './operation-context';
 import { productionAmazonAdsGateway } from './production-amazon-ads-gateway';
 
-export const createProductionOperationContext = () => createOperationContext({ amazonAds: productionAmazonAdsGateway, db });
+export const createProductionOperationContext = (principal?: OperationPrincipal) => createOperationContext({ amazonAds: productionAmazonAdsGateway, db, principal });

@@ -1,0 +1,1 @@
+ALTER TABLE "user_account_access" ALTER COLUMN "advertiser_account_id" SET NOT NULL;

@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { advertiserAccount, userAccountAccess, userPreferences } from '@/db/schema';
@@ -14,27 +14,36 @@ export const usersRouter = router({
 
     linkAccount: privateProcedure.input(z.object({ adsAccountId: z.string() })).mutation(async ({ ctx, input }) => {
         // Verify the account exists
-        const account = await db.query.advertiserAccount.findFirst({
+        const accounts = await db.query.advertiserAccount.findMany({
             where: eq(advertiserAccount.adsAccountId, input.adsAccountId),
         });
 
-        if (!account) {
+        if (accounts.length === 0) {
             throw new Error('Account not found');
         }
 
         await db
             .insert(userAccountAccess)
-            .values({
-                merchbaseUserId: ctx.user.merchbaseUserId,
-                adsAccountId: input.adsAccountId,
-            })
+            .values(accounts.map(account => ({ advertiserAccountId: account.id, merchbaseUserId: ctx.user.merchbaseUserId, adsAccountId: account.adsAccountId })))
             .onConflictDoNothing();
 
         return true;
     }),
 
     unlinkAccount: privateProcedure.input(z.object({ adsAccountId: z.string() })).mutation(async ({ ctx, input }) => {
-        await db.delete(userAccountAccess).where(and(eq(userAccountAccess.merchbaseUserId, ctx.user.merchbaseUserId), eq(userAccountAccess.adsAccountId, input.adsAccountId)));
+        const accounts = await db.select({ id: advertiserAccount.id }).from(advertiserAccount).where(eq(advertiserAccount.adsAccountId, input.adsAccountId));
+
+        if (accounts.length > 0) {
+            await db.delete(userAccountAccess).where(
+                and(
+                    eq(userAccountAccess.merchbaseUserId, ctx.user.merchbaseUserId),
+                    inArray(
+                        userAccountAccess.advertiserAccountId,
+                        accounts.map(account => account.id)
+                    )
+                )
+            );
+        }
 
         return true;
     }),
