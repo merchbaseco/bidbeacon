@@ -18,6 +18,20 @@
 - If `packages/bidbeacon-api-client/package.json` version changes, update `CHANGELOG.md` in the same PR.
 - `CHANGELOG.md` release versions track BidBeacon app releases; API client package versions are independent and tracked in `packages/bidbeacon-api-client/package.json`.
 
+## Agent skills
+
+### Issue tracker
+
+Specs and implementation issues are tracked in Linear under the Products team (`PRD`). BidBeacon work carries the `BidBeacon` label. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The Products team uses the canonical five-label triage vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+BidBeacon uses a single domain context at `CONTEXT.md`, with decisions under `docs/adr/`. See `docs/agents/domain.md`.
+
 ## Architecture
 
 Two services, same Docker image, separate containers:

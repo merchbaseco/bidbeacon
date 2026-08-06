@@ -1,4 +1,12 @@
+---
+summary: Documents the typed npm client and its migration to the shared MCP and CLI operation contract.
+read_when:
+  - changing the public operation router, generated client types, package version, or publishing workflow
+---
+
 # API Client Spec (Typed npm)
+
+> The accepted public operation surface is [cli-spec.md](cli-spec.md). The procedure examples below describe the currently published pre-migration package until the shared operation layer replaces them.
 
 This spec defines the public npm client package that exposes typed access to the BidBeacon API without duplicating the CLI or server logic.
 
@@ -59,7 +67,7 @@ Entity detail endpoints return current state; change history is fetched via `his
 - `CliRouterInputs` and `CliRouterOutputs` are exported for type-safe integration.
 - These types are generated from the server router and bundled into the package.
 - For shape-sensitive endpoints (for example `asins/get`), use `CliRouterOutputs[...]` directly instead of hardcoding local interfaces.
-- Metrics naming: conversion count is exposed as `purchases`.
+- The currently published package exposes conversion count as `purchases`; the accepted contract replaces it with `orders`.
 
 ## Build + Publish
 

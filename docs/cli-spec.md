@@ -1,377 +1,981 @@
-# BidBeacon CLI Spec
+---
+summary: Defines BidBeacon's shared stateless MCP and CLI contract for advertising search, performance, and control.
+read_when:
+  - changing MCP tools, CLI commands, public advertising schemas, Search defaults, campaign writes, or agent guidance
+---
 
-**Scope:** Sponsored Products use cases only for now.
+# BidBeacon MCP and CLI specification
 
-This spec defines the public, user-facing shape of the Sponsored Products (SP) CLI. It describes how the CLI looks and behaves from a product perspective.
+**Status:** Accepted design; implementation pending.
 
-**Principles**
-- Non-secret defaults in config, secrets in the platform secure store. Data commands do not prompt; `auth set` may prompt for local setup.
-- Resource-first, verb-second command shape.
-- JSON-only output.
-- One CLI command maps to one user capability (some commands compose multiple API calls).
-- Flat command structure. Filters provide drill-down.
-- Release notes must be available from the installed CLI package so agents can inspect what changed without needing repo access.
+This specification defines one public operation layer projected through:
 
-**ASIN-Centric Command Model (Pre-Beta Direction)**
-- ASIN workflows are first-class because optimization is frequently done per ASIN.
-- The CLI must support one-hop ASIN check-ins without forcing users to manually chain multiple commands.
-- Command responsibilities are explicit:
-  - `bb asins tree <ASIN>` (topology): resolve connected entities (campaigns, ad groups, targets, ads) with minimal structural fields.
-  - `bb asins overview <ASIN>` (operator check-in): ASIN performance summary derived from matched ad metrics, with optional hierarchical rollups.
-  - `bb metrics ... --asin <ASIN>` (analysis workbench): full metrics querying (filters, sort, pagination, entity pivots, series/table).
-- `--asin` in metrics commands performs internal ASIN->entity resolution so users keep one-hop ergonomics while command boundaries stay clean.
-- Pre-beta policy applies: prefer clean command boundaries over compatibility shims.
+- the BidBeacon MCP;
+- the `bb` CLI;
+- the typed HTTP client.
 
-**HTTP Path Shape (tRPC)**
-- CLI command segments map to slash-style tRPC procedure paths.
-- Pattern: `/api/<resource>/<verb>` (and deeper segments when needed).
-- Examples:
-  - `bb campaigns list` -> `GET /api/campaigns/list`
-  - `bb campaigns create ...` -> `POST /api/campaigns/create`
-  - `bb targets create keyword ...` -> `POST /api/targets/create/keyword`
-  - `bb metrics series campaigns ...` -> `GET /api/metrics/series/campaigns`
-- Transport URL note:
-  - Slash-style procedure names are percent-encoded in the request path (for example `/api/campaigns%2Fget`).
-- Transport remains tRPC semantics:
-  - query procedures use `GET` with URL-encoded `input`
-  - mutation procedures use `POST` with JSON body
+The surfaces share operation names, input schemas, outputs, defaults, and errors. Transport adapters contain no advertising business logic.
 
-**Response Envelope**
+Sponsored Products is the only writable ad product in this version.
+
+## Contract principles
+
+- Every account-scoped call requires an explicit BidBeacon Advertiser account ID.
+- The MCP and advertising operations are stateless. The CLI does not infer an account from dashboard state or local configuration.
+- `search` is the sole read operation for advertising resources, performance, and change history.
+- Public schemas use a small BidBeacon-owned vocabulary rather than Amazon report or API records.
+- Ordinary campaign construction uses one synchronous composite operation. Primitive creation operations remain available for bespoke topology and recovery.
+- Mutations use absolute desired values. There are no relative bid changes or dedicated pause, resume, and delete operations.
+- All successful output is structured JSON. Tool execution errors are model-visible structured errors.
+
+## Public operation inventory
+
+| MCP tool | CLI command | Purpose |
+| --- | --- | --- |
+| `list_advertiser_accounts` | `bb advertiser-accounts list` | Discover accessible Account IDs and account metadata |
+| `search` | `bb search <resource>` | Read current settings, performance, products, or change history |
+| `create_sponsored_products_campaign` | `bb create sponsored-products-campaign` | Create one complete ordinary Sponsored Products campaign |
+| `create_campaign` | `bb create campaign` | Create a campaign without children |
+| `create_ad_group` | `bb create ad-group` | Add an ad group to an existing campaign |
+| `create_ad` | `bb create ad` | Add an advertised ASIN to an ad group |
+| `create_keyword_target` | `bb create keyword-target` | Add a positive keyword target |
+| `create_product_target` | `bb create product-target` | Add a positive ASIN target |
+| `create_negative_keyword` | `bb create negative-keyword` | Add an ad-group negative keyword |
+| `create_negative_product_target` | `bb create negative-product-target` | Add an ad-group negative ASIN |
+| `update_campaign` | `bb update campaign` | Patch campaign state and supported controls |
+| `update_ad_group` | `bb update ad-group` | Patch ad-group state or default bid |
+| `update_ad` | `bb update ad` | Patch ad state |
+| `update_target` | `bb update target` | Patch target state or bid |
+
+The tool set does not include aliases for the replaced list, get, metrics, history, tree, overview, pause, resume, archive, delete, set-budget, or set-bid commands.
+
+## Shared conventions
+
+### Identifiers
+
+`accountId` is BidBeacon's opaque identifier for one marketplace-specific Advertiser account. Amazon account, profile, marketplace, campaign, ad-group, ad, and target identifiers are strings. Callers must not parse or numerically coerce them.
+
+`list_advertiser_accounts` is the only operation that does not require `accountId`.
+
+### Dates and timezones
+
+Date inputs are inclusive account-local dates in `YYYY-MM-DD` format:
+
 ```json
-{"ok": true, "data": {}}
+{
+  "startDate": "2026-07-01",
+  "endDate": "2026-07-07"
+}
 ```
+
+The response identifies the account timezone and the resolved range. Hour segments are also account-local. See [timezones.md](timezones.md).
+
+### Money, bids, and percentages
+
+- Money and bids are JSON numbers in the Advertiser account's currency.
+- `metrics.acos`, `metrics.ctr`, and `metrics.cvr` are percentage points: `24.45` means 24.45%.
+- `metrics.roas` is a multiplier: `4.09` means 4.09x.
+- Placement bid adjustments are percentage-point increases: `50` means a 50% increase.
+- Outputs do not contain formatted currency or percentage strings.
+
+### Resource state
+
+Creation accepts:
+
+```text
+ENABLED | PAUSED
+```
+
+Updates accept:
+
+```text
+ENABLED | PAUSED | ARCHIVED
+```
+
+`ARCHIVED` is terminal and applies only to an existing resource. Amazon delivery diagnostics are exposed separately as `deliveryStatus`; callers do not write that field.
+
+## Account discovery
+
+### `list_advertiser_accounts`
+
+Input:
+
 ```json
-{"ok": false, "error": {"code": "MISSING_CONFIG", "message": "config.account is required", "details": {}}}
+{}
 ```
 
-**Auth**
-Secrets are stored outside the config file.
-- `bb auth set`
-- `bb auth set --stdin`
-- `bb auth status`
-- `bb auth clear`
+Output:
 
-Auth behavior:
-- On macOS, `bb auth set` stores the API key in Keychain.
-- `MERCHBASE_API_KEY` overrides the secure-store value and is intended for automation, CI, and agent runtimes.
-- macOS Keychain uses service `co.merchbase.cli` and account `api-key`.
-- Auth commands never print the raw API key.
+```json
+{
+  "accounts": [
+    {
+      "id": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+      "name": "Zach US",
+      "countryCode": "US",
+      "marketplaceId": "ATVPDKIKX0DER",
+      "timezone": "America/Los_Angeles",
+      "currency": "USD",
+      "amazonAdsAccountId": "A...",
+      "profileId": "123..."
+    }
+  ]
+}
+```
 
-**Config**
-Config is stored locally at `~/.bidbeacon/config.json`.
-- `bb config show`
-- `bb config get <key>`
-- `bb config set base-url <value>` (`<value>` should be the server origin, for example `https://bidbeacon.merchbase.co`; a trailing `/api` is accepted and normalized)
-- `bb config set account <adsAccountId> <countryCode>`
-- `bb config set storage-dir <path>`
-- `bb config unset <key>`
-- `bb config reset`
+The descriptive Amazon identifiers never substitute for `id` in another operation.
 
-**Common Concepts**
-- States: `ENABLED`, `PAUSED`, `ARCHIVED`, `OTHER`, `ALL`
-- Metrics keys: `impressions`, `clicks`, `spend`, `purchases`, `sales`, `acos`, `cpc`, `ctr`, `roas`
-- Pagination: `--limit <n>` and `--offset <n>` (list + history + metrics table)
-- Sorting: `--sort <field>` and `--direction <asc|desc>`
+## Search
 
-**List Filters**
-List commands accept `--state` or `--all`.
-- Default is `ENABLED` when omitted.
-- `--all` is shorthand for `--state ALL`.
-- List commands return up to 20 items per request by default (override with `--limit`/`--offset`).
+### Input
 
-**Hierarchy Filters**
-Drill down by passing parent IDs as flags.
-- `bb ad-groups list --campaign <campaign_id>`
-- `bb ads list --campaign <campaign_id>`
-- `bb ads list --ad-group <ad_group_id>`
-- `bb targets list --campaign <campaign_id>`
-- `bb targets list --ad-group <ad_group_id>`
-- `bb targets list --negative <true|false>`
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "resource": "campaign",
+  "fields": [
+    "campaign.id",
+    "campaign.name",
+    "metrics.spend",
+    "metrics.orders"
+  ],
+  "filters": [
+    {
+      "field": "campaign.state",
+      "operator": "in",
+      "value": ["ENABLED", "PAUSED"]
+    },
+    {
+      "field": "metrics.spend",
+      "operator": "gte",
+      "value": 25
+    }
+  ],
+  "dateRange": {
+    "startDate": "2026-07-01",
+    "endDate": "2026-07-07"
+  },
+  "orderBy": [
+    {
+      "field": "metrics.spend",
+      "direction": "desc"
+    }
+  ],
+  "limit": 20,
+  "cursor": "opaque-server-cursor"
+}
+```
 
-**Accounts**
-- `bb accounts list`
+`resource` is one of:
 
-**Changelog**
-- `bb changelog`
-- `bb changelog <version>`
-- `bb changelog --all`
+```text
+campaign | ad_group | ad | target | product | change_event
+```
 
-Changelog behavior:
-- Default output returns the current CLI version entry when available, otherwise the latest packaged entry.
-- `<version>` accepts `1.2.3` or `v1.2.3`.
-- `--all` returns every packaged changelog entry.
+The resource determines row grain. A row may select fields from that resource and its ancestors, never its children. `product` is a read-only ASIN-grain view aggregated across matching ads.
 
-**Campaigns**
-- `bb campaigns list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--limit <n>] [--offset <n>]`
-- `bb campaigns search <query> [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--limit <n>] [--offset <n>]`
-- `bb campaigns get <campaign_id>`
-- `bb campaigns create <name> <budget>`
-- `bb campaigns update <campaign_id> --name <name> [--portfolio <id>] [--start <iso>] [--end <iso>]`
-- `bb campaigns pause <campaign_id>`
-- `bb campaigns resume <campaign_id>`
-- `bb campaigns delete <campaign_id>`
-- `bb campaigns set-budget <campaign_id> <budget>`
-- `bb campaigns set-bid-strategy <campaign_id> <strategy>`
-- `bb campaigns set-bid-adjustments <campaign_id> <placement|audience|creative> <json>`
+### Filters
 
-Campaign objects returned by campaign commands include:
-- `campaignId`
-- `name`
-- `state`
-- `budget`
-- `bidStrategy`
-- `startDateTime`
-- `endDateTime`
-- `portfolioId`
-- `creationDateTime`
-- `lastUpdatedDateTime`
+Each filter contains one Field, one operator, and one value. Supported operators are:
 
-**Ad Groups**
-- `bb ad-groups list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--limit <n>] [--offset <n>]`
-- `bb ad-groups get <ad_group_id>`
-- `bb ad-groups create <campaign_id> <name> <default_bid>`
-- `bb ad-groups update <ad_group_id> <name>`
-- `bb ad-groups set-default-bid <ad_group_id> <value>`
-- `bb ad-groups pause <ad_group_id>`
-- `bb ad-groups resume <ad_group_id>`
-- `bb ad-groups delete <ad_group_id>`
+| Operator | Value | Meaning |
+| --- | --- | --- |
+| `eq` | scalar | Equal |
+| `in` | non-empty scalar array | Equal to any supplied value |
+| `contains` | string | Case-insensitive text containment |
+| `gt` | number or date | Greater than |
+| `gte` | number or date | Greater than or equal |
+| `lt` | number or date | Less than |
+| `lte` | number or date | Less than or equal |
 
-**Ads**
-- `bb ads list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--asin <ASIN>] [--limit <n>] [--offset <n>]`
-- `bb ads get <ad_id>`
-- `bb ads create <ad_group_id> <asin|sku> [ASIN|SKU]`
-- `bb ads update <ad_id> <state>`
-- `bb ads delete <ad_id>`
+Every filter must match. `in` expresses alternatives for one field; Search has no general-purpose `OR`, nested filter groups, or query-language string.
 
-Ad objects returned by ad commands include:
-- `adId`
-- `campaignId`
-- `adGroupId`
-- `state`
-- `productIdType`
-- `productId`
-- `productTitle` (nullable)
+The Search schema constrains each field to its valid operators and value type. For example, IDs and states accept `eq` and `in`, names accept `eq`, `in`, and `contains`, and numeric metrics accept equality and comparison operators.
 
-**ASINs**
-- Directional target model:
-  - `bb asins tree <ASIN>`
-  - `bb asins overview <ASIN> [--range <range>] [--depth <campaign|ad-group|ad>] [--metrics <key1,key2,...>] [--state <value>|--all]`
+A compatible Field may be filtered or ordered without being selected for output.
 
-- Why this split exists:
-  - `tree` answers "what is connected to this ASIN?"
-  - `overview` answers "how is this ASIN performing right now?"
-  - `metrics --asin` answers "which exact entities are driving the result and by how much?"
+### Fields and defaults
 
-`bb asins tree <ASIN>` response shape:
-- Top-level includes:
-  - `asin`
-  - `context`:
-    - `accountId` / `countryCode`
-    - `depth` (`campaign|ad-group|target|ad`)
-    - `stateFilter` (`ENABLED` default, `ALL` when `--all`, other values when `--state` is passed)
-    - `scope` counts (`campaigns`, `adGroups`, `ads`, `targets`)
-  - `campaigns` (same structural hierarchy as before)
-- Top-level `campaigns[]` items include:
-  - `campaignId`
-  - `campaignName`
-  - `state`
-  - `creationDateTime`
-  - `targets` (hydrated target objects, not target IDs)
-  - `adGroups` (hydrated ad group objects)
-- Each `adGroups[]` item includes:
-  - `adGroupId`
-  - `campaignId`
-  - `name`
-  - `state`
-  - `defaultBid`
-  - `targets` (hydrated target objects, not target IDs)
-  - `ads` (hydrated ad objects, not ad IDs)
+The complete field vocabulary lives in [search-field-catalog.md](search-field-catalog.md) and is embedded into the MCP input schema.
 
-`bb asins overview <ASIN>` response shape:
-- Top-level includes:
-  - `asin`
-  - `context`:
-    - `accountId` / `countryCode`
-    - `range` / `rangeSource`
-    - `timezone`
-    - `depth` (`campaign` default, `ad-group`, or `ad`)
-    - `stateFilter` (`ENABLED` default, `ALL` when `--all`, other values when `--state` is passed)
-    - `metrics` (effective metrics keys)
-    - `scope` counts (`campaigns`, `adGroups`, `ads`, `targets`)
-  - `summary`:
-    - `totals` (ASIN-level rollup for selected range, derived from matched ad metrics)
-    - `campaigns[]` (campaign-level rollups; always present)
-    - `campaigns[].adGroups[]` (when `--depth ad-group|ad`)
-    - `campaigns[].adGroups[].ads[]` (when `--depth ad`)
+- Omitting `fields` selects the resource's documented Default fields.
+- Supplying `fields` replaces the Default fields.
+- Selecting a metric or segment makes the request a Performance search.
+- Selecting `segments.hour` also requires `segments.date`.
+- `segments.placement` is Campaign-only and may be combined with `segments.date`, but not `segments.hour`.
+- A validation error names incompatible fields and the fields permitted for that resource.
 
-Boundary guarantees:
-- `asins tree` returns topology only (no performance metrics payload).
-- `asins overview` returns curated ASIN-centric rollups only (not full workbench controls) and computes them from the matched ASIN ads, not whole-campaign totals.
-- Deep analysis belongs to `metrics series/table --asin <ASIN>`.
+The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` include the nine Standard performance metrics. A default campaign Search therefore behaves like the campaign table in the Amazon Ads dashboard: it returns campaign settings and recent performance together.
 
-**Targets**
-- `bb targets list [--state ENABLED|PAUSED|ARCHIVED|OTHER|ALL] [--all] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--negative <true|false>] [--limit <n>] [--offset <n>]`
-- `bb targets get <target_id>`
-- `bb targets create keyword <ad_group_id> <keyword> <match_type> <bid>`
-- `bb targets create product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU]`
-- `bb targets set-bid <target_id> <value>`
-- `bb targets adjust-bid <target_id> <delta>`
-- `bb targets delete <target_id>`
-- `bb targets pause <target_id>`
-- `bb targets resume <target_id>`
+### Date defaults
 
-Target detail commands return current entity state only.
-Change history is fetched via explicit history commands.
+- A Performance search without `dateRange` uses the last seven account-local dates, including the current date.
+- A `change_event` Search without `dateRange` uses the same seven-date default.
+- A settings-only Search does not resolve or report a date range.
+- The response always identifies an explicit or defaulted range and never silently substitutes a different range.
 
-**History**
-- `bb history campaigns <campaign_id> [--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>] [--limit <n>] [--offset <n>]`
-- `bb history ad-groups <ad_group_id> [--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>] [--limit <n>] [--offset <n>]`
-- `bb history ads <ad_id> [--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>] [--limit <n>] [--offset <n>]`
-- `bb history targets <target_id> [--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>] [--limit <n>] [--offset <n>]`
+### Ordering
 
-History range notes:
-- `--range` overrides configured range.
-- Aliases: `t`=`today`, `y`=`yesterday`, `w|week`=`7d`, `m|month`=`30d`.
-- Range interpretation uses the selected account timezone.
+`orderBy` is an ordered array of Fields and `asc` or `desc` directions. When omitted:
 
-History rows include:
-- `id`
-- `entityType` (`campaign`, `adGroup`, `ad`, `target`)
-- `entityId`
-- `eventType` (`bid_change`, `state_change`, `budget_change`)
-- `fieldName`
-- `previousValue`
-- `newValue`
-- `changedAt`
-- `source` (`bidbeacon`, `ams`, `change_history`)
+- aggregate Performance searches order by `metrics.spend desc`;
+- segmented Performance searches order by the selected segments ascending;
+- settings-only Campaign and Ad-group searches order by name ascending;
+- settings-only Ad and Target searches order by ID ascending;
+- settings-only Product searches order by title and then ASIN ascending;
+- `change_event` searches order by `changeEvent.changedAt desc`.
 
-History response shape also includes:
-- `context.entityType` / `context.entityId`
-- `context.range` / `context.rangeSource`
-- `context.timezone`
-- `context.limit` / `context.offset` (`null` when omitted)
+BidBeacon appends Campaign ID, Ad-group ID, Ad ID, Target ID, Product ASIN, or Change-event ID ascending as the final deterministic tie-breaker.
 
-**Bids**
-Aliases that map to the same behavior as target bid updates.
-- `bb bids set <target_id> <value>`
-- `bb bids adjust <target_id> <delta>`
+### Pagination
 
-**Metrics**
-Metrics commands come in two shapes.
-- `series` returns a time-series for charting.
-- `table` returns totals per entity.
+- `limit` defaults to `20`.
+- `limit` accepts `1` through `200`.
+- `cursor` is an opaque, query-bound keyset continuation token.
+- A cursor is valid only with the account, resource, fields, filters, date range, and ordering that produced it.
+- `nextCursor` is omitted after the final page.
 
-ASIN support:
-- `bb metrics series <entity> --asin <ASIN> ...`
-- `bb metrics table <entity> --asin <ASIN> ...`
-- `--asin` is a first-class scope selector and can be combined with existing filters (`--campaign`, `--ad-group`, `--ids`, `--filter`, `--search`), with narrower filters taking precedence.
+Search has no offset or page-number input. The CLI's `--all` option follows server cursors and emits one JSON array after all pages succeed.
 
-Metrics common flags:
-- `--metrics <key1,key2,...>` selects which metrics are returned. Defaults to all.
-- `--range <today|yesterday|7d|30d|YYYY-MM-DD..YYYY-MM-DD>` overrides the configured range.
-- `--group-by <campaigns|ad-groups|ads|targets>` alias for entity subcommands on both `series` and `table`.
-- `--asin <ASIN>` scopes results to entities connected to the ASIN.
-- `--filter <key><op><value>` repeatable.
-- `--search <text>` shortcut for `filters.search`.
-- `--state <ENABLED|PAUSED|ARCHIVED|OTHER|ALL>` shortcut for `filters.state`.
+### Output
 
-Metrics series-only flags:
-- `--bucket <auto|hour|day|week|month|year>`
-- `auto` uses hourly for single-day ranges and daily otherwise.
-- `hour` requires a single-day range.
-- Weeks start Monday.
+```json
+{
+  "context": {
+    "account": {
+      "id": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+      "timezone": "America/Los_Angeles",
+      "currency": "USD"
+    },
+    "resource": "campaign",
+    "fields": [
+      "campaign.id",
+      "campaign.name",
+      "metrics.spend",
+      "metrics.orders"
+    ],
+    "dateRange": {
+      "startDate": "2026-07-01",
+      "endDate": "2026-07-07",
+      "source": "EXPLICIT"
+    },
+    "orderBy": [
+      {
+        "field": "metrics.spend",
+        "direction": "desc"
+      },
+      {
+        "field": "campaign.id",
+        "direction": "asc"
+      }
+    ],
+    "coverage": {
+      "status": "COMPLETE",
+      "issues": []
+    }
+  },
+  "rows": [
+    {
+      "campaign.id": "123",
+      "campaign.name": "Shirts - Auto",
+      "metrics.spend": 42.31,
+      "metrics.orders": 6
+    }
+  ],
+  "nextCursor": "opaque-server-cursor"
+}
+```
 
-Metrics table-only flags:
-- `--sort <field>`
-- `--direction <asc|desc>`
-- `--limit <n>`
-- `--offset <n>`
+Each row is a flat mapping whose keys exactly match the resolved `fields`.
 
-Metrics table sort fields:
-- `impressions`
-- `clicks`
-- `purchases`
-- `spend`
-- `sales`
-- `acos`
-- `cpc`
-- `ctr`
-- `roas`
+`dateRange` and `coverage` are omitted for settings-only searches. `coverage` is omitted for `change_event`.
 
-Metrics filters:
-- `search` or `name`
-- `state` or `status` or `active-status`
-- `targeting` (`AUTO` or `MANUAL`)
-- `type` or `target-type` (`KEYWORD`, `PRODUCT`, or `AUTO`)
-- `target-match-type` (`BROAD`, `PHRASE`, `EXACT`, `PRODUCT_EXACT`, `PRODUCT_SIMILAR`, `SEARCH_CLOSE_MATCH`, `SEARCH_LOOSE_MATCH`, `PRODUCT_SUBSTITUTES`, `PRODUCT_COMPLEMENTS`)
-- `budget` (range)
-- `end-date` (range)
-- `out-of-budget` (`true|false`)
-- `metrics.<key>` (range filter for any metrics key)
+Coverage status is:
 
-Filter operators:
-- `=`, `!=`, `>=`, `<=`, `>`, `<`, `~` (fuzzy match)
+| Status | Meaning |
+| --- | --- |
+| `COMPLETE` | Every requested date has a completed daily report with zero parse errors |
+| `INCOMPLETE` | At least one requested date has a pending, failed, partially parsed, or unknown issue |
+| `UNKNOWN` | No requested date has retained report evidence |
 
-Filter examples:
+Coverage issues are compact:
+
+```json
+{
+  "date": "2026-07-03",
+  "status": "UNKNOWN"
+}
+```
+
+Issue status is `PENDING`, `FAILED`, `PARSE_ERRORS`, or `UNKNOWN`. `PARSE_ERRORS` also includes `errorCount`. Missing performance rows do not determine coverage; a valid zero-activity report is complete.
+
+## Search field behavior
+
+### Product-to-Ad traversal
+
+Product rows intentionally omit relationship counts and child IDs:
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "resource": "product",
+  "filters": [
+    {
+      "field": "product.asin",
+      "operator": "eq",
+      "value": "B0..."
+    }
+  ]
+}
+```
+
+The agent uses the returned `product.asin` to retrieve controllable topology:
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "resource": "ad",
+  "filters": [
+    {
+      "field": "ad.asin",
+      "operator": "eq",
+      "value": "B0..."
+    }
+  ]
+}
+```
+
+Default Ad fields return each Ad ID plus its Ad group and Campaign identities.
+
+### Aggregate and segmented performance
+
+Metrics aggregate at the selected resource grain unless the caller selects a segment. Each selected segment becomes part of the row grain.
+
+Examples:
+
+- Campaign plus metrics: one row per campaign for the range.
+- Campaign plus `segments.date`: one row per campaign and date.
+- Campaign plus `segments.date` and `segments.placement`: one row per campaign, date, and placement.
+- Product plus metrics: one row per advertised ASIN across all matching ads.
+
+## CLI projection
+
+The CLI serializes the same operation inputs and outputs as the MCP.
+
+### Global behavior
+
+- `--account <accountId>` is required by every account-scoped command.
+- `--json <object>`, `--json @<path>`, and `--json -` accept the operation-specific JSON input from a literal, file, or stdin.
+- Command flags and `--json` may not set the same input field.
+- Successful stdout contains only the output JSON.
+- A failure writes the structured error JSON to stderr and exits non-zero.
+- Auth and base URL remain local runtime configuration. Advertiser account selection does not.
+
+### Search syntax
+
 ```bash
-bb metrics table campaigns --filter state=ENABLED
-bb metrics table campaigns --filter budget>=25 --filter budget<=100
-bb metrics table campaigns --filter metrics.spend>=50
-bb metrics series campaigns --filter search~holiday
+bb search campaign \
+  --account 6d997c64-3e64-4d50-b732-ec79d47f87f1 \
+  --fields campaign.id,campaign.name,metrics.spend,metrics.orders \
+  --where 'campaign.state in ["ENABLED","PAUSED"]' \
+  --where 'metrics.spend>=25' \
+  --start-date 2026-07-01 \
+  --end-date 2026-07-07 \
+  --order-by metrics.spend:desc \
+  --limit 20
 ```
 
-Metrics series commands:
-- `bb metrics series campaigns [--asin <ASIN>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
-- `bb metrics series ad-groups [--asin <ASIN>] [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
-- `bb metrics series ads [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
-- `bb metrics series targets [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--bucket <auto|hour|day|week|month|year>]`
+CLI `--where` syntax maps directly to structured filters:
 
-Metrics series responses include a `context` object with:
-- `groupBy`, `ids`, `campaignId`, `adGroupId`, `asin`, `asinScope`, `asinStateFilter`
-- `range`, `rangeSource`, `timezone`
-- `bucket`, `metrics`, `filters`
+```text
+field=value
+field contains "text"
+field in ["value-1","value-2"]
+field>value
+field>=value
+field<value
+field<=value
+```
 
-Metrics table commands:
-- `bb metrics table campaigns [--asin <ASIN>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
-- `bb metrics table ad-groups [--asin <ASIN>] [--campaign <campaign_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
-- `bb metrics table ads [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
-- `bb metrics table targets [--asin <ASIN>] [--campaign <campaign_id>] [--ad-group <ad_group_id>] [--ids <id1,id2,...>] [--range <range>] [--sort <field>] [--direction <asc|desc>] [--limit <n>] [--offset <n>]`
+Repeated `--where` flags are joined with `AND`. The CLI rejects ambiguous or unsupported expressions locally.
 
-Metrics table responses include a `context` object with:
-- `groupBy`, `ids`, `campaignId`, `adGroupId`, `asin`, `asinScope`, `asinStateFilter`
-- `range`, `rangeSource`, `timezone`
-- `metrics`, `filters`
-- `sort`, `direction`, `limit`, `offset` (`null` when omitted)
+Other Search flags:
 
-**Enums**
-- `bb enums bid-strategy`
-- `bb enums match-type`
-- `bb enums placement`
-- `bb enums state`
+```text
+--cursor <cursor>
+--all
+```
 
-**Implementation Plan (ASIN Command Boundaries)**
-1. Introduce explicit command roles
-- Add `bb asins overview` as the default one-hop ASIN check-in surface.
-- Add `bb asins tree` as the structural resolver surface.
-- Remove `bb asins get` in the same release to keep one canonical command per capability.
+### Mutation syntax
 
-2. Add ASIN scoping to metrics workbench
-- Add `--asin` to metrics series/table for all entities (`campaigns`, `ad-groups`, `ads`, `targets`).
-- Resolve ASIN->entity IDs internally, then execute the existing metrics pipeline.
-- Include `context.asin` and resolved scope counts in metrics responses for traceability.
+Small mutations may use flags:
 
-3. Tighten payload boundaries
-- `asins tree`: no metrics payloads.
-- `asins overview`: curated/limited metrics payload intended for quick decisions.
-- `metrics --asin`: full flexible payload for analysis and diagnosis.
+```bash
+bb update target \
+  --account 6d997c64-3e64-4d50-b732-ec79d47f87f1 \
+  --target target_123 \
+  --state PAUSED \
+  --bid 0.45
+```
 
-4. Align docs/help/examples in same change set
-- Update CLI help text and README examples to teach the three-command model.
-- Add side-by-side examples for:
-  - quick ASIN check-in (`asins overview`)
-  - structural drill (`asins tree`)
-  - deep diagnosis (`metrics table/series --asin`)
+Nested creation inputs use the canonical JSON schema:
 
-5. Ship a clean break
-- Treat this as a pre-beta command-contract reset.
-- Do not add aliases, deprecated paths, or compatibility wrappers for `asins get`.
+```bash
+bb create sponsored-products-campaign \
+  --account 6d997c64-3e64-4d50-b732-ec79d47f87f1 \
+  --json @campaign.json
+```
+
+The JSON document omits `accountId` when `--account` supplies it.
+
+### Runtime commands
+
+Local runtime commands are not advertising operations and therefore do not have MCP equivalents:
+
+```text
+bb auth set
+bb auth set --stdin
+bb auth status
+bb auth clear
+bb config show
+bb config set base-url <url>
+bb config unset base-url
+bb changelog [version|--all]
+```
+
+On macOS, `auth set` stores the API key in Keychain using service `co.merchbase.cli` and account `api-key`. `MERCHBASE_API_KEY` overrides the secure-store value for automation. Auth commands never print the raw key. Configuration contains no selected Advertiser account.
+
+## Typed client projection
+
+The typed client exposes the operation names verbatim. Reads are queries and writes are mutations:
+
+```ts
+const accounts = await client.list_advertiser_accounts.query({});
+const campaigns = await client.search.query({
+  accountId,
+  resource: "campaign",
+});
+const updated = await client.update_campaign.mutate({
+  accountId,
+  campaignId,
+  changes: { dailyBudget: 25 },
+});
+```
+
+Inputs and outputs are inferred from the shared operation router rather than copied into the client package.
+
+## Canonical resource representations
+
+Mutation results reuse these compact objects. Optional properties are omitted when they do not apply; nullable source values remain `null`.
+
+### Campaign
+
+```json
+{
+  "id": "campaign_123",
+  "name": "Shirts - Auto",
+  "state": "PAUSED",
+  "deliveryStatus": "NOT_DELIVERING",
+  "dailyBudget": 20,
+  "bidStrategy": "DYNAMIC_DOWN_ONLY",
+  "targetingMode": "AUTO",
+  "startDate": "2026-08-05",
+  "endDate": null,
+  "placementBidAdjustments": {
+    "topOfSearch": 50,
+    "productPages": 20
+  }
+}
+```
+
+### Ad group
+
+```json
+{
+  "id": "ad_group_123",
+  "campaignId": "campaign_123",
+  "name": "Default",
+  "state": "ENABLED",
+  "deliveryStatus": "DELIVERING",
+  "defaultBid": 0.35
+}
+```
+
+### Ad
+
+```json
+{
+  "id": "ad_123",
+  "campaignId": "campaign_123",
+  "adGroupId": "ad_group_123",
+  "state": "ENABLED",
+  "deliveryStatus": "DELIVERING",
+  "asin": "B0...",
+  "productTitle": "Example shirt"
+}
+```
+
+### Target
+
+```json
+{
+  "id": "target_123",
+  "campaignId": "campaign_123",
+  "adGroupId": "ad_group_123",
+  "state": "ENABLED",
+  "deliveryStatus": "DELIVERING",
+  "type": "KEYWORD",
+  "negative": false,
+  "matchType": "EXACT",
+  "keyword": "funny cat shirt",
+  "bid": 0.45
+}
+```
+
+Target `type` is `KEYWORD`, `PRODUCT`, or `AUTO`. Keyword, ASIN, match type, and bid properties appear only when meaningful for that target.
+
+## Composite campaign creation
+
+### `create_sponsored_products_campaign`
+
+This is the preferred operation for a normal campaign launch.
+
+Input:
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "campaign": {
+    "name": "Shirts - Exact",
+    "state": "ENABLED",
+    "dailyBudget": 20,
+    "bidStrategy": "DYNAMIC_DOWN_ONLY",
+    "startDate": "2026-08-05",
+    "placementBidAdjustments": {
+      "topOfSearch": 50
+    }
+  },
+  "adGroup": {
+    "name": "Default",
+    "defaultBid": 0.35
+  },
+  "asins": ["B0ABC...", "B0DEF..."],
+  "targeting": {
+    "mode": "MANUAL_KEYWORD",
+    "keywords": [
+      {
+        "keyword": "funny cat shirt",
+        "matchType": "EXACT",
+        "bid": 0.45
+      }
+    ]
+  },
+  "negatives": {
+    "keywords": [
+      {
+        "keyword": "free",
+        "matchType": "PHRASE"
+      }
+    ],
+    "asins": ["B0NOPE..."]
+  }
+}
+```
+
+`campaign.state` is required. `campaign.startDate` defaults to the current account-local date. `campaign.endDate` is optional. `asins` and each target list are non-empty and contain no duplicates.
+
+The request creates exactly one initial ad group with one targeting mode:
+
+#### Automatic
+
+```json
+{
+  "mode": "AUTO",
+  "bidOverrides": {
+    "closeMatch": 0.45,
+    "looseMatch": 0.30,
+    "substitutes": 0.25,
+    "complements": 0.20
+  }
+}
+```
+
+Every override is optional. Omitted automatic groups inherit `adGroup.defaultBid`.
+
+#### Manual keyword
+
+```json
+{
+  "mode": "MANUAL_KEYWORD",
+  "keywords": [
+    {
+      "keyword": "funny cat shirt",
+      "matchType": "EXACT",
+      "bid": 0.45
+    }
+  ]
+}
+```
+
+Positive keyword match type is `BROAD`, `PHRASE`, or `EXACT`.
+
+#### Manual product
+
+```json
+{
+  "mode": "MANUAL_PRODUCT",
+  "products": [
+    {
+      "asin": "B0COMPETITOR...",
+      "bid": 0.40
+    }
+  ]
+}
+```
+
+Only individual ASIN targets are public. Category, brand, price, rating, and expression refinements are not accepted.
+
+Negative keywords use `PHRASE` or `EXACT`. Negative products are individual ASINs. All negatives created by this operation are ad-group scoped.
+
+### Execution semantics
+
+BidBeacon:
+
+1. validates the complete request before any Amazon write;
+2. creates the campaign in `PAUSED`;
+3. creates the ad group, ads, positive targets, and negative targets in `ENABLED`;
+4. applies the requested campaign state only after every child succeeds;
+5. waits for Amazon responses, including normal throttling retries, before returning.
+
+The campaign is the sole delivery gate. A requested `PAUSED` result still has enabled children so one later `update_campaign` call can launch the complete topology.
+
+There is no background job, prepare token, confirmation token, agent-supplied idempotency key, or automatic rollback.
+
+### Success output
+
+```json
+{
+  "campaign": {},
+  "adGroup": {},
+  "ads": [],
+  "targets": []
+}
+```
+
+Each value uses the canonical representation above. `targets` includes positive and negative targets. The result contains no performance data and does not repeat full ancestry on every child.
+
+### Partial failure
+
+If an Amazon write fails after at least one resource succeeds, the operation returns a tool execution error:
+
+```json
+{
+  "error": {
+    "code": "COMPOSITE_PARTIAL_FAILURE",
+    "message": "Sponsored Products campaign creation stopped after Amazon rejected a keyword target. The campaign remains paused.",
+    "details": {
+      "campaign": {},
+      "created": {
+        "adGroups": [],
+        "ads": [],
+        "targets": []
+      },
+      "failed": {
+        "operation": "create_keyword_target",
+        "input": {},
+        "amazon": {
+          "code": "INVALID_ARGUMENT",
+          "message": "..."
+        }
+      }
+    }
+  }
+}
+```
+
+BidBeacon preserves successful resources under the paused campaign. The agent uses the disclosed IDs and primitive operations to repair the topology or archives it through updates.
+
+## Primitive creation
+
+Primitive operations are escape hatches for extending existing campaigns, bespoke topology, and partial-failure recovery.
+
+### `create_campaign`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "name": "Shirts - Auto",
+  "state": "PAUSED",
+  "dailyBudget": 20,
+  "bidStrategy": "DYNAMIC_DOWN_ONLY",
+  "targetingMode": "AUTO",
+  "startDate": "2026-08-05",
+  "endDate": null,
+  "placementBidAdjustments": {
+    "topOfSearch": 50
+  }
+}
+```
+
+Returns one canonical Campaign.
+
+### `create_ad_group`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "campaignId": "campaign_123",
+  "name": "Default",
+  "state": "ENABLED",
+  "defaultBid": 0.35
+}
+```
+
+Returns one canonical Ad group.
+
+### `create_ad`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "adGroupId": "ad_group_123",
+  "asin": "B0...",
+  "state": "ENABLED"
+}
+```
+
+Returns one canonical Ad.
+
+### `create_keyword_target`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "adGroupId": "ad_group_123",
+  "keyword": "funny cat shirt",
+  "matchType": "EXACT",
+  "bid": 0.45,
+  "state": "ENABLED"
+}
+```
+
+Returns one canonical Target.
+
+### `create_product_target`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "adGroupId": "ad_group_123",
+  "asin": "B0COMPETITOR...",
+  "bid": 0.40,
+  "state": "ENABLED"
+}
+```
+
+Returns one canonical Target.
+
+### `create_negative_keyword`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "campaignId": "campaign_123",
+  "adGroupId": "ad_group_123",
+  "keyword": "free",
+  "matchType": "PHRASE",
+  "state": "ENABLED"
+}
+```
+
+Returns one canonical Target with `negative: true`. Campaign-level negative creation is not public.
+
+### `create_negative_product_target`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "campaignId": "campaign_123",
+  "adGroupId": "ad_group_123",
+  "asin": "B0NOPE...",
+  "state": "ENABLED"
+}
+```
+
+Returns one canonical Target with `negative: true`. Campaign-level negative creation is not public.
+
+## Updates
+
+Each update requires `accountId`, the resource ID, and a non-empty `changes` object. Omitted properties remain unchanged.
+
+### `update_campaign`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "campaignId": "campaign_123",
+  "changes": {
+    "state": "PAUSED",
+    "dailyBudget": 25,
+    "bidStrategy": "DYNAMIC_DOWN_ONLY",
+    "placementBidAdjustments": {
+      "topOfSearch": 30,
+      "productPages": 0
+    }
+  }
+}
+```
+
+Placement keys are `topOfSearch`, `restOfSearch`, `productPages`, and `amazonBusiness`. An omitted placement remains unchanged; `0` removes its adjustment. Returns the updated canonical Campaign.
+
+### `update_ad_group`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "adGroupId": "ad_group_123",
+  "changes": {
+    "state": "ENABLED",
+    "defaultBid": 0.40
+  }
+}
+```
+
+Returns the updated canonical Ad group.
+
+### `update_ad`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "adId": "ad_123",
+  "changes": {
+    "state": "ARCHIVED"
+  }
+}
+```
+
+Returns the updated canonical Ad.
+
+### `update_target`
+
+```json
+{
+  "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+  "targetId": "target_123",
+  "changes": {
+    "state": "PAUSED",
+    "bid": 0.50
+  }
+}
+```
+
+`bid` is invalid for a negative target. Existing campaign-level or ad-group-level negatives may be archived by ID. Returns the updated canonical Target.
+
+## Errors
+
+All operation failures use:
+
+```json
+{
+  "error": {
+    "code": "INVALID_INPUT",
+    "message": "Human- and model-readable explanation.",
+    "details": {}
+  }
+}
+```
+
+Stable error codes:
+
+| Code | Meaning |
+| --- | --- |
+| `AUTHENTICATION_REQUIRED` | Credentials are missing or invalid |
+| `ACCOUNT_ACCESS_DENIED` | Credentials cannot access the explicit Account ID |
+| `INVALID_INPUT` | The operation input fails schema or cross-field validation |
+| `RESOURCE_NOT_FOUND` | The requested resource is not present in the explicit account |
+| `CURSOR_INVALID` | The Search cursor is malformed, expired, or bound to another query |
+| `AMAZON_REJECTED` | Amazon rejected the requested operation |
+| `AMAZON_UNAVAILABLE` | Amazon remains unavailable after the documented retry policy |
+| `COMPOSITE_PARTIAL_FAILURE` | Composite creation created some resources before a later failure |
+| `INTERNAL_ERROR` | BidBeacon failed without a safe public diagnosis |
+
+Errors do not silently retry a mutation as a new background operation. Useful Amazon error codes and messages appear in `details` without exposing credentials or raw transport payloads.
+
+Performance coverage issues are successful Search results, not tool errors.
+
+## MCP presentation
+
+### Tool descriptions
+
+Tool descriptions state:
+
+- the capability and preferred use;
+- that `accountId` is required and is a BidBeacon Account ID;
+- material side effects;
+- the returned resource or error behavior.
+
+Descriptions do not repeat the field catalog, canonical resource shapes, or workflow manual. Shared schemas define those once in server code and generate each tool's JSON Schema.
+
+### Tool annotations
+
+| Tools | `readOnlyHint` | `destructiveHint` | `idempotentHint` | `openWorldHint` |
+| --- | --- | --- | --- | --- |
+| `list_advertiser_accounts`, `search` | `true` | `false` | `true` | `false` |
+| Creation tools | `false` | `false` | `false` | `true` |
+| Update tools | `false` | `true` | `true` | `true` |
+
+Creation is additive but can begin spend when `state` is `ENABLED`. Tool annotations are hints, not an approval boundary. The tool title and description identify the financial side effect so the MCP host can apply its approval policy around the single call.
+
+### Server instructions
+
+MCP server instructions contain only universal invariants:
+
+1. Discover the BidBeacon Account ID, then include it explicitly in every account-scoped call.
+2. Search defaults to settings plus the last seven account-local dates of performance; request fields and dates explicitly when the task requires another shape.
+3. Inspect current settings and relevant performance before consequential updates.
+4. Prefer `create_sponsored_products_campaign` for ordinary launches and primitive creation only for bespoke topology or recovery.
+5. Treat coverage issues as uncertainty in the archive, not zero performance.
+
+Correct tool use does not depend on a client honoring these instructions.
+
+## Optional Agent Skill
+
+The MCP distribution also includes the independently installable `bidbeacon-account-management` skill. It teaches:
+
+- account discovery and explicit routing;
+- campaign and Product performance diagnosis;
+- Product-to-Ad traversal;
+- comparison periods and metric interpretation;
+- coverage-aware conclusions;
+- inspect-before-mutate optimization;
+- composite campaign creation, host approval, and partial-failure recovery.
+
+The skill does not duplicate tool schemas and is not required for MCP correctness.
+
+## Migration from the pre-beta CLI
+
+This contract cleanly replaces the prior public shape:
+
+| Replaced behavior | Canonical behavior |
+| --- | --- |
+| Dashboard-selected or configured account fallback | Explicit `--account` on every account-scoped command |
+| `campaigns list/get`, `metrics table/series`, `history`, `asins tree/overview` | `bb search <resource>` |
+| Offset pagination | Opaque keyset cursor; `--all` follows cursors |
+| Default `ENABLED` state filter | No implicit state filter |
+| `purchases` | `orders` |
+| `budget`, `budgetAmount` | `dailyBudget` |
+| `pause`, `resume`, `delete`, `set-*`, relative bid adjustment | One absolute patch-style update per resource |
+| Sequential ordinary campaign construction | `bb create sponsored-products-campaign` |
+
+No compatibility aliases are part of the pre-beta migration.
+
+## Reference rationale
+
+The shape deliberately combines:
+
+- [Google Ads MCP](https://github.com/googleads/google-ads-mcp)'s small `search`-centered read surface and separately installable diagnostic skills;
+- [Amazon Ads MCP](https://advertising.amazon.com/en-ca/library/news/amazon-ads-mcp-server-open-beta)'s composite end-to-end Sponsored Products campaign workflow;
+- BidBeacon's durable archive, explicit performance coverage, curated Field catalog, and ASIN-grain Product view.
+
+Decision rationale is recorded in [ADR 0001](adr/0001-use-search-for-advertising-resource-reads.md) through [ADR 0011](adr/0011-layer-composite-campaign-creation-over-primitives.md).

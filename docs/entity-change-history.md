@@ -1,3 +1,9 @@
+---
+summary: Documents canonical entity-change storage, reconciliation, and its current and accepted public read paths.
+read_when:
+  - changing change-history ingestion, reconciliation, storage, or public Search behavior
+---
+
 # Entity Change History
 
 BidBeacon stores optimization-impacting entity changes in a canonical table: `entity_change_history`.
@@ -55,9 +61,13 @@ Current normalization rules:
 
 This keeps one canonical per-day result while still allowing immediate local writes before authoritative daily replacement.
 
-## Read Path (Explicit)
+## Read path
 
-History is read through explicit history surfaces, not entity detail endpoints:
+The accepted public contract reads history with `search` and `resource: "change_event"` as defined in [cli-spec.md](cli-spec.md). Change events use the same explicit Account ID, field selection, filters, date range, ordering, and cursor contract as other Searches.
+
+### Current pre-migration path
+
+The currently implemented API and CLI still read history through dedicated surfaces:
 
 - HTTP API (tRPC path): `/api/history/list`
   - Input: `config`, `entityType`, `entityId`, optional `range`, optional `limit`, optional `offset`

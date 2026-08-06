@@ -1,4 +1,12 @@
-# Ads API (Settings + Details)
+---
+summary: Documents the currently implemented internal settings/detail API during migration to the accepted public Search contract.
+read_when:
+  - changing the current ads routers or migrating them to the public MCP and CLI operation layer
+---
+
+# Ads API (current implementation)
+
+> The accepted public contract is [cli-spec.md](cli-spec.md). This document records the pre-migration routers that the dashboard and existing CLI still call; its endpoint names, offset cursor, Amazon-shaped fields, and defaults are not the target public interface.
 
 This API exposes campaign/ad group/ad/target settings from the export tables and supports bid edits for Sponsored Products (SP) only. It intentionally does **not** surface AMS Campaign Management raw JSON.
 
