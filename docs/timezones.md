@@ -25,6 +25,7 @@ Notes:
 
 - `performance_hourly.bucket_start` is UTC `timestamptz` (canonical). `bucket_date` and `bucket_hour` are account-local labels.
 - `performance_daily.bucket_start` is UTC `timestamptz`. `bucket_date` is account-local label.
+- `performance_daily_placement.bucket_start` is UTC `timestamptz`; `bucket_date` is the account-local report date and `country_code` preserves the marketplace projection boundary.
 - `report_dataset_metadata.period_start`, `next_refresh_at`, and `last_report_created_at` are UTC `timestamptz` instants.
 - Hourly-grain report metadata uses one `period_start` per account-local date. Daily and hourly-grain report dates both begin at account-local midnight.
 
@@ -37,6 +38,7 @@ Notes:
   - `bucketStart` (UTC instant)
   - `bucketDate` / `bucketHour` (account-local labels)
   - uses `fromZonedTime` under the hood to handle DST transitions correctly.
+- The daily Campaign-placement parser converts `date.value` into the same UTC `bucket_start` and account-local `bucket_date`; it does not invent an hourly placement grain.
 
 ### Marketing Stream flow (AMS)
 

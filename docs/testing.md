@@ -37,4 +37,13 @@ Ad-mutation builders live in
 `src/operations/testing/ad-mutation-fixtures.ts`; keep them separate from Campaign fixtures and
 do not use an alternate repository or local Postgres service.
 
+Campaign placement Search acceptance lives in `src/operations/placement-search.test.ts` and uses
+the production `performance_daily_placement` schema through the embedded PGlite harness. Its
+placement-specific builders live in `src/operations/testing/placement-search-fixtures.ts`. Keep
+placement coverage assertions tied to `entityType = placement`; ordinary ASIN/Target report
+metadata is not valid placement coverage evidence. The ingestion acceptance test uses the same
+production projection and verifies source normalization, normalized-key aggregation, unknown-value
+accounting, authoritative stale-row reconciliation, marketplace-scoped metadata, idempotence,
+account-local dates, and changed-row counts.
+
 Auth tests must not use production credentials or database writes. Use the shared package's fake Clerk client/projection store patterns and assert that legacy `bbk_`, `BB_API_KEY`, query-string WebSocket credentials, and product-local API-key routes remain absent.

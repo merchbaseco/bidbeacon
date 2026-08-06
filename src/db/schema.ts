@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { bigint, boolean, date, doublePrecision, index, integer, jsonb, numeric, pgTable, primaryKey, smallint, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
 
 /**
@@ -198,7 +199,7 @@ export const reportDatasetMetadata = pgTable(
         countryCode: text('country_code').notNull(),
         periodStart: timestamp('period_start', { withTimezone: true, mode: 'date' }).notNull(),
         aggregation: text('aggregation').notNull(), // hourly, daily
-        entityType: text('entity_type').notNull(), // target, product
+        entityType: text('entity_type').notNull(), // target, product, daily placement
 
         status: text('status').notNull(), // enum: missing, fetching, parsing, completed, failed
         refreshing: boolean('refreshing').notNull().default(false), // whether a refresh is currently in progress
@@ -213,7 +214,10 @@ export const reportDatasetMetadata = pgTable(
         error: text('error'),
     },
     table => [
-        uniqueIndex('report_dataset_metadata_unique_idx').on(table.accountId, table.periodStart, table.aggregation, table.entityType),
+        uniqueIndex('report_dataset_metadata_unique_idx').on(table.accountId, table.periodStart, table.aggregation, table.entityType).where(sql`${table.entityType} <> 'placement'`),
+        uniqueIndex('report_dataset_metadata_placement_unique_idx')
+            .on(table.accountId, table.countryCode, table.periodStart, table.aggregation, table.entityType)
+            .where(sql`${table.entityType} = 'placement'`),
         index('report_dataset_metadata_due_idx').on(table.refreshing, table.nextRefreshAt),
     ]
 );
@@ -332,6 +336,39 @@ export const performanceDaily = pgTable(
         index('idx_perf_daily_adgroup_date').on(table.adGroupId, table.bucketDate),
         index('idx_perf_daily_ad_date').on(table.adId, table.bucketDate),
         index('idx_perf_daily_entity_date').on(table.entityType, table.entityId, table.bucketDate),
+    ]
+);
+
+/**
+ * Authoritative daily Sponsored Products Campaign-placement performance.
+ *
+ * This projection intentionally has its own grain. Placement is not an
+ * attribute of the ordinary ASIN/Target performance tables.
+ */
+export const performanceDailyPlacement = pgTable(
+    'performance_daily_placement',
+    {
+        accountId: text('account_id').notNull(),
+        countryCode: text('country_code').notNull(),
+        bucketStart: timestamp('bucket_start', { withTimezone: true, mode: 'date' }).notNull(), // UTC start-of-day
+        bucketDate: date('bucket_date').notNull(), // account-local day label
+
+        campaignId: text('campaign_id').notNull(),
+        placement: text('placement').notNull(),
+
+        impressions: integer('impressions').notNull(),
+        clicks: integer('clicks').notNull(),
+        spend: numeric('spend', { precision: 7, scale: 2 }).notNull(),
+        sales: numeric('sales', { precision: 10, scale: 2 }).notNull(),
+        purchases: integer('purchases').notNull(),
+    },
+    table => [
+        primaryKey({
+            columns: [table.accountId, table.countryCode, table.bucketDate, table.campaignId, table.placement],
+        }),
+
+        index('idx_perf_daily_placement_campaign_date').on(table.accountId, table.countryCode, table.campaignId, table.bucketDate),
+        index('idx_perf_daily_placement_date').on(table.accountId, table.countryCode, table.bucketDate),
     ]
 );
 

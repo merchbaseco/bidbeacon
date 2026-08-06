@@ -70,6 +70,32 @@ describe('createReportForDataset', () => {
         });
     });
 
+    it('requests the daily Campaign-placement fields for an account-local date', async () => {
+        await createReportForDataset({
+            accountId: 'amzn-account',
+            countryCode: 'US',
+            timestamp: '2026-07-19T07:00:00.000Z',
+            aggregation: 'daily',
+            entityType: 'placement',
+        });
+
+        const request = createReportMock.mock.calls[0]?.[0];
+        expect(request?.reports?.[0]?.periods?.[0]?.datePeriod).toEqual({
+            startDate: '2026-07-19',
+            endDate: '2026-07-19',
+        });
+        expect(request?.reports?.[0]?.query?.fields).toEqual([
+            'date.value',
+            'campaign.id',
+            'placement.value',
+            'metric.impressions',
+            'metric.clicks',
+            'metric.purchases',
+            'metric.sales',
+            'metric.totalCost',
+        ]);
+    });
+
     it('prioritizes fresh periods ahead of historical backfills', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-01-05T12:00:00.000Z'));

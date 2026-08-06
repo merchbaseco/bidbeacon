@@ -21,6 +21,9 @@ export type CreateReportForDatasetInput = {
  */
 export async function createReportForDataset(input: CreateReportForDatasetInput): Promise<string> {
     const reportConfig = reportConfigs[input.aggregation][input.entityType];
+    if (!reportConfig) {
+        throw new Error(`No report configuration found for aggregation: ${input.aggregation}, entityType: ${input.entityType}`);
+    }
     const date = new Date(input.timestamp);
 
     // Find the advertiser account

@@ -14,7 +14,7 @@ import { createReportForDataset } from '@/lib/create-report/index';
 import { parseReport } from '@/lib/parse-report/index';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
 import { getNextAction } from '@/lib/report-status-state-machine/state-machine';
-import { AGGREGATION_TYPES, ENTITY_TYPES } from '@/types/reports';
+import { AGGREGATION_TYPES, ENTITY_TYPES, type EntityType } from '@/types/reports';
 import { utcNow } from '@/utils/date';
 import { formatError, serializeError } from '@/utils/errors';
 import { emitEvent } from '@/utils/events';
@@ -94,6 +94,7 @@ export const updateReportStatusJob = boss
                             reportDatum = await db.query.reportDatasetMetadata.findFirst({
                                 where: and(
                                     eq(reportDatasetMetadata.accountId, accountId),
+                                    eq(reportDatasetMetadata.countryCode, countryCode),
                                     eq(reportDatasetMetadata.periodStart, date),
                                     eq(reportDatasetMetadata.aggregation, aggregation),
                                     eq(reportDatasetMetadata.entityType, entityType)
@@ -122,7 +123,7 @@ export const updateReportStatusJob = boss
                             action = await getNextAction(
                                 reportDatum.periodStart,
                                 reportDatum.aggregation as 'hourly' | 'daily',
-                                reportDatum.entityType as 'target' | 'product',
+                                reportDatum.entityType as EntityType,
                                 reportDatum.lastReportCreatedAt,
                                 reportDatum.reportId,
                                 countryCode
@@ -317,18 +318,7 @@ async function claimReport(row: InferSelectModel<typeof reportDatasetMetadata>):
  * Sets refreshing=false and emits update event.
  */
 async function setRefreshing(row: InferSelectModel<typeof reportDatasetMetadata>, refreshing: boolean): Promise<void> {
-    const [updatedRow] = await db
-        .update(reportDatasetMetadata)
-        .set({ refreshing })
-        .where(
-            and(
-                eq(reportDatasetMetadata.accountId, row.accountId),
-                eq(reportDatasetMetadata.periodStart, row.periodStart),
-                eq(reportDatasetMetadata.aggregation, row.aggregation),
-                eq(reportDatasetMetadata.entityType, row.entityType)
-            )
-        )
-        .returning();
+    const [updatedRow] = await db.update(reportDatasetMetadata).set({ refreshing }).where(eq(reportDatasetMetadata.uid, row.uid)).returning();
 
     if (updatedRow) {
         emitEvent({
@@ -342,18 +332,7 @@ async function setRefreshing(row: InferSelectModel<typeof reportDatasetMetadata>
  * Updates the status for a report datum and emits update event.
  */
 async function setStatus(row: InferSelectModel<typeof reportDatasetMetadata>, status: string): Promise<void> {
-    const [updatedRow] = await db
-        .update(reportDatasetMetadata)
-        .set({ status })
-        .where(
-            and(
-                eq(reportDatasetMetadata.accountId, row.accountId),
-                eq(reportDatasetMetadata.periodStart, row.periodStart),
-                eq(reportDatasetMetadata.aggregation, row.aggregation),
-                eq(reportDatasetMetadata.entityType, row.entityType)
-            )
-        )
-        .returning();
+    const [updatedRow] = await db.update(reportDatasetMetadata).set({ status }).where(eq(reportDatasetMetadata.uid, row.uid)).returning();
 
     if (updatedRow) {
         emitEvent({
@@ -376,14 +355,7 @@ async function markReportProcessed(row: InferSelectModel<typeof reportDatasetMet
             lastProcessedReportId: reportId,
             error: null,
         })
-        .where(
-            and(
-                eq(reportDatasetMetadata.accountId, row.accountId),
-                eq(reportDatasetMetadata.periodStart, row.periodStart),
-                eq(reportDatasetMetadata.aggregation, row.aggregation),
-                eq(reportDatasetMetadata.entityType, row.entityType)
-            )
-        )
+        .where(eq(reportDatasetMetadata.uid, row.uid))
         .returning();
 
     if (!updatedRow) {
@@ -418,18 +390,7 @@ const markReportFailed = async (row: InferSelectModel<typeof reportDatasetMetada
 };
 
 async function setNextRefreshAt(row: InferSelectModel<typeof reportDatasetMetadata>, nextRefreshAt: Date | null): Promise<void> {
-    const [updatedRow] = await db
-        .update(reportDatasetMetadata)
-        .set({ nextRefreshAt })
-        .where(
-            and(
-                eq(reportDatasetMetadata.accountId, row.accountId),
-                eq(reportDatasetMetadata.periodStart, row.periodStart),
-                eq(reportDatasetMetadata.aggregation, row.aggregation),
-                eq(reportDatasetMetadata.entityType, row.entityType)
-            )
-        )
-        .returning();
+    const [updatedRow] = await db.update(reportDatasetMetadata).set({ nextRefreshAt }).where(eq(reportDatasetMetadata.uid, row.uid)).returning();
 
     if (updatedRow) {
         emitEvent({
@@ -450,14 +411,7 @@ async function setReport(row: InferSelectModel<typeof reportDatasetMetadata>, re
             reportId,
             lastReportCreatedAt: utcNow(),
         })
-        .where(
-            and(
-                eq(reportDatasetMetadata.accountId, row.accountId),
-                eq(reportDatasetMetadata.periodStart, row.periodStart),
-                eq(reportDatasetMetadata.aggregation, row.aggregation),
-                eq(reportDatasetMetadata.entityType, row.entityType)
-            )
-        )
+        .where(eq(reportDatasetMetadata.uid, row.uid))
         .returning();
 
     if (!updatedRow) {
@@ -480,14 +434,7 @@ async function setError(reportDatum: typeof reportDatasetMetadata.$inferSelect, 
     const [updatedRow] = await db
         .update(reportDatasetMetadata)
         .set({ status: 'error', error: formatError(error), refreshing: false })
-        .where(
-            and(
-                eq(reportDatasetMetadata.accountId, reportDatum.accountId),
-                eq(reportDatasetMetadata.periodStart, reportDatum.periodStart),
-                eq(reportDatasetMetadata.aggregation, reportDatum.aggregation),
-                eq(reportDatasetMetadata.entityType, reportDatum.entityType)
-            )
-        )
+        .where(eq(reportDatasetMetadata.uid, reportDatum.uid))
         .returning();
 
     if (updatedRow) {
@@ -516,17 +463,7 @@ const deferReport = async (row: InferSelectModel<typeof reportDatasetMetadata>, 
 };
 
 async function clearError(row: InferSelectModel<typeof reportDatasetMetadata>): Promise<void> {
-    const [updatedRow] = await db
-        .update(reportDatasetMetadata)
-        .set({ error: null })
-        .where(
-            and(
-                eq(reportDatasetMetadata.accountId, row.accountId),
-                eq(reportDatasetMetadata.periodStart, row.periodStart),
-                eq(reportDatasetMetadata.aggregation, row.aggregation),
-                eq(reportDatasetMetadata.entityType, row.entityType)
-            )
-        );
+    const [updatedRow] = await db.update(reportDatasetMetadata).set({ error: null }).where(eq(reportDatasetMetadata.uid, row.uid));
 
     if (updatedRow) {
         emitEvent({

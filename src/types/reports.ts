@@ -7,7 +7,7 @@ import type { z } from 'zod';
 export const AGGREGATION_TYPES = ['hourly', 'daily'] as const;
 export type AggregationType = (typeof AGGREGATION_TYPES)[number];
 
-export const ENTITY_TYPES = ['target', 'product'] as const;
+export const ENTITY_TYPES = ['target', 'product', 'placement'] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
 /**
@@ -33,4 +33,4 @@ export interface ReportConfig {
 /**
  * Map of aggregation -> entityType -> report configuration.
  */
-export type ReportConfigMap = Record<AggregationType, Record<EntityType, ReportConfig>>;
+export type ReportConfigMap = Record<AggregationType, Partial<Record<EntityType, ReportConfig>>>;

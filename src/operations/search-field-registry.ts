@@ -35,11 +35,11 @@ const PERFORMANCE_FIELDS = [
     'metrics.cvr',
 ] as const;
 
-export const CAMPAIGN_SEARCH_FIELDS = [...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date'] as const;
+export const CAMPAIGN_SEARCH_FIELDS = [...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.placement'] as const;
 export const AD_GROUP_SEARCH_FIELDS = [...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.hour'] as const;
 export const AD_SEARCH_FIELDS = [...AD_RESOURCE_FIELDS, ...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.hour'] as const;
 
-export const SEARCH_FIELDS = [...AD_SEARCH_FIELDS] as const;
+export const SEARCH_FIELDS = [...AD_SEARCH_FIELDS, 'segments.placement'] as const;
 
 export type SearchField = (typeof SEARCH_FIELDS)[number];
 export type CampaignSearchField = (typeof CAMPAIGN_SEARCH_FIELDS)[number];
@@ -116,6 +116,7 @@ export const searchFieldRegistry: Readonly<Record<SearchField, SearchFieldDefini
     'metrics.cvr': definition('metrics.cvr', 'number', numericOperators, allResources, [], { performance: true }),
     'segments.date': definition('segments.date', 'date', dateOperators, allResources, [], { performance: true, segment: true }),
     'segments.hour': definition('segments.hour', 'number', numericOperators, childResources, [], { performance: true, segment: true }),
+    'segments.placement': definition('segments.placement', 'string', stringEqualityOperators, ['campaign'], [], { performance: true, segment: true }),
 };
 
 export const CAMPAIGN_DEFAULT_FIELDS = CAMPAIGN_SEARCH_FIELDS.filter(field => searchFieldRegistry[field].defaultResources.includes('campaign')) as CampaignSearchField[];
@@ -141,3 +142,5 @@ export const getCampaignSearchField = (field: string) => (Object.hasOwn(campaign
 export const isCampaignPerformanceField = (field: string) => campaignSearchFieldRegistry[field as CampaignSearchField]?.performance ?? false;
 
 export const isCampaignSegmentField = (field: string) => campaignSearchFieldRegistry[field as CampaignSearchField]?.segment ?? false;
+
+export const isCampaignPlacementSegmentField = (field: string) => field === 'segments.placement';

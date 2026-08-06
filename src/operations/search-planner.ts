@@ -1,6 +1,7 @@
 import { format, subDays } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { z } from 'zod';
+import { PLACEMENT_VALUES } from '@/lib/placement-report/normalize-placement';
 import { OperationError } from './operation-errors';
 import { createSearchQueryFingerprint } from './search-cursor';
 import {
@@ -115,6 +116,7 @@ export type SearchPlan = {
     segmented: boolean;
     segmentFields: readonly SearchField[];
     hourly: boolean;
+    placement: boolean;
     fingerprint: string;
 };
 
@@ -127,6 +129,15 @@ export const planSearch = (input: unknown, options: { timezone: string; now?: Da
     const parsedInput = searchInputSchema.safeParse(input);
     if (!parsedInput.success) {
         throw invalidInput('Search input is invalid.', { issues: parsedInput.error.issues });
+    }
+    if (usesSearchField(parsedInput.data, 'segments.placement') && usesSearchField(parsedInput.data, 'segments.hour')) {
+        throw invalidInput('segments.placement cannot be combined with segments.hour.');
+    }
+    if (parsedInput.data.resource !== 'campaign' && usesSearchField(parsedInput.data, 'segments.placement')) {
+        throw invalidInput('segments.placement is only compatible with Campaign Search.', {
+            field: 'segments.placement',
+            resource: parsedInput.data.resource,
+        });
     }
     if (!isSearchResource(parsedInput.data.resource)) {
         throw invalidInput('Search resource is not available in this operation slice.', {
@@ -144,7 +155,11 @@ export const planSearch = (input: unknown, options: { timezone: string; now?: Da
     const segmentFields = [...new Set([...fields, ...requestedOrder.map(order => order.field)].filter(isSearchSegmentField))];
     const segmented = segmentFields.length > 0;
     const hourly = usedFields.some(isSearchHourSegmentField);
+    const placement = usedFields.includes('segments.placement');
 
+    if (placement && hourly) {
+        throw invalidInput('segments.placement cannot be combined with segments.hour.');
+    }
     if (hourly && !usedFields.includes('segments.date')) {
         throw invalidInput('segments.hour requires the compatible segments.date Field.', {
             field: 'segments.hour',
@@ -185,6 +200,7 @@ export const planSearch = (input: unknown, options: { timezone: string; now?: Da
         segmented,
         segmentFields,
         hourly,
+        placement,
         fingerprint,
     };
 };
@@ -260,6 +276,9 @@ const validateFilterValue = (field: SearchFieldDefinition, operator: SearchOpera
         if (!Array.isArray(value) || value.length === 0 || value.some(item => !(isScalarValue(field, item) && isValidFieldValue(field, item)))) {
             throw invalidInput('The in operator requires a non-empty array of values matching the Field type.', { field: field.field });
         }
+        if (field.field === 'segments.placement' && value.some(item => !isPublicPlacement(item))) {
+            throw invalidInput('Placement filters must use the public placement vocabulary.', { field: field.field, allowedValues: PLACEMENT_VALUES });
+        }
         return value as string[] | number[];
     }
 
@@ -272,6 +291,9 @@ const validateFilterValue = (field: SearchFieldDefinition, operator: SearchOpera
 
     if (!(isScalarValue(field, value) && isValidFieldValue(field, value))) {
         throw invalidInput('Search filter value does not match the Field type.', { field: field.field });
+    }
+    if (field.field === 'segments.placement' && !isPublicPlacement(value)) {
+        throw invalidInput('Placement filters must use the public placement vocabulary.', { field: field.field, allowedValues: PLACEMENT_VALUES });
     }
 
     return value;
@@ -319,6 +341,9 @@ const getDefaultOrder = (resource: SearchResource, performance: boolean, segment
         if (segmentFields.includes('segments.hour')) {
             order.push({ field: 'segments.hour', direction: 'asc' });
         }
+        if (segmentFields.includes('segments.placement')) {
+            order.push({ field: 'segments.placement', direction: 'asc' });
+        }
         return order;
     }
     if (performance) {
@@ -354,3 +379,8 @@ const isIsoDate = (value: string) => {
 };
 
 const invalidInput = (message: string, details: Record<string, unknown> = {}) => new OperationError('INVALID_INPUT', message, details);
+
+const isPublicPlacement = (value: unknown): value is (typeof PLACEMENT_VALUES)[number] => typeof value === 'string' && (PLACEMENT_VALUES as readonly string[]).includes(value);
+
+const usesSearchField = (input: { fields?: readonly string[]; filters?: readonly { field: string }[]; orderBy?: readonly { field: string }[] }, field: string) =>
+    input.fields?.includes(field) || input.filters?.some(filter => filter.field === field) || input.orderBy?.some(order => order.field === field);

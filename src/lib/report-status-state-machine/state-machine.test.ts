@@ -27,4 +27,12 @@ describe('report status state machine', () => {
 
         await expect(getNextAction(new Date('2026-07-19T07:00:00.000Z'), 'hourly', 'target', null, 'report-id', 'US')).resolves.toBe('fail');
     });
+
+    it('creates an eligible daily Campaign placement report without enabling hourly placement reports', async () => {
+        const periodStart = new Date('2026-07-19T07:00:00.000Z');
+        const now = new Date('2026-07-20T07:00:00.000Z');
+
+        await expect(getNextAction(periodStart, 'daily', 'placement', null, null, 'US', now)).resolves.toBe('create');
+        await expect(getNextAction(periodStart, 'hourly', 'placement', null, null, 'US', now)).resolves.toBe('none');
+    });
 });
