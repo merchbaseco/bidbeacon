@@ -8,6 +8,12 @@ read_when:
 
 BidBeacon exposes a deliberately small, stable field vocabulary. The catalog is shared by the MCP, CLI, and public operation layer; Amazon field names remain internal source mappings.
 
+## Campaign Search implementation status
+
+The first shared Search slice implements `resource: campaign`. It accepts Campaign settings, the standard performance metrics, optional `metrics.cvr`, and the account-local `segments.date` field. Omitting `fields` returns the Campaign default fields plus the standard metrics; supplying `fields` replaces that set. The operation currently rejects fields owned by later Search slices, including other resources, `segments.hour`, and `segments.placement`.
+
+Campaign performance reads the canonical daily archive at the advertised-ASIN grain (`performance_daily.entity_type = product`) and aggregates component metrics before deriving ACOS, CPC, CTR, ROAS, and CVR. Date-segmented rows are zero-filled for every Campaign and requested account-local date. Coverage comes from retained daily Product report metadata, so a completed report with zero records is complete while missing metadata remains unknown.
+
 ## Resource fields
 
 | Resource | Default fields | Additional selectable fields |

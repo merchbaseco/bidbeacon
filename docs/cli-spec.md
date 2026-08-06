@@ -6,7 +6,7 @@ read_when:
 
 # BidBeacon MCP and CLI specification
 
-**Status:** Accepted design; account discovery and UUID authorization are implemented in the shared operation layer; the remaining operation adapters are pending.
+**Status:** Accepted design; account discovery and UUID authorization plus the Campaign Search operation are implemented in the shared operation layer; the remaining Search resources and operation adapters are pending.
 
 This specification defines one public operation layer projected through:
 
@@ -176,6 +176,8 @@ campaign | ad_group | ad | target | product | change_event
 
 The resource determines row grain. A row may select fields from that resource and its ancestors, never its children. `product` is a read-only ASIN-grain view aggregated across matching ads.
 
+The first delivered operation slice supports `resource: campaign`. It accepts Campaign settings, standard metrics, optional `metrics.cvr`, and `segments.date`; Search rejects fields owned by later resource slices, `segments.hour`, and `segments.placement` until their archive projections are delivered.
+
 ### Filters
 
 Each filter contains one Field, one operator, and one value. Supported operators are:
@@ -203,9 +205,10 @@ The complete field vocabulary lives in [search-field-catalog.md](search-field-ca
 - Omitting `fields` selects the resource's documented Default fields.
 - Supplying `fields` replaces the Default fields.
 - Selecting a metric or segment makes the request a Performance search.
-- Selecting `segments.hour` also requires `segments.date`.
-- `segments.placement` is Campaign-only and may be combined with `segments.date`, but not `segments.hour`.
+- Campaign Search accepts `segments.date`; `segments.hour` and `segments.placement` are reserved for later archive-backed Search slices.
 - A validation error names incompatible fields and the fields permitted for that resource.
+
+Campaign performance uses the daily advertised-ASIN archive (`entity_type = product`) as its one canonical source grain. Date-segmented Campaign rows are account-local and zero-filled across the requested inclusive dates. Coverage is derived from retained daily Product report metadata, including valid completed zero-record reports.
 
 The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` include the nine Standard performance metrics. A default campaign Search therefore behaves like the campaign table in the Amazon Ads dashboard: it returns campaign settings and recent performance together.
 

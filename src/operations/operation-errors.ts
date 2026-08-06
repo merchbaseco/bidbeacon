@@ -1,4 +1,4 @@
-export type OperationErrorCode = 'ACCOUNT_ACCESS_DENIED' | 'AUTHENTICATION_REQUIRED' | 'INVALID_INPUT';
+export type OperationErrorCode = 'ACCOUNT_ACCESS_DENIED' | 'AUTHENTICATION_REQUIRED' | 'CURSOR_INVALID' | 'INVALID_INPUT';
 
 export class OperationError extends Error {
     readonly code: OperationErrorCode;
