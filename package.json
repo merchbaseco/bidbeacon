@@ -6,7 +6,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && bun run skill:package",
     "build:dashboard": "vite build --config vite.config.dashboard.ts",
     "start": "dotenv --no-expand -e .env -- node dist/index.js",
     "start:worker": "dotenv --no-expand -e .env -- node dist/worker.js",
@@ -20,6 +20,8 @@
     "db:studio": "drizzle-kit studio",
     "worker": "dotenv --no-expand -e .env -- tsx src/worker/index.ts",
     "peek-dlq": "tsx scripts/peek-dlq.ts",
+    "skill:package": "bun scripts/package-account-management-skill.ts",
+    "skill:validate": "bun scripts/validate-account-management-skill.ts",
     "prepublishOnly": "node -e \"console.error('Root package publish is blocked. Publish from packages/bidbeacon-api-client or packages/bidbeacon-cli instead.'); process.exit(1)\"",
     "test": "vitest",
     "version:check": "tsx scripts/verify-release-versions.ts",

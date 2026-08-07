@@ -31,6 +31,12 @@ The public tool inventory is deliberately limited to the shared operation layer:
 
 The server exposes tools only. It does not expose MCP resources, prompts, sampling, Apps, stdio transport, or selected-account/session state. Input and output JSON Schemas are generated from the operation schemas. Successful calls return the same JSON value as portable text content and `structuredContent`. Operation failures use the stable `{ error: { code, message, details } }` envelope documented in [the CLI contract](cli-spec.md).
 
+## Optional account-management skill
+
+The distribution also ships the independently installable `bidbeacon-account-management` Agent Skill at `dist/skills/bidbeacon-account-management` after `bun run build`; the source folder is `skills/bidbeacon-account-management`. A compatible agent host may install or read that folder and its relative references separately from the MCP connection. The skill adds progressive-disclosure guidance for account routing, Campaign and Product diagnosis, ASIN traversal, comparison periods, coverage, optimization, campaign launch, and partial-failure recovery.
+
+The skill is optional. The MCP remains self-sufficient: tool names, generated schemas, validation errors, canonical outputs, and universal server instructions are enough for correct calls when the skill is absent.
+
 ## Deployment checks
 
 The reverse proxy must forward `/mcp` and the four discovery paths to the API server, preserving `Authorization`, `Origin`, `Accept`, `Content-Type`, `Mcp-Protocol-Version`, `Mcp-Session-Id`, and `Last-Event-ID` headers. The server is stateless, so do not add sticky-session or in-memory session requirements.

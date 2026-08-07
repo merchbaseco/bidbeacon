@@ -57,12 +57,17 @@ Postgres is bound to `127.0.0.1` for local-only access.
 ## Scripts
 
 - `bun run build` – bundle server and worker
+- `bun run skill:validate` – validate the optional account-management skill and its local references
 - `bun run dev` – run API server + dashboard in dev mode
 - `bun run dev:server` – run API server in dev mode with the server job runner disabled by default
 - `bun run start` – run compiled server
 - `bun run worker` – run worker in dev mode
 - `bun run dev:dashboard` – run dashboard dev server (proxies /api to production)
 - `./test-api.sh` – smoke test the health endpoint
+
+## Optional Agent Skill
+
+The repository bundles the optional `bidbeacon-account-management` Agent Skill beside the self-sufficient MCP. Compatible agent hosts can install or read `skills/bidbeacon-account-management` directly; a production build copies the same independently readable folder to `dist/skills/bidbeacon-account-management`. The MCP does not require the skill for correct tool calls.
 
 ## API Client (npm)
 

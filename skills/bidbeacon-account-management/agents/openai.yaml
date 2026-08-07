@@ -1,0 +1,4 @@
+interface:
+  display_name: "BidBeacon Account Management"
+  short_description: "Diagnose, optimize, and launch ad accounts"
+  default_prompt: "Use $bidbeacon-account-management to diagnose or safely optimize a BidBeacon advertising account."
