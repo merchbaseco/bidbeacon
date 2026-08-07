@@ -7,7 +7,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { validateAccountManagementSkill } from '../scripts/account-management-skill-package';
 import { MCP_TOOL_NAMES } from '../src/mcp/operation-definitions';
 
-const sourceSkillDirectory = resolve('skills/bidbeacon-account-management');
+const sourceSkillDirectory = resolve('skills/bidbeacon-amazon-ads');
 const evaluationCasesFile = resolve('tests/fixtures/account-management-skill-cases.json');
 const temporaryDirectories: string[] = [];
 const execFileAsync = promisify(execFile);
@@ -30,14 +30,14 @@ const LINE_BREAK_PATTERN = /\r?\n/;
 const RECIPE_HEADING_PATTERN = /^# Recipe: /;
 const WORD_PATTERN = /\S+/g;
 
-describe('BidBeacon account-management skill package', () => {
+describe('BidBeacon Amazon Ads skill package', () => {
     afterEach(async () => {
         await Promise.all(temporaryDirectories.splice(0).map(directory => rm(directory, { force: true, recursive: true })));
     });
 
     it('validates the source skill manifest and every referenced local file', async () => {
         await expect(validateAccountManagementSkill(sourceSkillDirectory)).resolves.toEqual({
-            name: 'bidbeacon-account-management',
+            name: 'bidbeacon-amazon-ads',
             files: expectedSkillFiles,
         });
     });
@@ -45,12 +45,12 @@ describe('BidBeacon account-management skill package', () => {
     it('packages an exact self-contained copy through the production package command', async () => {
         const stagingDirectory = await mkdtemp(join(tmpdir(), 'bidbeacon-skill-package-'));
         temporaryDirectories.push(stagingDirectory);
-        const distributionDirectory = join(stagingDirectory, 'dist', 'skills', 'bidbeacon-account-management');
+        const distributionDirectory = join(stagingDirectory, 'dist', 'skills', 'bidbeacon-amazon-ads');
 
         await execFileAsync('bun', ['scripts/package-account-management-skill.ts', distributionDirectory], { cwd: resolve('.') });
 
         await expect(validateAccountManagementSkill(distributionDirectory)).resolves.toEqual({
-            name: 'bidbeacon-account-management',
+            name: 'bidbeacon-amazon-ads',
             files: expectedSkillFiles,
         });
         for (const file of expectedSkillFiles) {
@@ -107,13 +107,13 @@ describe('BidBeacon account-management skill package', () => {
         const skillDirectory = await createTemporarySkill();
         await writeFile(
             join(skillDirectory, 'agents', 'openai.yaml'),
-            'interface:\n  display_name: ""\n  short_description: "Diagnose, optimize, and launch ad accounts"\n  default_prompt: "Use $bidbeacon-account-management."\n'
+            'interface:\n  display_name: ""\n  short_description: "Diagnose, optimize, and launch ad accounts"\n  default_prompt: "Use $bidbeacon-amazon-ads."\n'
         );
         await expect(validateAccountManagementSkill(skillDirectory)).rejects.toThrow('non-empty');
 
         const originalSkill = await readFile(join(sourceSkillDirectory, 'SKILL.md'), 'utf8');
         await writeFile(join(skillDirectory, 'agents', 'openai.yaml'), await readFile(join(sourceSkillDirectory, 'agents', 'openai.yaml'), 'utf8'));
-        await writeFile(join(skillDirectory, 'SKILL.md'), originalSkill.replace('name: bidbeacon-account-management', 'name: wrong\nname: bidbeacon-account-management'));
+        await writeFile(join(skillDirectory, 'SKILL.md'), originalSkill.replace('name: bidbeacon-amazon-ads', 'name: wrong\nname: bidbeacon-amazon-ads'));
         await expect(validateAccountManagementSkill(skillDirectory)).rejects.toThrow('duplicate name');
     });
 
@@ -136,7 +136,7 @@ describe('BidBeacon account-management skill package', () => {
 const createTemporarySkill = async () => {
     const stagingDirectory = await mkdtemp(join(tmpdir(), 'bidbeacon-skill-validation-'));
     temporaryDirectories.push(stagingDirectory);
-    const skillDirectory = join(stagingDirectory, 'bidbeacon-account-management');
+    const skillDirectory = join(stagingDirectory, 'bidbeacon-amazon-ads');
     await cp(sourceSkillDirectory, skillDirectory, { recursive: true });
     return skillDirectory;
 };

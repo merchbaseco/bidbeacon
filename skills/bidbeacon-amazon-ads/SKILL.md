@@ -1,9 +1,9 @@
 ---
-name: bidbeacon-account-management
+name: bidbeacon-amazon-ads
 description: "Manage Amazon Ads through BidBeacon: audit accounts, investigate Campaign or ASIN performance, optimize resources, launch Sponsored Products ads, manage negatives or lifecycle, recover partial launches, or explicitly add or revise a recipe in this skill."
 ---
 
-# BidBeacon account management
+# Manage Amazon Ads with BidBeacon
 
 Use one recipe. Tool schemas own validation; this skill owns judgment.
 

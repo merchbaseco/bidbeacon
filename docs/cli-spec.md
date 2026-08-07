@@ -965,7 +965,7 @@ Correct tool use does not depend on a client honoring these instructions.
 
 ## Optional Agent Skill
 
-The MCP distribution also includes the independently installable `bidbeacon-account-management` skill. Its recipe router covers:
+The MCP distribution also includes the independently installable `bidbeacon-amazon-ads` skill. Its recipe router covers:
 
 - account discovery and explicit routing;
 - account review and opportunity discovery;

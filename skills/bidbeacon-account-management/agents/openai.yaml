@@ -1,4 +1,0 @@
-interface:
-  display_name: "BidBeacon Account Management"
-  short_description: "Run safe, recipe-based Amazon Ads workflows"
-  default_prompt: "Use $bidbeacon-account-management to choose and run the right BidBeacon account-management recipe."

@@ -51,7 +51,7 @@ _Avoid_: Fractional percentages, formatted currency strings
 A compact server-level hint containing only universal operating invariants, including explicit Account IDs, stateless requests, Search defaults, and inspect-before-mutate behavior. Correct tool use never depends on a client applying these instructions.
 _Avoid_: Workflow manual, field catalog
 
-**BidBeacon account management skill**:
+**BidBeacon Amazon Ads skill**:
 An optional Agent Skill bundled alongside the independently usable MCP. It teaches higher-level workflows such as performance diagnosis, Product-to-Ad drill-down, comparison periods, coverage interpretation, and safe optimization sequencing; compatible agent hosts install or reference it separately.
 _Avoid_: Required MCP runtime dependency, duplicating tool schemas
 

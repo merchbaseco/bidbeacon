@@ -1,0 +1,4 @@
+interface:
+  display_name: "BidBeacon Amazon Ads"
+  short_description: "Run safe, recipe-based Amazon Ads workflows"
+  default_prompt: "Use $bidbeacon-amazon-ads to choose and run the right BidBeacon Amazon Ads recipe."

@@ -31,9 +31,9 @@ The public tool inventory is deliberately limited to the shared operation layer:
 
 The server exposes tools only. It does not expose MCP resources, prompts, sampling, Apps, stdio transport, or selected-account/session state. Input and output JSON Schemas are generated from the operation schemas. Successful calls return the same JSON value as portable text content and `structuredContent`. Operation failures use the stable `{ error: { code, message, details } }` envelope documented in [the CLI contract](cli-spec.md).
 
-## Optional account-management skill
+## Optional Amazon Ads skill
 
-The public repository exposes the independently installable `bidbeacon-account-management` Agent Skill in the skills.sh-compatible `skills/bidbeacon-account-management` folder. Install it with `npx skills add merchbaseco/bidbeacon --skill bidbeacon-account-management -g`. A production build also copies the same independently readable folder to `dist/skills/bidbeacon-account-management`. Its compact router progressively discloses one recipe for the active job: account review, Campaign or ASIN investigation, optimization, campaign launch, negative targeting, pause/archive, partial-failure recovery, or explicit user-requested skill extension. Recipes contain high-level judgment, branching, and completion bounds without copying MCP schemas or worked request bodies.
+The public repository exposes the independently installable `bidbeacon-amazon-ads` Agent Skill in the skills.sh-compatible `skills/bidbeacon-amazon-ads` folder. Install it with `npx skills add merchbaseco/bidbeacon --skill bidbeacon-amazon-ads -g`. A production build also copies the same independently readable folder to `dist/skills/bidbeacon-amazon-ads`. Its compact router progressively discloses one recipe for the active job: account review, Campaign or ASIN investigation, optimization, campaign launch, negative targeting, pause/archive, partial-failure recovery, or explicit user-requested skill extension. Recipes contain high-level judgment, branching, and completion bounds without copying MCP schemas or worked request bodies.
 
 The skill is optional. The MCP remains self-sufficient: tool names, generated schemas, validation errors, canonical outputs, and universal server instructions are enough for correct calls when the skill is absent.
 

@@ -1,7 +1,7 @@
 import { cp, mkdir, readdir, readFile, rm } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 
-export const ACCOUNT_MANAGEMENT_SKILL_NAME = 'bidbeacon-account-management';
+export const ACCOUNT_MANAGEMENT_SKILL_NAME = 'bidbeacon-amazon-ads';
 
 const FRONTMATTER_PATTERN = /^---\r?\n([\s\S]*?)\r?\n---\r?\n/;
 const FRONTMATTER_LINE_BREAK_PATTERN = /\r?\n/;

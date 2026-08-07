@@ -4,9 +4,9 @@ read_when:
   - changing MCP instructions, tool descriptions, prompts, or bundled agent skills
 ---
 
-# Bundle an optional account management skill
+# Bundle an optional Amazon Ads skill
 
-BidBeacon ships a self-sufficient MCP plus an optional `bidbeacon-account-management` Agent Skill in the same distribution. Tool names, schemas, validation errors, and compact server instructions are sufficient for correct primitive calls without the skill. The skill is a compact intent router over progressively disclosed, job-shaped recipes. Recipes carry only durable judgment, branching, and completion bounds for account review, Campaign or ASIN investigation, optimization, launch, negative targeting, lifecycle changes, partial-failure recovery, and explicit user-requested skill extension.
+BidBeacon ships a self-sufficient MCP plus an optional `bidbeacon-amazon-ads` Agent Skill in the same distribution. Tool names, schemas, validation errors, and compact server instructions are sufficient for correct primitive calls without the skill. The skill is a compact intent router over progressively disclosed, job-shaped recipes. Recipes carry only durable judgment, branching, and completion bounds for account review, Campaign or ASIN investigation, optimization, launch, negative targeting, lifecycle changes, partial-failure recovery, and explicit user-requested skill extension.
 
 Generic reference chapters were rejected because they force the agent to translate a concrete user job into internal categories and compose the actual workflow itself. Recipe files instead match recognizable requests and load only the active branch. Universal account-routing, timezone, coverage, approval, verification, and spend-gate invariants stay in `SKILL.md`; exact schemas, defaults, and Field compatibility remain authoritative in the MCP. Worked request bodies and exhaustive procedures are omitted so the agent can use current tool schemas and task context rather than a stale cached contract.
 

@@ -57,7 +57,7 @@ Postgres is bound to `127.0.0.1` for local-only access.
 ## Scripts
 
 - `bun run build` – bundle server and worker
-- `bun run skill:validate` – validate the optional account-management skill and its local references
+- `bun run skill:validate` – validate the optional Amazon Ads skill and its local references
 - `bun run dev` – run API server + dashboard in dev mode
 - `bun run dev:server` – run API server in dev mode with the server job runner disabled by default
 - `bun run start` – run compiled server
@@ -67,13 +67,13 @@ Postgres is bound to `127.0.0.1` for local-only access.
 
 ## Optional Agent Skill
 
-Install the optional `bidbeacon-account-management` Agent Skill with [skills.sh](https://skills.sh/):
+Install the optional `bidbeacon-amazon-ads` Agent Skill with [skills.sh](https://skills.sh/):
 
 ```bash
-npx skills add merchbaseco/bidbeacon --skill bidbeacon-account-management -g
+npx skills add merchbaseco/bidbeacon --skill bidbeacon-amazon-ads -g
 ```
 
-The skill complements the self-sufficient MCP with progressively disclosed recipes for account reviews, Campaign and ASIN investigation, optimization, launch, negative targeting, lifecycle changes, and partial-failure recovery. Its source remains at `skills/bidbeacon-account-management`; the MCP does not require it for correct tool calls.
+The skill complements the self-sufficient MCP with progressively disclosed recipes for account reviews, Campaign and ASIN investigation, optimization, launch, negative targeting, lifecycle changes, and partial-failure recovery. Its source remains at `skills/bidbeacon-amazon-ads`; the MCP does not require it for correct tool calls.
 
 ## API Client (npm)
 
