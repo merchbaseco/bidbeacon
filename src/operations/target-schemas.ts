@@ -5,6 +5,7 @@ export const targetCreationStateSchema = z.enum(['ENABLED', 'PAUSED']);
 export const targetStateSchema = z.enum(['ENABLED', 'PAUSED', 'ARCHIVED']);
 export const targetKeywordMatchTypeSchema = z.enum(['BROAD', 'PHRASE', 'EXACT']);
 export const targetNegativeKeywordMatchTypeSchema = z.enum(['PHRASE', 'EXACT']);
+export const autoTargetMatchTypeSchema = z.enum(['SEARCH_CLOSE_MATCH', 'SEARCH_LOOSE_MATCH', 'PRODUCT_SUBSTITUTES', 'PRODUCT_COMPLEMENTS']);
 export const targetTypeSchema = z.enum(['KEYWORD', 'PRODUCT', 'AUTO']);
 export const targetAsinSchema = z
     .string()
@@ -28,6 +29,16 @@ export const productTargetCreateInputSchema = z
         accountId: accountIdSchema,
         adGroupId: z.string().trim().min(1),
         asin: targetAsinSchema,
+        bid: z.number().finite().nonnegative(),
+        state: targetCreationStateSchema,
+    })
+    .strict();
+
+export const autoTargetCreateInputSchema = z
+    .object({
+        accountId: accountIdSchema,
+        adGroupId: z.string().trim().min(1),
+        matchType: autoTargetMatchTypeSchema,
         bid: z.number().finite().nonnegative(),
         state: targetCreationStateSchema,
     })
@@ -86,6 +97,7 @@ export const canonicalTargetSchema = z.object({
 
 export type KeywordTargetCreateInput = z.infer<typeof keywordTargetCreateInputSchema>;
 export type ProductTargetCreateInput = z.infer<typeof productTargetCreateInputSchema>;
+export type AutoTargetCreateInput = z.infer<typeof autoTargetCreateInputSchema>;
 export type NegativeKeywordCreateInput = z.infer<typeof negativeKeywordCreateInputSchema>;
 export type NegativeProductTargetCreateInput = z.infer<typeof negativeProductTargetCreateInputSchema>;
 export type TargetUpdateChanges = z.infer<typeof targetUpdateChangesSchema>;

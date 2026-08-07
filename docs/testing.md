@@ -55,4 +55,12 @@ Change events, stable Amazon errors, and cross-account isolation. Target-mutatio
 in `src/operations/testing/target-mutation-fixtures.ts`; keep them target-specific and use the
 production operation path with embedded PGlite and the programmable gateway.
 
+Composite Sponsored Products creation acceptance lives in
+`src/operations/composite-campaign-mutations.test.ts`. It uses the same embedded PGlite and
+programmable gateway to cover complete validation, automatic/manual keyword/manual product
+topologies, default-bid inheritance, placement controls, negative Targets, child-enabled versus
+Campaign-gated state, canonical success output, and every partial-failure position. Its Amazon
+responses live in `src/operations/testing/composite-campaign-fixtures.ts`; the gateway supports
+response sequences so each synchronous child has an independent accepted resource.
+
 Auth tests must not use production credentials or database writes. Use the shared package's fake Clerk client/projection store patterns and assert that legacy `bbk_`, `BB_API_KEY`, query-string WebSocket credentials, and product-local API-key routes remain absent.

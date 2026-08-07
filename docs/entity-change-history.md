@@ -35,7 +35,7 @@ Current normalization rules:
   - `BID_AMOUNT` / `DEFAULT_BID_AMOUNT` -> `bid_change`
 - Ad:
   - `STATUS` -> `state_change`
-- Target-like entities (keyword, product targeting, negative keyword):
+- Target-like entities (automatic, keyword, product targeting, negative keyword):
   - `STATUS` -> `state_change`
   - `BID_AMOUNT` (where available) -> `bid_change`
 
@@ -44,9 +44,13 @@ Current normalization rules:
 ### BidBeacon-triggered writes (immediate)
 - Shared operation mutations (`createCampaign`, `updateCampaign`, `createAdGroup`,
   `updateAdGroup`, `createAd`, `updateAd`, `createKeywordTarget`, `createProductTarget`,
-  `createNegativeKeyword`, `createNegativeProductTarget`, and `updateTarget`) plus the legacy public mutation helpers
+  `createAutomaticTarget`, `createNegativeKeyword`, `createNegativeProductTarget`, and
+  `updateTarget`) plus the legacy public mutation helpers
   (`updateCampaignRow`, `updateAdGroupRow`, `updateAdRow`, `updateTargetRow`) write history rows
   with `source = 'bidbeacon'`.
+- `create_sponsored_products_campaign` delegates each child and its final Campaign state change to
+  those same mutation paths, so composite success and partial completion retain the ordinary
+  immediate `bidbeacon` Change events for every accepted resource.
 - Shared ad-group and target bid mutation routers also write `bid_change` rows.
 
 ### AMS-triggered writes (sub-daily)

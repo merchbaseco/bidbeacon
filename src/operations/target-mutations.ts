@@ -6,6 +6,8 @@ import { resolveAdvertiserAccount } from './advertiser-accounts';
 import type { OperationContext } from './operation-context';
 import { OperationError } from './operation-errors';
 import {
+    type AutoTargetCreateInput,
+    autoTargetCreateInputSchema,
     type CanonicalTarget,
     canonicalTargetSchema,
     type KeywordTargetCreateInput,
@@ -115,6 +117,46 @@ export const createProductTarget = async (context: OperationContext, input: unkn
         },
     });
     assertReturnedTargetIdentity(canonical, { campaignId: ownedAdGroup.campaignId, adGroupId: ownedAdGroup.adGroupId, type: 'PRODUCT', negative: false });
+    const changedAt = new Date();
+
+    await reconcileTarget(context, canonical, undefined, changedAt);
+    await recordTargetChanges(context, account, canonical.id, changedAt, [
+        { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
+        { eventType: 'bid_change', fieldName: 'bidAmount', previousValue: null, newValue: canonical.bid },
+    ]);
+
+    return canonical;
+};
+
+export const createAutomaticTarget = async (context: OperationContext, input: unknown): Promise<CanonicalTarget> => {
+    const parsedInput = parseInput(autoTargetCreateInputSchema, input, 'create_auto_target');
+    const account = await resolveAdvertiserAccount(context, { accountId: parsedInput.accountId });
+    const ownedAdGroup = await findOwnedAdGroup(context, account, parsedInput.adGroupId);
+    if (!ownedAdGroup) {
+        throw new OperationError('RESOURCE_NOT_FOUND', 'Ad group not found in the requested Advertiser Account.', { adGroupId: parsedInput.adGroupId });
+    }
+
+    const response = await callAmazon(context, 'createTargets', {
+        profileId: resolveProfileId(account),
+        region: resolveApiRegion(account.countryCode),
+        targets: [buildAutomaticCreatePayload(parsedInput)],
+    });
+    const amazonTarget = extractTarget(response);
+    const canonical = mapCanonicalTarget({
+        amazonTarget,
+        fallback: {
+            id: amazonTarget.targetId,
+            campaignId: ownedAdGroup.campaignId,
+            adGroupId: ownedAdGroup.adGroupId,
+            state: parsedInput.state,
+            deliveryStatus: inferDeliveryStatus(parsedInput.state),
+            type: 'AUTO',
+            negative: false,
+            matchType: parsedInput.matchType,
+            bid: parsedInput.bid,
+        },
+    });
+    assertReturnedTargetIdentity(canonical, { campaignId: ownedAdGroup.campaignId, adGroupId: ownedAdGroup.adGroupId, type: 'AUTO', negative: false });
     const changedAt = new Date();
 
     await reconcileTarget(context, canonical, undefined, changedAt);
@@ -323,6 +365,20 @@ const buildProductCreatePayload = (input: ProductTargetCreateInput) => ({
             productIdType: 'ASIN',
             matchType: 'PRODUCT_EXACT',
             product: { productId: input.asin },
+        },
+    },
+});
+
+const buildAutomaticCreatePayload = (input: AutoTargetCreateInput) => ({
+    adProduct: 'SPONSORED_PRODUCTS',
+    adGroupId: input.adGroupId,
+    bid: { bid: input.bid },
+    state: input.state,
+    negative: false,
+    targetType: 'AUTO',
+    targetDetails: {
+        autoTarget: {
+            matchType: input.matchType,
         },
     },
 });
@@ -613,6 +669,9 @@ const resolveTargetType = (record: AmazonRecord, fallback: CanonicalTarget['type
     }
 
     const details = readRecord(record.targetDetails);
+    if (readRecord(details?.autoTarget)) {
+        return 'AUTO';
+    }
     if (readRecord(details?.keywordTarget) || raw === 'KEYWORD') {
         return 'KEYWORD';
     }
@@ -626,7 +685,8 @@ const resolveMatchType = (record: AmazonRecord) => {
     const details = readRecord(record.targetDetails);
     const keywordTarget = readRecord(details?.keywordTarget);
     const productTarget = readRecord(details?.productTarget);
-    return readString(keywordTarget?.matchType) ?? readString(productTarget?.matchType) ?? readString(record.targetMatchType) ?? readString(record.matchType);
+    const autoTarget = readRecord(details?.autoTarget);
+    return readString(keywordTarget?.matchType) ?? readString(productTarget?.matchType) ?? readString(autoTarget?.matchType) ?? readString(record.targetMatchType) ?? readString(record.matchType);
 };
 
 const resolveKeyword = (record: AmazonRecord) => {

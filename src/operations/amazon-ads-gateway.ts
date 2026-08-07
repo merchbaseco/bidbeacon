@@ -34,12 +34,15 @@ export type FakeAmazonAdsGateway = AmazonAdsGateway & {
 };
 
 type AmazonAdsResponses = Partial<Record<AmazonAdsOperation, AmazonAdsGatewayResponse>>;
+type AmazonAdsResponseSequences = Partial<Record<AmazonAdsOperation, AmazonAdsGatewayResponse[]>>;
 
 export const createFakeAmazonAdsGateway = ({
     responses = {},
+    responseSequences = {},
     failure,
 }: {
     responses?: AmazonAdsResponses;
+    responseSequences?: AmazonAdsResponseSequences;
     failure?: {
         operation: AmazonAdsOperation;
         callNumber?: number;
@@ -58,7 +61,7 @@ export const createFakeAmazonAdsGateway = ({
             throw new Error(failure.message ?? `Amazon Ads fake failed at ${operation}.`);
         }
 
-        return responses[operation] ?? defaultResponses[operation];
+        return responseSequences[operation]?.[callNumber - 1] ?? responses[operation] ?? defaultResponses[operation];
     };
 
     return {

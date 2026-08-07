@@ -67,3 +67,6 @@ The API health rate-limit count sums attempt-level 429s. Rows recorded before th
   errors are mapped only after that gateway call has definitively completed.
 - Target mutations call `createTargets` / `updateTargets` through the same production gateway
   wrapper and inherit the same synchronous limiter, timeout, retry, and final-error mapping.
+- Composite Sponsored Products creation invokes those Campaign, Ad group, Ad, and Target
+  primitives synchronously, so it waits for each Amazon response and inherits the same limiter,
+  timeout, retry, and final-error behavior before returning success or `COMPOSITE_PARTIAL_FAILURE`.

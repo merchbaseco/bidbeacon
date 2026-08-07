@@ -246,3 +246,18 @@ canonical Target representation, upserts the Target archive, and records immedia
 Change events for accepted state and bid changes. Amazon rejection, exhausted unavailability,
 invalid input, missing ancestry, and denied Account UUIDs use the stable shared operation error
 codes.
+
+### Composite Sponsored Products campaign creation
+
+`create_sponsored_products_campaign` is the preferred synchronous ordinary-launch operation. It
+validates one Campaign, one Ad group, one or more advertised ASIN Ads, exactly one targeting mode,
+and optional ad-group negative keyword/ASIN Targets before the first Amazon write. Automatic mode
+creates the four automatic Target groups and uses `adGroup.defaultBid` for omitted overrides;
+manual keyword and product modes create only their respective positive Target kind.
+
+The operation creates the Campaign `PAUSED`, all children `ENABLED`, and applies a requested
+Campaign `ENABLED` state only after every child succeeds. A requested `PAUSED` result does not
+issue a redundant Campaign update. Success returns canonical Campaign, Ad group, Ads, and Targets.
+If a later synchronous primitive fails, the operation stops without rollback, leaves the paused
+Campaign and successful resources locally reconciled, and raises `COMPOSITE_PARTIAL_FAILURE` with
+the successful resources, exact failed primitive input, and a sanitized Amazon error.

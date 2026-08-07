@@ -8,7 +8,8 @@ read_when:
 
 **Status:** Accepted design; account discovery and UUID authorization plus Campaign, Ad-group, and
 Ad, and Product Search and Campaign, Ad-group, Ad, and Target mutation slices are implemented in the
-shared operation layer; Target Search, Change-event Search, and operation adapters are pending.
+shared operation layer, along with composite Sponsored Products campaign creation. Target Search,
+Change-event Search, and operation adapters are pending.
 
 This specification defines one public operation layer projected through:
 
@@ -680,7 +681,7 @@ If an Amazon write fails after at least one resource succeeds, the operation ret
 {
   "error": {
     "code": "COMPOSITE_PARTIAL_FAILURE",
-    "message": "Sponsored Products campaign creation stopped after Amazon rejected a keyword target. The campaign remains paused.",
+    "message": "Sponsored Products campaign creation stopped during create_keyword_target. The Campaign remains paused.",
     "details": {
       "campaign": {},
       "created": {
@@ -690,7 +691,14 @@ If an Amazon write fails after at least one resource succeeds, the operation ret
       },
       "failed": {
         "operation": "create_keyword_target",
-        "input": {},
+        "input": {
+          "accountId": "6d997c64-3e64-4d50-b732-ec79d47f87f1",
+          "adGroupId": "amazon-ad-group-id",
+          "keyword": "free",
+          "matchType": "EXACT",
+          "bid": 0.45,
+          "state": "ENABLED"
+        },
         "amazon": {
           "code": "INVALID_ARGUMENT",
           "message": "..."
@@ -701,7 +709,12 @@ If an Amazon write fails after at least one resource succeeds, the operation ret
 }
 ```
 
-BidBeacon preserves successful resources under the paused campaign. The agent uses the disclosed IDs and primitive operations to repair the topology or archives it through updates.
+`campaign` and every entry in `created` use the canonical BidBeacon shapes. `failed.input` is the
+exact primitive input that failed, and `failed.amazon` contains only useful sanitized Amazon error
+fields; credentials and raw transport payloads are never returned. BidBeacon preserves successful
+resources under the paused campaign, stops after the failed step, and does not attempt rollback.
+The agent uses the disclosed IDs and primitive operations to repair the topology or archives it
+through updates.
 
 ## Primitive creation
 

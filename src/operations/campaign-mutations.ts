@@ -3,6 +3,8 @@ import { and, eq } from 'drizzle-orm';
 import { campaign, entityChangeHistory } from '@/db/schema';
 import { getAdvertiserAccountMetadata } from '@/utils/advertiser-account-metadata';
 import { getTimezoneForCountry } from '@/utils/timezones';
+import { createAd, createAdGroup } from './ad-mutations';
+import type { CanonicalAd, CanonicalAdGroup } from './ad-schemas';
 import { resolveAdvertiserAccount } from './advertiser-accounts';
 import {
     type CampaignCreateInput,
@@ -13,8 +15,11 @@ import {
     campaignUpdateInputSchema,
     canonicalCampaignSchema,
 } from './campaign-schemas';
+import { type CompositeCampaignCreateInput, type CompositeCampaignCreationResult, compositeCampaignCreateInputSchema, compositeCampaignCreationResultSchema } from './composite-campaign-schemas';
 import type { OperationContext } from './operation-context';
 import { OperationError } from './operation-errors';
+import { createAutomaticTarget, createKeywordTarget, createNegativeKeyword, createNegativeProductTarget, createProductTarget } from './target-mutations';
+import type { CanonicalTarget } from './target-schemas';
 
 const AMAZON_BID_STRATEGIES = {
     FIXED: 'MANUAL',
@@ -67,44 +72,22 @@ type CampaignHistoryChange = {
     previousValue: string | number | null | undefined;
     newValue: string | number | null | undefined;
 };
+type CampaignCreationOptions = {
+    autoCreateTargets?: boolean;
+};
 
 const AMAZON_UNAVAILABLE_MESSAGE_REGEX = /network|unavailable|timeout|timed out|fetch failed|econn|enet|eai_again/i;
 const AMAZON_STATUS_CODE_REGEX = /\b(408|409|429|500|502|503|504)\b/;
 const CALENDAR_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 const COMPACT_CALENDAR_DATE_REGEX = /^\d{8}$/;
+const COMPOSITE_AUTO_TARGETS = [
+    { key: 'closeMatch', matchType: 'SEARCH_CLOSE_MATCH' },
+    { key: 'looseMatch', matchType: 'SEARCH_LOOSE_MATCH' },
+    { key: 'substitutes', matchType: 'PRODUCT_SUBSTITUTES' },
+    { key: 'complements', matchType: 'PRODUCT_COMPLEMENTS' },
+] as const;
 
-export const createCampaign = async (context: OperationContext, input: unknown): Promise<CanonicalCampaign> => {
-    const parsedInput = parseCampaignInput(campaignCreateInputSchema, input, 'create_campaign');
-    const account = await resolveAdvertiserAccount(context, { accountId: parsedInput.accountId });
-    const profileId = resolveProfileId(account);
-    const response = await callAmazon(context, 'createCampaigns', {
-        profileId,
-        region: resolveApiRegion(account.countryCode),
-        campaigns: [buildCreatePayload(parsedInput, account)],
-    });
-    const amazonCampaign = extractCampaign(response);
-    const canonical = mapCanonicalCampaign({
-        account,
-        amazonCampaign,
-        fallback: buildCreateFallback(parsedInput, amazonCampaign),
-    });
-    const now = new Date();
-
-    await reconcileCampaign(context, account, canonical, undefined, now);
-    await recordCampaignChanges(context, account, canonical.id, now, [
-        { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
-        { eventType: 'budget_change', fieldName: 'budgetAmount', previousValue: null, newValue: canonical.dailyBudget },
-        { eventType: 'bid_change', fieldName: 'bidStrategy', previousValue: null, newValue: canonical.bidStrategy },
-        {
-            eventType: 'bid_change',
-            fieldName: 'placementBidAdjustments',
-            previousValue: null,
-            newValue: serializePlacementBidAdjustments(canonical.placementBidAdjustments),
-        },
-    ]);
-
-    return canonical;
-};
+export const createCampaign = async (context: OperationContext, input: unknown): Promise<CanonicalCampaign> => createCampaignWithOptions(context, input);
 
 export const updateCampaign = async (context: OperationContext, input: unknown): Promise<CanonicalCampaign> => {
     const parsedInput = parseCampaignInput(campaignUpdateInputSchema, input, 'update_campaign');
@@ -160,6 +143,165 @@ export const updateCampaign = async (context: OperationContext, input: unknown):
     return canonical;
 };
 
+export const createSponsoredProductsCampaign = async (context: OperationContext, input: unknown): Promise<CompositeCampaignCreationResult> => {
+    const parsedInput = parseCompositeInput(input);
+    const account = await resolveAdvertiserAccount(context, { accountId: parsedInput.accountId });
+    const startDate = parsedInput.campaign.startDate ?? formatInTimeZone(new Date(), getTimezoneForCountry(account.countryCode), 'yyyy-MM-dd');
+    if (parsedInput.campaign.endDate && parsedInput.campaign.endDate < startDate) {
+        throw new OperationError('INVALID_INPUT', 'create_sponsored_products_campaign input is invalid.', {
+            issues: [{ path: ['campaign', 'endDate'], message: 'endDate must be on or after startDate.' }],
+        });
+    }
+    const campaign = await createCampaignWithOptions(
+        context,
+        {
+            accountId: parsedInput.accountId,
+            name: parsedInput.campaign.name,
+            state: 'PAUSED',
+            dailyBudget: parsedInput.campaign.dailyBudget,
+            bidStrategy: parsedInput.campaign.bidStrategy,
+            targetingMode: parsedInput.targeting.mode,
+            startDate,
+            endDate: parsedInput.campaign.endDate ?? null,
+            placementBidAdjustments: parsedInput.campaign.placementBidAdjustments,
+        },
+        { autoCreateTargets: false }
+    );
+
+    const created: {
+        campaign: CompositeCampaignCreationResult['campaign'];
+        adGroup: CompositeCampaignCreationResult['adGroup'] | undefined;
+        ads: CompositeCampaignCreationResult['ads'];
+        targets: CompositeCampaignCreationResult['targets'];
+    } = { campaign, adGroup: undefined, ads: [], targets: [] };
+
+    try {
+        const adGroupInput = {
+            accountId: parsedInput.accountId,
+            campaignId: campaign.id,
+            name: parsedInput.adGroup.name,
+            state: 'ENABLED' as const,
+            defaultBid: parsedInput.adGroup.defaultBid,
+        };
+        created.adGroup = await runCompositeStep('create_ad_group', adGroupInput, () => createAdGroup(context, adGroupInput));
+
+        for (const asin of parsedInput.asins) {
+            const adInput = {
+                accountId: parsedInput.accountId,
+                adGroupId: created.adGroup.id,
+                asin,
+                state: 'ENABLED' as const,
+            };
+            created.ads.push(await runCompositeStep('create_ad', adInput, () => createAd(context, adInput)));
+        }
+
+        if (parsedInput.targeting.mode === 'AUTO') {
+            for (const automaticTarget of COMPOSITE_AUTO_TARGETS) {
+                const targetInput = {
+                    accountId: parsedInput.accountId,
+                    adGroupId: created.adGroup.id,
+                    matchType: automaticTarget.matchType,
+                    bid: parsedInput.targeting.bidOverrides?.[automaticTarget.key] ?? parsedInput.adGroup.defaultBid,
+                    state: 'ENABLED' as const,
+                };
+                created.targets.push(await runCompositeStep('create_auto_target', targetInput, () => createAutomaticTarget(context, targetInput)));
+            }
+        } else if (parsedInput.targeting.mode === 'MANUAL_KEYWORD') {
+            for (const keyword of parsedInput.targeting.keywords) {
+                const targetInput = {
+                    accountId: parsedInput.accountId,
+                    adGroupId: created.adGroup.id,
+                    keyword: keyword.keyword,
+                    matchType: keyword.matchType,
+                    bid: keyword.bid,
+                    state: 'ENABLED' as const,
+                };
+                created.targets.push(await runCompositeStep('create_keyword_target', targetInput, () => createKeywordTarget(context, targetInput)));
+            }
+        } else {
+            for (const product of parsedInput.targeting.products) {
+                const targetInput = {
+                    accountId: parsedInput.accountId,
+                    adGroupId: created.adGroup.id,
+                    asin: product.asin,
+                    bid: product.bid,
+                    state: 'ENABLED' as const,
+                };
+                created.targets.push(await runCompositeStep('create_product_target', targetInput, () => createProductTarget(context, targetInput)));
+            }
+        }
+
+        for (const keyword of parsedInput.negatives?.keywords ?? []) {
+            const targetInput = {
+                accountId: parsedInput.accountId,
+                campaignId: campaign.id,
+                adGroupId: created.adGroup.id,
+                keyword: keyword.keyword,
+                matchType: keyword.matchType,
+                state: 'ENABLED' as const,
+            };
+            created.targets.push(await runCompositeStep('create_negative_keyword', targetInput, () => createNegativeKeyword(context, targetInput)));
+        }
+
+        for (const asin of parsedInput.negatives?.asins ?? []) {
+            const targetInput = {
+                accountId: parsedInput.accountId,
+                campaignId: campaign.id,
+                adGroupId: created.adGroup.id,
+                asin,
+                state: 'ENABLED' as const,
+            };
+            created.targets.push(await runCompositeStep('create_negative_product_target', targetInput, () => createNegativeProductTarget(context, targetInput)));
+        }
+
+        if (parsedInput.campaign.state === 'ENABLED') {
+            const updateInput = {
+                accountId: parsedInput.accountId,
+                campaignId: campaign.id,
+                changes: { state: 'ENABLED' as const },
+            };
+            created.campaign = await runCompositeStep('update_campaign', updateInput, () => updateCampaign(context, updateInput));
+        }
+
+        return compositeCampaignCreationResultSchema.parse({ campaign: created.campaign, adGroup: created.adGroup, ads: created.ads, targets: created.targets });
+    } catch (error) {
+        throw toCompositePartialFailure(error, created);
+    }
+};
+
+const createCampaignWithOptions = async (context: OperationContext, input: unknown, options: CampaignCreationOptions = {}): Promise<CanonicalCampaign> => {
+    const parsedInput = parseCampaignInput(campaignCreateInputSchema, input, 'create_campaign');
+    const account = await resolveAdvertiserAccount(context, { accountId: parsedInput.accountId });
+    const profileId = resolveProfileId(account);
+    const response = await callAmazon(context, 'createCampaigns', {
+        profileId,
+        region: resolveApiRegion(account.countryCode),
+        campaigns: [buildCreatePayload(parsedInput, account, options)],
+    });
+    const amazonCampaign = extractCampaign(response);
+    const canonical = mapCanonicalCampaign({
+        account,
+        amazonCampaign,
+        fallback: buildCreateFallback(parsedInput, amazonCampaign),
+    });
+    const now = new Date();
+
+    await reconcileCampaign(context, account, canonical, undefined, now);
+    await recordCampaignChanges(context, account, canonical.id, now, [
+        { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
+        { eventType: 'budget_change', fieldName: 'budgetAmount', previousValue: null, newValue: canonical.dailyBudget },
+        { eventType: 'bid_change', fieldName: 'bidStrategy', previousValue: null, newValue: canonical.bidStrategy },
+        {
+            eventType: 'bid_change',
+            fieldName: 'placementBidAdjustments',
+            previousValue: null,
+            newValue: serializePlacementBidAdjustments(canonical.placementBidAdjustments),
+        },
+    ]);
+
+    return canonical;
+};
+
 const parseCampaignInput = <T>(schema: { safeParse: (input: unknown) => { success: boolean; data?: T; error?: { issues: unknown[] } } }, input: unknown, operationName: string): T => {
     const parsed = schema.safeParse(input);
     if (!parsed.success) {
@@ -168,7 +310,71 @@ const parseCampaignInput = <T>(schema: { safeParse: (input: unknown) => { succes
     return parsed.data as T;
 };
 
-const buildCreatePayload = (input: CampaignCreateInput, account: ResolvedAccount) => {
+const parseCompositeInput = (input: unknown): CompositeCampaignCreateInput => parseCampaignInput(compositeCampaignCreateInputSchema, input, 'create_sponsored_products_campaign');
+
+const runCompositeStep = async <T>(operation: string, input: Record<string, unknown>, action: () => Promise<T>) => {
+    try {
+        return await action();
+    } catch (error) {
+        throw new CompositeStepFailure(operation, input, error);
+    }
+};
+
+const toCompositePartialFailure = (error: unknown, created: { campaign: CanonicalCampaign; adGroup: CanonicalAdGroup | undefined; ads: CanonicalAd[]; targets: CanonicalTarget[] }) => {
+    const failure = error instanceof CompositeStepFailure ? error : new CompositeStepFailure('composite_response', {}, error);
+    throw new OperationError('COMPOSITE_PARTIAL_FAILURE', `Sponsored Products campaign creation stopped during ${failure.operation}. The Campaign remains paused.`, {
+        campaign: created.campaign,
+        created: {
+            adGroups: created.adGroup ? [created.adGroup] : [],
+            ads: created.ads,
+            targets: created.targets,
+        },
+        failed: {
+            operation: failure.operation,
+            input: failure.input,
+            amazon: sanitizeCompositeAmazonError(failure.error),
+        },
+    });
+};
+
+class CompositeStepFailure extends Error {
+    readonly operation: string;
+    readonly input: Record<string, unknown>;
+    readonly error: unknown;
+
+    constructor(operation: string, input: Record<string, unknown>, error: unknown) {
+        super(`Composite step ${operation} failed.`);
+        this.name = 'CompositeStepFailure';
+        this.operation = operation;
+        this.input = input;
+        this.error = error;
+    }
+}
+
+const sanitizeCompositeAmazonError = (error: unknown) => {
+    const details = error instanceof OperationError ? error.details : undefined;
+    const amazon = details?.amazon;
+    if (isRecord(amazon)) {
+        return {
+            ...(readString(amazon.code) ? { code: readString(amazon.code) } : {}),
+            ...(readString(amazon.errorCode) ? { errorCode: readString(amazon.errorCode) } : {}),
+            ...(typeof amazon.statusCode === 'number' ? { statusCode: amazon.statusCode } : {}),
+            ...(readString(amazon.message) ? { message: sanitizeCompositeErrorMessage(readString(amazon.message) as string) } : {}),
+        };
+    }
+
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+        ...(error instanceof OperationError ? { code: error.code } : {}),
+        message: sanitizeCompositeErrorMessage(message),
+    };
+};
+
+const sanitizeCompositeErrorMessage = (message: string) => message.replace(/Bearer\s+[^\s]+/gi, 'Bearer [redacted]').slice(0, 500);
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const buildCreatePayload = (input: CampaignCreateInput, account: ResolvedAccount, options: CampaignCreationOptions) => {
     const bidSettings: AmazonRecord = {
         bidStrategy: AMAZON_BID_STRATEGIES[input.bidStrategy],
     };
@@ -184,7 +390,7 @@ const buildCreatePayload = (input: CampaignCreateInput, account: ResolvedAccount
         startDateTime: toAmazonDateTime(input.startDate, account.countryCode, false),
         marketplaceScope: 'SINGLE_MARKETPLACE',
         countries: [account.countryCode.toUpperCase()],
-        autoCreationSettings: { autoCreateTargets: input.targetingMode === 'AUTO' },
+        autoCreationSettings: { autoCreateTargets: options.autoCreateTargets ?? input.targetingMode === 'AUTO' },
         budgets: [buildAmazonBudget(input.dailyBudget, getAdvertiserAccountMetadata(account.countryCode).currency)],
         optimizations: { bidSettings },
     };
