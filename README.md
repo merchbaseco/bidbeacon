@@ -67,7 +67,7 @@ Postgres is bound to `127.0.0.1` for local-only access.
 
 ## Optional Agent Skill
 
-The repository bundles the optional `bidbeacon-account-management` Agent Skill beside the self-sufficient MCP. Compatible agent hosts can install or read `skills/bidbeacon-account-management` directly; a production build copies the same independently readable folder to `dist/skills/bidbeacon-account-management`. The MCP does not require the skill for correct tool calls.
+The repository bundles the optional `bidbeacon-account-management` Agent Skill beside the self-sufficient MCP. Compatible agent hosts can install or read `skills/bidbeacon-account-management` directly; a production build copies the same independently readable folder to `dist/skills/bidbeacon-account-management`. Its progressively disclosed recipes cover account reviews, Campaign and ASIN investigation, optimization, launch, negative targeting, lifecycle changes, and partial-failure recovery. The MCP does not require the skill for correct tool calls.
 
 ## API Client (npm)
 

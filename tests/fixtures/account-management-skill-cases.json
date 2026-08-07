@@ -1,0 +1,81 @@
+[
+  {
+    "prompt": "Audit the last seven days as a business, compare where useful, and give me no more than three concrete actions.",
+    "recipe": "references/account-review.md",
+    "checks": [
+      "ACoS-first summary",
+      "drill into aggregate outliers",
+      "at most three scoped actions",
+      "aligned MerchBase sales context"
+    ]
+  },
+  {
+    "prompt": "This multi-product campaign's ACoS got much worse. What actually changed?",
+    "recipe": "references/investigate-campaign.md",
+    "checks": [
+      "relevant historical baseline",
+      "Target or ASIN decomposition",
+      "no aggregate-only action"
+    ]
+  },
+  {
+    "prompt": "How is this ASIN doing, and which ads and campaigns are responsible?",
+    "recipe": "references/investigate-product.md",
+    "checks": [
+      "Product search",
+      "ASIN-to-Ad traversal",
+      "distinct performance grains",
+      "actual MerchBase sales before optional RankWrangler context"
+    ]
+  },
+  {
+    "prompt": "Recommend a new bid for this target, but don't change anything yet.",
+    "recipe": "references/optimize-resource.md",
+    "checks": ["absolute proposal", "policy and evidence", "no mutation"]
+  },
+  {
+    "prompt": "Bring back last year's baseball campaigns with conservative bids. Include every paused campaign.",
+    "recipe": "references/pause-or-archive.md",
+    "checks": [
+      "all states and full pagination",
+      "BidBeacon and MerchBase seasonal history",
+      "read-back and follow-up"
+    ]
+  },
+  {
+    "prompt": "Create a paused automatic Sponsored Products campaign for these ASINs.",
+    "recipe": "references/launch-campaign.md",
+    "checks": [
+      "composite launch",
+      "paused spend gate",
+      "return child identifiers"
+    ]
+  },
+  {
+    "prompt": "The campaign launch partially failed after creating some ads. Recover it without duplicating anything.",
+    "recipe": "references/recover-partial-launch.md",
+    "checks": [
+      "preserve returned identifiers",
+      "inspect topology",
+      "repair only missing branch"
+    ]
+  },
+  {
+    "prompt": "Add these negative ASINs to the existing ad group.",
+    "recipe": "references/manage-negatives.md",
+    "checks": [
+      "inspect for duplicates",
+      "Ad-group scope",
+      "canonical Target result"
+    ]
+  },
+  {
+    "prompt": "Add a recipe to this skill for the search-term harvesting workflow we keep using.",
+    "recipe": "references/add-recipe.md",
+    "checks": [
+      "explicit maintenance request",
+      "reuse check",
+      "original prompt becomes an evaluation"
+    ]
+  }
+]

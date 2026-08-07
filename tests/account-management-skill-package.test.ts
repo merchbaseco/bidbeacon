@@ -8,11 +8,27 @@ import { validateAccountManagementSkill } from '../scripts/account-management-sk
 import { MCP_TOOL_NAMES } from '../src/mcp/operation-definitions';
 
 const sourceSkillDirectory = resolve('skills/bidbeacon-account-management');
+const evaluationCasesFile = resolve('tests/fixtures/account-management-skill-cases.json');
 const temporaryDirectories: string[] = [];
 const execFileAsync = promisify(execFile);
-const expectedSkillFiles = ['SKILL.md', 'agents/openai.yaml', 'references/diagnosis.md', 'references/optimization-and-launch.md', 'references/partial-failure-recovery.md'];
+const expectedSkillFiles = [
+    'SKILL.md',
+    'agents/openai.yaml',
+    'references/account-review.md',
+    'references/add-recipe.md',
+    'references/investigate-campaign.md',
+    'references/investigate-product.md',
+    'references/launch-campaign.md',
+    'references/manage-negatives.md',
+    'references/optimize-resource.md',
+    'references/pause-or-archive.md',
+    'references/recover-partial-launch.md',
+];
+const recipeFiles = expectedSkillFiles.filter(file => file.startsWith('references/'));
 const expectedDockerBuildScripts = ['!scripts/account-management-skill-package.ts', '!scripts/package-account-management-skill.ts'];
 const LINE_BREAK_PATTERN = /\r?\n/;
+const RECIPE_HEADING_PATTERN = /^# Recipe: /;
+const WORD_PATTERN = /\S+/g;
 
 describe('BidBeacon account-management skill package', () => {
     afterEach(async () => {
@@ -55,11 +71,36 @@ describe('BidBeacon account-management skill package', () => {
         expect(dockerignore.split(LINE_BREAK_PATTERN).filter(line => line.startsWith('!scripts/'))).toEqual(expectedDockerBuildScripts);
     });
 
-    it('uses only exact operation names exposed by the MCP', async () => {
+    it('uses only operation names exposed by the MCP', async () => {
         const markdown = (await Promise.all(expectedSkillFiles.filter(file => file.endsWith('.md')).map(file => readFile(join(sourceSkillDirectory, file), 'utf8')))).join('\n');
         const mentionedOperations = [...markdown.matchAll(/`(search|[a-z]+(?:_[a-z]+)+)`/g)].map(match => match[1]).filter(name => name !== 'change_event');
 
-        expect([...new Set(mentionedOperations)].sort()).toEqual([...MCP_TOOL_NAMES].sort());
+        expect(mentionedOperations.length).toBeGreaterThan(0);
+        expect(mentionedOperations.every(operation => MCP_TOOL_NAMES.includes(operation as (typeof MCP_TOOL_NAMES)[number]))).toBe(true);
+    });
+
+    it('keeps every disclosed recipe compact and directly reachable from the router', async () => {
+        const router = await readFile(join(sourceSkillDirectory, 'SKILL.md'), 'utf8');
+        expect(router.match(WORD_PATTERN)?.length).toBeLessThanOrEqual(250);
+
+        for (const file of recipeFiles) {
+            const recipe = await readFile(join(sourceSkillDirectory, file), 'utf8');
+            expect(router).toContain(`(${file})`);
+            expect(recipe).toMatch(RECIPE_HEADING_PATTERN);
+            expect(recipe).toContain('\n## Done\n');
+            expect(recipe.match(WORD_PATTERN)?.length).toBeLessThanOrEqual(180);
+        }
+    });
+
+    it('keeps a real-workflow evaluation case for every recipe', async () => {
+        const cases = JSON.parse(await readFile(evaluationCasesFile, 'utf8')) as { prompt: string; recipe: string; checks: string[] }[];
+
+        expect(new Set(cases.map(testCase => testCase.prompt)).size).toBe(cases.length);
+        expect([...new Set(cases.map(testCase => testCase.recipe))].sort()).toEqual(recipeFiles);
+        for (const testCase of cases) {
+            expect(testCase.prompt.length).toBeGreaterThan(20);
+            expect(testCase.checks.length).toBeGreaterThanOrEqual(2);
+        }
     });
 
     it('rejects malformed interface metadata and duplicate frontmatter', async () => {
@@ -76,11 +117,19 @@ describe('BidBeacon account-management skill package', () => {
         await expect(validateAccountManagementSkill(skillDirectory)).rejects.toThrow('duplicate name');
     });
 
+    it('requires the model-facing description to identify the Amazon Ads domain', async () => {
+        const skillDirectory = await createTemporarySkill();
+        const skill = await readFile(join(skillDirectory, 'SKILL.md'), 'utf8');
+        await writeFile(join(skillDirectory, 'SKILL.md'), skill.replaceAll('Amazon Ads', 'advertising'));
+
+        await expect(validateAccountManagementSkill(skillDirectory)).rejects.toThrow('must identify Amazon Ads');
+    });
+
     it('rejects a missing progressive-disclosure reference', async () => {
         const skillDirectory = await createTemporarySkill();
-        await rm(join(skillDirectory, 'references', 'diagnosis.md'));
+        await rm(join(skillDirectory, 'references', 'account-review.md'));
 
-        await expect(validateAccountManagementSkill(skillDirectory)).rejects.toThrow('references missing local file references/diagnosis.md');
+        await expect(validateAccountManagementSkill(skillDirectory)).rejects.toThrow('references missing local file references/account-review.md');
     });
 });
 

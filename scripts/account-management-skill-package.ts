@@ -27,8 +27,11 @@ export const validateAccountManagementSkill = async (skillDirectory: string): Pr
     if (!SKILL_NAME_PATTERN.test(frontmatter.name)) {
         throw new Error('Skill name must use lowercase letters, digits, and hyphens.');
     }
-    if (frontmatter.description.length < 40 || frontmatter.description.length > 1024 || !frontmatter.description.includes('Use when')) {
-        throw new Error('Skill description must explain what it does and when to use it.');
+    if (frontmatter.description.length < 40 || frontmatter.description.length > 1024) {
+        throw new Error('Skill description must explain what it does and its trigger contexts.');
+    }
+    if (!frontmatter.description.includes('Amazon Ads')) {
+        throw new Error('Skill description must identify Amazon Ads as its domain.');
     }
     if (skillMarkdown.includes('[TODO:')) {
         throw new Error('Skill contains unfinished TODO content.');

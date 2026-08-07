@@ -965,17 +965,19 @@ Correct tool use does not depend on a client honoring these instructions.
 
 ## Optional Agent Skill
 
-The MCP distribution also includes the independently installable `bidbeacon-account-management` skill. It teaches:
+The MCP distribution also includes the independently installable `bidbeacon-account-management` skill. Its recipe router covers:
 
 - account discovery and explicit routing;
-- campaign and Product performance diagnosis;
-- Product-to-Ad traversal;
-- comparison periods and metric interpretation;
-- coverage-aware conclusions;
-- inspect-before-mutate optimization;
-- composite campaign creation, host approval, and partial-failure recovery.
+- account review and opportunity discovery;
+- Campaign and ASIN investigation, including Product-to-Ad traversal;
+- explicit comparison ranges, metric interpretation, and coverage-aware conclusions;
+- inspect-before-mutate recommendations and approved updates;
+- automatic, manual-keyword, and manual-ASIN campaign launch;
+- negative targeting, pause/archive, and partial-failure recovery;
+- selective MerchBase actual-sales and RankWrangler external-demand context;
+- explicit user-requested skill extension.
 
-The skill does not duplicate tool schemas and is not required for MCP correctness.
+Recipes contain only durable judgment, branching, and completion bounds. Exact inputs, defaults, Fields, and validation remain authoritative in the shared operation schemas. The skill is not required for MCP correctness.
 
 ## Migration from the pre-beta CLI
 

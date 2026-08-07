@@ -1,36 +1,32 @@
 ---
 name: bidbeacon-account-management
-description: Guide high-level BidBeacon account discovery, Campaign and Product diagnosis, comparison, optimization, Sponsored Products launch, and recovery workflows. Use when a user asks to analyze or change a BidBeacon Advertiser account through the BidBeacon MCP.
+description: Manage Amazon Ads through BidBeacon: audit accounts, investigate Campaign or ASIN performance, optimize resources, launch Sponsored Products ads, manage negatives or lifecycle, recover partial launches, or explicitly add or revise a recipe in this skill.
 ---
 
 # BidBeacon account management
 
-Use this optional skill to coordinate multi-call account workflows. The BidBeacon MCP remains self-sufficient: its tool schemas, validation errors, server instructions, and canonical outputs are the authority for correct calls, even when this skill is not installed.
+Use one recipe. Tool schemas own validation; this skill owns judgment.
 
-Keep this skill at the workflow layer. Choose the account, Search resource, Fields, dates, comparison, and mutation sequence; let the MCP define exact input schemas and validation. Do not invent aliases, copy operation schemas, or reproduce the Field catalog.
+## Invariants
 
-## Trigger and progressive disclosure
+1. Resolve the marketplace-specific Advertiser Account UUID when unknown or ambiguous. Pass it on every scoped call.
+2. Use account-local dates and currency, comparable ranges, and Search coverage.
+3. Inspect before writing. Show the exact proposed outcome, obtain approval at the consequential call, await it, and verify accepted state; read back when delivery or multiple writes matter.
+4. Treat the Campaign as the spend gate. Create paused unless enabled delivery is explicit.
+5. Join evidence by marketplace and ASIN: BidBeacon owns ad attribution, MerchBase actual sales and royalties, and RankWrangler external demand.
 
-Use the workflow below for every account-management request. Read only the reference that matches the active branch:
+## Recipes
 
-- Read [performance diagnosis](references/diagnosis.md) for Campaign or Product analysis, ASIN drill-downs, comparison periods, and coverage-aware conclusions.
-- Read [optimization and launch](references/optimization-and-launch.md) before an optimization write or a normal campaign launch.
-- Read [partial-failure recovery](references/partial-failure-recovery.md) only after `create_sponsored_products_campaign` returns `COMPOSITE_PARTIAL_FAILURE`.
+- Account audit or opportunity discovery: [account review](references/account-review.md)
+- ASIN performance or topology: [Product investigation](references/investigate-product.md)
+- Campaign performance or change: [Campaign investigation](references/investigate-campaign.md)
+- Recommendation or authorized control change: [optimization](references/optimize-resource.md)
+- Sponsored Products ad launch: [Campaign launch](references/launch-campaign.md)
+- Negative keyword or ASIN changes: [negative targeting](references/manage-negatives.md)
+- Reactivation, pause, or permanent cleanup: [lifecycle](references/pause-or-archive.md)
+- `COMPOSITE_PARTIAL_FAILURE`: [recovery](references/recover-partial-launch.md)
+- Explicit request to add or revise a recipe in this skill: [add a recipe](references/add-recipe.md)
 
-## Route every workflow explicitly
+Read only the selected recipe; follow a linked recipe only when that recipe branches.
 
-1. Call `list_advertiser_accounts` first when the Account ID is unknown. Choose the intended marketplace-specific Advertiser account using its returned descriptive metadata.
-2. Treat the returned opaque `id` as the only valid BidBeacon Advertiser Account UUID. Pass it as `accountId` on every scoped `search`, creation, and update call. Never substitute an Amazon Ads account ID, profile ID, marketplace ID, dashboard selection, or local default.
-3. Keep the selected account's timezone and currency beside the workflow. Interpret every `YYYY-MM-DD` date and hour as account-local, and interpret spend, sales, and bids in the account currency.
-4. If more than one account matches the user's description, ask which Account ID to use before reading or writing account data.
-
-## Choose the workflow branch
-
-- Diagnose Campaign or Product performance: read [performance diagnosis](references/diagnosis.md), then use `search` with explicit dates and only the compatible curated Fields needed for the question.
-- Optimize an existing Campaign, Ad group, Ad, or Target: read [optimization and launch](references/optimization-and-launch.md), inspect before writing, and submit absolute desired values through the matching `update_*` tool.
-- Launch an ordinary Sponsored Products campaign: read [optimization and launch](references/optimization-and-launch.md), prefer `create_sponsored_products_campaign`, and obtain host approval around that consequential call.
-- Build bespoke topology, extend an existing Campaign, or repair a partial launch: use the primitive operations described in the launch reference; read the recovery reference for a disclosed partial-failure error.
-
-## Close the loop
-
-Report the Account ID, account-local date range, Search coverage status when performance was used, and the canonical result or structured error. Treat `COMPLETE`, `INCOMPLETE`, and `UNKNOWN` coverage as different evidence levels; never turn missing coverage into zero performance.
+Finish with the evidence, result, identifiers, and uncertainty needed for follow-up.
