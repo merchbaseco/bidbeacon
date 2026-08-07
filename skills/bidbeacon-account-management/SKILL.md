@@ -1,6 +1,6 @@
 ---
 name: bidbeacon-account-management
-description: Manage Amazon Ads through BidBeacon: audit accounts, investigate Campaign or ASIN performance, optimize resources, launch Sponsored Products ads, manage negatives or lifecycle, recover partial launches, or explicitly add or revise a recipe in this skill.
+description: "Manage Amazon Ads through BidBeacon: audit accounts, investigate Campaign or ASIN performance, optimize resources, launch Sponsored Products ads, manage negatives or lifecycle, recover partial launches, or explicitly add or revise a recipe in this skill."
 ---
 
 # BidBeacon account management
