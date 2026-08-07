@@ -11,6 +11,7 @@ const sourceSkillDirectory = resolve('skills/bidbeacon-account-management');
 const temporaryDirectories: string[] = [];
 const execFileAsync = promisify(execFile);
 const expectedSkillFiles = ['SKILL.md', 'agents/openai.yaml', 'references/diagnosis.md', 'references/optimization-and-launch.md', 'references/partial-failure-recovery.md'];
+const expectedDockerBuildScripts = ['!scripts/account-management-skill-package.ts', '!scripts/package-account-management-skill.ts'];
 
 describe('BidBeacon account-management skill package', () => {
     afterEach(async () => {
@@ -50,7 +51,7 @@ describe('BidBeacon account-management skill package', () => {
         expect(dockerfile).toContain('bun run build');
         expect(dockerfile).toContain('COPY --from=build /app/dist ./dist');
         expect(dockerignore.split(/\r?\n/)).not.toContain('scripts');
-        expect(dockerignore.split(/\r?\n/)).toContain('!scripts/package-account-management-skill.ts');
+        expect(dockerignore.split(/\r?\n/).filter(line => line.startsWith('!scripts/'))).toEqual(expectedDockerBuildScripts);
     });
 
     it('uses only exact operation names exposed by the MCP', async () => {

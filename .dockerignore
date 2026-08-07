@@ -12,5 +12,6 @@ README.md
 DEPLOYMENT.md
 test-api.sh
 scripts/*
+!scripts/account-management-skill-package.ts
 !scripts/package-account-management-skill.ts
 *.md
