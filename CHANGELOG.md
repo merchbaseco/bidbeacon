@@ -15,6 +15,10 @@ All notable changes to this project will be documented in this file.
 - Changed the public contract to use exact underscore operation names and explicit Advertiser Account UUIDs for every scoped operation.
 - Changed CLI success output to direct JSON on stdout and structured error JSON on stderr.
 
+### Fixed
+
+- Fixed `ARCHIVED` updates to use Amazon's v3 resource-specific delete APIs, including idempotent recovery when a resource is already missing at Amazon.
+
 ### Removed
 
 - Removed the legacy slash-style public procedure map, selected/configured-account fallback, dedicated list/get/metrics/history/ASIN command paths, aliases, offset pagination, and dedicated pause/resume/delete mutation paths.
