@@ -453,6 +453,18 @@ describe('Campaign mutation operations', () => {
                 startDate: '2026-08-10',
             })
         ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+        await expect(
+            createCampaign(context, {
+                accountId: campaignMutationAccountId,
+                name: 'Invalid date range',
+                state: 'PAUSED',
+                dailyBudget: 25,
+                bidStrategy: 'FIXED',
+                targetingMode: 'AUTO',
+                startDate: '2026-08-10',
+                endDate: '2026-08-09',
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
         await expect(updateCampaign(context, { accountId: campaignMutationAccountId, campaignId: 'campaign-existing-1', changes: {} })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
         await expect(updateCampaign(context, { accountId: campaignMutationAccountId, campaignId: 'campaign-existing-1', changes: { name: 'not supported' } })).rejects.toMatchObject({
             code: 'INVALID_INPUT',

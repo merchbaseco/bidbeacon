@@ -39,12 +39,7 @@ export const campaignCreateInputSchema = z
         endDate: campaignDateSchema.nullable().optional(),
         placementBidAdjustments: campaignPlacementBidAdjustmentsSchema.optional(),
     })
-    .strict()
-    .superRefine((value, refinementContext) => {
-        if (value.endDate && value.endDate < value.startDate) {
-            refinementContext.addIssue({ code: z.ZodIssueCode.custom, message: 'endDate must be on or after startDate.', path: ['endDate'] });
-        }
-    });
+    .strict();
 
 export const campaignUpdateChangesSchema = z
     .object({

@@ -6,6 +6,7 @@ Fastify-based API for BidBeacon's Amazon Ads integration.
 
 - **URL:** https://bidbeacon.merchbase.co
 - **Health check:** `GET /api/health`
+- **Remote MCP:** `POST https://bidbeacon.merchbase.co/mcp` (Clerk OAuth; see [`docs/mcp.md`](docs/mcp.md))
 
 ## Local Development
 

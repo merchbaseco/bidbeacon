@@ -271,6 +271,11 @@ export const createSponsoredProductsCampaign = async (context: OperationContext,
 
 const createCampaignWithOptions = async (context: OperationContext, input: unknown, options: CampaignCreationOptions = {}): Promise<CanonicalCampaign> => {
     const parsedInput = parseCampaignInput(campaignCreateInputSchema, input, 'create_campaign');
+    if (parsedInput.endDate && parsedInput.endDate < parsedInput.startDate) {
+        throw new OperationError('INVALID_INPUT', 'create_campaign input is invalid.', {
+            issues: [{ path: ['endDate'], message: 'endDate must be on or after startDate.' }],
+        });
+    }
     const account = await resolveAdvertiserAccount(context, { accountId: parsedInput.accountId });
     const profileId = resolveProfileId(account);
     const response = await callAmazon(context, 'createCampaigns', {

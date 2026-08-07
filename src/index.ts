@@ -13,7 +13,10 @@ import { db, testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
 import { accountDatasetMetadata, reportDatasetMetadata } from '@/db/schema.js';
 import { startJobs, stopJobs } from '@/jobs/index.js';
-import { createServer } from '@/server-config.js';
+import { createBidBeaconMcpAuth } from '@/mcp/auth';
+import { registerBidBeaconMcpRoutes } from '@/mcp/http';
+import { createProductionOperationContext } from '@/operations/production-operation-context';
+import { createServer, getMcpResourceUrl } from '@/server-config.js';
 import { getServerRuntimeFlags } from '@/server-runtime';
 import { getBidBeaconAccess } from '@/services/access/bidbeacon-access';
 import { emitEvent } from '@/utils/events.js';
@@ -161,6 +164,17 @@ async function registerRoutes(fastify: FastifyInstance) {
     });
     registerRealtimeTicketRoute(fastify, { access, ticketStore });
     registerWebSocketRoute(fastify, { access, ticketStore });
+    await registerBidBeaconMcpRoutes(fastify, {
+        auth: createBidBeaconMcpAuth(access),
+        createContext: ({ accessibleAccountIds, merchbaseUserId }) =>
+            createProductionOperationContext({
+                accessibleAccountIds,
+                credentialKind: 'oauth',
+                merchbaseUserId,
+            }),
+        publishableKey: requireEnvironment('CLERK_PUBLISHABLE_KEY'),
+        resourceUrl: getMcpResourceUrl(),
+    });
 
     // tRPC API routes
     await fastify.register(fastifyTRPCPlugin, {

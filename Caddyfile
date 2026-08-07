@@ -1,4 +1,17 @@
 :80 {
+    # Remote MCP transport and OAuth discovery metadata
+    handle /mcp* {
+        reverse_proxy server:8080
+    }
+
+    handle /.well-known/oauth-protected-resource* {
+        reverse_proxy server:8080
+    }
+
+    handle /.well-known/oauth-authorization-server* {
+        reverse_proxy server:8080
+    }
+
     # API requests go to the server
     handle /api/* {
         reverse_proxy server:8080
