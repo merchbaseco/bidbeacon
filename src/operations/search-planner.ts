@@ -25,7 +25,7 @@ const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
 
 const searchFilterInputSchema = z
     .object({
-        field: z.string(),
+        field: z.enum(SEARCH_FIELDS),
         operator: z.enum(SEARCH_OPERATORS),
         value: z.unknown(),
     })
@@ -33,7 +33,7 @@ const searchFilterInputSchema = z
 
 const searchOrderInputSchema = z
     .object({
-        field: z.string(),
+        field: z.enum(SEARCH_FIELDS),
         direction: z.enum(['asc', 'desc']),
     })
     .strict();
@@ -48,8 +48,8 @@ const searchDateRangeInputSchema = z
 export const searchInputSchema = z
     .object({
         accountId: z.string().uuid(),
-        resource: z.string(),
-        fields: z.array(z.string()).min(1).optional(),
+        resource: z.enum(SEARCH_RESOURCES),
+        fields: z.array(z.enum(SEARCH_FIELDS)).min(1).optional(),
         filters: z.array(searchFilterInputSchema).optional(),
         dateRange: searchDateRangeInputSchema.optional(),
         orderBy: z.array(searchOrderInputSchema).min(1).optional(),
@@ -141,13 +141,6 @@ export const planSearch = (input: unknown, options: { timezone: string; now?: Da
             resource: parsedInput.data.resource,
         });
     }
-    if (!isSearchResource(parsedInput.data.resource)) {
-        throw invalidInput('Search resource is not available in this operation slice.', {
-            resource: parsedInput.data.resource,
-            supportedResources: [...SEARCH_RESOURCES],
-        });
-    }
-
     const resource = parsedInput.data.resource;
     const fields = resolveFields(resource, parsedInput.data.fields);
     const filters = resolveFilters(resource, parsedInput.data.filters ?? []);
@@ -426,8 +419,6 @@ const appendTieBreakers = (resource: SearchResource, orderBy: readonly SearchOrd
 };
 
 const fieldsForResource = (resource: SearchResource) => SEARCH_FIELDS.filter(field => isSearchFieldCompatible(resource, field));
-
-const isSearchResource = (resource: string): resource is SearchResource => (SEARCH_RESOURCES as readonly string[]).includes(resource);
 
 const isIsoDate = (value: string) => {
     if (!ISO_DATE_REGEX.test(value)) {

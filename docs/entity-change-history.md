@@ -45,8 +45,7 @@ Current normalization rules:
 - Shared operation mutations (`createCampaign`, `updateCampaign`, `createAdGroup`,
   `updateAdGroup`, `createAd`, `updateAd`, `createKeywordTarget`, `createProductTarget`,
   `createAutomaticTarget`, `createNegativeKeyword`, `createNegativeProductTarget`, and
-  `updateTarget`) plus the legacy public mutation helpers
-  (`updateCampaignRow`, `updateAdGroupRow`, `updateAdRow`, `updateTargetRow`) write history rows
+  `updateTarget`) write history rows
   with `source = 'bidbeacon'`.
 - `create_sponsored_products_campaign` delegates each child and its final Campaign state change to
   those same mutation paths, so composite success and partial completion retain the ordinary
@@ -73,21 +72,7 @@ This keeps one canonical per-day result while still allowing immediate local wri
 
 The implemented public contract reads history with `search` and `resource: "change_event"` as defined in [cli-spec.md](cli-spec.md). Change events use the same explicit Account ID, field selection, filters, inclusive account-local date range, ordering, and cursor contract as other Searches. Search maps internal entity/event/field/source values to the public `changeEvent.*` vocabulary and returns previous/current values with their JSON types, including structured placement-adjustment objects.
 
-### Current pre-migration path
-
-The currently implemented API and CLI still read history through dedicated surfaces:
-
-- HTTP API (tRPC path): `/api/history/list`
-  - Input: `config`, `entityType`, `entityId`, optional `range`, optional `limit`, optional `offset`
-  - `entityType`: `campaign` | `adGroup` | `ad` | `target`
-- CLI:
-  - `bb history campaigns <campaign_id> [--range <range>]`
-  - `bb history ad-groups <ad_group_id> [--range <range>]`
-  - `bb history ads <ad_id> [--range <range>]`
-  - `bb history targets <target_id> [--range <range>]`
-  - Optional flags: `--limit`, `--offset`
-
-Entity detail APIs (for example `targets.get`) return current entity state only.
+There is no dedicated public history endpoint. External callers use the canonical `search` operation with `resource: "change_event"`. The private, session-authenticated dashboard entity detail may show the latest Target bid transition through its internal app router; that presentation route is not part of the public HTTP client or CLI contract.
 
 ## Sync State
 

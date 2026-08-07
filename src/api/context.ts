@@ -15,6 +15,7 @@ export type Context = {
     accessibleAdvertiserAccountIds: string[];
     authType: AuthType;
     credentialKind: CredentialKind | null;
+    operationContext?: unknown;
     request: unknown;
     user: AuthenticatedUser | null;
 };

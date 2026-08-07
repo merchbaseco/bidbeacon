@@ -1,2334 +1,944 @@
 #!/usr/bin/env node
-import { spawnSync } from 'node:child_process';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join, resolve } from 'node:path';
-import { createBidBeaconClient } from '@bidbeacon/http-client';
-import { type AsinOverviewDepth, type AsinStateFilter, getAsinOverview, getAsinTree, type MetricKey, type MetricsEntity, resolveAsinMetricsScope } from './asin-commands';
-import { API_KEY_ENV_VAR, clearStoredApiKey, getMissingApiKeyMessage, loadAuthState, setStoredApiKey } from './auth';
+import { join } from 'node:path';
+import { type BidBeaconClient, createBidBeaconClient, type RouterInputs } from '@bidbeacon/http-client';
+import { clearStoredApiKey, getMissingApiKeyMessage, loadAuthState, setStoredApiKey } from './auth';
 import { normalizeApiBaseUrl, withTransportHint } from './base-url';
-import { CliUsageError, isCliUsageError } from './cli-errors';
-import { type HelpTopicKey, renderHelp, resolveHelpTopicKey } from './help';
-import { getTimezoneForCountry } from './timezones';
+import { renderHelp, resolveHelpTopicKey } from './help';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
-const DEFAULT_RANGE = '7d';
+const DEFAULT_STORAGE_DIR = join(homedir(), '.bidbeacon');
+const DEFAULT_SETTINGS_PATH = join(DEFAULT_STORAGE_DIR, 'settings.json');
+const CONFIG_FILENAME = 'config.json';
 const STORAGE_DIR_ENV_VAR = 'BB_STORAGE_DIR';
 const BASE_URL_ENV_VAR = 'BB_BASE_URL';
-const ACCOUNT_ID_ENV_VAR = 'BB_ACCOUNT_ID';
-const COUNTRY_CODE_ENV_VAR = 'BB_COUNTRY_CODE';
-const DEFAULT_STORAGE_DIR = join(homedir(), '.bidbeacon');
-const STORAGE_SETTINGS_PATH = join(DEFAULT_STORAGE_DIR, 'settings.json');
-const CONFIG_FILENAME = 'config.json';
-const CONFIG_KEYS = ['storage-dir', 'base-url', 'account'] as const;
-const METRICS_KEYS = ['impressions', 'clicks', 'spend', 'purchases', 'sales', 'acos', 'cpc', 'ctr', 'roas'] as const;
-const METRICS_KEYS_SET = new Set(METRICS_KEYS);
-const METRICS_BUCKETS = ['auto', 'hour', 'day', 'week', 'month', 'year'] as const;
-const METRICS_BUCKETS_SET = new Set(METRICS_BUCKETS);
-const METRIC_FILTER_REGEX = /^\s*([^<>=!~]+)\s*(<=|>=|!=|=|<|>|~)\s*(.+)\s*$/;
-const ASIN_REGEX = /^[A-Z0-9]{10}$/;
-const NUMERIC_ID_REGEX = /^[0-9]+$/;
-const SEARCH_PAGE_LIMIT = 200;
-const METRICS_NO_MATCH_ID = '__bb_no_match__';
-const CHANGELOG_SPLIT_REGEX = /\r?\n/;
-const CHANGELOG_ENTRY_REGEX = /^##\s+v?([0-9][^\s]*)\s+-\s+([0-9]{4}-[0-9]{2}-[0-9]{2})\s*$/;
+const CHANGELOG_ENTRY_REGEX = /^##\s+v?([^\s]+)\s+-\s+(\d{4}-\d{2}-\d{2})\s*$/;
 const CHANGELOG_SECTION_REGEX = /^###\s+(.+?)\s*$/;
-const CHANGELOG_VERSION_PREFIX_REGEX = /^v/i;
-const CHANGELOG_SOURCES = [
-    { label: 'package', url: new URL('../CHANGELOG.md', import.meta.url) },
-    { label: 'workspace', url: new URL('../../../CHANGELOG.md', import.meta.url) },
-] as const;
+const CHANGELOG_LINES_REGEX = /\r?\n/;
+const CHANGELOG_BULLET_REGEX = /^[-*]\s+/;
+const CHANGELOG_SOURCES = [new URL('../CHANGELOG.md', import.meta.url), new URL('../../../CHANGELOG.md', import.meta.url)] as const;
+const FILTER_TOKEN_REGEX = /^[A-Za-z0-9_.:/-]+$/;
+const INTEGER_REGEX = /^[0-9]+$/;
+const VERSION_PREFIX_REGEX = /^v/i;
+const WHERE_SYMBOL_EXPRESSION_REGEX = /^(?<field>[A-Za-z][A-Za-z0-9_.]*)\s*(?<operator>>=|<=|>|<|=)\s*(?<value>.+)$/;
+const WHERE_WORD_EXPRESSION_REGEX = /^(?<field>[A-Za-z][A-Za-z0-9_.]*)\s+(?<operator>contains|in)\s+(?<value>.+)$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const SEARCH_FIELD_NAMES = new Set([
+    'campaign.id',
+    'campaign.name',
+    'campaign.state',
+    'campaign.deliveryStatus',
+    'campaign.dailyBudget',
+    'campaign.targetingMode',
+    'campaign.bidStrategy',
+    'campaign.startDate',
+    'campaign.endDate',
+    'adGroup.id',
+    'adGroup.name',
+    'adGroup.state',
+    'adGroup.deliveryStatus',
+    'adGroup.defaultBid',
+    'ad.id',
+    'ad.state',
+    'ad.deliveryStatus',
+    'ad.asin',
+    'ad.productTitle',
+    'ad.type',
+    'target.id',
+    'target.state',
+    'target.deliveryStatus',
+    'target.type',
+    'target.scope',
+    'target.bid',
+    'target.negative',
+    'target.keyword',
+    'target.asin',
+    'target.matchType',
+    'product.asin',
+    'product.title',
+    'changeEvent.id',
+    'changeEvent.resourceType',
+    'changeEvent.resourceId',
+    'changeEvent.eventType',
+    'changeEvent.field',
+    'changeEvent.previousValue',
+    'changeEvent.newValue',
+    'changeEvent.changedAt',
+    'changeEvent.source',
+    'metrics.impressions',
+    'metrics.clicks',
+    'metrics.spend',
+    'metrics.orders',
+    'metrics.sales',
+    'metrics.acos',
+    'metrics.cpc',
+    'metrics.ctr',
+    'metrics.roas',
+    'metrics.cvr',
+    'segments.date',
+    'segments.hour',
+    'segments.placement',
+]);
 
 const main = async () => {
-    const { positional, flags } = parseArgs(process.argv.slice(2));
+    const parsed = parseArgs(process.argv.slice(2));
     const helpContext = await buildHelpContext();
 
-    if (positional.length === 0 || flags.help) {
-        const topicKey = resolveHelpTopicKey(positional);
-        process.stdout.write(renderHelp(topicKey, helpContext));
+    if (parsed.flags.has('version')) {
+        process.stdout.write(`${helpContext.version}\n`);
         return;
     }
 
-    const [rawCommand, subcommand, action, ...rest] = positional;
-    const command = resolveCommandAlias(rawCommand);
-
-    if (command === 'config') {
-        if (!subcommand) {
-            process.stdout.write(renderHelp('config', helpContext));
-            return;
-        }
-        await handleConfigCommand(subcommand, action, rest);
+    if (parsed.positional.length === 0 || parsed.flags.has('help')) {
+        process.stdout.write(renderHelp(resolveHelpTopicKey(parsed.positional), helpContext));
         return;
     }
 
-    if (command === 'auth') {
-        if (!subcommand) {
-            process.stdout.write(renderHelp('auth', helpContext));
-            return;
-        }
-        await handleAuthCommand(subcommand, action, flags);
-        return;
-    }
-
+    const [command, subcommand, ...rest] = parsed.positional;
     switch (command) {
-        case 'accounts': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('accounts', helpContext));
-                return;
-            }
-            if (subcommand !== 'list') {
-                throw new CliUsageError({ topicKey: 'accounts', message: `Unknown subcommand: ${subcommand}` });
-            }
-            const config = await loadConfig();
-            const client = createApiClient(config);
-            const data = await client['accounts/list'].query();
-            printOutput(data);
+        case 'auth':
+            await handleAuthCommand(subcommand, rest, parsed.flags);
             return;
-        }
-        case 'campaigns': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('campaigns', helpContext));
-                return;
-            }
-            const config = await loadConfig();
-            const getContext = () => {
-                const cliConfig = requireCliConfig(config);
-                return {
-                    client: createApiClient(config),
-                    cliConfig,
-                };
-            };
-            if (subcommand === 'list') {
-                const state = resolveListStateFlag(flags);
-                const limitRaw = readFlag(flags, ['limit']);
-                const offsetRaw = readFlag(flags, ['offset']);
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/list'].query({
-                    config: cliConfig,
-                    state,
-                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
-                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'search') {
-                if (!action) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <query>.' });
-                }
-                const query = action.trim();
-                if (query.length === 0) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <query>.' });
-                }
-                const state = resolveListStateFlag(flags) ?? 'ALL';
-                const limitRaw = readFlag(flags, ['limit']);
-                const offsetRaw = readFlag(flags, ['offset']);
-                const { client, cliConfig } = getContext();
-                const data = await searchCampaigns(client, cliConfig, query, {
-                    state,
-                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
-                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'get') {
-                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/get'].query({ config: cliConfig, campaignId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'create') {
-                const [name, budget] = [action, rest[0]];
-                if (!(name && budget)) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <name> <budget>.' });
-                }
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/create'].mutate({
-                    config: cliConfig,
-                    name,
-                    budget: parseNumberArg(budget, 'budget'),
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'update') {
-                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const name = readFlag(flags, ['name']);
-                const portfolioId = readFlag(flags, ['portfolio']);
-                const startDateTime = readFlag(flags, ['start']);
-                const endDateTime = readFlag(flags, ['end']);
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/update'].mutate({
-                    config: cliConfig,
-                    campaignId,
-                    name: name ?? undefined,
-                    portfolioId: portfolioId ?? undefined,
-                    startDateTime: startDateTime ?? undefined,
-                    endDateTime: endDateTime ?? undefined,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'pause') {
-                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/pause'].mutate({ config: cliConfig, campaignId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'resume') {
-                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/resume'].mutate({ config: cliConfig, campaignId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'delete') {
-                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/delete'].mutate({ config: cliConfig, campaignId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'set-budget') {
-                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const budget = rest[0];
-                if (!budget) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <budget>.' });
-                }
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/set-budget'].mutate({
-                    config: cliConfig,
-                    campaignId,
-                    budget: parseNumberArg(budget, 'budget'),
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'set-bid-strategy') {
-                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const strategy = rest[0];
-                if (!strategy) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <strategy>.' });
-                }
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/set-bid-strategy'].mutate({
-                    config: cliConfig,
-                    campaignId,
-                    strategy,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'set-bid-adjustments') {
-                const campaignId = requireNumericIdArg(action, { topicKey: 'campaigns', label: '<campaign_id>', expected: 'campaign_id' });
-                const scope = rest[0];
-                const json = rest[1];
-                if (!(scope && json)) {
-                    throw new CliUsageError({ topicKey: 'campaigns', message: 'Missing required args: <campaign_id> <scope> <json>.' });
-                }
-                const { client, cliConfig } = getContext();
-                const data = await client['campaigns/set-bid-adjustments'].mutate({
-                    config: cliConfig,
-                    campaignId,
-                    scope,
-                    adjustments: parseJsonArg(json),
-                });
-                printOutput(data);
-                return;
-            }
-            throw new CliUsageError({ topicKey: 'campaigns', message: `Unknown subcommand: ${subcommand}` });
-        }
-        case 'ad-groups': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('ad-groups', helpContext));
-                return;
-            }
-            const config = await loadConfig();
-            const client = createApiClient(config);
-            const cliConfig = requireCliConfig(config);
-            if (subcommand === 'list') {
-                const state = resolveListStateFlag(flags);
-                const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), {
-                    topicKey: 'ad-groups',
-                    label: '--campaign',
-                    expected: 'campaign_id',
-                });
-                const limitRaw = readFlag(flags, ['limit']);
-                const offsetRaw = readFlag(flags, ['offset']);
-                const data = await client['ad-groups/list'].query({
-                    config: cliConfig,
-                    state,
-                    campaignId,
-                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
-                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'get') {
-                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client['ad-groups/get'].query({ config: cliConfig, adGroupId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'create') {
-                const [campaignIdRaw, name, bid] = [action, rest[0], rest[1]];
-                if (!(campaignIdRaw && name && bid)) {
-                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <campaign_id> <name> <default_bid>.' });
-                }
-                const campaignId = parseNumericId(campaignIdRaw, { topicKey: 'ad-groups', label: '<campaign_id>', expected: 'campaign_id' });
-                const data = await client['ad-groups/create'].mutate({
-                    config: cliConfig,
-                    campaignId,
-                    name,
-                    defaultBid: parseNumberArg(bid, 'default_bid'),
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'update') {
-                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const name = rest[0];
-                if (!name) {
-                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <ad_group_id> <name>.' });
-                }
-                const data = await client['ad-groups/update'].mutate({ config: cliConfig, adGroupId, name });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'set-default-bid') {
-                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const value = rest[0];
-                if (!value) {
-                    throw new CliUsageError({ topicKey: 'ad-groups', message: 'Missing required args: <ad_group_id> <value>.' });
-                }
-                const data = await client['ad-groups/set-default-bid'].mutate({
-                    config: cliConfig,
-                    adGroupId,
-                    value: parseNumberArg(value, 'value'),
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'pause') {
-                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client['ad-groups/pause'].mutate({ config: cliConfig, adGroupId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'resume') {
-                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client['ad-groups/resume'].mutate({ config: cliConfig, adGroupId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'delete') {
-                const adGroupId = requireNumericIdArg(action, { topicKey: 'ad-groups', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client['ad-groups/delete'].mutate({ config: cliConfig, adGroupId });
-                printOutput(data);
-                return;
-            }
-            throw new CliUsageError({ topicKey: 'ad-groups', message: `Unknown subcommand: ${subcommand}` });
-        }
-        case 'ads': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('ads', helpContext));
-                return;
-            }
-            const config = await loadConfig();
-            const client = createApiClient(config);
-            const cliConfig = requireCliConfig(config);
-            if (subcommand === 'list') {
-                const state = resolveListStateFlag(flags);
-                const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), { topicKey: 'ads', label: '--campaign', expected: 'campaign_id' });
-                const adGroupId = parseOptionalNumericIdFlag(readFlag(flags, ['ad-group', 'ad-group-id']), { topicKey: 'ads', label: '--ad-group', expected: 'ad_group_id' });
-                const asin = readFlag(flags, ['asin']);
-                const limitRaw = readFlag(flags, ['limit']);
-                const offsetRaw = readFlag(flags, ['offset']);
-                const data = await client['ads/list'].query({
-                    config: cliConfig,
-                    state,
-                    campaignId,
-                    adGroupId,
-                    productAsin: asin ?? undefined,
-                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
-                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'get') {
-                const adId = requireNumericIdArg(action, { topicKey: 'ads', label: '<ad_id>', expected: 'ad_id' });
-                const data = await client['ads/get'].query({ config: cliConfig, adId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'create') {
-                const [adGroupIdRaw, productId] = [action, rest[0]];
-                const productIdType = rest[1] ?? 'ASIN';
-                if (!(adGroupIdRaw && productId)) {
-                    throw new CliUsageError({ topicKey: 'ads', message: 'Missing required args: <ad_group_id> <asin|sku>.' });
-                }
-                const adGroupId = parseNumericId(adGroupIdRaw, { topicKey: 'ads', label: '<ad_group_id>', expected: 'ad_group_id' });
-                const data = await client['ads/create'].mutate({
-                    config: cliConfig,
-                    adGroupId,
-                    productIdType,
-                    productId,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'update') {
-                const adId = requireNumericIdArg(action, { topicKey: 'ads', label: '<ad_id>', expected: 'ad_id' });
-                const state = rest[0];
-                if (!state) {
-                    throw new CliUsageError({ topicKey: 'ads', message: 'Missing required args: <ad_id> <state>.' });
-                }
-                const data = await client['ads/update'].mutate({ config: cliConfig, adId, state });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'delete') {
-                const adId = requireNumericIdArg(action, { topicKey: 'ads', label: '<ad_id>', expected: 'ad_id' });
-                const data = await client['ads/delete'].mutate({ config: cliConfig, adId });
-                printOutput(data);
-                return;
-            }
-            throw new CliUsageError({ topicKey: 'ads', message: `Unknown subcommand: ${subcommand}` });
-        }
-        case 'asins': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('asins', helpContext));
-                return;
-            }
-            const config = await loadConfig();
-            const client = createApiClient(config);
-            const cliConfig = requireCliConfig(config);
-            if (subcommand === 'tree') {
-                const asin = requireAsinArg(action, { topicKey: 'asins', label: '<asin>' });
-                const depth = parseAsinTreeDepthFlag(flags);
-                const stateFilter = resolveAsinStateFilter(flags);
-                const data = await getAsinTree(client, cliConfig, asin, {
-                    depth,
-                    stateFilter,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'overview') {
-                const asin = requireAsinArg(action, { topicKey: 'asins', label: '<asin>' });
-                const rangeOverride = readFlag(flags, ['range']);
-                const metrics = resolveMetricKeys(parseMetricsSelectionFlag(flags));
-                const depth = parseAsinOverviewDepthFlag(flags);
-                const stateFilter = resolveAsinStateFilter(flags);
-                const data = await getAsinOverview(client, cliConfig, asin, {
-                    range: rangeOverride ?? undefined,
-                    metrics,
-                    depth,
-                    stateFilter,
-                });
-                printOutput(data);
-                return;
-            }
-            throw new CliUsageError({ topicKey: 'asins', message: `Unknown subcommand: ${subcommand}` });
-        }
-        case 'targets': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('targets', helpContext));
-                return;
-            }
-            const config = await loadConfig();
-            const client = createApiClient(config);
-            const cliConfig = requireCliConfig(config);
-            if (subcommand === 'list') {
-                const state = resolveListStateFlag(flags);
-                const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), { topicKey: 'targets', label: '--campaign', expected: 'campaign_id' });
-                const adGroupId = parseOptionalNumericIdFlag(readFlag(flags, ['ad-group', 'ad-group-id']), { topicKey: 'targets', label: '--ad-group', expected: 'ad_group_id' });
-                const negative = parseOptionalBooleanFlag(readFlag(flags, ['negative']), { topicKey: 'targets', label: '--negative' });
-                const limitRaw = readFlag(flags, ['limit']);
-                const offsetRaw = readFlag(flags, ['offset']);
-                const data = await client['targets/list'].query({
-                    config: cliConfig,
-                    state,
-                    campaignId,
-                    adGroupId,
-                    negative,
-                    limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
-                    offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'set-bid') {
-                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const value = rest[0];
-                if (!value) {
-                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing required args: <target_id> <value>.' });
-                }
-                const data = await client['bids/set'].mutate({
-                    config: cliConfig,
-                    targetId,
-                    value: parseNumberArg(value, 'value'),
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'adjust-bid') {
-                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const delta = rest[0];
-                if (!delta) {
-                    throw new CliUsageError({ topicKey: 'targets', message: 'Missing required args: <target_id> <delta>.' });
-                }
-                const data = await client['bids/adjust'].mutate({
-                    config: cliConfig,
-                    targetId,
-                    delta: parseNumberArg(delta, 'delta'),
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'get') {
-                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const data = await client['targets/get'].query({ config: cliConfig, targetId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'create') {
-                const targetType = action;
-                if (!targetType) {
-                    process.stdout.write(renderHelp('targets', helpContext));
-                    return;
-                }
-                if (targetType === 'keyword') {
-                    const [adGroupIdRaw, keyword, matchType, bid] = rest;
-                    if (!(adGroupIdRaw && keyword && matchType && bid)) {
-                        throw new CliUsageError({
-                            topicKey: 'targets',
-                            message: 'Missing required args: keyword <ad_group_id> <keyword> <match_type> <bid>.',
-                        });
-                    }
-                    const adGroupId = parseNumericId(adGroupIdRaw, { topicKey: 'targets', label: '<ad_group_id>', expected: 'ad_group_id' });
-                    const data = await client['targets/create/keyword'].mutate({
-                        config: cliConfig,
-                        adGroupId,
-                        keyword,
-                        matchType,
-                        bid: parseNumberArg(bid, 'bid'),
-                    });
-                    printOutput(data);
-                    return;
-                }
-                if (targetType === 'product') {
-                    const [adGroupIdRaw, productId, matchType, bid, productIdType] = rest;
-                    if (!(adGroupIdRaw && productId && matchType && bid)) {
-                        throw new CliUsageError({
-                            topicKey: 'targets',
-                            message: 'Missing required args: product <ad_group_id> <asin|sku> <match_type> <bid> [ASIN|SKU].',
-                        });
-                    }
-                    const adGroupId = parseNumericId(adGroupIdRaw, { topicKey: 'targets', label: '<ad_group_id>', expected: 'ad_group_id' });
-                    const data = await client['targets/create/product'].mutate({
-                        config: cliConfig,
-                        adGroupId,
-                        productIdType: productIdType ?? 'ASIN',
-                        productId,
-                        matchType,
-                        bid: parseNumberArg(bid, 'bid'),
-                    });
-                    printOutput(data);
-                    return;
-                }
-                throw new CliUsageError({ topicKey: 'targets', message: `Unknown create type: ${targetType}` });
-            }
-            if (subcommand === 'delete') {
-                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const data = await client['targets/delete'].mutate({ config: cliConfig, targetId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'pause') {
-                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const data = await client['targets/pause'].mutate({ config: cliConfig, targetId });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'resume') {
-                const targetId = requireNumericIdArg(action, { topicKey: 'targets', label: '<target_id>', expected: 'target_id' });
-                const data = await client['targets/resume'].mutate({ config: cliConfig, targetId });
-                printOutput(data);
-                return;
-            }
-            throw new CliUsageError({ topicKey: 'targets', message: `Unknown subcommand: ${subcommand}` });
-        }
-        case 'history': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('history', helpContext));
-                return;
-            }
-
-            const entity = resolveHistoryEntityRef(subcommand);
-            const config = await loadConfig();
-            const client = createApiClient(config);
-            const cliConfig = requireCliConfig(config);
-            const entityId = requireNumericIdArg(action, {
-                topicKey: 'history',
-                label: entity.label,
-                expected: entity.expected,
-            });
-            const rangeOverride = readFlag(flags, ['range']);
-            const limitRaw = readFlag(flags, ['limit']);
-            const offsetRaw = readFlag(flags, ['offset']);
-            const limit = limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined;
-            const offset = offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined;
-            const rangeContext = resolveRangeContext(cliConfig, rangeOverride);
-
-            const data = await client['history/list'].query({
-                config: cliConfig,
-                entityType: entity.entityType,
-                entityId,
-                range: rangeOverride ?? undefined,
-                limit,
-                offset,
-            });
-            printOutput({
-                context: {
-                    accountId: cliConfig.accountId,
-                    countryCode: cliConfig.countryCode,
-                    entityType: entity.entityType,
-                    entityId,
-                    range: rangeContext.range,
-                    rangeSource: rangeContext.rangeSource,
-                    timezone: rangeContext.timezone,
-                    limit: limit ?? null,
-                    offset: offset ?? null,
-                },
-                ...data,
-            });
+        case 'config':
+            await handleConfigCommand(subcommand, rest);
             return;
-        }
-        case 'bids': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('bids', helpContext));
-                return;
-            }
-            const config = await loadConfig();
-            const client = createApiClient(config);
-            const cliConfig = requireCliConfig(config);
-            if (subcommand === 'set') {
-                const targetId = requireNumericIdArg(action, { topicKey: 'bids', label: '<target_id>', expected: 'target_id' });
-                const value = rest[0];
-                if (!value) {
-                    throw new CliUsageError({ topicKey: 'bids', message: 'Missing required args: <target_id> <value>.' });
-                }
-                const data = await client['bids/set'].mutate({
-                    config: cliConfig,
-                    targetId,
-                    value: parseNumberArg(value, 'value'),
-                });
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'adjust') {
-                const targetId = requireNumericIdArg(action, { topicKey: 'bids', label: '<target_id>', expected: 'target_id' });
-                const delta = rest[0];
-                if (!delta) {
-                    throw new CliUsageError({ topicKey: 'bids', message: 'Missing required args: <target_id> <delta>.' });
-                }
-                const data = await client['bids/adjust'].mutate({
-                    config: cliConfig,
-                    targetId,
-                    delta: parseNumberArg(delta, 'delta'),
-                });
-                printOutput(data);
-                return;
-            }
-            throw new CliUsageError({ topicKey: 'bids', message: `Unknown subcommand: ${subcommand}` });
-        }
-        case 'metrics': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('metrics', helpContext));
-                return;
-            }
-            const config = await loadConfig();
-            const client = createApiClient(config);
-            const cliConfig = requireCliConfig(config);
-            if (subcommand !== 'series' && subcommand !== 'table') {
-                throw new CliUsageError({ topicKey: 'metrics', message: `Unknown subcommand: ${subcommand}` });
-            }
-            const groupBy = readFlag(flags, ['group-by', 'groupby']);
-            const entity = resolveMetricsEntity(action, groupBy, subcommand === 'series' ? 'metrics series' : 'metrics table');
-
-            const ids = parseIdsFlag(flags);
-            const asinRaw = readFlag(flags, ['asin']);
-            const asin = asinRaw
-                ? parseAsin(asinRaw, {
-                      topicKey: subcommand === 'series' ? 'metrics series' : 'metrics table',
-                      label: '--asin',
-                  })
-                : undefined;
-            const campaignId = parseOptionalNumericIdFlag(readFlag(flags, ['campaign', 'campaign-id']), {
-                topicKey: subcommand === 'series' ? 'metrics series' : 'metrics table',
-                label: '--campaign',
-                expected: 'campaign_id',
-            });
-            const adGroupId = parseOptionalNumericIdFlag(readFlag(flags, ['ad-group', 'ad-group-id']), {
-                topicKey: subcommand === 'series' ? 'metrics series' : 'metrics table',
-                label: '--ad-group',
-                expected: 'ad_group_id',
-            });
-            const metrics = parseMetricsSelectionFlag(flags);
-            const filters = parseMetricsFiltersFlag(flags);
-            const rangeOverride = readFlag(flags, ['range']);
-            const bucket = parseMetricsBucketFlag(flags);
-            const rangeContext = resolveRangeContext(cliConfig, rangeOverride);
-            const asinStateFilter = resolveMetricsAsinStateFilter(flags);
-            const asinScope = asin ? await resolveAsinMetricsScope(client, cliConfig, asin, entity, asinStateFilter) : null;
-            const resolvedIds = mergeMetricScopeIds(ids, asinScope?.ids);
-            const scopedIds = resolvedIds && resolvedIds.length === 0 ? [METRICS_NO_MATCH_ID] : resolvedIds;
-            const metricsContext = {
-                accountId: cliConfig.accountId,
-                countryCode: cliConfig.countryCode,
-                groupBy: entity,
-                ids: resolvedIds ?? [],
-                campaignId: campaignId ?? null,
-                adGroupId: adGroupId ?? null,
-                asin: asin ?? null,
-                asinScope: asinScope?.scope ?? null,
-                asinStateFilter: asin ? asinStateFilter : null,
-                metrics: resolveMetricKeys(metrics),
-                filters: filters ?? {},
-                range: rangeContext.range,
-                rangeSource: rangeContext.rangeSource,
-                timezone: rangeContext.timezone,
-            };
-
-            const sortField = readFlag(flags, ['sort']);
-            const sortDirection = readFlag(flags, ['direction']);
-            const limitRaw = readFlag(flags, ['limit']);
-            const offsetRaw = readFlag(flags, ['offset']);
-
-            if (subcommand === 'series' && (sortField || sortDirection || limitRaw || offsetRaw)) {
-                throw new CliUsageError({
-                    topicKey: 'metrics series',
-                    message: 'Series metrics do not support --sort, --direction, --limit, or --offset.',
-                });
-            }
-            if (subcommand === 'table' && bucket) {
-                throw new CliUsageError({ topicKey: 'metrics table', message: 'Table metrics do not support --bucket.' });
-            }
-
-            const tableOptions =
-                subcommand === 'table'
-                    ? {
-                          sort: {
-                              field: parseSortField(sortField),
-                              direction: parseSortDirection(sortDirection),
-                          },
-                          limit: limitRaw ? parsePositiveIntArg(limitRaw, 'limit') : undefined,
-                          offset: offsetRaw ? parseNonNegativeIntArg(offsetRaw, 'offset') : undefined,
-                      }
-                    : null;
-
-            if (subcommand === 'series') {
-                if (entity === 'campaigns') {
-                    if (campaignId || adGroupId) {
-                        throw new CliUsageError({
-                            topicKey: 'metrics series',
-                            message: 'Series campaigns does not accept --campaign or --ad-group.',
-                        });
-                    }
-                    const data = await client['metrics/series/campaigns'].query({
-                        config: cliConfig,
-                        ids: scopedIds,
-                        metrics,
-                        filters,
-                        range: rangeOverride ?? undefined,
-                        bucket: bucket ?? undefined,
-                    });
-                    printOutput({
-                        context: {
-                            ...metricsContext,
-                            bucket: bucket ?? null,
-                        },
-                        ...data,
-                    });
-                    return;
-                }
-                if (entity === 'ad-groups') {
-                    if (adGroupId) {
-                        throw new CliUsageError({
-                            topicKey: 'metrics series',
-                            message: 'Series ad-groups does not accept --ad-group (use --campaign to scope).',
-                        });
-                    }
-                    const data = await client['metrics/series/ad-groups'].query({
-                        config: cliConfig,
-                        campaignId: campaignId ?? undefined,
-                        ids: scopedIds,
-                        metrics,
-                        filters,
-                        range: rangeOverride ?? undefined,
-                        bucket: bucket ?? undefined,
-                    });
-                    printOutput({
-                        context: {
-                            ...metricsContext,
-                            bucket: bucket ?? null,
-                        },
-                        ...data,
-                    });
-                    return;
-                }
-                if (entity === 'ads') {
-                    const data = await client['metrics/series/ads'].query({
-                        config: cliConfig,
-                        campaignId: campaignId ?? undefined,
-                        adGroupId: adGroupId ?? undefined,
-                        ids: scopedIds,
-                        metrics,
-                        filters,
-                        range: rangeOverride ?? undefined,
-                        bucket: bucket ?? undefined,
-                    });
-                    printOutput({
-                        context: {
-                            ...metricsContext,
-                            bucket: bucket ?? null,
-                        },
-                        ...data,
-                    });
-                    return;
-                }
-                if (entity === 'targets') {
-                    const data = await client['metrics/series/targets'].query({
-                        config: cliConfig,
-                        campaignId: campaignId ?? undefined,
-                        adGroupId: adGroupId ?? undefined,
-                        ids: scopedIds,
-                        metrics,
-                        filters,
-                        range: rangeOverride ?? undefined,
-                        bucket: bucket ?? undefined,
-                    });
-                    printOutput({
-                        context: {
-                            ...metricsContext,
-                            bucket: bucket ?? null,
-                        },
-                        ...data,
-                    });
-                    return;
-                }
-            }
-
-            if (subcommand === 'table') {
-                if (!tableOptions) {
-                    throw new Error('Missing table options.');
-                }
-
-                if (entity === 'campaigns') {
-                    if (campaignId || adGroupId) {
-                        throw new CliUsageError({
-                            topicKey: 'metrics table',
-                            message: 'Table campaigns does not accept --campaign or --ad-group.',
-                        });
-                    }
-                    const data = await client['metrics/table/campaigns'].query({
-                        config: cliConfig,
-                        ids: scopedIds,
-                        metrics,
-                        filters,
-                        range: rangeOverride ?? undefined,
-                        sort: tableOptions.sort,
-                        limit: tableOptions.limit,
-                        offset: tableOptions.offset,
-                    });
-                    printOutput({
-                        context: {
-                            ...metricsContext,
-                            sort: tableOptions.sort.field,
-                            direction: tableOptions.sort.direction,
-                            limit: tableOptions.limit ?? null,
-                            offset: tableOptions.offset ?? null,
-                        },
-                        ...data,
-                    });
-                    return;
-                }
-                if (entity === 'ad-groups') {
-                    if (adGroupId) {
-                        throw new CliUsageError({
-                            topicKey: 'metrics table',
-                            message: 'Table ad-groups does not accept --ad-group (use --campaign to scope).',
-                        });
-                    }
-                    const data = await client['metrics/table/ad-groups'].query({
-                        config: cliConfig,
-                        campaignId: campaignId ?? undefined,
-                        ids: scopedIds,
-                        metrics,
-                        filters,
-                        range: rangeOverride ?? undefined,
-                        sort: tableOptions.sort,
-                        limit: tableOptions.limit,
-                        offset: tableOptions.offset,
-                    });
-                    printOutput({
-                        context: {
-                            ...metricsContext,
-                            sort: tableOptions.sort.field,
-                            direction: tableOptions.sort.direction,
-                            limit: tableOptions.limit ?? null,
-                            offset: tableOptions.offset ?? null,
-                        },
-                        ...data,
-                    });
-                    return;
-                }
-                if (entity === 'ads') {
-                    const data = await client['metrics/table/ads'].query({
-                        config: cliConfig,
-                        campaignId: campaignId ?? undefined,
-                        adGroupId: adGroupId ?? undefined,
-                        ids: scopedIds,
-                        metrics,
-                        filters,
-                        range: rangeOverride ?? undefined,
-                        sort: tableOptions.sort,
-                        limit: tableOptions.limit,
-                        offset: tableOptions.offset,
-                    });
-                    printOutput({
-                        context: {
-                            ...metricsContext,
-                            sort: tableOptions.sort.field,
-                            direction: tableOptions.sort.direction,
-                            limit: tableOptions.limit ?? null,
-                            offset: tableOptions.offset ?? null,
-                        },
-                        ...data,
-                    });
-                    return;
-                }
-                if (entity === 'targets') {
-                    const data = await client['metrics/table/targets'].query({
-                        config: cliConfig,
-                        campaignId: campaignId ?? undefined,
-                        adGroupId: adGroupId ?? undefined,
-                        ids: scopedIds,
-                        metrics,
-                        filters,
-                        range: rangeOverride ?? undefined,
-                        sort: tableOptions.sort,
-                        limit: tableOptions.limit,
-                        offset: tableOptions.offset,
-                    });
-                    printOutput({
-                        context: {
-                            ...metricsContext,
-                            sort: tableOptions.sort.field,
-                            direction: tableOptions.sort.direction,
-                            limit: tableOptions.limit ?? null,
-                            offset: tableOptions.offset ?? null,
-                        },
-                        ...data,
-                    });
-                    return;
-                }
-            }
-            throw new CliUsageError({ topicKey: subcommand === 'series' ? 'metrics series' : 'metrics table', message: `Unknown entity: ${entity}` });
-        }
-        case 'enums': {
-            if (!subcommand) {
-                process.stdout.write(renderHelp('enums', helpContext));
-                return;
-            }
-            const config = await loadConfig();
-            const client = createApiClient(config);
-            if (subcommand === 'bid-strategy') {
-                const data = await client['enums/bid-strategy'].query();
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'match-type') {
-                const data = await client['enums/match-type'].query();
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'placement') {
-                const data = await client['enums/placement'].query();
-                printOutput(data);
-                return;
-            }
-            if (subcommand === 'state') {
-                const data = await client['enums/state'].query();
-                printOutput(data);
-                return;
-            }
-            throw new CliUsageError({ topicKey: 'enums', message: `Unknown subcommand: ${subcommand}` });
-        }
-        case 'changelog': {
-            if (action || rest.length > 0) {
-                throw new CliUsageError({ topicKey: 'changelog', message: 'Too many positional args. Use: bb changelog [version] [--all].' });
-            }
-
-            const includeAll = readBooleanFlag(flags, ['all']);
-            const requestedVersion = subcommand ? normalizeChangelogVersion(subcommand) : undefined;
-            if (includeAll && requestedVersion) {
-                throw new CliUsageError({ topicKey: 'changelog', message: 'Use either a version arg or --all, not both.' });
-            }
-
-            const currentVersion = await resolveCliVersion();
-            const changelog = await loadCliChangelog();
-            const latestVersion = changelog.entries[0]?.version ?? null;
-
-            if (includeAll) {
-                printOutput({
-                    currentVersion,
-                    latestVersion,
-                    source: changelog.source,
-                    entries: changelog.entries,
-                });
-                return;
-            }
-
-            const entry = resolveRequestedChangelogEntry(changelog.entries, {
-                currentVersion,
-                requestedVersion,
-            });
-            if (!entry) {
-                const availableVersions = changelog.entries.map(item => `v${item.version}`).join(', ');
-                throw new CliUsageError({
-                    topicKey: 'changelog',
-                    message: `Unknown changelog version: v${requestedVersion}. Available versions: ${availableVersions}.`,
-                });
-            }
-
-            printOutput({
-                currentVersion,
-                latestVersion,
-                requestedVersion: requestedVersion ?? null,
-                selectedVersion: entry.version,
-                source: changelog.source,
-                entry,
-            });
+        case 'advertiser-accounts':
+            await handleAdvertiserAccountsCommand(subcommand, rest, parsed.flags);
             return;
-        }
+        case 'search':
+            await handleSearchCommand(subcommand, parsed.flags);
+            return;
+        case 'create':
+            await handleCreateCommand(subcommand, parsed.flags);
+            return;
+        case 'update':
+            await handleUpdateCommand(subcommand, parsed.flags);
+            return;
+        case 'changelog':
+            await handleChangelogCommand(subcommand, parsed.flags);
+            return;
         default:
-            throw new CliUsageError({ topicKey: 'global', message: `Unknown command: ${command}` });
+            throw invalidInput(`Unknown command: ${command}.`, { command });
     }
 };
 
-const handleAuthCommand = async (subcommand?: string, value?: string, flags: ParsedFlags = {}) => {
-    try {
-        if (subcommand === 'status') {
-            printOutput(serializeAuthState(loadAuthState()));
-            return;
-        }
+type FlagMap = Map<string, string[]>;
 
-        if (subcommand === 'set') {
-            const input = await resolveAuthSetInput(value, flags);
-            const auth = setStoredApiKey(input.apiKey);
-            printOutput({
-                inputSource: input.source,
-                saved: true,
-                ...serializeAuthState(auth),
-            });
-            return;
-        }
-
-        if (subcommand === 'clear') {
-            const { cleared, auth } = clearStoredApiKey();
-            printOutput({
-                cleared,
-                ...serializeAuthState(auth),
-            });
-            return;
-        }
-
-        throw new CliUsageError({ topicKey: 'auth', message: `Unknown auth subcommand: ${subcommand}.` });
-    } catch (error) {
-        if (isCliUsageError(error)) {
-            throw error;
-        }
-        if (error instanceof Error) {
-            throw new CliUsageError({ topicKey: 'auth', message: error.message });
-        }
-        throw error;
-    }
+type ParsedArgs = {
+    positional: string[];
+    flags: FlagMap;
 };
 
-const handleConfigCommand = async (subcommand?: string, action?: string, rest: string[] = []) => {
-    if (subcommand === 'show') {
-        const storage = await loadCliStorage();
-        const config = await loadConfig();
-        printOutput({
-            auth: serializeAuthState(loadAuthState()),
-            storageDir: storage.storageDir,
-            configPath: storage.configPath,
-            config,
-        });
+type CliConfig = {
+    storageDir: string;
+    configPath: string;
+    baseUrl?: string;
+};
+
+type StoredConfig = {
+    baseUrl?: string;
+};
+
+type FlagKind = 'string' | 'number' | 'json';
+
+type OperationErrorShape = {
+    operationCode?: string;
+    code?: string;
+    message?: string;
+    details?: unknown;
+};
+
+type CliContractErrorShape = {
+    code: string;
+    message: string;
+    details: unknown;
+};
+
+class CliContractError extends Error {
+    readonly code: string;
+    readonly details: unknown;
+
+    constructor(input: CliContractErrorShape) {
+        super(input.message);
+        this.name = 'CliContractError';
+        this.code = input.code;
+        this.details = input.details;
+    }
+}
+
+const handleAdvertiserAccountsCommand = async (subcommand: string | undefined, rest: string[], flags: FlagMap) => {
+    assertNoUnexpectedFlags(flags, ['help']);
+    if (subcommand !== 'list' || rest.length > 0) {
+        throw invalidInput('Use `bb advertiser-accounts list`.', { command: 'advertiser-accounts' });
+    }
+    const client = await createApiClient();
+    printOutput(await client.list_advertiser_accounts.query({}));
+};
+
+const handleSearchCommand = async (resource: string | undefined, flags: FlagMap) => {
+    if (!resource) {
+        throw invalidInput('Missing search resource.', { expected: ['campaign', 'ad-group', 'ad', 'target', 'product', 'change-event'] });
+    }
+    const allowedFlags = ['account', 'fields', 'where', 'start-date', 'end-date', 'order-by', 'limit', 'cursor', 'all', 'help'];
+    assertNoUnexpectedFlags(flags, allowedFlags);
+    const accountId = requireAccount(flags);
+    const input = buildSearchInput(resource, accountId, flags);
+    const client = await createApiClient();
+    const result = flags.has('all') ? await fetchAllSearchPages(client, input) : await client.search.query(input);
+    printOutput(result);
+};
+
+const handleCreateCommand = async (operation: string | undefined, flags: FlagMap) => {
+    if (!operation) {
+        throw invalidInput('Missing create operation.', { expected: CREATE_OPERATION_NAMES });
+    }
+    const definition = CREATE_DEFINITIONS[operation];
+    if (!definition) {
+        throw invalidInput(`Unknown create operation: ${operation}.`, { operation, expected: CREATE_OPERATION_NAMES });
+    }
+    const allowedFlags = ['account', 'json', 'help', ...Object.keys(definition.flags)];
+    assertNoUnexpectedFlags(flags, allowedFlags);
+    const accountId = requireAccount(flags);
+    const json = await readJsonFlag(flags, { required: definition.jsonRequired });
+
+    if (definition.composite) {
+        if (!json) {
+            throw invalidInput('Composite creation requires `--json <object|@file|->`.', { operation });
+        }
+        const input = mergeAccount(json, accountId, operation);
+        printOutput(await callCreateOperation(await createApiClient(), operation, input));
         return;
     }
 
-    if (subcommand === 'get') {
-        const key = requireConfigKey(action, 'get');
-        printOutput({
-            key,
-            value: await getConfigValue(key),
-        });
-        return;
-    }
+    const flagInput = readTypedFlags(flags, definition.flags);
+    const input = mergeTopLevelInput(json ?? {}, { accountId, ...flagInput }, operation);
+    printOutput(await callCreateOperation(await createApiClient(), operation, input));
+};
 
-    if (subcommand === 'reset') {
-        await saveConfig({});
-        printOutput({ cleared: true });
-        return;
+const handleUpdateCommand = async (resource: string | undefined, flags: FlagMap) => {
+    if (!resource) {
+        throw invalidInput('Missing update resource.', { expected: UPDATE_RESOURCE_NAMES });
     }
-
-    if (subcommand === 'unset') {
-        const key = requireConfigKey(action, 'unset');
-        const result = await unsetConfigValue(key);
-        printOutput({
-            key,
-            saved: true,
-            ...result,
-        });
-        return;
+    const definition = UPDATE_DEFINITIONS[resource];
+    if (!definition) {
+        throw invalidInput(`Unknown update resource: ${resource}.`, { resource, expected: UPDATE_RESOURCE_NAMES });
     }
+    const allowedFlags = ['account', 'json', 'help', definition.idFlag, ...Object.keys(definition.changes)];
+    assertNoUnexpectedFlags(flags, allowedFlags);
+    const accountId = requireAccount(flags);
+    const json = await readJsonFlag(flags);
+    const id = readOptionalFlag(flags, definition.idFlag);
+    const changes = readTypedFlags(flags, definition.changes);
+    const input = mergeUpdateInput(json ?? {}, { accountId, ...(id === undefined ? {} : { [definition.idProperty]: id }) }, changes, definition, resource);
+    printOutput(await callUpdateOperation(await createApiClient(), definition.operation, input));
+};
 
-    if (subcommand !== 'set') {
-        throw new CliUsageError({ topicKey: 'config', message: 'Missing config subcommand. Use: bb config set <key> <value>.' });
-    }
-
-    const key = requireConfigKey(action, 'set');
-    const config = await loadStoredConfig();
-    const value = rest[0];
-    if (!value) {
-        throw new CliUsageError({ topicKey: 'config', message: `Missing value for config key "${key}". Use: bb config set ${key} <value>.` });
-    }
-
-    switch (key) {
-        case 'storage-dir': {
-            const storage = await setStorageDir(value);
-            printOutput({
-                saved: true,
-                storageDir: storage.storageDir,
-                configPath: storage.configPath,
-            });
-            return;
+const handleAuthCommand = async (subcommand: string | undefined, rest: string[], flags: FlagMap) => {
+    assertNoUnexpectedFlags(flags, ['stdin', 'json', 'help']);
+    if (subcommand === 'set') {
+        if (rest.length > 1) {
+            throw invalidInput('Use `bb auth set [ak_...]` or `bb auth set --stdin`.', {});
         }
-        case 'base-url':
-            config.baseUrl = normalizeApiBaseUrl(value);
-            break;
-        case 'account':
-            if (!rest[1]) {
-                throw new CliUsageError({ topicKey: 'config', message: 'Missing required args: account <adsAccountId> <countryCode>.' });
-            }
-            config.accountId = value;
-            config.countryCode = rest[1];
-            break;
-        default:
-            throw new CliUsageError({ topicKey: 'config', message: `Unknown config key: ${key}.` });
+        const value = flags.has('stdin') ? await readStdin() : rest[0];
+        if (!value) {
+            throw invalidInput('Missing API key. Use `bb auth set [ak_...]` or `bb auth set --stdin`.', {});
+        }
+        const auth = setStoredApiKey(value);
+        printOutput({ source: auth.source, envOverride: auth.envOverride });
+        return;
     }
-
-    await saveConfig(config);
-    printOutput({ key, saved: true });
+    if (subcommand === 'clear' && rest.length === 0) {
+        const result = clearStoredApiKey();
+        printOutput({ cleared: result.cleared, source: result.auth.source, envOverride: result.auth.envOverride });
+        return;
+    }
+    if (subcommand === 'status' && rest.length === 0) {
+        const auth = loadAuthState();
+        printOutput({ source: auth.source, envOverride: auth.envOverride, secureStore: auth.secureStore });
+        return;
+    }
+    throw invalidInput('Use `bb auth set`, `bb auth clear`, or `bb auth status`.', {});
 };
 
-const resolveAuthSetInput = async (value: string | undefined, flags: ParsedFlags) => {
-    const useStdin = readBooleanFlag(flags, ['stdin']);
-
-    if (value && useStdin) {
-        throw new CliUsageError({ topicKey: 'auth', message: 'Use either an API-key argument or --stdin, not both.' });
-    }
-
-    if (value) {
-        return {
-            apiKey: value,
-            source: 'argument',
-        };
-    }
-
-    if (useStdin) {
-        return {
-            apiKey: await readSecretFromStdin(),
-            source: 'stdin',
-        };
-    }
-
-    return {
-        apiKey: await readSecretFromPrompt('Merchbase API key: '),
-        source: 'prompt',
-    };
-};
-
-const readSecretFromStdin = async () => {
-    let value = '';
-
-    for await (const chunk of process.stdin) {
-        value += String(chunk);
-    }
-
-    return value.trim();
-};
-
-const readSecretFromPrompt = (prompt: string) => {
-    if (!(process.stdin.isTTY && process.stdin.setRawMode)) {
-        throw new CliUsageError({
-            topicKey: 'auth',
-            message: 'auth set needs <api-key>, --stdin, or an interactive terminal prompt.',
-        });
-    }
-
-    return new Promise<string>((resolve, reject) => {
-        const input = process.stdin;
-        const onData = (chunk: Buffer) => {
-            const text = chunk.toString('utf8');
-
-            for (const character of text) {
-                if (character === '\u0003') {
-                    cleanup();
-                    process.stdout.write('\n');
-                    reject(new CliUsageError({ topicKey: 'auth', message: 'auth set was canceled.' }));
-                    return;
-                }
-
-                if (character === '\r' || character === '\n') {
-                    cleanup();
-                    process.stdout.write('\n');
-                    resolve(buffer.trim());
-                    return;
-                }
-
-                if (character === '\u007f') {
-                    buffer = buffer.slice(0, -1);
-                    return;
-                }
-
-                buffer += character;
-            }
-        };
-
-        const cleanup = () => {
-            input.off('data', onData);
-            input.setRawMode(false);
-            input.pause();
-        };
-
-        let buffer = '';
-        process.stdout.write(prompt);
-        input.setRawMode(true);
-        input.resume();
-        input.on('data', onData);
-    });
-};
-
-const requireConfigKey = (value: string | undefined, command: 'get' | 'set' | 'unset'): ConfigKey => {
-    const key = CONFIG_KEYS.find(candidate => candidate === value);
-    if (key) {
-        return key;
-    }
-
-    if (!value) {
-        throw new CliUsageError({
-            topicKey: 'config',
-            message: `Missing config key. Use: bb config ${command} <key>${command === 'set' ? ' <value>' : ''}. Expected: ${CONFIG_KEYS.join(', ')}.`,
-        });
-    }
-
-    throw new CliUsageError({
-        topicKey: 'config',
-        message: `Unknown config key: ${value}. Expected: ${CONFIG_KEYS.join(', ')}.`,
-    });
-};
-
-const getConfigValue = async (key: ConfigKey) => {
-    if (key === 'storage-dir') {
-        return (await loadCliStorage()).storageDir;
-    }
-
+const handleConfigCommand = async (subcommand: string | undefined, rest: string[]) => {
     const config = await loadConfig();
-    if (key === 'base-url') {
-        return config.baseUrl ?? DEFAULT_BASE_URL;
-    }
-
-    return {
-        accountId: config.accountId ?? null,
-        countryCode: config.countryCode ?? null,
-    };
-};
-
-const unsetConfigValue = async (key: ConfigKey) => {
-    if (key === 'storage-dir') {
-        const storage = await setStorageDir(DEFAULT_STORAGE_DIR);
-        return {
-            configPath: storage.configPath,
-            storageDir: storage.storageDir,
-        };
-    }
-
-    const config = await loadStoredConfig();
-    const nextConfig = key === 'base-url' ? { ...config, baseUrl: undefined } : { ...config, accountId: undefined, countryCode: undefined };
-
-    await saveConfig(nextConfig);
-    return {
-        config: await loadConfig(),
-    };
-};
-
-const loadConfig = async (): Promise<CliConfig> => {
-    return resolveConfigEnvOverrides(await loadStoredConfig());
-};
-
-const loadStoredConfig = async (): Promise<CliConfig> => {
-    const { configPath } = await loadCliStorage();
-    try {
-        const raw = await readFile(configPath, 'utf8');
-        return sanitizeCliConfig(JSON.parse(raw));
-    } catch {
-        return {};
-    }
-};
-
-const saveConfig = async (config: CliConfig) => {
-    const { storageDir, configPath } = await loadCliStorage();
-    await mkdir(storageDir, { recursive: true });
-    await writeFile(configPath, JSON.stringify(config, null, 2));
-};
-
-const resolveApiConfig = (config: CliConfig) => {
-    const baseUrl = normalizeApiBaseUrl(config.baseUrl ?? DEFAULT_BASE_URL);
-    const apiKey = resolveApiKey();
-    if (!apiKey) {
-        throw new CliUsageError({ topicKey: 'auth', message: getMissingApiKeyMessage() });
-    }
-
-    return { baseUrl, apiKey };
-};
-
-const createApiClient = (config: CliConfig) => {
-    const apiConfig = resolveApiConfig(config);
-    return createBidBeaconClient({
-        baseUrl: apiConfig.baseUrl,
-        credential: apiConfig.apiKey,
-        batch: false,
-    });
-};
-
-const resolveCommandAlias = (value?: string) => {
-    if (!value) {
-        return value;
-    }
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'campaign') {
-        return 'campaigns';
-    }
-    return normalized;
-};
-
-const serializeAuthState = (auth: ReturnType<typeof loadAuthState>) => {
-    return {
-        authenticated: auth.source !== 'none',
-        source: auth.source,
-        envOverride: auth.envOverride,
-        envVar: API_KEY_ENV_VAR,
-        secureStore: {
-            backend: auth.secureStore.backend,
-            label: auth.secureStore.label,
-            available: auth.secureStore.available,
-            configured: auth.secureStore.configured,
-            detail: auth.secureStore.detail ?? null,
-        },
-    };
-};
-
-const requireCliConfig = (config: CliConfig) => {
-    if (!(config.accountId && config.countryCode)) {
-        throw new CliUsageError({
-            topicKey: 'config',
-            message: 'Missing config: account + country. Use: bb config set account <adsAccountId> <countryCode>.',
-        });
-    }
-    return {
-        accountId: config.accountId,
-        countryCode: config.countryCode,
-        range: DEFAULT_RANGE,
-    };
-};
-
-const printOutput = (data: unknown) => {
-    console.log(JSON.stringify({ ok: true, data }, null, 2));
-};
-
-const resolveRangeContext = (config: RequiredCliConfig, rangeOverride: string | null) => {
-    return {
-        range: rangeOverride ?? config.range,
-        rangeSource: rangeOverride ? 'flag' : 'default',
-        timezone: getTimezoneForCountry(config.countryCode),
-    };
-};
-
-const parseArgs = (args: string[]) => {
-    const flags: ParsedFlags = {};
-    const positional: string[] = [];
-
-    let index = 0;
-    while (index < args.length) {
-        const value = args[index];
-        if (value === '-h') {
-            flags.help = true;
-            index += 1;
-            continue;
+    if (!subcommand || subcommand === 'show') {
+        if (rest.length > 0) {
+            throw invalidInput('Use `bb config show` without additional arguments.', {});
         }
-        if (!value.startsWith('--')) {
-            positional.push(value);
-            index += 1;
-            continue;
+        printOutput({ storageDir: config.storageDir, configPath: config.configPath, config: configToOutput(config) });
+        return;
+    }
+    if (subcommand === 'get') {
+        const key = requireConfigKey(rest[0]);
+        if (rest.length > 1) {
+            throw invalidInput('`bb config get` accepts one key.', { key });
         }
-
-        const [rawKey, inlineValue] = value.slice(2).split('=');
-        const key = rawKey.trim();
-        if (!key) {
-            index += 1;
-            continue;
+        printOutput({ key, value: key === 'base-url' ? config.baseUrl : config.storageDir });
+        return;
+    }
+    if (subcommand === 'set') {
+        const key = requireConfigKey(rest[0]);
+        const value = rest[1]?.trim();
+        if (!value || rest.length > 2) {
+            throw invalidInput('`bb config set` requires one key and one value.', { key });
         }
-
-        if (inlineValue !== undefined) {
-            if (flags[key] === undefined) {
-                flags[key] = inlineValue;
-            } else if (Array.isArray(flags[key])) {
-                flags[key] = [...flags[key], inlineValue];
-            } else {
-                flags[key] = [flags[key] as string, inlineValue];
-            }
-            index += 1;
-            continue;
-        }
-
-        const next = args[index + 1];
-        if (!next || next.startsWith('--')) {
-            flags[key] = true;
-            index += 1;
-            continue;
-        }
-
-        if (flags[key] === undefined) {
-            flags[key] = next;
-        } else if (Array.isArray(flags[key])) {
-            flags[key] = [...flags[key], next];
+        if (key === 'storage-dir') {
+            const baseUrl = config.baseUrl;
+            await writeJson(DEFAULT_SETTINGS_PATH, { storageDir: value });
+            const nextConfig = await loadConfig();
+            await saveStoredConfig(nextConfig, { baseUrl });
         } else {
-            flags[key] = [flags[key] as string, next];
+            await saveStoredConfig(config, { baseUrl: normalizeApiBaseUrl(value) });
         }
-        index += 2;
+        printOutput({ key, value: key === 'storage-dir' ? value : normalizeApiBaseUrl(value) });
+        return;
     }
-
-    return { positional, flags };
+    if (subcommand === 'unset') {
+        const key = requireConfigKey(rest[0]);
+        if (rest.length > 1) {
+            throw invalidInput('`bb config unset` accepts one key.', { key });
+        }
+        if (key === 'storage-dir') {
+            await rm(DEFAULT_SETTINGS_PATH, { force: true });
+        } else {
+            const stored = await readStoredConfig(config.configPath);
+            stored.baseUrl = undefined;
+            await writeJson(config.configPath, stored);
+        }
+        printOutput({ key, unset: true });
+        return;
+    }
+    if (subcommand === 'reset' && rest.length === 0) {
+        await rm(config.configPath, { force: true });
+        await rm(DEFAULT_SETTINGS_PATH, { force: true });
+        printOutput({ reset: true });
+        return;
+    }
+    throw invalidInput('Use `bb config show|get|set|unset|reset`.', {});
 };
 
-const readFlag = (flags: ParsedFlags, keys: string[]) => {
-    for (const key of keys) {
-        const value = flags[key];
-        if (Array.isArray(value)) {
-            return value.find(entry => typeof entry === 'string') ?? null;
-        }
-        if (typeof value === 'string') {
-            return value;
-        }
+const handleChangelogCommand = async (version: string | undefined, flags: FlagMap) => {
+    assertNoUnexpectedFlags(flags, ['all', 'help']);
+    const changelog = await readChangelog();
+    if (flags.has('all')) {
+        printOutput({ currentVersion: changelog.currentVersion, changelog: changelog.raw });
+        return;
     }
-    return null;
+    const selectedVersion = normalizeVersion(version ?? changelog.currentVersion);
+    const entry = changelog.entries.find(candidate => candidate.version === selectedVersion);
+    if (!entry) {
+        throw invalidInput(`Changelog entry not found for version ${selectedVersion}.`, { version: selectedVersion });
+    }
+    printOutput({ currentVersion: changelog.currentVersion, selectedVersion, entry });
 };
 
-const readBooleanFlag = (flags: ParsedFlags, keys: string[]) => {
-    for (const key of keys) {
-        const value = flags[key];
-        if (value === true) {
-            return true;
-        }
-        if (Array.isArray(value)) {
-            return value.some(entry => {
-                if (entry === true) {
-                    return true;
-                }
-                if (typeof entry !== 'string') {
-                    return false;
-                }
-                const normalized = entry.trim().toLowerCase();
-                return ['true', '1', 'yes', 'y'].includes(normalized);
-            });
-        }
-        if (typeof value === 'string') {
-            const normalized = value.trim().toLowerCase();
-            if (['true', '1', 'yes', 'y'].includes(normalized)) {
-                return true;
-            }
-            if (['false', '0', 'no', 'n'].includes(normalized)) {
-                return false;
-            }
-        }
+const callCreateOperation = async (client: BidBeaconClient, operation: string, input: unknown) => {
+    switch (operation) {
+        case 'sponsored-products-campaign':
+            return client.create_sponsored_products_campaign.mutate(input as RouterInputs['create_sponsored_products_campaign']);
+        case 'campaign':
+            return client.create_campaign.mutate(input as RouterInputs['create_campaign']);
+        case 'ad-group':
+            return client.create_ad_group.mutate(input as RouterInputs['create_ad_group']);
+        case 'ad':
+            return client.create_ad.mutate(input as RouterInputs['create_ad']);
+        case 'keyword-target':
+            return client.create_keyword_target.mutate(input as RouterInputs['create_keyword_target']);
+        case 'product-target':
+            return client.create_product_target.mutate(input as RouterInputs['create_product_target']);
+        case 'negative-keyword':
+            return client.create_negative_keyword.mutate(input as RouterInputs['create_negative_keyword']);
+        case 'negative-product-target':
+            return client.create_negative_product_target.mutate(input as RouterInputs['create_negative_product_target']);
+        default:
+            throw invalidInput(`Unknown create operation: ${operation}.`, { operation });
     }
-    return false;
 };
 
-const readFlagValues = (flags: ParsedFlags, keys: string[]) => {
-    const values: string[] = [];
-    for (const key of keys) {
-        const value = flags[key];
-        if (Array.isArray(value)) {
-            values.push(...value.filter(entry => typeof entry === 'string'));
-        } else if (typeof value === 'string') {
-            values.push(value);
+const callUpdateOperation = async (client: BidBeaconClient, operation: string, input: unknown) => {
+    switch (operation) {
+        case 'update_campaign':
+            return client.update_campaign.mutate(input as RouterInputs['update_campaign']);
+        case 'update_ad_group':
+            return client.update_ad_group.mutate(input as RouterInputs['update_ad_group']);
+        case 'update_ad':
+            return client.update_ad.mutate(input as RouterInputs['update_ad']);
+        case 'update_target':
+            return client.update_target.mutate(input as RouterInputs['update_target']);
+        default:
+            throw invalidInput(`Unknown update operation: ${operation}.`, { operation });
+    }
+};
+
+const fetchAllSearchPages = async (client: BidBeaconClient, input: RouterInputs['search']) => {
+    const rows: unknown[] = [];
+    let pageInput = input;
+    const seenCursors = new Set<string>();
+
+    while (true) {
+        const page = await client.search.query(pageInput);
+        rows.push(...page.rows);
+        if (!page.nextCursor) {
+            return rows;
         }
+        if (seenCursors.has(page.nextCursor)) {
+            throw new CliContractError({ code: 'CURSOR_INVALID', message: 'Search returned a repeated cursor.', details: { cursor: page.nextCursor } });
+        }
+        seenCursors.add(page.nextCursor);
+        pageInput = { ...pageInput, cursor: page.nextCursor };
+    }
+};
+
+const buildSearchInput = (rawResource: string, accountId: string, flags: FlagMap): RouterInputs['search'] => {
+    const resource = toSearchResource(rawResource);
+    const input: Record<string, unknown> = { accountId, resource };
+    const fields = readOptionalFlag(flags, 'fields');
+    if (fields !== undefined) {
+        input.fields = splitList(fields, 'fields');
+        validateSearchFields(input.fields as string[]);
+    }
+    const where = flags.get('where') ?? [];
+    if (where.length > 0) {
+        input.filters = where.map(parseWhereExpression);
+        validateSearchFields((input.filters as Array<{ field: string }>).map(filter => filter.field));
+    }
+    const startDate = readOptionalFlag(flags, 'start-date');
+    const endDate = readOptionalFlag(flags, 'end-date');
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+        throw invalidInput('`--start-date` and `--end-date` must be supplied together.', {});
+    }
+    if (startDate && endDate) {
+        input.dateRange = { startDate, endDate };
+    }
+    const orderBy = readOptionalFlag(flags, 'order-by');
+    if (orderBy !== undefined) {
+        input.orderBy = parseOrderBy(orderBy);
+        validateSearchFields((input.orderBy as Array<{ field: string }>).map(order => order.field));
+    }
+    const limit = readOptionalFlag(flags, 'limit');
+    if (limit !== undefined) {
+        input.limit = parseBoundedInt(limit, 'limit', 1, 200);
+    }
+    const cursor = readOptionalFlag(flags, 'cursor');
+    if (cursor !== undefined) {
+        input.cursor = cursor;
+    }
+    return input as RouterInputs['search'];
+};
+
+const mergeAccount = (json: Record<string, unknown>, accountId: string, operation: string) => {
+    if (Object.hasOwn(json, 'accountId')) {
+        throw duplicateInput('accountId', operation);
+    }
+    return { ...json, accountId };
+};
+
+const mergeTopLevelInput = (json: Record<string, unknown>, flags: Record<string, unknown>, operation: string) => {
+    for (const key of Object.keys(flags)) {
+        if (Object.hasOwn(json, key)) {
+            throw duplicateInput(key, operation);
+        }
+    }
+    return { ...json, ...flags };
+};
+
+const mergeUpdateInput = (json: Record<string, unknown>, topLevelFlags: Record<string, unknown>, changeFlags: Record<string, unknown>, definition: UpdateDefinition, resource: string) => {
+    if (Object.hasOwn(json, 'accountId')) {
+        throw duplicateInput('accountId', resource);
+    }
+    if (Object.hasOwn(json, definition.idProperty) && Object.hasOwn(topLevelFlags, definition.idProperty)) {
+        throw duplicateInput(definition.idProperty, resource);
+    }
+    const jsonChanges = json.changes;
+    if (jsonChanges !== undefined && (!jsonChanges || typeof jsonChanges !== 'object' || Array.isArray(jsonChanges))) {
+        throw invalidInput('`changes` in --json must be an object.', { property: 'changes' });
+    }
+    const changes = { ...((jsonChanges ?? {}) as Record<string, unknown>) };
+    for (const [key, value] of Object.entries(changeFlags)) {
+        if (Object.hasOwn(changes, key)) {
+            throw duplicateInput(`changes.${key}`, resource);
+        }
+        changes[key] = value;
+    }
+    if (Object.keys(changes).length === 0) {
+        throw invalidInput('An update requires at least one change flag or a non-empty `changes` object in --json.', { resource });
+    }
+    const input = { ...json, ...topLevelFlags, changes };
+    if (!(typeof input[definition.idProperty] === 'string' && input[definition.idProperty])) {
+        throw invalidInput(`Missing required ${definition.idProperty}.`, { resource, property: definition.idProperty });
+    }
+    return input;
+};
+
+const readTypedFlags = (flags: FlagMap, definition: Record<string, FlagKind>) => {
+    const values: Record<string, unknown> = {};
+    for (const [flag, kind] of Object.entries(definition)) {
+        const raw = readOptionalFlag(flags, flag);
+        if (raw === undefined) {
+            continue;
+        }
+        values[camelCase(flag)] = parseFlagValue(raw, kind, flag);
     }
     return values;
 };
 
-const resolveListStateFlag = (flags: ParsedFlags) => {
-    const allEnabled = readBooleanFlag(flags, ['all']);
-    if (allEnabled) {
-        return 'ALL';
-    }
-
-    const raw = readFlag(flags, ['state']);
-    if (!raw) {
+const readJsonFlag = async (flags: FlagMap, options: { required?: boolean } = {}): Promise<Record<string, unknown> | undefined> => {
+    const raw = readOptionalFlag(flags, 'json');
+    if (raw === undefined) {
+        if (options.required) {
+            throw invalidInput('Missing required `--json <object|@file|->`.', {});
+        }
         return undefined;
     }
-
-    const normalized = raw.trim().toUpperCase();
-    const allowed = new Set(['ENABLED', 'PAUSED', 'ARCHIVED', 'OTHER', 'ALL']);
-    if (!allowed.has(normalized)) {
-        throw new Error('Invalid --state. Use ENABLED, PAUSED, ARCHIVED, OTHER, or ALL.');
+    let source = raw;
+    if (raw === '-') {
+        source = await readStdin();
+    } else if (raw.startsWith('@')) {
+        const path = raw.slice(1).trim();
+        if (!path) {
+            throw invalidInput('`--json @file` requires a file path.', {});
+        }
+        source = await readFile(path, 'utf8');
     }
-    return normalized;
-};
-
-const parseNumberArg = (value: string, label: string) => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed)) {
-        throw new Error(`Invalid number for ${label}.`);
-    }
-    return parsed;
-};
-
-const parseJsonArg = (value: string) => {
+    let parsed: unknown;
     try {
-        return JSON.parse(value);
+        parsed = JSON.parse(source);
     } catch {
-        throw new Error('Invalid JSON payload.');
+        throw invalidInput('`--json` must contain valid JSON.', {});
     }
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+        throw invalidInput('`--json` must contain a JSON object.', {});
+    }
+    return parsed as Record<string, unknown>;
 };
 
-const looksLikeAsin = (value: string) => {
-    const trimmed = value.trim().toUpperCase();
-    return ASIN_REGEX.test(trimmed);
+const parseWhereExpression = (raw: string) => {
+    const trimmed = raw.trim();
+    const match = WHERE_WORD_EXPRESSION_REGEX.exec(trimmed) ?? WHERE_SYMBOL_EXPRESSION_REGEX.exec(trimmed);
+    if (!match?.groups) {
+        throw invalidInput(`Unsupported --where expression: ${raw}.`, { expression: raw });
+    }
+    const field = match.groups.field;
+    const operator = match.groups.operator.toLowerCase();
+    const valueText = match.groups.value.trim();
+    if (operator === 'contains') {
+        const value = parseJsonValue(valueText, raw);
+        if (typeof value !== 'string') {
+            throw invalidInput('`contains` requires a string value.', { expression: raw });
+        }
+        return { field, operator: 'contains' as const, value };
+    }
+    if (operator === 'in') {
+        const value = parseJsonValue(valueText, raw);
+        if (!Array.isArray(value) || value.length === 0) {
+            throw invalidInput('`in` requires a non-empty JSON array.', { expression: raw });
+        }
+        return { field, operator: 'in' as const, value };
+    }
+    const value = parseJsonValue(valueText, raw);
+    const mappedOperator = { '=': 'eq', '>': 'gt', '>=': 'gte', '<': 'lt', '<=': 'lte' }[operator];
+    if (!mappedOperator) {
+        throw invalidInput(`Unsupported --where operator: ${operator}.`, { expression: raw });
+    }
+    if (mappedOperator !== 'eq' && (Array.isArray(value) || (value !== null && typeof value === 'object'))) {
+        throw invalidInput('Ordered comparison filters require a scalar value.', { expression: raw });
+    }
+    return { field, operator: mappedOperator as 'eq' | 'gt' | 'gte' | 'lt' | 'lte', value };
 };
 
-const parseNumericId = (value: string, input: { topicKey: HelpTopicKey; label: string; expected: string }) => {
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
-        throw new CliUsageError({ topicKey: input.topicKey, message: `Missing ${input.label}.` });
-    }
-    if (NUMERIC_ID_REGEX.test(trimmed)) {
-        return trimmed;
-    }
-
-    const asinHint = looksLikeAsin(trimmed) ? ' This looks like an ASIN.' : '';
-    throw new CliUsageError({
-        topicKey: input.topicKey,
-        message: `Invalid ${input.label}: expected ${input.expected} (numeric), received ${JSON.stringify(trimmed)}.${asinHint}`,
-    });
-};
-
-const requireNumericIdArg = (value: string | undefined, input: { topicKey: HelpTopicKey; label: string; expected: string }) => {
-    if (!value) {
-        throw new CliUsageError({ topicKey: input.topicKey, message: `Missing ${input.label}.` });
-    }
-    return parseNumericId(value, input);
-};
-
-const parseOptionalNumericIdFlag = (value: string | null, input: { topicKey: HelpTopicKey; label: string; expected: string }) => {
-    if (!value) {
-        return undefined;
-    }
-    return parseNumericId(value, input);
-};
-
-const parseOptionalBooleanFlag = (value: string | null, input: { topicKey: HelpTopicKey; label: string }) => {
-    if (value === null) {
-        return undefined;
-    }
+const parseJsonValue = (raw: string, expression: string) => {
     try {
-        return parseBooleanValue(value);
+        return JSON.parse(raw) as unknown;
     } catch {
-        throw new CliUsageError({
-            topicKey: input.topicKey,
-            message: `Invalid ${input.label}: expected true|false.`,
-        });
+        if (FILTER_TOKEN_REGEX.test(raw)) {
+            return raw;
+        }
+        throw invalidInput(`Filter value must be JSON or an unquoted simple token: ${expression}.`, { expression });
     }
 };
 
-const resolveHistoryEntityRef = (value: string) => {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'campaign' || normalized === 'campaigns') {
-        return {
-            entityType: 'campaign' as const,
-            label: '<campaign_id>',
-            expected: 'campaign_id',
-        };
-    }
-    if (normalized === 'ad-group' || normalized === 'ad-groups' || normalized === 'adgroup' || normalized === 'adgroups') {
-        return {
-            entityType: 'adGroup' as const,
-            label: '<ad_group_id>',
-            expected: 'ad_group_id',
-        };
-    }
-    if (normalized === 'ad' || normalized === 'ads') {
-        return {
-            entityType: 'ad' as const,
-            label: '<ad_id>',
-            expected: 'ad_id',
-        };
-    }
-    if (normalized === 'target' || normalized === 'targets') {
-        return {
-            entityType: 'target' as const,
-            label: '<target_id>',
-            expected: 'target_id',
-        };
-    }
-    throw new CliUsageError({
-        topicKey: 'history',
-        message: `Unknown history entity: ${value}. Use campaigns, ad-groups, ads, or targets.`,
+const parseOrderBy = (raw: string) => {
+    const values = splitList(raw, 'order-by');
+    return values.map(value => {
+        const [field, direction, ...extra] = value.split(':');
+        if (!(field && direction) || extra.length > 0 || (direction !== 'asc' && direction !== 'desc')) {
+            throw invalidInput(`Invalid order-by value: ${value}. Use field:asc or field:desc.`, { value });
+        }
+        return { field, direction };
     });
 };
 
-const parseAsin = (value: string, input: { topicKey: HelpTopicKey; label: string }) => {
-    const trimmed = value.trim().toUpperCase();
-    if (ASIN_REGEX.test(trimmed)) {
-        return trimmed;
-    }
-    throw new CliUsageError({
-        topicKey: input.topicKey,
-        message: `Invalid ${input.label}: expected an ASIN (10 alphanumeric chars), received ${JSON.stringify(value.trim())}.`,
-    });
-};
-
-const requireAsinArg = (value: string | undefined, input: { topicKey: HelpTopicKey; label: string }) => {
-    if (!value) {
-        throw new CliUsageError({ topicKey: input.topicKey, message: `Missing ${input.label}.` });
-    }
-    return parseAsin(value, input);
-};
-
-const resolveAsinStateFilter = (flags: ParsedFlags): AsinStateFilter => {
-    return resolveListStateFlag(flags) ?? 'ENABLED';
-};
-
-const resolveMetricsAsinStateFilter = (flags: ParsedFlags): AsinStateFilter => {
-    return resolveAsinStateFilter(flags);
-};
-
-const parseAsinTreeDepthFlag = (flags: ParsedFlags) => {
-    const raw = readFlag(flags, ['depth']);
-    if (!raw) {
-        return 'ad' as const;
-    }
-    const normalized = raw.trim().toLowerCase();
-    if (normalized === 'campaign' || normalized === 'campaigns') {
-        return 'campaign' as const;
-    }
-    if (normalized === 'ad-group' || normalized === 'ad-groups' || normalized === 'adgroup' || normalized === 'adgroups') {
-        return 'ad-group' as const;
-    }
-    if (normalized === 'target' || normalized === 'targets') {
-        return 'target' as const;
-    }
-    if (normalized === 'ad' || normalized === 'ads') {
-        return 'ad' as const;
-    }
-    throw new Error('Invalid --depth for asins tree. Use campaign, ad-group, target, or ad.');
-};
-
-const parseAsinOverviewDepthFlag = (flags: ParsedFlags) => {
-    const raw = readFlag(flags, ['depth']);
-    if (!raw) {
-        return 'campaign' as const;
-    }
-    const normalized = raw.trim().toLowerCase();
-    if (normalized === 'campaign' || normalized === 'campaigns') {
-        return 'campaign' as const satisfies AsinOverviewDepth;
-    }
-    if (normalized === 'ad-group' || normalized === 'ad-groups' || normalized === 'adgroup' || normalized === 'adgroups') {
-        return 'ad-group' as const satisfies AsinOverviewDepth;
-    }
-    if (normalized === 'ad' || normalized === 'ads') {
-        return 'ad' as const satisfies AsinOverviewDepth;
-    }
-    throw new Error('Invalid --depth for asins overview. Use campaign, ad-group, or ad.');
-};
-
-const parseIdsFlag = (flags: ParsedFlags) => {
-    const raw = readFlag(flags, ['ids']);
-    if (!raw) {
-        return undefined;
-    }
-    const ids = raw
+const splitList = (raw: string, label: string) => {
+    const values = raw
         .split(',')
         .map(value => value.trim())
         .filter(Boolean);
-    if (ids.length === 0) {
-        throw new Error('Invalid --ids. Use comma-separated values.');
+    if (values.length === 0) {
+        throw invalidInput(`--${label} requires at least one value.`, {});
     }
-    return ids;
+    if (new Set(values).size !== values.length) {
+        throw invalidInput(`--${label} values must be unique.`, { values });
+    }
+    return values;
 };
 
-const parseSortField = (value?: string) => {
-    if (!value) {
-        return 'spend' as const;
+const validateSearchFields = (fields: string[]) => {
+    const unsupported = fields.filter(field => !SEARCH_FIELD_NAMES.has(field));
+    if (unsupported.length > 0) {
+        throw invalidInput(`Unsupported Search Field: ${unsupported[0]}.`, { field: unsupported[0] });
     }
-    const normalized = value.trim().toLowerCase();
-    if (!METRICS_KEYS_SET.has(normalized as MetricKey)) {
-        throw new Error('Invalid --sort. Use impressions, clicks, purchases, spend, sales, acos, cpc, ctr, or roas.');
-    }
-    return normalized as MetricKey;
 };
 
-const parseSortDirection = (value?: string) => {
-    if (!value) {
-        return 'desc' as const;
+const parseFlagValue = (raw: string, kind: FlagKind, flag: string) => {
+    if (kind === 'number') {
+        const value = Number(raw);
+        if (!Number.isFinite(value)) {
+            throw invalidInput(`--${flag} requires a finite number.`, { flag });
+        }
+        return value;
     }
-    const normalized = value.trim().toLowerCase();
-    if (normalized !== 'asc' && normalized !== 'desc') {
-        throw new Error('Invalid --direction. Use asc or desc.');
+    if (kind === 'json') {
+        try {
+            const value = JSON.parse(raw) as unknown;
+            if (!value || typeof value !== 'object' || Array.isArray(value)) {
+                throw new Error('not object');
+            }
+            return value;
+        } catch {
+            throw invalidInput(`--${flag} requires a JSON object.`, { flag });
+        }
     }
-    return normalized as 'asc' | 'desc';
+    return raw === 'null' && (flag === 'end-date' || flag === 'placement-bid-adjustments') ? null : raw;
 };
 
-const parsePositiveIntArg = (value: string, label: string) => {
-    const parsed = Number(value);
-    if (!(Number.isFinite(parsed) && Number.isInteger(parsed)) || parsed < 1) {
-        throw new Error(`Invalid ${label}. Use an integer >= 1.`);
+const parseArgs = (args: string[]): ParsedArgs => {
+    const positional: string[] = [];
+    const flags: FlagMap = new Map();
+    for (let index = 0; index < args.length; index += 1) {
+        const arg = args[index];
+        if (arg === '-h' || arg === '--help') {
+            addFlag(flags, 'help', 'true');
+            continue;
+        }
+        if (arg === '--version') {
+            addFlag(flags, 'version', 'true');
+            continue;
+        }
+        if (arg.startsWith('--')) {
+            const separator = arg.indexOf('=');
+            const rawName = separator >= 0 ? arg.slice(2, separator) : arg.slice(2);
+            if (!rawName) {
+                throw invalidInput('Flag name cannot be empty.', {});
+            }
+            const inlineValue = separator >= 0 ? arg.slice(separator + 1) : undefined;
+            const value = inlineValue ?? (args[index + 1] && !args[index + 1].startsWith('--') ? args[++index] : 'true');
+            addFlag(flags, rawName, value);
+            continue;
+        }
+        positional.push(arg);
     }
-    return parsed;
+    return { positional, flags };
 };
 
-const parseNonNegativeIntArg = (value: string, label: string) => {
-    const parsed = Number(value);
-    if (!(Number.isFinite(parsed) && Number.isInteger(parsed)) || parsed < 0) {
-        throw new Error(`Invalid ${label}. Use an integer >= 0.`);
-    }
-    return parsed;
+const addFlag = (flags: FlagMap, name: string, value: string) => {
+    const values = flags.get(name) ?? [];
+    values.push(value);
+    flags.set(name, values);
 };
 
-const parseMetricsSelectionFlag = (flags: ParsedFlags) => {
-    const raw = readFlag(flags, ['metrics']);
-    if (!raw) {
+const assertNoUnexpectedFlags = (flags: FlagMap, allowed: string[]) => {
+    const allowedSet = new Set(allowed);
+    const unexpected = [...flags.keys()].filter(name => !allowedSet.has(name));
+    if (unexpected.length > 0) {
+        throw invalidInput(`Unsupported flag: --${unexpected[0]}.`, { flag: unexpected[0] });
+    }
+};
+
+const readRequiredFlag = (flags: FlagMap, name: string) => {
+    const value = readOptionalFlag(flags, name);
+    if (value === undefined || value === 'true') {
+        throw invalidInput(`Missing required --${name}.`, { flag: name });
+    }
+    return value;
+};
+
+const readOptionalFlag = (flags: FlagMap, name: string) => {
+    const values = flags.get(name);
+    if (!values) {
         return undefined;
     }
-    const entries = raw
-        .split(',')
-        .map(value => value.trim().toLowerCase())
-        .filter(Boolean);
-    if (entries.length === 0) {
-        throw new Error('Invalid --metrics. Use a comma-separated list of metric keys.');
+    if (values.length !== 1) {
+        throw invalidInput(`--${name} may only be supplied once.`, { flag: name });
     }
-    for (const key of entries) {
-        if (!METRICS_KEYS_SET.has(key as MetricKey)) {
-            throw new Error(`Invalid metric key: ${key}.`);
-        }
+    const value = values[0];
+    if (value === 'true' && name !== 'all' && name !== 'help' && name !== 'version' && name !== 'stdin') {
+        throw invalidInput(`--${name} requires a value.`, { flag: name });
     }
-    return entries as MetricKey[];
+    return value;
 };
 
-const parseMetricsBucketFlag = (flags: ParsedFlags) => {
-    const raw = readFlag(flags, ['bucket']);
-    if (!raw) {
-        return undefined;
+const requireAccount = (flags: FlagMap) => {
+    const accountId = readRequiredFlag(flags, 'account');
+    if (!UUID_REGEX.test(accountId)) {
+        throw invalidInput('--account must be an advertiser account UUID.', { accountId });
     }
-    const normalized = raw.trim().toLowerCase();
-    if (!METRICS_BUCKETS_SET.has(normalized as (typeof METRICS_BUCKETS)[number])) {
-        throw new Error('Invalid --bucket. Use auto, hour, day, week, month, or year.');
-    }
-    return normalized as (typeof METRICS_BUCKETS)[number];
+    return accountId;
 };
 
-const parseMetricsFiltersFlag = (flags: ParsedFlags) => {
-    const entries = readFlagValues(flags, ['filter']);
-    const filters: Record<string, unknown> = {};
+const duplicateInput = (property: string, operation: string) => invalidInput(`Property ${property} was assigned by both --json and a flag.`, { operation, property });
 
-    for (const entry of entries) {
-        const parsed = parseFilterExpression(entry);
-        applyFilterExpression(filters, parsed);
+const invalidInput = (message: string, details: unknown) => new CliContractError({ code: 'INVALID_INPUT', message, details });
+
+const toSearchResource = (resource: string) => {
+    const normalized = SEARCH_RESOURCE_BY_COMMAND[resource as keyof typeof SEARCH_RESOURCE_BY_COMMAND];
+    if (!normalized) {
+        throw invalidInput(`Unknown search resource: ${resource}.`, { resource, expected: Object.keys(SEARCH_RESOURCE_BY_COMMAND) });
     }
-
-    const search = readFlag(flags, ['search']);
-    if (search) {
-        filters.search = search;
-    }
-
-    const state = resolveListStateFlag(flags);
-    if (state) {
-        filters.state = state;
-    }
-
-    return Object.keys(filters).length > 0 ? filters : undefined;
+    return normalized as RouterInputs['search']['resource'];
 };
 
-const parseFilterExpression = (raw: string) => {
-    const match = raw.match(METRIC_FILTER_REGEX);
-    if (!match) {
-        throw new Error(`Invalid --filter expression: ${raw}`);
+const parseBoundedInt = (raw: string, label: string, minimum: number, maximum: number) => {
+    if (!INTEGER_REGEX.test(raw)) {
+        throw invalidInput(`--${label} requires an integer.`, { flag: label });
     }
-    const [, key, operator, value] = match;
-    return { key: key.trim(), operator, value: value.trim() };
-};
-
-const applyFilterExpression = (filters: Record<string, unknown>, expression: { key: string; operator: string; value: string }) => {
-    const key = expression.key;
-    const operator = expression.operator;
-    const value = expression.value;
-
-    const normalizedKey = key.trim();
-    const metricKey = resolveMetricKey(normalizedKey);
-
-    if (metricKey) {
-        applyMetricRangeFilter(filters, metricKey, operator, value);
-        return;
+    const value = Number(raw);
+    if (value < minimum || value > maximum) {
+        throw invalidInput(`--${label} must be between ${minimum} and ${maximum}.`, { flag: label, minimum, maximum });
     }
-
-    switch (normalizedKey) {
-        case 'search':
-        case 'name': {
-            if (operator !== '=' && operator !== '~') {
-                throw new Error(`Invalid operator for ${normalizedKey}. Use = or ~.`);
-            }
-            filters.search = value;
-            return;
-        }
-        case 'state':
-        case 'status':
-        case 'active-status': {
-            if (operator !== '=') {
-                throw new Error(`Invalid operator for ${normalizedKey}. Use =.`);
-            }
-            filters.state = value.trim().toUpperCase();
-            return;
-        }
-        case 'targeting':
-        case 'type': {
-            if (operator !== '=') {
-                throw new Error(`Invalid operator for ${normalizedKey}. Use =.`);
-            }
-            filters.targeting = value.trim().toUpperCase();
-            return;
-        }
-        case 'target-type': {
-            if (operator !== '=') {
-                throw new Error(`Invalid operator for ${normalizedKey}. Use =.`);
-            }
-            filters.targetType = value.trim().toUpperCase();
-            return;
-        }
-        case 'target-match-type': {
-            if (operator !== '=') {
-                throw new Error(`Invalid operator for ${normalizedKey}. Use =.`);
-            }
-            filters.targetMatchType = value.trim().toUpperCase();
-            return;
-        }
-        case 'budget': {
-            applyRangeFilter(filters, 'budget', operator, value);
-            return;
-        }
-        case 'end-date': {
-            applyDateFilter(filters, operator, value);
-            return;
-        }
-        case 'out-of-budget': {
-            if (operator !== '=' && operator !== '!=') {
-                throw new Error('Invalid operator for out-of-budget. Use = or !=.');
-            }
-            const parsed = parseBooleanValue(value);
-            filters.outOfBudget = operator === '!=' ? !parsed : parsed;
-            return;
-        }
-        default:
-            throw new Error(`Unknown filter key: ${normalizedKey}`);
-    }
+    return value;
 };
 
-const resolveMetricKey = (key: string) => {
-    const trimmed = key.trim().toLowerCase();
-    if (trimmed.startsWith('metrics.')) {
-        const candidate = trimmed.replace('metrics.', '');
-        return METRICS_KEYS_SET.has(candidate as MetricKey) ? candidate : null;
-    }
-    if (METRICS_KEYS_SET.has(trimmed as MetricKey)) {
-        return trimmed;
-    }
-    return null;
-};
+const camelCase = (value: string) => value.replace(/-([a-z])/g, (_, character: string) => character.toUpperCase());
 
-const applyMetricRangeFilter = (filters: Record<string, unknown>, metric: string, operator: string, rawValue: string) => {
-    const numeric = parseNumberArg(rawValue, `metrics.${metric}`);
-    const metricsFilters = (filters.metrics as Record<string, { min?: number; max?: number }> | undefined) ?? {};
-    const existing = metricsFilters[metric] ?? {};
-
-    const next = applyRangeOperator(existing, operator, numeric, `metrics.${metric}`);
-    metricsFilters[metric] = next;
-    filters.metrics = metricsFilters;
-};
-
-const applyRangeFilter = (filters: Record<string, unknown>, key: string, operator: string, rawValue: string) => {
-    const numeric = parseNumberArg(rawValue, key);
-    const range = (filters[key] as { min?: number; max?: number } | undefined) ?? {};
-    const next = applyRangeOperator(range, operator, numeric, key);
-    filters[key] = next;
-};
-
-const applyRangeOperator = (range: { min?: number; max?: number }, operator: string, value: number, label: string) => {
-    const next = { ...range };
-    switch (operator) {
-        case '>':
-        case '>=':
-            next.min = value;
-            break;
-        case '<':
-        case '<=':
-            next.max = value;
-            break;
-        case '=':
-            next.min = value;
-            next.max = value;
-            break;
-        default:
-            throw new Error(`Invalid operator for ${label}. Use =, >=, <=, >, or <.`);
-    }
-    return next;
-};
-
-const applyDateFilter = (filters: Record<string, unknown>, operator: string, value: string) => {
-    const endDate = (filters.endDate as { before?: string; after?: string } | undefined) ?? {};
-    if (operator === '>' || operator === '>=') {
-        endDate.after = value;
-    } else if (operator === '<' || operator === '<=') {
-        endDate.before = value;
-    } else if (operator === '=') {
-        endDate.after = value;
-        endDate.before = value;
-    } else {
-        throw new Error('Invalid operator for end-date. Use =, >=, <=, >, or <.');
-    }
-    filters.endDate = endDate;
-};
-
-const parseBooleanValue = (value: string) => {
-    const normalized = value.trim().toLowerCase();
-    if (['true', '1', 'yes', 'y'].includes(normalized)) {
-        return true;
-    }
-    if (['false', '0', 'no', 'n'].includes(normalized)) {
-        return false;
-    }
-    throw new Error(`Invalid boolean value: ${value}.`);
-};
-
-const searchCampaigns = async (client: ApiClient, config: RequiredCliConfig, query: string, options: { state: string; limit?: number; offset?: number }) => {
-    const normalizedQuery = query.trim().toLowerCase();
-    const requestedLimit = options.limit ?? 20;
-    const requestedOffset = options.offset ?? 0;
-    const matchedItems: CampaignListItem[] = [];
-
-    let pageOffset = 0;
-    while (true) {
-        const page = await client['campaigns/list'].query({
-            config,
-            state: options.state as CampaignSearchState,
-            limit: SEARCH_PAGE_LIMIT,
-            offset: pageOffset,
-        });
-        if (page.items.length === 0) {
-            break;
-        }
-
-        for (const item of page.items) {
-            const idMatch = item.campaignId.toLowerCase().includes(normalizedQuery);
-            const nameMatch = (item.name ?? '').toLowerCase().includes(normalizedQuery);
-            if (idMatch || nameMatch) {
-                matchedItems.push(item);
-            }
-        }
-
-        if (page.items.length < SEARCH_PAGE_LIMIT) {
-            break;
-        }
-        pageOffset += SEARCH_PAGE_LIMIT;
-    }
-
-    return {
-        query,
-        totalMatched: matchedItems.length,
-        items: matchedItems.slice(requestedOffset, requestedOffset + requestedLimit),
-    };
-};
-
-const resolveMetricsEntity = (action: string | undefined, groupBy: string | null, topicKey: HelpTopicKey): MetricsEntity => {
-    const actionValue = action ? normalizeMetricsEntity(action) : null;
-    const groupByValue = groupBy ? normalizeMetricsEntity(groupBy) : null;
-
-    if (action && !actionValue) {
-        throw new CliUsageError({
-            topicKey,
-            message: `Unknown entity: ${action}. Use campaigns, ad-groups, ads, or targets.`,
-        });
-    }
-    if (groupBy && !groupByValue) {
-        throw new CliUsageError({
-            topicKey,
-            message: `Invalid --group-by: ${groupBy}. Use campaigns, ad-groups, ads, or targets.`,
-        });
-    }
-    if (actionValue && groupByValue && actionValue !== groupByValue) {
-        throw new CliUsageError({
-            topicKey,
-            message: `Conflicting entity selectors: positional ${actionValue} and --group-by ${groupByValue}.`,
-        });
-    }
-
-    const resolved = actionValue ?? groupByValue;
-    if (!resolved) {
-        throw new CliUsageError({
-            topicKey,
-            message: 'Missing entity. Use campaigns, ad-groups, ads, or targets (or pass --group-by).',
-        });
-    }
-    return resolved;
-};
-
-const normalizeMetricsEntity = (value: string): MetricsEntity | null => {
-    const normalized = value.trim().toLowerCase();
-    if (normalized === 'campaign' || normalized === 'campaigns') {
-        return 'campaigns' as const;
-    }
-    if (normalized === 'ad-group' || normalized === 'ad-groups' || normalized === 'adgroup' || normalized === 'adgroups') {
-        return 'ad-groups' as const;
-    }
-    if (normalized === 'ad' || normalized === 'ads') {
-        return 'ads' as const;
-    }
-    if (normalized === 'target' || normalized === 'targets') {
-        return 'targets' as const;
-    }
-    return null;
-};
-
-const mergeMetricScopeIds = (primary: string[] | undefined, secondary: string[] | undefined) => {
-    if (primary && secondary) {
-        const secondarySet = new Set(secondary);
-        return uniqueStrings(primary.filter(id => secondarySet.has(id)));
-    }
-    return primary ?? secondary;
-};
-
-const uniqueStrings = (values: string[]) => {
-    return Array.from(new Set(values));
-};
-
-const resolveMetricKeys = (selection: MetricsSelection): MetricKey[] => {
-    return selection ?? [...METRICS_KEYS];
-};
-
-type ApiClient = ReturnType<typeof createApiClient>;
-type RequiredCliConfig = ReturnType<typeof requireCliConfig>;
-type CampaignSearchState = 'ENABLED' | 'PAUSED' | 'ARCHIVED' | 'OTHER' | 'ALL';
-type MetricsBucket = (typeof METRICS_BUCKETS)[number];
-type ConfigKey = (typeof CONFIG_KEYS)[number];
-type CampaignListItem = Awaited<ReturnType<ApiClient['campaigns/list']['query']>>['items'][number];
-type MetricsSelection = MetricKey[] | undefined;
-
-type CliConfig = {
-    baseUrl?: string;
-    accountId?: string;
-    countryCode?: string;
-};
-
-type CliStorageSettings = {
-    storageDir?: string;
-};
-
-type CliStorage = {
-    storageDir: string;
-    configPath: string;
-};
-
-type ParsedFlags = Record<string, string | boolean | string[]> & {
-    help?: boolean;
-};
-
-type ChangelogSection = {
-    title: string;
-    changes: string[];
-};
-
-type ChangelogEntry = {
-    version: string;
-    date: string;
-    sections: ChangelogSection[];
-};
-
-type LoadedChangelog = {
-    source: (typeof CHANGELOG_SOURCES)[number]['label'];
-    entries: ChangelogEntry[];
-};
-
-const buildHelpContext = async () => {
-    const version = await resolveCliVersion();
-    const sha = resolveCliSha();
+const createApiClient = async () => {
     const config = await loadConfig();
-    const configSummary = formatConfigSummary(config);
-    return { version, sha, configSummary };
-};
-
-const resolveCliVersion = async () => {
-    try {
-        const pkgUrl = new URL('../package.json', import.meta.url);
-        const raw = await readFile(pkgUrl, 'utf8');
-        const parsed = JSON.parse(raw) as { version?: string };
-        return parsed.version ?? 'dev';
-    } catch {
-        return 'dev';
+    const auth = loadAuthState();
+    if (!auth.apiKey) {
+        throw new CliContractError({ code: 'AUTHENTICATION_REQUIRED', message: getMissingApiKeyMessage(), details: {} });
     }
+    return createBidBeaconClient({ baseUrl: config.baseUrl ?? DEFAULT_BASE_URL, credential: auth.apiKey });
 };
 
-const resolveCliSha = () => {
-    const envSha = process.env.BB_CLI_SHA ?? process.env.GIT_SHA ?? process.env.COMMIT_SHA;
-    if (envSha) {
-        return envSha.slice(0, 12);
-    }
-    return tryGetGitSha();
-};
-
-const tryGetGitSha = () => {
-    try {
-        // Best-effort only; `bb` may be running outside a git checkout.
-        const result = spawnSync('git', ['rev-parse', '--short', 'HEAD'], { encoding: 'utf8' });
-        if (result.status !== 0) {
-            return undefined;
-        }
-        return result.stdout.trim() || undefined;
-    } catch {
-        return undefined;
-    }
-};
-
-const formatConfigSummary = (config: CliConfig) => {
-    const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
-    const accountId = config.accountId;
-    const accountCountry = config.countryCode?.toUpperCase();
-    const accountSummary = accountId ? `account ${truncateAccountId(accountId)}${accountCountry ? ` (${accountCountry})` : ''}` : 'account not set';
-    const authSource = resolveAuthSummarySource();
-    const authSummary = authSource === 'none' ? 'auth not set' : `auth ${authSource}`;
-    return `${accountSummary}, base-url ${baseUrl}, ${authSummary}`;
-};
-
-const truncateAccountId = (accountId: string) => {
-    if (accountId.length <= 20) {
-        return accountId;
-    }
-    return `${accountId.slice(0, 16)}...${accountId.slice(-4)}`;
-};
-
-const resolveAuthSummarySource = () => {
-    if (resolveEnvValue(API_KEY_ENV_VAR)) {
-        return 'env' as const;
-    }
-    try {
-        return loadAuthState().source;
-    } catch {
-        return 'none' as const;
-    }
-};
-
-const loadCliStorage = async (): Promise<CliStorage> => {
+const loadConfig = async (): Promise<CliConfig> => {
     const storageDir = await resolveStorageDir();
+    const configPath = join(storageDir, CONFIG_FILENAME);
+    const stored = await readStoredConfig(configPath);
+    const envBaseUrl = process.env[BASE_URL_ENV_VAR]?.trim();
     return {
         storageDir,
-        configPath: join(storageDir, CONFIG_FILENAME),
-    };
-};
-
-const resolveApiKey = () => {
-    const envApiKey = resolveEnvValue(API_KEY_ENV_VAR);
-    if (envApiKey) {
-        return envApiKey;
-    }
-    return loadAuthState().apiKey;
-};
-
-const resolveConfigEnvOverrides = (config: CliConfig): CliConfig => {
-    return {
-        ...config,
-        baseUrl: resolveEnvValue(BASE_URL_ENV_VAR) ?? config.baseUrl,
-        accountId: resolveEnvValue(ACCOUNT_ID_ENV_VAR) ?? config.accountId,
-        countryCode: resolveEnvValue(COUNTRY_CODE_ENV_VAR) ?? config.countryCode,
-    };
-};
-
-const sanitizeCliConfig = (value: unknown): CliConfig => {
-    if (!value || typeof value !== 'object') {
-        return {};
-    }
-
-    const candidate = value as Record<string, unknown>;
-    return {
-        baseUrl: typeof candidate.baseUrl === 'string' ? candidate.baseUrl : undefined,
-        accountId: typeof candidate.accountId === 'string' ? candidate.accountId : undefined,
-        countryCode: typeof candidate.countryCode === 'string' ? candidate.countryCode : undefined,
+        configPath,
+        baseUrl: envBaseUrl ? normalizeApiBaseUrl(envBaseUrl) : stored.baseUrl,
     };
 };
 
 const resolveStorageDir = async () => {
-    const envStorageDir = resolveEnvValue(STORAGE_DIR_ENV_VAR);
+    const envStorageDir = process.env[STORAGE_DIR_ENV_VAR]?.trim();
     if (envStorageDir) {
-        return normalizeStorageDir(envStorageDir);
+        return envStorageDir;
     }
-
     try {
-        const raw = await readFile(STORAGE_SETTINGS_PATH, 'utf8');
-        const parsed = JSON.parse(raw) as CliStorageSettings;
-        return normalizeStorageDir(parsed.storageDir);
+        const settings = JSON.parse(await readFile(DEFAULT_SETTINGS_PATH, 'utf8')) as { storageDir?: unknown };
+        if (typeof settings.storageDir === 'string' && settings.storageDir.trim()) {
+            return settings.storageDir;
+        }
     } catch {
-        return DEFAULT_STORAGE_DIR;
+        // Missing or malformed local settings fall back to the default storage directory.
+    }
+    return DEFAULT_STORAGE_DIR;
+};
+
+const readStoredConfig = async (path: string): Promise<StoredConfig> => {
+    try {
+        const parsed = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+        return typeof parsed.baseUrl === 'string' && parsed.baseUrl.trim() ? { baseUrl: normalizeApiBaseUrl(parsed.baseUrl) } : {};
+    } catch {
+        return {};
     }
 };
 
-const setStorageDir = async (value: string): Promise<CliStorage> => {
-    const storageDir = normalizeStorageDir(value);
-    const config = await loadStoredConfig();
-    const configPath = join(storageDir, CONFIG_FILENAME);
-
-    await mkdir(DEFAULT_STORAGE_DIR, { recursive: true });
-    await mkdir(storageDir, { recursive: true });
-    await writeFile(STORAGE_SETTINGS_PATH, JSON.stringify({ storageDir }, null, 2));
-    await writeFile(configPath, JSON.stringify(config, null, 2));
-
-    return { storageDir, configPath };
+const saveStoredConfig = async (config: CliConfig, values: StoredConfig) => {
+    await mkdir(config.storageDir, { recursive: true });
+    await writeJson(config.configPath, values);
 };
 
-const normalizeStorageDir = (value?: string | null) => {
-    if (!value) {
-        return DEFAULT_STORAGE_DIR;
-    }
-
-    const trimmed = value.trim();
-    if (trimmed.length === 0) {
-        return DEFAULT_STORAGE_DIR;
-    }
-
-    if (trimmed === '~') {
-        return homedir();
-    }
-
-    if (trimmed.startsWith('~/')) {
-        return join(homedir(), trimmed.slice(2));
-    }
-
-    return resolve(trimmed);
+const writeJson = async (path: string, value: unknown) => {
+    await mkdir(join(path, '..'), { recursive: true });
+    await writeFile(path, `${JSON.stringify(value, null, 2)}\n`, 'utf8');
 };
 
-const resolveEnvValue = (name: string) => {
-    const value = process.env[name]?.trim();
-    return value ? value : undefined;
+const configToOutput = (config: CliConfig) => (config.baseUrl ? { baseUrl: config.baseUrl } : {});
+
+const requireConfigKey = (value: string | undefined): 'base-url' | 'storage-dir' => {
+    if (value === 'base-url' || value === 'storage-dir') {
+        return value;
+    }
+    throw invalidInput('Config key must be `base-url` or `storage-dir`.', { key: value });
 };
 
-const loadCliChangelog = async (): Promise<LoadedChangelog> => {
+const buildHelpContext = async () => {
+    const packageJson = await readPackageJson();
+    const config = await loadConfig();
+    const auth = loadAuthState();
+    const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
+    return {
+        version: packageJson.version ?? '0.0.0',
+        configSummary: `config: ${auth.apiKey ? 'api-key configured' : 'api-key missing'}, base-url ${baseUrl}`,
+    };
+};
+
+const readPackageJson = async () => {
+    for (const packageUrl of [new URL('../package.json', import.meta.url), new URL('../../package.json', import.meta.url), new URL('../../../package.json', import.meta.url)]) {
+        try {
+            return JSON.parse(await readFile(packageUrl, 'utf8')) as { version?: string };
+        } catch {
+            // Bundled test artifacts may live deeper than the package dist directory.
+        }
+    }
+    return { version: '0.0.0' };
+};
+
+const readStdin = async () => readFile(0, 'utf8');
+
+const printOutput = (value: unknown) => {
+    process.stdout.write(`${JSON.stringify(value)}\n`);
+};
+
+const normalizeError = (error: unknown): CliContractErrorShape => {
+    if (error instanceof CliContractError) {
+        return { code: error.code, message: error.message, details: error.details };
+    }
+    const candidate = error as {
+        message?: string;
+        data?: OperationErrorShape;
+        shape?: { data?: OperationErrorShape };
+    };
+    const operationError = candidate.shape?.data ?? candidate.data;
+    const operationCode = operationError?.operationCode;
+    if (operationCode) {
+        return {
+            code: operationCode,
+            message: withTransportHint(operationError.message ?? candidate.message ?? 'Request failed.'),
+            details: operationError.details ?? {},
+        };
+    }
+    const trpcCode = (candidate.data as { code?: string } | undefined)?.code;
+    const mappedCode = trpcCode ? TRPC_ERROR_TO_OPERATION_CODE[trpcCode] : undefined;
+    return {
+        code: mappedCode ?? 'INTERNAL_ERROR',
+        message: withTransportHint(candidate.message ?? 'Request failed.'),
+        details: {},
+    };
+};
+
+const normalizeVersion = (value: string) => value.replace(VERSION_PREFIX_REGEX, '');
+
+const readChangelog = async () => {
+    let raw: string | undefined;
     for (const source of CHANGELOG_SOURCES) {
         try {
-            const raw = await readFile(source.url, 'utf8');
-            const entries = parseChangelog(raw);
-            if (entries.length > 0) {
-                return { source: source.label, entries };
-            }
+            raw = await readFile(source, 'utf8');
+            break;
         } catch {
-            // Fall through so local development can use the workspace changelog when the package copy is absent.
+            // Installed packages and source checkouts place the changelog at different depths.
         }
     }
-
-    throw new Error('CLI changelog is unavailable. Rebuild or reinstall `@bidbeacon/cli` to bundle release notes.');
-};
-
-const parseChangelog = (raw: string): ChangelogEntry[] => {
+    if (!raw) {
+        throw new CliContractError({ code: 'INTERNAL_ERROR', message: 'The packaged BidBeacon changelog is unavailable.', details: {} });
+    }
     const entries: ChangelogEntry[] = [];
-    const lines = raw.split(CHANGELOG_SPLIT_REGEX);
-    let currentEntry: ChangelogEntry | null = null;
-    let currentSection: ChangelogSection | null = null;
-
-    for (const line of lines) {
-        const entryMatch = line.match(CHANGELOG_ENTRY_REGEX);
-        if (entryMatch) {
-            currentEntry = {
-                version: entryMatch[1],
-                date: entryMatch[2],
-                sections: [],
-            };
-            entries.push(currentEntry);
-            currentSection = null;
+    let current: ChangelogEntry | undefined;
+    let currentSection: ChangelogSection | undefined;
+    for (const line of raw.split(CHANGELOG_LINES_REGEX)) {
+        const header = CHANGELOG_ENTRY_REGEX.exec(line);
+        if (header) {
+            current = { version: header[1], date: header[2], sections: [] };
+            entries.push(current);
+            currentSection = undefined;
             continue;
         }
-
-        const sectionMatch = line.match(CHANGELOG_SECTION_REGEX);
-        if (sectionMatch && currentEntry) {
-            currentSection = {
-                title: sectionMatch[1],
-                changes: [],
-            };
-            currentEntry.sections.push(currentSection);
+        const section = CHANGELOG_SECTION_REGEX.exec(line);
+        if (section && current) {
+            currentSection = { title: section[1], changes: [] };
+            current.sections.push(currentSection);
             continue;
         }
-
-        if (line.startsWith('- ') && currentSection) {
-            currentSection.changes.push(line.slice(2).trim());
+        if (currentSection && CHANGELOG_BULLET_REGEX.test(line)) {
+            currentSection.changes.push(line.replace(CHANGELOG_BULLET_REGEX, ''));
         }
     }
-
-    return entries;
+    const currentVersion = entries[0]?.version ?? '0.0.0';
+    return { currentVersion, entries, raw };
 };
 
-const normalizeChangelogVersion = (value: string) => {
-    const trimmed = value.trim();
-    if (!trimmed) {
-        throw new CliUsageError({ topicKey: 'changelog', message: 'Missing changelog version.' });
-    }
-    return trimmed.replace(CHANGELOG_VERSION_PREFIX_REGEX, '');
+type ChangelogSection = { title: string; changes: string[] };
+type ChangelogEntry = { version: string; date: string; sections: ChangelogSection[] };
+
+const CREATE_OPERATION_NAMES = ['sponsored-products-campaign', 'campaign', 'ad-group', 'ad', 'keyword-target', 'product-target', 'negative-keyword', 'negative-product-target'] as const;
+
+const SEARCH_RESOURCE_BY_COMMAND = {
+    campaign: 'campaign',
+    'ad-group': 'ad_group',
+    ad: 'ad',
+    target: 'target',
+    product: 'product',
+    'change-event': 'change_event',
+} as const;
+const UPDATE_RESOURCE_NAMES = ['campaign', 'ad-group', 'ad', 'target'] as const;
+
+const CREATE_DEFINITIONS: Record<string, { composite?: boolean; jsonRequired?: boolean; flags: Record<string, FlagKind> }> = {
+    'sponsored-products-campaign': { composite: true, jsonRequired: true, flags: {} },
+    campaign: {
+        flags: {
+            name: 'string',
+            state: 'string',
+            'daily-budget': 'number',
+            'bid-strategy': 'string',
+            'targeting-mode': 'string',
+            'start-date': 'string',
+            'end-date': 'string',
+            'placement-bid-adjustments': 'json',
+        },
+    },
+    'ad-group': { flags: { 'campaign-id': 'string', name: 'string', state: 'string', 'default-bid': 'number' } },
+    ad: { flags: { 'ad-group-id': 'string', asin: 'string', state: 'string' } },
+    'keyword-target': { flags: { 'ad-group-id': 'string', keyword: 'string', 'match-type': 'string', bid: 'number', state: 'string' } },
+    'product-target': { flags: { 'ad-group-id': 'string', asin: 'string', bid: 'number', state: 'string' } },
+    'negative-keyword': { flags: { 'campaign-id': 'string', 'ad-group-id': 'string', keyword: 'string', 'match-type': 'string', state: 'string' } },
+    'negative-product-target': { flags: { 'campaign-id': 'string', 'ad-group-id': 'string', asin: 'string', state: 'string' } },
 };
 
-const resolveRequestedChangelogEntry = (
-    entries: ChangelogEntry[],
-    input: {
-        currentVersion: string;
-        requestedVersion?: string;
-    }
-) => {
-    if (input.requestedVersion) {
-        return entries.find(entry => entry.version === input.requestedVersion) ?? null;
-    }
-
-    return entries.find(entry => entry.version === input.currentVersion) ?? entries[0] ?? null;
+type UpdateDefinition = {
+    operation: 'update_campaign' | 'update_ad_group' | 'update_ad' | 'update_target';
+    idFlag: string;
+    idProperty: string;
+    changes: Record<string, FlagKind>;
 };
 
-await main().catch(async error => {
-    if (isCliUsageError(error)) {
-        const helpContext = await buildHelpContext();
-        process.stderr.write(`Error: ${error.message}\n\n`);
-        process.stderr.write(renderHelp(error.topicKey, helpContext));
-        process.exit(error.exitCode);
-    }
+const UPDATE_DEFINITIONS: Record<string, UpdateDefinition> = {
+    campaign: {
+        operation: 'update_campaign',
+        idFlag: 'campaign-id',
+        idProperty: 'campaignId',
+        changes: { state: 'string', 'daily-budget': 'number', 'bid-strategy': 'string', 'placement-bid-adjustments': 'json' },
+    },
+    'ad-group': { operation: 'update_ad_group', idFlag: 'ad-group-id', idProperty: 'adGroupId', changes: { state: 'string', 'default-bid': 'number' } },
+    ad: { operation: 'update_ad', idFlag: 'ad-id', idProperty: 'adId', changes: { state: 'string' } },
+    target: { operation: 'update_target', idFlag: 'target-id', idProperty: 'targetId', changes: { state: 'string', bid: 'number' } },
+};
 
-    console.error(JSON.stringify({ ok: false, error: error instanceof Error ? withTransportHint(error.message) : error }, null, 2));
-    process.exit(1);
+const TRPC_ERROR_TO_OPERATION_CODE: Record<string, string> = {
+    UNAUTHORIZED: 'AUTHENTICATION_REQUIRED',
+    FORBIDDEN: 'ACCOUNT_ACCESS_DENIED',
+    BAD_REQUEST: 'INVALID_INPUT',
+    NOT_FOUND: 'RESOURCE_NOT_FOUND',
+    CONFLICT: 'COMPOSITE_PARTIAL_FAILURE',
+    TIMEOUT: 'AMAZON_UNAVAILABLE',
+};
+
+main().catch(error => {
+    const normalized = normalizeError(error);
+    process.stderr.write(`${JSON.stringify({ error: normalized })}\n`);
+    process.exitCode = 1;
 });

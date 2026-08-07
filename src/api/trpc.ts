@@ -1,7 +1,32 @@
 import { initTRPC, TRPCError } from '@trpc/server';
-import type { Context } from './context.js';
+import { ZodError } from 'zod';
+import { OperationError } from '@/operations/operation-errors';
+import type { Context } from './context';
 
-const t = initTRPC.context<Context>().create();
+const t = initTRPC.context<Context>().create({
+    errorFormatter: ({ shape, error }) => {
+        const operationError = getOperationError(error);
+        const validationDetails = error.code === 'BAD_REQUEST' && error.cause instanceof ZodError ? { issues: error.cause.issues } : undefined;
+
+        return {
+            ...shape,
+            data: {
+                ...shape.data,
+                ...(operationError
+                    ? {
+                          operationCode: operationError.code,
+                          details: operationError.details,
+                      }
+                    : validationDetails
+                      ? {
+                            operationCode: 'INVALID_INPUT',
+                            details: validationDetails,
+                        }
+                      : {}),
+            },
+        };
+    },
+});
 
 /**
  * Base router and procedure helpers
@@ -52,3 +77,11 @@ export const privateProcedure = apiProcedure.use(({ ctx, next }) => {
 
     return next({ ctx });
 });
+
+const getOperationError = (error: TRPCError) => {
+    if (error.cause instanceof OperationError) {
+        return error.cause;
+    }
+
+    return null;
+};

@@ -30,11 +30,11 @@ describe('bb transport error hint', () => {
 });
 
 describe('bb transport path encoding', () => {
-    it('encodes slash-style tRPC procedures in the /api path', () => {
-        expect(encodeTrpcProcedurePath('https://bidbeacon.merchbase.co/api/campaigns/get?input=%7B%7D')).toBe('https://bidbeacon.merchbase.co/api/campaigns%2Fget?input=%7B%7D');
+    it('leaves canonical operation paths unchanged', () => {
+        expect(encodeTrpcProcedurePath('https://bidbeacon.merchbase.co/api/search?input=%7B%7D')).toBe('https://bidbeacon.merchbase.co/api/search?input=%7B%7D');
     });
 
-    it('preserves batch separators while encoding each procedure', () => {
-        expect(encodeTrpcProcedurePath('https://bidbeacon.merchbase.co/api/campaigns/get,ad-groups/list?batch=1')).toBe('https://bidbeacon.merchbase.co/api/campaigns%2Fget,ad-groups%2Flist?batch=1');
+    it('preserves canonical batch separators', () => {
+        expect(encodeTrpcProcedurePath('https://bidbeacon.merchbase.co/api/search,update_target?batch=1')).toBe('https://bidbeacon.merchbase.co/api/search,update_target?batch=1');
     });
 });

@@ -2,8 +2,9 @@ import { ServiceAccessError } from '@merchbaseco/access';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import Fastify, { type FastifyInstance } from 'fastify';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 import { createContext } from './context';
-import { apiProcedure, privateProcedure, router } from './trpc';
+import { apiProcedure, privateProcedure, publicProcedure, router } from './trpc';
 
 const authMocks = vi.hoisted(() => {
     return {
@@ -27,6 +28,8 @@ const authTestRouter = router({
         userId: ctx.user.merchbaseUserId,
         accountIds: ctx.accessibleAccountIds,
     })),
+    validationProbe: publicProcedure.input(z.object({ value: z.string() })).query(({ input }) => input),
+    outputProbe: publicProcedure.output(z.string()).query(() => 42 as never),
 });
 
 describe('HTTP authentication', () => {
@@ -141,6 +144,28 @@ describe('HTTP authentication', () => {
 
         expect(denied.statusCode).toBe(403);
         expect(unavailable.statusCode).toBe(500);
+    });
+
+    it('adds public validation details only to caller input failures', async () => {
+        const invalidInput = await app.inject({
+            method: 'GET',
+            url: `/api/validationProbe?input=${encodeURIComponent(JSON.stringify({ value: 42 }))}`,
+        });
+        const invalidOutput = await app.inject({
+            method: 'GET',
+            url: '/api/outputProbe',
+        });
+
+        expect(invalidInput.statusCode).toBe(400);
+        expect(invalidInput.json().error.data).toMatchObject({
+            code: 'BAD_REQUEST',
+            operationCode: 'INVALID_INPUT',
+            details: { issues: expect.any(Array) },
+        });
+        expect(invalidOutput.statusCode).toBe(500);
+        expect(invalidOutput.json().error.data).toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+        expect(invalidOutput.json().error.data).not.toHaveProperty('operationCode');
+        expect(invalidOutput.json().error.data).not.toHaveProperty('details');
     });
 });
 

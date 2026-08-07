@@ -1,72 +1,55 @@
 # @bidbeacon/http-client
 
-Typed tRPC client for the BidBeacon API.
+Typed HTTP client for BidBeacon’s canonical operation contract.
 
-## Install
+## Install and use
 
 ```bash
 npm install @bidbeacon/http-client
 ```
-
-## Usage
 
 ```ts
 import { createBidBeaconClient } from '@bidbeacon/http-client';
 
 const client = createBidBeaconClient({
   baseUrl: 'https://bidbeacon.merchbase.co',
-  credential: 'ak_...'
-});
-
-const accounts = await client['accounts/list'].query();
-```
-
-Batching is enabled by default.
-You can tune or disable batching:
-
-```ts
-const client = createBidBeaconClient({
-  baseUrl: 'https://bidbeacon.merchbase.co',
   credential: 'ak_...',
-  batch: true, // default
-  batchMaxItems: 20, // default when batching
-  batchMaxURLLength: 2000, // default when batching
 });
 
-const unbatchedClient = createBidBeaconClient({
-  baseUrl: 'https://bidbeacon.merchbase.co',
-  credential: 'ak_...',
-  batch: false, // optional
+const accounts = await client.list_advertiser_accounts.query({});
+const page = await client.search.query({
+  accountId: '00000000-0000-4000-8000-000000000001',
+  resource: 'campaign',
+  fields: ['campaign.id', 'metrics.orders'],
 });
-```
-
-The client is scoped to slash-style CLI paths (for example `campaigns/list`) so it stays in lockstep with the CLI.
-
-Change history is available through an explicit endpoint:
-
-```ts
-const history = await client['history/list'].query({
-  config: { accountId: '...', countryCode: 'US', range: 'today' },
-  entityType: 'target',
-  entityId: '1234567890',
-  range: '7d', // optional override of config.range
-  limit: 20,
+const target = await client.update_target.mutate({
+  accountId: '00000000-0000-4000-8000-000000000001',
+  targetId: 'target-1',
+  changes: { bid: 0.75 },
 });
 ```
 
-## Types
+The operation names are verbatim and match the CLI/MCP contract:
+
+`list_advertiser_accounts`, `search`, `create_sponsored_products_campaign`, `create_campaign`, `create_ad_group`, `create_ad`, `create_keyword_target`, `create_product_target`, `create_negative_keyword`, `create_negative_product_target`, `update_campaign`, `update_ad_group`, `update_ad`, and `update_target`.
+
+`list_advertiser_accounts` is the only unscoped operation. Every other operation requires an explicit advertiser account UUID. The client exports `CliRouterInputs` and `CliRouterOutputs`, inferred directly from the server router:
 
 ```ts
 import type { CliRouterInputs, CliRouterOutputs } from '@bidbeacon/http-client';
 
-type CampaignsListInput = CliRouterInputs['campaigns/list'];
-type CampaignsListOutput = CliRouterOutputs['campaigns/list'];
+type SearchInput = CliRouterInputs['search'];
+type SearchOutput = CliRouterOutputs['search'];
 ```
+
+Batching is enabled by default. Configure it with `batch`, `batchMaxItems`, and `batchMaxURLLength`, or set `batch: false` for one HTTP request per operation.
 
 ## Maintenance
 
-When the API router changes, regenerate the bundled router types:
+Regenerate the bundled router types and build artifacts after a public router change:
 
 ```bash
-bun run api-client:types
+bun run api-client:build
 ```
+
+The generated types and `dist/` output are release artifacts. Version changes follow [the release process](../../docs/release-process.md).

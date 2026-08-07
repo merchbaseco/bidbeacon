@@ -1,115 +1,76 @@
 ---
-summary: Documents the typed npm client and its migration to the shared MCP and CLI operation contract.
+summary: Documents the typed npm client for the canonical BidBeacon operation contract.
 read_when:
   - changing the public operation router, generated client types, package version, or publishing workflow
 ---
 
 # API Client Spec (Typed npm)
 
-> The accepted public operation surface is [cli-spec.md](cli-spec.md). The procedure examples below describe the currently published pre-migration package until the shared operation layer replaces them.
-
-This spec defines the public npm client package that exposes typed access to the BidBeacon API without duplicating the CLI or server logic.
-
-## Goals
-
-- Provide a stable, typed JavaScript client for external codebases.
-- Keep the surface area aligned with the CLI API so there is one canonical API surface.
-- Avoid a separate REST surface that would need independent maintenance.
+The typed npm package is the HTTP projection of the same operation contract used by the CLI and MCP server. It is generated from `src/api/router-public.ts`; it does not define a second business-logic path.
 
 ## Package
 
 - Name: `@bidbeacon/http-client`
 - Location: `packages/bidbeacon-api-client`
 - Output: `dist/` (ESM + `.d.ts`)
+- Entry point: `createBidBeaconClient({ baseUrl, credential, headers, batch, batchMaxItems, batchMaxURLLength })`
 
-## Philosophy
+The `credential` is the shared bearer credential: suite API keys, Clerk session tokens, or OAuth credentials. Account authorization is resolved by the server from the credential and the explicit `accountId` in each scoped input.
 
-- The client mirrors the public API surface shared by the CLI.
-- The client uses slash-style procedure keys that mirror CLI command shape (for example `campaigns/list`).
-- Typed inputs and outputs are derived from the server router, not duplicated.
-- Publish manually to npm for now.
+## Operation surface
 
-## Client Surface
+The client exposes these exact operation names as tRPC query/mutation keys:
 
-- Primary entrypoint: `createBidBeaconClient({ baseUrl, credential, headers, batch, batchMaxItems, batchMaxURLLength })`
-- `credential` is the generic bearer credential field. It accepts suite-issued `ak_...` keys, Clerk web-session tokens, and OAuth tokens.
-- Usage returns the CLI surface directly, for example:
+```text
+list_advertiser_accounts
+search
+create_sponsored_products_campaign
+create_campaign
+create_ad_group
+create_ad
+create_keyword_target
+create_product_target
+create_negative_keyword
+create_negative_product_target
+update_campaign
+update_ad_group
+update_ad
+update_target
+```
+
+Queries use `.query(...)`; creates and updates use `.mutate(...)`. `list_advertiser_accounts` is the only unscoped operation. All other inputs require an opaque Advertiser Account UUID. Search uses the curated Field/metric catalog, account-local date ranges, structured filters, ordering, and keyset cursors described in [cli-spec.md](cli-spec.md).
 
 ```ts
 const client = createBidBeaconClient({ baseUrl, credential });
-const accounts = await client['accounts/list'].query();
-```
 
-Batch behavior:
-
-- `batch` defaults to `true`.
-- `batchMaxItems` defaults to `20` (applies when batching is enabled).
-- `batchMaxURLLength` defaults to `2000` (applies when batching is enabled).
-- `batchMaxURLLength` should stay below the server route param limit; this project uses Fastify `maxParamLength: 4096`.
-- Server note: Fastify's default router `maxParamLength` (`100`) can reject long batched procedure paths with 404; configure a higher value (for example `4096`) on the API server.
-
-History is explicit and entity-scoped:
-
-```ts
-const history = await client['history/list'].query({
-  config: { accountId: '...', countryCode: 'US', range: 'today' },
-  entityType: 'campaign',
-  entityId: '1234567890',
-  range: 'yesterday', // optional override of config.range
+const accounts = await client.list_advertiser_accounts.query({});
+const rows = await client.search.query({
+  accountId,
+  resource: 'campaign',
+  fields: ['campaign.id', 'metrics.orders'],
+  filters: [{ field: 'metrics.orders', operator: 'gte', value: 1 }],
+  dateRange: { startDate: '2026-08-01', endDate: '2026-08-06' },
+  orderBy: [{ field: 'metrics.orders', direction: 'desc' }],
   limit: 50,
+});
+
+const updated = await client.update_campaign.mutate({
+  accountId,
+  campaignId,
+  changes: { state: 'PAUSED' },
 });
 ```
 
-Entity detail endpoints return current state; change history is fetched via `history/list`.
+## Types and HTTP behavior
 
-## Types
+`CliRouterInputs` and `CliRouterOutputs` are inferred from the public router and bundled into the package. Canonical procedure names serialize directly under `/api/<operation-name>`; there are no slash-style aliases or success envelopes. The HTTP client preserves tRPC transport errors so CLI consumers can render the stable operation error contract.
 
-- `CliRouterInputs` and `CliRouterOutputs` are exported for type-safe integration.
-- These types are generated from the server router and bundled into the package.
-- For shape-sensitive endpoints (for example `asins/get`), use `CliRouterOutputs[...]` directly instead of hardcoding local interfaces.
-- The currently published package exposes conversion count as `purchases`; the accepted contract replaces it with `orders`.
+Batching defaults to enabled with 20 items and a 2,000-character URL limit. Disable batching with `batch: false` when one request per operation is required.
 
-## Build + Publish
+## Build and release
 
 ```bash
 bun run api-client:build
 ```
 
-```bash
-cd packages/bidbeacon-api-client
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm whoami
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm publish --access public
-```
-
-Bump `packages/bidbeacon-api-client/package.json` as part of the shared release process in `docs/release-process.md`.
-That release flow now also requires `bun install` and `bun run version:check` so `bun.lock` stays aligned with the published client version.
-
-## Versioning Policy
-
-BidBeacon uses one shared SemVer release version across surfaces:
-
-- Tag: `vX.Y.Z`
-- App: `package.json#version`
-- API client: `packages/bidbeacon-api-client/package.json#version`
-- CLI: `packages/bidbeacon-cli/package.json#version`
-
-Version lockstep is mandatory: these three version numbers must match exactly for every release.
-Do not publish `@bidbeacon/http-client` or `@bidbeacon/cli` at versions that diverge from `package.json`.
-Do not publish if `bun.lock` still resolves `@bidbeacon/http-client` to an older version.
-
-Use SemVer for the API client package:
-
-- `MAJOR`: breaking changes to the published client contract (removed/renamed procedures, incompatible input/output changes).
-- `MINOR`: backward-compatible additions to the public client surface.
-- `PATCH`: backward-compatible fixes or internal improvements.
-
-Release checklist for API client changes:
-
-1. Update shared version files (`package.json`, CLI package, and API client package) to the same `X.Y.Z`.
-2. Review all commits since the previous version bump and summarize them under a new `CHANGELOG.md` version header (`## vX.Y.Z - YYYY-MM-DD`).
-3. Never use an `Unreleased` header in `CHANGELOG.md`; changelog updates happen only during version bumps.
-4. Ensure the release commit follows the searchable convention from `docs/release-process.md`: `feat: version bump vX.Y.Z`.
-5. Run `bun run api-client:build`.
-6. Run `bun run test` and publish only when tests pass.
-7. Publish with `npm publish --access public`.
-8. Tag and push with `git tag vX.Y.Z && git push origin vX.Y.Z`.
+The generated `src/app-router.d.ts` and `dist/` files must be clean after a second build. Public procedure removals or incompatible input/output changes are a breaking client release under the repository’s SemVer policy. Update the shared app, CLI, and client versions plus `CHANGELOG.md`; follow [release-process.md](release-process.md). Actual npm publication, tagging, and deployment remain explicit release actions.

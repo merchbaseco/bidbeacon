@@ -2,64 +2,50 @@ import { describe, expect, it } from 'vitest';
 import { renderHelp, resolveHelpTopicKey } from '../../packages/bidbeacon-cli/src/help';
 
 describe('bb help topics', () => {
-    it('resolves nested metrics topics', () => {
-        expect(resolveHelpTopicKey(['metrics'])).toBe('metrics');
-        expect(resolveHelpTopicKey(['metrics', 'series'])).toBe('metrics series');
-        expect(resolveHelpTopicKey(['metrics', 'table'])).toBe('metrics table');
+    it('resolves only canonical topics', () => {
+        expect(resolveHelpTopicKey([])).toBe('global');
+        expect(resolveHelpTopicKey(['advertiser-accounts', 'list'])).toBe('advertiser-accounts');
+        expect(resolveHelpTopicKey(['search'])).toBe('search');
+        expect(resolveHelpTopicKey(['create'])).toBe('create');
+        expect(resolveHelpTopicKey(['update'])).toBe('update');
+        expect(resolveHelpTopicKey(['auth'])).toBe('auth');
+        expect(resolveHelpTopicKey(['config'])).toBe('config');
         expect(resolveHelpTopicKey(['changelog'])).toBe('changelog');
-        expect(resolveHelpTopicKey(['metrics', 'series', 'campaigns'])).toBe('metrics series');
-        expect(resolveHelpTopicKey(['campaign'])).toBe('campaigns');
-        expect(resolveHelpTopicKey(['asins'])).toBe('asins');
-        expect(resolveHelpTopicKey(['history'])).toBe('history');
+        expect(resolveHelpTopicKey(['campaigns'])).toBe('global');
     });
 
-    it('renders ASCII help output with usage and commands', () => {
-        const output = renderHelp('campaigns', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
-        expect(output).toContain('BidBeacon 0.0.0-abc123 - config: api-key missing');
-        expect(output).toContain('Usage: bb campaigns');
-        expect(output).toContain('Commands:');
-        expect(output).not.toContain('—');
+    it('renders canonical operation guidance without legacy names', () => {
+        const output = renderHelp('global', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
+        expect(output).toContain('BidBeacon CLI 0.0.0-abc123');
+        expect(output).toContain('advertiser-accounts list');
+        expect(output).toContain('search <resource>');
+        expect(output).toContain('create <operation>');
+        expect(output).toContain('requires `--account <');
+        expect(output).not.toContain('campaigns');
+        expect(output).not.toContain('metrics');
+        expect(output).not.toContain('asins');
+        expect(output).not.toContain('history');
     });
 
-    it('renders auth and config setup commands', () => {
-        const authOutput = renderHelp('auth', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
-        expect(authOutput).toContain('set [ak_...]');
-        expect(authOutput).toContain('set --stdin');
+    it('documents JSON input and the curated search controls', () => {
+        const createOutput = renderHelp('create', { version: '0.0.0' });
+        expect(createOutput).toContain('sponsored-products-campaign');
+        expect(createOutput).toContain('--json <object|@file|->');
+
+        const searchOutput = renderHelp('search', { version: '0.0.0' });
+        expect(searchOutput).toContain('--where <expression>');
+        expect(searchOutput).toContain('metrics.orders');
+        expect(searchOutput).toContain('--all');
+    });
+
+    it('renders auth, config, and changelog guidance', () => {
+        const authOutput = renderHelp('auth', { version: '0.0.0' });
         expect(authOutput).toContain('MERCHBASE_API_KEY');
-
-        const configOutput = renderHelp('config', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
-        expect(configOutput).toContain('get <key>');
-        expect(configOutput).toContain('unset <key>');
-        expect(configOutput).toContain('reset');
-        expect(configOutput).not.toContain('config clear');
-    });
-
-    it('renders explicit history command guidance for targets', () => {
-        const targetsOutput = renderHelp('targets', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
-        expect(targetsOutput).toContain('Use `bb history targets <target_id>` for change-history rows.');
-
-        const historyOutput = renderHelp('history', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
-        expect(historyOutput).toContain('--range <range>');
-    });
-
-    it('renders ASIN and metrics discoverability flags', () => {
-        const asinsOutput = renderHelp('asins', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
-        expect(asinsOutput).toContain('--range <range>');
-        expect(asinsOutput).toContain('--metrics <keys>');
-        expect(asinsOutput).toContain('--depth <value>');
-        expect(asinsOutput).toContain('--state <value>');
-        expect(asinsOutput).toContain('tree <asin>');
-        expect(asinsOutput).toContain('overview <asin>');
-
-        const metricsSeriesOutput = renderHelp('metrics series', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
-        expect(metricsSeriesOutput).toContain('--group-by <entity>');
-        expect(metricsSeriesOutput).toContain('--asin <ASIN>');
-    });
-
-    it('renders changelog command guidance', () => {
-        const output = renderHelp('changelog', { version: '0.0.0', sha: 'abc123', configSummary: 'config: api-key missing' });
-        expect(output).toContain('Usage: bb changelog [version] [--all]');
-        expect(output).toContain('--all');
-        expect(output).toContain('Version arg accepts `1.2.3` or `v1.2.3`.');
+        const configOutput = renderHelp('config', { version: '0.0.0' });
+        expect(configOutput).toContain('base-url|storage-dir');
+        expect(configOutput).not.toContain('accountId');
+        expect(configOutput).not.toContain('countryCode');
+        const changelogOutput = renderHelp('changelog', { version: '0.0.0' });
+        expect(changelogOutput).toContain('bb changelog [version] [--all]');
     });
 });

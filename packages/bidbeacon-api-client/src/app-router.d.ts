@@ -8,1370 +8,480 @@ export type CredentialKind = "api_key" | "oauth" | "session";
 export type Context = {
 	accessError: "access_denied" | "access_unavailable" | null;
 	accessibleAccountIds: string[];
+	accessibleAdvertiserAccountIds: string[];
 	authType: AuthType;
 	credentialKind: CredentialKind | null;
+	operationContext?: unknown;
 	request: unknown;
 	user: AuthenticatedUser | null;
 };
+export type OperationErrorCode = "ACCOUNT_ACCESS_DENIED" | "AMAZON_REJECTED" | "AMAZON_UNAVAILABLE" | "AUTHENTICATION_REQUIRED" | "COMPOSITE_PARTIAL_FAILURE" | "CURSOR_INVALID" | "INTERNAL_ERROR" | "INVALID_INPUT" | "RESOURCE_NOT_FOUND";
 export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 	ctx: Context;
 	meta: object;
-	errorShape: import("@trpc/server").TRPCDefaultErrorShape;
+	errorShape: {
+		data: {
+			operationCode: OperationErrorCode;
+			details: Record<string, unknown>;
+			code: import("@trpc/server").TRPC_ERROR_CODE_KEY;
+			httpStatus: number;
+			path?: string;
+			stack?: string;
+		} | {
+			operationCode: string;
+			details: {
+				issues: import("zod").ZodIssue[];
+			};
+			code: import("@trpc/server").TRPC_ERROR_CODE_KEY;
+			httpStatus: number;
+			path?: string;
+			stack?: string;
+		} | {
+			code: import("@trpc/server").TRPC_ERROR_CODE_KEY;
+			httpStatus: number;
+			path?: string;
+			stack?: string;
+		};
+		message: string;
+		code: import("@trpc/server").TRPC_ERROR_CODE_NUMBER;
+	};
 	transformer: false;
 }, import("@trpc/server").TRPCDecorateCreateRouterOptions<{
-	readonly "accounts/list": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
+	readonly list_advertiser_accounts: import("@trpc/server").TRPCQueryProcedure<{
+		input: {};
 		output: {
-			items: {
-				accountId: string;
-				countryCode: string | null;
-				name: string | null;
+			accounts: {
+				id: string;
+				name: string;
+				countryCode: string;
+				marketplaceId: string;
+				currency: string;
+				profileId: string | null;
+				amazonAdsAccountId: string;
+				timezone: string;
 			}[];
 		};
 		meta: object;
 	}>;
-	readonly "campaigns/list": import("@trpc/server").TRPCQueryProcedure<{
+	readonly search: import("@trpc/server").TRPCQueryProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
+			accountId: string;
+			resource: "campaign" | "ad_group" | "ad" | "target" | "product" | "change_event";
+			orderBy?: {
+				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.placement" | "segments.hour";
+				direction: "asc" | "desc";
+			}[] | undefined;
 			limit?: number | undefined;
-			offset?: number | undefined;
+			fields?: ("campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.placement" | "segments.hour")[] | undefined;
+			filters?: {
+				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.placement" | "segments.hour";
+				operator: "eq" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
+				value?: unknown;
+			}[] | undefined;
+			dateRange?: {
+				startDate: string;
+				endDate: string;
+			} | undefined;
+			cursor?: string | undefined;
 		};
 		output: {
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			}[];
+			context: {
+				orderBy: {
+					field: string;
+					direction: "asc" | "desc";
+				}[];
+				account: {
+					id: string;
+					currency: string;
+					timezone: string;
+				};
+				resource: "campaign" | "ad_group" | "ad" | "target" | "product" | "change_event";
+				fields: string[];
+				dateRange?: {
+					startDate: string;
+					endDate: string;
+					source: "DEFAULT" | "EXPLICIT";
+				} | undefined;
+				coverage?: {
+					status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+					issues: ({
+						date: string;
+						status: "PENDING" | "FAILED" | "UNKNOWN";
+					} | {
+						date: string;
+						status: "PARSE_ERRORS";
+						errorCount: number;
+					})[];
+				} | undefined;
+			};
+			rows: Record<string, unknown>[];
+			nextCursor?: string | undefined;
 		};
 		meta: object;
 	}>;
-	readonly "campaigns/get": import("@trpc/server").TRPCQueryProcedure<{
+	readonly create_sponsored_products_campaign: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
+			campaign: {
 				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
+				state: "ENABLED" | "PAUSED";
+				bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+				dailyBudget: number;
+				startDate?: string | undefined;
+				endDate?: string | null | undefined;
+				placementBidAdjustments?: {
+					topOfSearch?: number | undefined;
+					restOfSearch?: number | undefined;
+					productPages?: number | undefined;
+					amazonBusiness?: number | undefined;
+				} | undefined;
 			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/create": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			name: string;
-			budget: number;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/update": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-			name?: string | undefined;
-			startDateTime?: string | undefined;
-			endDateTime?: string | null | undefined;
-			portfolioId?: string | null | undefined;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/pause": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/resume": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/delete": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/set-budget": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-			budget: number;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/set-bid-strategy": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-			strategy: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE";
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/set-bid-adjustments": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-			scope: "placement" | "audience" | "creative";
-			adjustments?: any;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/list": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-		};
-		output: {
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/get": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
+			accountId: string;
+			adGroup: {
 				name: string;
 				defaultBid: number;
 			};
+			asins: string[];
+			targeting: {
+				mode: "AUTO";
+				bidOverrides?: {
+					closeMatch?: number | undefined;
+					looseMatch?: number | undefined;
+					substitutes?: number | undefined;
+					complements?: number | undefined;
+				} | undefined;
+			} | {
+				mode: "MANUAL_KEYWORD";
+				keywords: {
+					bid: number;
+					matchType: "BROAD" | "PHRASE" | "EXACT";
+					keyword: string;
+				}[];
+			} | {
+				mode: "MANUAL_PRODUCT";
+				products: {
+					bid: number;
+					asin: string;
+				}[];
+			};
+			negatives?: {
+				asins?: string[] | undefined;
+				keywords?: {
+					matchType: "PHRASE" | "EXACT";
+					keyword: string;
+				}[] | undefined;
+			} | undefined;
+		};
+		output: {
+			campaign: {
+				id: string;
+				name: string;
+				state: "ENABLED" | "PAUSED" | "ARCHIVED";
+				deliveryStatus: string;
+				startDate: string;
+				endDate: string | null;
+				bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+				dailyBudget: number;
+				targetingMode: "AUTO" | "MANUAL_KEYWORD" | "MANUAL_PRODUCT";
+				placementBidAdjustments?: {
+					topOfSearch?: number | undefined;
+					restOfSearch?: number | undefined;
+					productPages?: number | undefined;
+					amazonBusiness?: number | undefined;
+				} | undefined;
+			};
+			adGroup: {
+				id: string;
+				campaignId: string;
+				name: string;
+				state: "ENABLED" | "PAUSED" | "ARCHIVED";
+				deliveryStatus: string;
+				defaultBid: number;
+			};
+			ads: {
+				id: string;
+				campaignId: string;
+				state: "ENABLED" | "PAUSED" | "ARCHIVED";
+				deliveryStatus: string;
+				adGroupId: string;
+				productTitle: string | null;
+				asin: string;
+			}[];
+			targets: {
+				id: string;
+				campaignId: string;
+				state: "ENABLED" | "PAUSED" | "ARCHIVED";
+				deliveryStatus: string;
+				adGroupId: string | null;
+				negative: boolean;
+				type: "AUTO" | "KEYWORD" | "PRODUCT";
+				bid?: number | undefined;
+				matchType?: string | undefined;
+				asin?: string | undefined;
+				keyword?: string | undefined;
+			}[];
 		};
 		meta: object;
 	}>;
-	readonly "ad-groups/create": import("@trpc/server").TRPCMutationProcedure<{
+	readonly create_campaign: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
+			accountId: string;
 			name: string;
+			state: "ENABLED" | "PAUSED";
+			startDate: string;
+			bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+			dailyBudget: number;
+			targetingMode: "AUTO" | "MANUAL_KEYWORD" | "MANUAL_PRODUCT";
+			endDate?: string | null | undefined;
+			placementBidAdjustments?: {
+				topOfSearch?: number | undefined;
+				restOfSearch?: number | undefined;
+				productPages?: number | undefined;
+				amazonBusiness?: number | undefined;
+			} | undefined;
+		};
+		output: {
+			id: string;
+			name: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			startDate: string;
+			endDate: string | null;
+			bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+			dailyBudget: number;
+			targetingMode: "AUTO" | "MANUAL_KEYWORD" | "MANUAL_PRODUCT";
+			placementBidAdjustments?: {
+				topOfSearch?: number | undefined;
+				restOfSearch?: number | undefined;
+				productPages?: number | undefined;
+				amazonBusiness?: number | undefined;
+			} | undefined;
+		};
+		meta: object;
+	}>;
+	readonly create_ad_group: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			campaignId: string;
+			accountId: string;
+			name: string;
+			state: "ENABLED" | "PAUSED";
 			defaultBid: number;
 		};
 		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/update": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
+			id: string;
+			campaignId: string;
 			name: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			defaultBid: number;
 		};
 		meta: object;
 	}>;
-	readonly "ad-groups/set-default-bid": import("@trpc/server").TRPCMutationProcedure<{
+	readonly create_ad: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			value: number;
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
 			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/pause": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/resume": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/delete": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ads/list": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			productAsin?: string | undefined;
-		};
-		output: {
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productIdType: "ASIN" | "SKU";
-				productId: string;
-				productTitle: string | null;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "ads/get": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productIdType: "ASIN" | "SKU";
-				productId: string;
-				productTitle: string | null;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ads/create": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-			productIdType: "ASIN" | "SKU";
-			productId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productIdType: "ASIN" | "SKU";
-				productId: string;
-				productTitle: string | null;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ads/update": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-			adId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productIdType: "ASIN" | "SKU";
-				productId: string;
-				productTitle: string | null;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ads/delete": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adId: string;
-		};
-		output: {
-			adId: string;
-			deleted: true;
-		};
-		meta: object;
-	}>;
-	readonly "asins/get": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
 			asin: string;
 		};
 		output: {
-			campaigns: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				creationDateTime: string | null;
-				targets: {
-					type: "KEYWORD" | "PRODUCT" | "AUTO";
-					state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-					campaignId: string;
-					adGroupId: string | null;
-					negative: boolean;
-					targetId: string;
-					bid: number | null;
-					productIdType?: "ASIN" | "SKU" | null | undefined;
-					productId?: string | null | undefined;
-					targetMatchType?: string | null | undefined;
-					keyword?: string | null | undefined;
-					keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-					productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-				}[];
-				campaignName: string;
-				adGroups: {
-					state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-					campaignId: string;
-					adGroupId: string;
-					name: string;
-					defaultBid: number;
-					targets: {
-						type: "KEYWORD" | "PRODUCT" | "AUTO";
-						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-						campaignId: string;
-						adGroupId: string | null;
-						negative: boolean;
-						targetId: string;
-						bid: number | null;
-						productIdType?: "ASIN" | "SKU" | null | undefined;
-						productId?: string | null | undefined;
-						targetMatchType?: string | null | undefined;
-						keyword?: string | null | undefined;
-						keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-						productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-					}[];
-					ads: {
-						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-						campaignId: string;
-						adGroupId: string;
-						adId: string;
-						productIdType: "ASIN" | "SKU";
-						productId: string;
-						productTitle: string | null;
-					}[];
-				}[];
-			}[];
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string;
+			productTitle: string | null;
+			asin: string;
 		};
 		meta: object;
 	}>;
-	readonly "history/list": import("@trpc/server").TRPCQueryProcedure<{
+	readonly create_keyword_target: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			entityType: "campaign" | "adGroup" | "ad" | "target";
-			entityId: string;
-			range?: string | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-		};
-		output: {
-			items: {
-				entityType: "campaign" | "adGroup" | "ad" | "target";
-				entityId: string;
-				id: string;
-				eventType: "bid_change" | "state_change" | "budget_change";
-				fieldName: string;
-				previousValue: string | null;
-				newValue: string | null;
-				changedAt: string;
-				source: "bidbeacon" | "ams" | "change_history";
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "targets/list": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			negative?: boolean | undefined;
-		};
-		output: {
-			items: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "targets/get": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "targets/create/keyword": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
 			adGroupId: string;
 			bid: number;
-			keyword: string;
 			matchType: "BROAD" | "PHRASE" | "EXACT";
+			keyword: string;
 		};
 		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
 		};
 		meta: object;
 	}>;
-	readonly "targets/create/product": import("@trpc/server").TRPCMutationProcedure<{
+	readonly create_product_target: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
 			adGroupId: string;
-			productIdType: "ASIN" | "SKU";
-			productId: string;
 			bid: number;
-			matchType: "PRODUCT_EXACT" | "PRODUCT_SIMILAR";
+			asin: string;
 		};
 		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
 		};
 		meta: object;
 	}>;
-	readonly "targets/delete": import("@trpc/server").TRPCMutationProcedure<{
+	readonly create_negative_keyword: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
+			campaignId: string;
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
+			adGroupId: string;
+			matchType: "PHRASE" | "EXACT";
+			keyword: string;
+		};
+		output: {
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
+		};
+		meta: object;
+	}>;
+	readonly create_negative_product_target: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			campaignId: string;
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
+			adGroupId: string;
+			asin: string;
+		};
+		output: {
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
+		};
+		meta: object;
+	}>;
+	readonly update_campaign: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			campaignId: string;
+			accountId: string;
+			changes: {
+				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | undefined;
+				bidStrategy?: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN" | undefined;
+				dailyBudget?: number | undefined;
+				placementBidAdjustments?: {
+					topOfSearch?: number | undefined;
+					restOfSearch?: number | undefined;
+					productPages?: number | undefined;
+					amazonBusiness?: number | undefined;
+				} | undefined;
 			};
+		};
+		output: {
+			id: string;
+			name: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			startDate: string;
+			endDate: string | null;
+			bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+			dailyBudget: number;
+			targetingMode: "AUTO" | "MANUAL_KEYWORD" | "MANUAL_PRODUCT";
+			placementBidAdjustments?: {
+				topOfSearch?: number | undefined;
+				restOfSearch?: number | undefined;
+				productPages?: number | undefined;
+				amazonBusiness?: number | undefined;
+			} | undefined;
+		};
+		meta: object;
+	}>;
+	readonly update_ad_group: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			accountId: string;
+			adGroupId: string;
+			changes: {
+				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | undefined;
+				defaultBid?: number | undefined;
+			};
+		};
+		output: {
+			id: string;
+			campaignId: string;
+			name: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			defaultBid: number;
+		};
+		meta: object;
+	}>;
+	readonly update_ad: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			accountId: string;
+			adId: string;
+			changes: {
+				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | undefined;
+			};
+		};
+		output: {
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string;
+			productTitle: string | null;
+			asin: string;
+		};
+		meta: object;
+	}>;
+	readonly update_target: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			accountId: string;
 			targetId: string;
+			changes: {
+				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | undefined;
+				bid?: number | undefined;
+			};
 		};
 		output: {
-			targetId: string;
-			deleted: true;
-		};
-		meta: object;
-	}>;
-	readonly "targets/pause": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "targets/resume": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "bids/set": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			value: number;
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "bids/adjust": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-			delta: number;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "metrics/series/campaigns": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-			bucket?: "auto" | "hour" | "day" | "week" | "month" | "year" | undefined;
-		};
-		output: {
-			range: {
-				startDate: string;
-				endDate: string;
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			series: {
-				start: string;
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-			granularity: "hour" | "day" | "week" | "month" | "year";
-			timezone: string;
-		};
-		meta: object;
-	}>;
-	readonly "metrics/series/ad-groups": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-			bucket?: "auto" | "hour" | "day" | "week" | "month" | "year" | undefined;
-		};
-		output: {
-			range: {
-				startDate: string;
-				endDate: string;
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			series: {
-				start: string;
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-			granularity: "hour" | "day" | "week" | "month" | "year";
-			timezone: string;
-		};
-		meta: object;
-	}>;
-	readonly "metrics/series/ads": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-			bucket?: "auto" | "hour" | "day" | "week" | "month" | "year" | undefined;
-		};
-		output: {
-			range: {
-				startDate: string;
-				endDate: string;
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			series: {
-				start: string;
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-			granularity: "hour" | "day" | "week" | "month" | "year";
-			timezone: string;
-		};
-		meta: object;
-	}>;
-	readonly "metrics/series/targets": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-			bucket?: "auto" | "hour" | "day" | "week" | "month" | "year" | undefined;
-		};
-		output: {
-			range: {
-				startDate: string;
-				endDate: string;
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			series: {
-				start: string;
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-			granularity: "hour" | "day" | "week" | "month" | "year";
-			timezone: string;
-		};
-		meta: object;
-	}>;
-	readonly "metrics/table/campaigns": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			sort?: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			} | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-		};
-		output: {
-			sort: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
-				campaignId: string;
-				name: string | null;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "metrics/table/ad-groups": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			sort?: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			} | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-		};
-		output: {
-			sort: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
-				campaignId: string;
-				adGroupId: string;
-				name: string | null;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-				campaignName: string | null;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "metrics/table/ads": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			sort?: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			} | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-		};
-		output: {
-			sort: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productId: string | null;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-				campaignName: string | null;
-				adGroupName: string | null;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "metrics/table/targets": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			sort?: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			} | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-		};
-		output: {
-			sort: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			items: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
-				campaignId: string;
-				adGroupId: string | null;
-				productId: string | null;
-				targetId: string;
-				targetMatchType: string | null;
-				keyword: string | null;
-				keywordMatchType: "BROAD" | "PHRASE" | "EXACT" | null;
-				productMatchType: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-				campaignName: string | null;
-				adGroupName: string | null;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "enums/bid-strategy": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
-		output: {
-			items: ("MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE")[];
-		};
-		meta: object;
-	}>;
-	readonly "enums/match-type": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
-		output: {
-			keyword: ("BROAD" | "PHRASE" | "EXACT")[];
-			product: ("PRODUCT_EXACT" | "PRODUCT_SIMILAR")[];
-		};
-		meta: object;
-	}>;
-	readonly "enums/placement": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
-		output: {
-			items: ("HOME_PAGE" | "TOP_OF_SEARCH" | "REST_OF_SEARCH" | "PRODUCT_PAGE" | "SITE_AMAZON_BUSINESS")[];
-		};
-		meta: object;
-	}>;
-	readonly "enums/state": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
-		output: {
-			items: ("ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER")[];
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
 		};
 		meta: object;
 	}>;
@@ -1379,1362 +489,469 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 	ctx: Context;
 	meta: object;
-	errorShape: import("@trpc/server").TRPCDefaultErrorShape;
+	errorShape: {
+		data: {
+			operationCode: OperationErrorCode;
+			details: Record<string, unknown>;
+			code: import("@trpc/server").TRPC_ERROR_CODE_KEY;
+			httpStatus: number;
+			path?: string;
+			stack?: string;
+		} | {
+			operationCode: string;
+			details: {
+				issues: import("zod").ZodIssue[];
+			};
+			code: import("@trpc/server").TRPC_ERROR_CODE_KEY;
+			httpStatus: number;
+			path?: string;
+			stack?: string;
+		} | {
+			code: import("@trpc/server").TRPC_ERROR_CODE_KEY;
+			httpStatus: number;
+			path?: string;
+			stack?: string;
+		};
+		message: string;
+		code: import("@trpc/server").TRPC_ERROR_CODE_NUMBER;
+	};
 	transformer: false;
 }, import("@trpc/server").TRPCDecorateCreateRouterOptions<{
-	readonly "accounts/list": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
+	readonly list_advertiser_accounts: import("@trpc/server").TRPCQueryProcedure<{
+		input: {};
 		output: {
-			items: {
-				accountId: string;
-				countryCode: string | null;
-				name: string | null;
+			accounts: {
+				id: string;
+				name: string;
+				countryCode: string;
+				marketplaceId: string;
+				currency: string;
+				profileId: string | null;
+				amazonAdsAccountId: string;
+				timezone: string;
 			}[];
 		};
 		meta: object;
 	}>;
-	readonly "campaigns/list": import("@trpc/server").TRPCQueryProcedure<{
+	readonly search: import("@trpc/server").TRPCQueryProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
+			accountId: string;
+			resource: "campaign" | "ad_group" | "ad" | "target" | "product" | "change_event";
+			orderBy?: {
+				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.placement" | "segments.hour";
+				direction: "asc" | "desc";
+			}[] | undefined;
 			limit?: number | undefined;
-			offset?: number | undefined;
+			fields?: ("campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.placement" | "segments.hour")[] | undefined;
+			filters?: {
+				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.placement" | "segments.hour";
+				operator: "eq" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
+				value?: unknown;
+			}[] | undefined;
+			dateRange?: {
+				startDate: string;
+				endDate: string;
+			} | undefined;
+			cursor?: string | undefined;
 		};
 		output: {
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			}[];
+			context: {
+				orderBy: {
+					field: string;
+					direction: "asc" | "desc";
+				}[];
+				account: {
+					id: string;
+					currency: string;
+					timezone: string;
+				};
+				resource: "campaign" | "ad_group" | "ad" | "target" | "product" | "change_event";
+				fields: string[];
+				dateRange?: {
+					startDate: string;
+					endDate: string;
+					source: "DEFAULT" | "EXPLICIT";
+				} | undefined;
+				coverage?: {
+					status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+					issues: ({
+						date: string;
+						status: "PENDING" | "FAILED" | "UNKNOWN";
+					} | {
+						date: string;
+						status: "PARSE_ERRORS";
+						errorCount: number;
+					})[];
+				} | undefined;
+			};
+			rows: Record<string, unknown>[];
+			nextCursor?: string | undefined;
 		};
 		meta: object;
 	}>;
-	readonly "campaigns/get": import("@trpc/server").TRPCQueryProcedure<{
+	readonly create_sponsored_products_campaign: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
+			campaign: {
 				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
+				state: "ENABLED" | "PAUSED";
+				bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+				dailyBudget: number;
+				startDate?: string | undefined;
+				endDate?: string | null | undefined;
+				placementBidAdjustments?: {
+					topOfSearch?: number | undefined;
+					restOfSearch?: number | undefined;
+					productPages?: number | undefined;
+					amazonBusiness?: number | undefined;
+				} | undefined;
 			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/create": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			name: string;
-			budget: number;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/update": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-			name?: string | undefined;
-			startDateTime?: string | undefined;
-			endDateTime?: string | null | undefined;
-			portfolioId?: string | null | undefined;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/pause": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/resume": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/delete": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/set-budget": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-			budget: number;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/set-bid-strategy": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-			strategy: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE";
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "campaigns/set-bid-adjustments": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
-			scope: "placement" | "audience" | "creative";
-			adjustments?: any;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				name: string;
-				budget: number;
-				creationDateTime: string | null;
-				lastUpdatedDateTime: string | null;
-				bidStrategy?: "MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE" | null | undefined;
-				startDateTime?: string | null | undefined;
-				endDateTime?: string | null | undefined;
-				portfolioId?: string | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/list": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-		};
-		output: {
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/get": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
+			accountId: string;
+			adGroup: {
 				name: string;
 				defaultBid: number;
 			};
+			asins: string[];
+			targeting: {
+				mode: "AUTO";
+				bidOverrides?: {
+					closeMatch?: number | undefined;
+					looseMatch?: number | undefined;
+					substitutes?: number | undefined;
+					complements?: number | undefined;
+				} | undefined;
+			} | {
+				mode: "MANUAL_KEYWORD";
+				keywords: {
+					bid: number;
+					matchType: "BROAD" | "PHRASE" | "EXACT";
+					keyword: string;
+				}[];
+			} | {
+				mode: "MANUAL_PRODUCT";
+				products: {
+					bid: number;
+					asin: string;
+				}[];
+			};
+			negatives?: {
+				asins?: string[] | undefined;
+				keywords?: {
+					matchType: "PHRASE" | "EXACT";
+					keyword: string;
+				}[] | undefined;
+			} | undefined;
+		};
+		output: {
+			campaign: {
+				id: string;
+				name: string;
+				state: "ENABLED" | "PAUSED" | "ARCHIVED";
+				deliveryStatus: string;
+				startDate: string;
+				endDate: string | null;
+				bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+				dailyBudget: number;
+				targetingMode: "AUTO" | "MANUAL_KEYWORD" | "MANUAL_PRODUCT";
+				placementBidAdjustments?: {
+					topOfSearch?: number | undefined;
+					restOfSearch?: number | undefined;
+					productPages?: number | undefined;
+					amazonBusiness?: number | undefined;
+				} | undefined;
+			};
+			adGroup: {
+				id: string;
+				campaignId: string;
+				name: string;
+				state: "ENABLED" | "PAUSED" | "ARCHIVED";
+				deliveryStatus: string;
+				defaultBid: number;
+			};
+			ads: {
+				id: string;
+				campaignId: string;
+				state: "ENABLED" | "PAUSED" | "ARCHIVED";
+				deliveryStatus: string;
+				adGroupId: string;
+				productTitle: string | null;
+				asin: string;
+			}[];
+			targets: {
+				id: string;
+				campaignId: string;
+				state: "ENABLED" | "PAUSED" | "ARCHIVED";
+				deliveryStatus: string;
+				adGroupId: string | null;
+				negative: boolean;
+				type: "AUTO" | "KEYWORD" | "PRODUCT";
+				bid?: number | undefined;
+				matchType?: string | undefined;
+				asin?: string | undefined;
+				keyword?: string | undefined;
+			}[];
 		};
 		meta: object;
 	}>;
-	readonly "ad-groups/create": import("@trpc/server").TRPCMutationProcedure<{
+	readonly create_campaign: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			campaignId: string;
+			accountId: string;
 			name: string;
+			state: "ENABLED" | "PAUSED";
+			startDate: string;
+			bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+			dailyBudget: number;
+			targetingMode: "AUTO" | "MANUAL_KEYWORD" | "MANUAL_PRODUCT";
+			endDate?: string | null | undefined;
+			placementBidAdjustments?: {
+				topOfSearch?: number | undefined;
+				restOfSearch?: number | undefined;
+				productPages?: number | undefined;
+				amazonBusiness?: number | undefined;
+			} | undefined;
+		};
+		output: {
+			id: string;
+			name: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			startDate: string;
+			endDate: string | null;
+			bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+			dailyBudget: number;
+			targetingMode: "AUTO" | "MANUAL_KEYWORD" | "MANUAL_PRODUCT";
+			placementBidAdjustments?: {
+				topOfSearch?: number | undefined;
+				restOfSearch?: number | undefined;
+				productPages?: number | undefined;
+				amazonBusiness?: number | undefined;
+			} | undefined;
+		};
+		meta: object;
+	}>;
+	readonly create_ad_group: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			campaignId: string;
+			accountId: string;
+			name: string;
+			state: "ENABLED" | "PAUSED";
 			defaultBid: number;
 		};
 		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/update": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
+			id: string;
+			campaignId: string;
 			name: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			defaultBid: number;
 		};
 		meta: object;
 	}>;
-	readonly "ad-groups/set-default-bid": import("@trpc/server").TRPCMutationProcedure<{
+	readonly create_ad: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			value: number;
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
 			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/pause": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/resume": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ad-groups/delete": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				name: string;
-				defaultBid: number;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ads/list": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			productAsin?: string | undefined;
-		};
-		output: {
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productIdType: "ASIN" | "SKU";
-				productId: string;
-				productTitle: string | null;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "ads/get": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productIdType: "ASIN" | "SKU";
-				productId: string;
-				productTitle: string | null;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ads/create": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adGroupId: string;
-			productIdType: "ASIN" | "SKU";
-			productId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productIdType: "ASIN" | "SKU";
-				productId: string;
-				productTitle: string | null;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ads/update": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-			adId: string;
-		};
-		output: {
-			item: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productIdType: "ASIN" | "SKU";
-				productId: string;
-				productTitle: string | null;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "ads/delete": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			adId: string;
-		};
-		output: {
-			adId: string;
-			deleted: true;
-		};
-		meta: object;
-	}>;
-	readonly "asins/get": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
 			asin: string;
 		};
 		output: {
-			campaigns: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				creationDateTime: string | null;
-				targets: {
-					type: "KEYWORD" | "PRODUCT" | "AUTO";
-					state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-					campaignId: string;
-					adGroupId: string | null;
-					negative: boolean;
-					targetId: string;
-					bid: number | null;
-					productIdType?: "ASIN" | "SKU" | null | undefined;
-					productId?: string | null | undefined;
-					targetMatchType?: string | null | undefined;
-					keyword?: string | null | undefined;
-					keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-					productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-				}[];
-				campaignName: string;
-				adGroups: {
-					state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-					campaignId: string;
-					adGroupId: string;
-					name: string;
-					defaultBid: number;
-					targets: {
-						type: "KEYWORD" | "PRODUCT" | "AUTO";
-						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-						campaignId: string;
-						adGroupId: string | null;
-						negative: boolean;
-						targetId: string;
-						bid: number | null;
-						productIdType?: "ASIN" | "SKU" | null | undefined;
-						productId?: string | null | undefined;
-						targetMatchType?: string | null | undefined;
-						keyword?: string | null | undefined;
-						keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-						productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-					}[];
-					ads: {
-						state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-						campaignId: string;
-						adGroupId: string;
-						adId: string;
-						productIdType: "ASIN" | "SKU";
-						productId: string;
-						productTitle: string | null;
-					}[];
-				}[];
-			}[];
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string;
+			productTitle: string | null;
+			asin: string;
 		};
 		meta: object;
 	}>;
-	readonly "history/list": import("@trpc/server").TRPCQueryProcedure<{
+	readonly create_keyword_target: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			entityType: "campaign" | "adGroup" | "ad" | "target";
-			entityId: string;
-			range?: string | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-		};
-		output: {
-			items: {
-				entityType: "campaign" | "adGroup" | "ad" | "target";
-				entityId: string;
-				id: string;
-				eventType: "bid_change" | "state_change" | "budget_change";
-				fieldName: string;
-				previousValue: string | null;
-				newValue: string | null;
-				changedAt: string;
-				source: "bidbeacon" | "ams" | "change_history";
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "targets/list": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			negative?: boolean | undefined;
-		};
-		output: {
-			items: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "targets/get": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "targets/create/keyword": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
 			adGroupId: string;
 			bid: number;
-			keyword: string;
 			matchType: "BROAD" | "PHRASE" | "EXACT";
+			keyword: string;
 		};
 		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
 		};
 		meta: object;
 	}>;
-	readonly "targets/create/product": import("@trpc/server").TRPCMutationProcedure<{
+	readonly create_product_target: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
 			adGroupId: string;
-			productIdType: "ASIN" | "SKU";
-			productId: string;
 			bid: number;
-			matchType: "PRODUCT_EXACT" | "PRODUCT_SIMILAR";
+			asin: string;
 		};
 		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
 		};
 		meta: object;
 	}>;
-	readonly "targets/delete": import("@trpc/server").TRPCMutationProcedure<{
+	readonly create_negative_keyword: import("@trpc/server").TRPCMutationProcedure<{
 		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
+			campaignId: string;
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
+			adGroupId: string;
+			matchType: "PHRASE" | "EXACT";
+			keyword: string;
+		};
+		output: {
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
+		};
+		meta: object;
+	}>;
+	readonly create_negative_product_target: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			campaignId: string;
+			accountId: string;
+			state: "ENABLED" | "PAUSED";
+			adGroupId: string;
+			asin: string;
+		};
+		output: {
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
+		};
+		meta: object;
+	}>;
+	readonly update_campaign: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			campaignId: string;
+			accountId: string;
+			changes: {
+				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | undefined;
+				bidStrategy?: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN" | undefined;
+				dailyBudget?: number | undefined;
+				placementBidAdjustments?: {
+					topOfSearch?: number | undefined;
+					restOfSearch?: number | undefined;
+					productPages?: number | undefined;
+					amazonBusiness?: number | undefined;
+				} | undefined;
 			};
+		};
+		output: {
+			id: string;
+			name: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			startDate: string;
+			endDate: string | null;
+			bidStrategy: "FIXED" | "DYNAMIC_DOWN_ONLY" | "DYNAMIC_UP_AND_DOWN";
+			dailyBudget: number;
+			targetingMode: "AUTO" | "MANUAL_KEYWORD" | "MANUAL_PRODUCT";
+			placementBidAdjustments?: {
+				topOfSearch?: number | undefined;
+				restOfSearch?: number | undefined;
+				productPages?: number | undefined;
+				amazonBusiness?: number | undefined;
+			} | undefined;
+		};
+		meta: object;
+	}>;
+	readonly update_ad_group: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			accountId: string;
+			adGroupId: string;
+			changes: {
+				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | undefined;
+				defaultBid?: number | undefined;
+			};
+		};
+		output: {
+			id: string;
+			campaignId: string;
+			name: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			defaultBid: number;
+		};
+		meta: object;
+	}>;
+	readonly update_ad: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			accountId: string;
+			adId: string;
+			changes: {
+				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | undefined;
+			};
+		};
+		output: {
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string;
+			productTitle: string | null;
+			asin: string;
+		};
+		meta: object;
+	}>;
+	readonly update_target: import("@trpc/server").TRPCMutationProcedure<{
+		input: {
+			accountId: string;
 			targetId: string;
+			changes: {
+				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | undefined;
+				bid?: number | undefined;
+			};
 		};
 		output: {
-			targetId: string;
-			deleted: true;
-		};
-		meta: object;
-	}>;
-	readonly "targets/pause": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "targets/resume": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "bids/set": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			value: number;
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "bids/adjust": import("@trpc/server").TRPCMutationProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			targetId: string;
-			delta: number;
-		};
-		output: {
-			item: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER";
-				campaignId: string;
-				adGroupId: string | null;
-				negative: boolean;
-				targetId: string;
-				bid: number | null;
-				productIdType?: "ASIN" | "SKU" | null | undefined;
-				productId?: string | null | undefined;
-				targetMatchType?: string | null | undefined;
-				keyword?: string | null | undefined;
-				keywordMatchType?: "BROAD" | "PHRASE" | "EXACT" | null | undefined;
-				productMatchType?: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null | undefined;
-			};
-		};
-		meta: object;
-	}>;
-	readonly "metrics/series/campaigns": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-			bucket?: "auto" | "hour" | "day" | "week" | "month" | "year" | undefined;
-		};
-		output: {
-			range: {
-				startDate: string;
-				endDate: string;
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			series: {
-				start: string;
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-			granularity: "hour" | "day" | "week" | "month" | "year";
-			timezone: string;
-		};
-		meta: object;
-	}>;
-	readonly "metrics/series/ad-groups": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-			bucket?: "auto" | "hour" | "day" | "week" | "month" | "year" | undefined;
-		};
-		output: {
-			range: {
-				startDate: string;
-				endDate: string;
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			series: {
-				start: string;
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-			granularity: "hour" | "day" | "week" | "month" | "year";
-			timezone: string;
-		};
-		meta: object;
-	}>;
-	readonly "metrics/series/ads": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-			bucket?: "auto" | "hour" | "day" | "week" | "month" | "year" | undefined;
-		};
-		output: {
-			range: {
-				startDate: string;
-				endDate: string;
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			series: {
-				start: string;
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-			granularity: "hour" | "day" | "week" | "month" | "year";
-			timezone: string;
-		};
-		meta: object;
-	}>;
-	readonly "metrics/series/targets": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-			bucket?: "auto" | "hour" | "day" | "week" | "month" | "year" | undefined;
-		};
-		output: {
-			range: {
-				startDate: string;
-				endDate: string;
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			series: {
-				start: string;
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-			granularity: "hour" | "day" | "week" | "month" | "year";
-			timezone: string;
-		};
-		meta: object;
-	}>;
-	readonly "metrics/table/campaigns": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			sort?: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			} | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-		};
-		output: {
-			sort: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
-				campaignId: string;
-				name: string | null;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "metrics/table/ad-groups": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			sort?: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			} | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-		};
-		output: {
-			sort: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
-				campaignId: string;
-				adGroupId: string;
-				name: string | null;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-				campaignName: string | null;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "metrics/table/ads": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			sort?: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			} | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-		};
-		output: {
-			sort: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			items: {
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
-				campaignId: string;
-				adGroupId: string;
-				adId: string;
-				productId: string | null;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-				campaignName: string | null;
-				adGroupName: string | null;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "metrics/table/targets": import("@trpc/server").TRPCQueryProcedure<{
-		input: {
-			config: {
-				accountId: string;
-				range: string;
-				countryCode?: string | undefined;
-			};
-			range?: string | undefined;
-			sort?: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			} | undefined;
-			limit?: number | undefined;
-			offset?: number | undefined;
-			campaignId?: string | undefined;
-			adGroupId?: string | undefined;
-			metrics?: ("impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas")[] | undefined;
-			ids?: string[] | undefined;
-			filters?: {
-				state?: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | "ALL" | undefined;
-				budget?: {
-					min?: number | undefined;
-					max?: number | undefined;
-				} | undefined;
-				targetMatchType?: string | undefined;
-				metrics?: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", {
-					min?: number | undefined;
-					max?: number | undefined;
-				}>> | undefined;
-				endDate?: {
-					before?: string | undefined;
-					after?: string | undefined;
-				} | undefined;
-				search?: string | undefined;
-				targeting?: "MANUAL" | "AUTO" | undefined;
-				targetType?: "KEYWORD" | "PRODUCT" | "AUTO" | undefined;
-				outOfBudget?: boolean | undefined;
-			} | undefined;
-		};
-		output: {
-			sort: {
-				field: "impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas";
-				direction: "asc" | "desc";
-			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-			items: {
-				type: "KEYWORD" | "PRODUCT" | "AUTO";
-				state: "ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER" | null;
-				campaignId: string;
-				adGroupId: string | null;
-				productId: string | null;
-				targetId: string;
-				targetMatchType: string | null;
-				keyword: string | null;
-				keywordMatchType: "BROAD" | "PHRASE" | "EXACT" | null;
-				productMatchType: "PRODUCT_EXACT" | "PRODUCT_SIMILAR" | null;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "purchases" | "sales" | "acos" | "cpc" | "ctr" | "roas", number | null>>;
-				campaignName: string | null;
-				adGroupName: string | null;
-			}[];
-		};
-		meta: object;
-	}>;
-	readonly "enums/bid-strategy": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
-		output: {
-			items: ("MANUAL" | "RULE_BASED" | "SALES_DOWN_ONLY" | "SALES_UP_AND_DOWN" | "SALES" | "NEW_TO_BRAND" | "NONE")[];
-		};
-		meta: object;
-	}>;
-	readonly "enums/match-type": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
-		output: {
-			keyword: ("BROAD" | "PHRASE" | "EXACT")[];
-			product: ("PRODUCT_EXACT" | "PRODUCT_SIMILAR")[];
-		};
-		meta: object;
-	}>;
-	readonly "enums/placement": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
-		output: {
-			items: ("HOME_PAGE" | "TOP_OF_SEARCH" | "REST_OF_SEARCH" | "PRODUCT_PAGE" | "SITE_AMAZON_BUSINESS")[];
-		};
-		meta: object;
-	}>;
-	readonly "enums/state": import("@trpc/server").TRPCQueryProcedure<{
-		input: void;
-		output: {
-			items: ("ENABLED" | "PAUSED" | "ARCHIVED" | "OTHER")[];
+			id: string;
+			campaignId: string;
+			state: "ENABLED" | "PAUSED" | "ARCHIVED";
+			deliveryStatus: string;
+			adGroupId: string | null;
+			negative: boolean;
+			type: "AUTO" | "KEYWORD" | "PRODUCT";
+			bid?: number | undefined;
+			matchType?: string | undefined;
+			asin?: string | undefined;
+			keyword?: string | undefined;
 		};
 		meta: object;
 	}>;

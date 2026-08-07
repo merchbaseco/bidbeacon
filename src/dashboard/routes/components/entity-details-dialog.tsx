@@ -1,4 +1,3 @@
-import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { Badge } from '@/dashboard/components/ui/badge';
@@ -11,7 +10,6 @@ import { Separator } from '@/dashboard/components/ui/separator';
 import { Spinner } from '@/dashboard/components/ui/spinner';
 import { api } from '@/dashboard/lib/trpc';
 import { useAdsEntityDetails } from '@/dashboard/routes/hooks/use-ads-entity-details';
-import { usePublicApiClient } from '@/dashboard/routes/hooks/use-public-api-client';
 import type { PerformanceDimension, PerformanceTableOutput } from '@/types/performance-api';
 
 const PAGE_SIZE = 10;
@@ -85,9 +83,6 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
     });
 
     const utils = api.useUtils();
-    const queryClient = useQueryClient();
-    const { getClient } = usePublicApiClient();
-    const historyQueryPrefix = useMemo(() => ['public-history-list', accountId] as const, [accountId]);
 
     const updateBid = api.ads.targets.updateBid.useMutation({
         onSuccess: result => {
@@ -100,7 +95,7 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
                       }
                     : prev
             );
-            queryClient.invalidateQueries({ queryKey: historyQueryPrefix });
+            utils.entityHistory.latestTargetBidChange.invalidate({ accountId, targetId: result.targetId });
             utils.ads.targets.list.invalidate();
             toast.success('Bid updated', {
                 description: `New bid: ${formatCurrency(result.bidAmount)}`,
@@ -114,26 +109,16 @@ const EntityDetailsDialog = ({ open, onOpenChange, row, accountId }: { open: boo
     });
 
     const targetData = data && 'targetId' in data ? data : null;
-    const targetHistoryQuery = useQuery({
-        queryKey: [...historyQueryPrefix, targetData?.targetId ?? ''],
-        enabled: Boolean(open && targetData?.targetId),
-        queryFn: async () => {
-            if (!targetData?.targetId) {
-                return { items: [] };
-            }
-            const client = await getClient();
-            return client['history/list'].query({
-                config: {
-                    accountId,
-                    range: 'today',
-                },
-                entityType: 'target',
-                entityId: targetData.targetId,
-                limit: 20,
-            });
+    const latestTargetBidChangeQuery = api.entityHistory.latestTargetBidChange.useQuery(
+        {
+            accountId,
+            targetId: targetData?.targetId ?? '',
         },
-    });
-    const latestTargetBidChange = useMemo(() => targetHistoryQuery.data?.items.find(item => item.eventType === 'bid_change') ?? null, [targetHistoryQuery.data?.items]);
+        {
+            enabled: Boolean(open && targetData?.targetId),
+        }
+    );
+    const latestTargetBidChange = latestTargetBidChangeQuery.data ?? null;
 
     useEffect(() => {
         if (!open) {

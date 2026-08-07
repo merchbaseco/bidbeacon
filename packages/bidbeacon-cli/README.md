@@ -1,6 +1,6 @@
 # @bidbeacon/cli
 
-BidBeacon command-line interface.
+BidBeacon’s canonical operation CLI.
 
 ## Install
 
@@ -8,34 +8,40 @@ BidBeacon command-line interface.
 npm install -g @bidbeacon/cli
 ```
 
-## Usage
+## Contract
 
 ```bash
-bb auth set
-bb auth status
-bb --help
+bb auth set --stdin
+bb advertiser-accounts list
+bb search campaign --account <advertiser-account-uuid> --fields campaign.id,metrics.orders --where 'metrics.orders>=1' --all
+bb create campaign --account <advertiser-account-uuid> --name "Example" --state ENABLED --daily-budget 25 --bid-strategy FIXED --targeting-mode AUTO --start-date 2026-08-06
+bb create sponsored-products-campaign --account <advertiser-account-uuid> --json @campaign.json
+bb update target --account <advertiser-account-uuid> --target-id <target-id> --bid 0.75
 bb config show
-bb config set storage-dir ~/.config/bidbeacon-work
-bb accounts list
 bb changelog
-bb campaigns search lepricorn
-bb asins tree B07NXRP1B8 --depth ad-group
-bb asins overview B07NXRP1B8 --range 14d --depth ad-group --metrics spend,sales,acos
-bb metrics table targets --asin B07NXRP1B8 --range 14d --sort acos --direction desc --limit 25
 ```
 
-`bb changelog` prints the packaged release notes for the installed CLI version by default. Use `bb changelog --all` to dump the full bundled changelog or `bb changelog v0.2.3` to inspect a specific release.
+All account-scoped commands require an explicit advertiser account UUID. The CLI does not read or write a selected account. `bb advertiser-accounts list` is the only unscoped operation.
 
-Authentication defaults to the platform secure store and keeps secrets out of `config.json`. On macOS, `bb auth set` saves the API key in Keychain. For non-interactive setup, pass `--stdin`.
+Search supports explicit fields, account-local inclusive dates, stable ordering, keyset cursors, repeated `--where` AND filters, and `--all`. Use `in ["a", "b"]` for alternatives. Metric fields use the canonical vocabulary, including `metrics.orders` and `metrics.cvr`.
 
-`bb config set storage-dir <path>` persists a custom directory for CLI config/data. After you set it once, future `bb` commands use `<path>/config.json` instead of `~/.bidbeacon/config.json`.
+Primitive create and update operations accept camel-case operation properties as kebab-case flags. Nested input can come from a JSON literal, `@file`, or stdin:
 
-Env overrides still work and take precedence over saved defaults. `MERCHBASE_API_KEY` is intended for automation, CI, and agent runtimes:
+```bash
+bb update campaign --account <advertiser-account-uuid> --campaign-id <campaign-id> --json '{"changes":{"state":"PAUSED"}}'
+bb create sponsored-products-campaign --account <advertiser-account-uuid> --json - < campaign.json
+```
+
+Flags and JSON may not assign the same property twice. Successful operation output is JSON on stdout. Failures are stable `{ "error": { "code", "message", "details" } }` JSON on stderr with a nonzero exit status.
+
+## Local configuration
+
+Authentication uses the platform secure store. `MERCHBASE_API_KEY` is intended for automation, CI, and agent runtimes; it is never persisted by the CLI.
+
+`bb config set storage-dir <path>` persists a custom transport-settings directory. The only saved settings are `base-url` and the storage directory itself. Environment overrides take precedence:
 
 - `MERCHBASE_API_KEY`
 - `BB_STORAGE_DIR`
 - `BB_BASE_URL`
-- `BB_ACCOUNT_ID`
-- `BB_COUNTRY_CODE`
 
-When no `--range` is passed, the CLI defaults to `7d`.
+There is no account, country, range, or dashboard-selection configuration.

@@ -11,8 +11,8 @@ const getRequestUrl = (request: RequestInfo | URL) => {
     return request.url;
 };
 
-const singleResultBody = JSON.stringify({ result: { data: { items: [] } } });
-const batchResultBody = JSON.stringify([{ result: { data: { items: [] } } }, { result: { data: { items: [] } } }]);
+const singleResultBody = JSON.stringify({ result: { data: { accounts: [] } } });
+const batchResultBody = JSON.stringify([{ result: { data: { accounts: [] } } }, { result: { data: { accounts: [] } } }]);
 
 describe('api client batching defaults', () => {
     const originalFetch = globalThis.fetch;
@@ -36,10 +36,10 @@ describe('api client batching defaults', () => {
             credential: 'ak_test',
         });
 
-        await Promise.all([client['accounts/list'].query(), client['accounts/list'].query()]);
+        await Promise.all([client.list_advertiser_accounts.query({}), client.list_advertiser_accounts.query({})]);
 
         expect(urls).toHaveLength(1);
-        expect(urls[0]).toContain('/api/accounts%2Flist,accounts%2Flist');
+        expect(urls[0]).toContain('/api/list_advertiser_accounts,list_advertiser_accounts');
         expect(urls[0]).toContain('batch=1');
     });
 
@@ -59,10 +59,10 @@ describe('api client batching defaults', () => {
             batch: false,
         });
 
-        await Promise.all([client['accounts/list'].query(), client['accounts/list'].query()]);
+        await Promise.all([client.list_advertiser_accounts.query({}), client.list_advertiser_accounts.query({})]);
 
         expect(urls).toHaveLength(2);
-        expect(urls.every(url => url.includes('/api/accounts%2Flist'))).toBe(true);
+        expect(urls.every(url => url.includes('/api/list_advertiser_accounts'))).toBe(true);
         expect(urls.some(url => url.includes('batch=1'))).toBe(false);
     });
 
@@ -88,7 +88,7 @@ describe('api client batching defaults', () => {
             batchMaxItems: 50,
         });
 
-        await Promise.all(Array.from({ length: 120 }, () => client['accounts/list'].query()));
+        await Promise.all(Array.from({ length: 120 }, () => client.list_advertiser_accounts.query({})));
 
         expect(urls.length).toBeGreaterThan(1);
         expect(urls.every(url => url.length <= 2000)).toBe(true);

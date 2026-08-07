@@ -1,7 +1,6 @@
-import { clientRestProcedures } from './public/client-rest';
-import { router } from './trpc';
+import { publicOperationRouter } from './public/operation-router';
 
-export const publicAppRouter = router(clientRestProcedures);
+export const publicAppRouter = publicOperationRouter;
 
 export const cliAppRouter = publicAppRouter;
 

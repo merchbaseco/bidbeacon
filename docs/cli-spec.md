@@ -9,7 +9,7 @@ read_when:
 **Status:** Accepted design; account discovery and UUID authorization plus Campaign, Ad-group, and
 Ad, Target, Product, and Change-event Search and Campaign, Ad-group, Ad, and Target mutation slices
 are implemented in the shared operation layer, along with composite Sponsored Products campaign
-creation. Operation adapters remain transport work.
+creation. The public CLI, tRPC router, and typed HTTP client adapters are implemented from this shared layer.
 
 This specification defines one public operation layer projected through:
 
@@ -423,7 +423,7 @@ Small mutations may use flags:
 ```bash
 bb update target \
   --account 6d997c64-3e64-4d50-b732-ec79d47f87f1 \
-  --target target_123 \
+  --target-id target_123 \
   --state PAUSED \
   --bid 0.45
 ```

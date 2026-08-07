@@ -21,6 +21,12 @@ Never publish a client surface at a divergent version from the app/server releas
 - Keep feature notes in PRs/commits; consolidate them when cutting a release.
 - Do not add or maintain an `Unreleased` section in `CHANGELOG.md`.
 
+## Public Contract Changes
+
+The CLI, typed HTTP client, and MCP operation names are one public contract. Removing or renaming a procedure, changing an input shape, or changing an output shape is a breaking client release and requires a major SemVer bump under the current policy. Regenerate `src/app-router.d.ts` and `dist/`, update the CLI README and API-client docs, and add the versioned changelog entry in the same change.
+
+During implementation or review, do not publish packages, create a release, tag, push, or deploy. The release owner runs the publication step first, then refreshes `bun.lock`, runs `bun run version:check`, and continues with the release checklist below.
+
 ## Version-Bump Commit Convention
 
 - Every release/version-bump commit message must include `version bump vX.Y.Z`.
@@ -95,9 +101,9 @@ Publish npm package:
 
 ```bash
 cd packages/bidbeacon-api-client
-# Load NPM_TOKEN from the macOS Keychain item `rankwrangler-npm-token`:
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm whoami
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm publish --access public
+# Load NPM_TOKEN from the repository .env:
+NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm whoami
+NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm publish --access public --provenance=false
 ```
 
 Note: the repo root package is marked `private: true` and has a `prepublishOnly` block.
@@ -113,9 +119,9 @@ Publish CLI package:
 
 ```bash
 cd packages/bidbeacon-cli
-# Load NPM_TOKEN from the macOS Keychain item `rankwrangler-npm-token`:
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm whoami
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm publish --access public
+# Load NPM_TOKEN from the repository .env:
+NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm whoami
+NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm publish --access public --provenance=false
 ```
 
 Optional verification:

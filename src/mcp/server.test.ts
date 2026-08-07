@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { advertiserAccount, campaign } from '@/db/schema';
 import { createFakeAmazonAdsGateway } from '@/operations/amazon-ads-gateway';
 import { createOperationContext, type OperationContext } from '@/operations/operation-context';
+import { SEARCH_FIELDS, SEARCH_RESOURCES } from '@/operations/search-field-registry';
 import { createTestDatabase, type TestDatabase } from '@/operations/testing/create-test-database';
 import { buildAdvertiserAccount, buildCampaign } from '@/operations/testing/fixtures';
 import { MCP_SERVER_INSTRUCTIONS, MCP_TOOL_NAMES } from './operation-definitions';
@@ -37,6 +38,9 @@ describe('BidBeacon MCP server', () => {
             const updateTool = listed.tools.find(tool => tool.name === 'update_campaign');
             expect(listTool?.inputSchema.properties).toEqual({});
             expect(searchTool?.inputSchema.required).toContain('accountId');
+            expect(searchTool?.inputSchema.properties?.resource).toMatchObject({ enum: SEARCH_RESOURCES });
+            expect(searchTool?.inputSchema.properties?.fields).toMatchObject({ items: { enum: SEARCH_FIELDS } });
+            expect(searchTool?.inputSchema.properties?.filters).toMatchObject({ items: { properties: { field: { enum: SEARCH_FIELDS } } } });
             expect(createCampaignTool?.inputSchema.required).toEqual(['accountId', 'name', 'state', 'dailyBudget', 'bidStrategy', 'targetingMode', 'startDate']);
             expect(updateTool?.inputSchema.required).toEqual(['accountId', 'campaignId', 'changes']);
             expect(updateTool?.outputSchema?.required).toEqual(['id', 'name', 'state', 'deliveryStatus', 'dailyBudget', 'bidStrategy', 'targetingMode', 'startDate', 'endDate']);

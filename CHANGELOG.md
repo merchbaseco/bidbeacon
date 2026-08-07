@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## v1.0.0 - 2026-08-07
+
+### Added
+
+- Added the canonical stateless CLI, typed HTTP client, and public operation router for account discovery, Search, composite Sponsored Products creation, primitive creation, and resource updates.
+- Added structured Search filters, account-local date ranges, ordering, keyset cursors, `--all` buffering, nested JSON input, and stable machine-readable CLI errors.
+- Added generated public router types, representative HTTP serialization coverage, and an opt-in live Sponsored Products smoke test outside deterministic verification.
+
+### Changed
+
+- Changed the public contract to use exact underscore operation names and explicit Advertiser Account UUIDs for every scoped operation.
+- Changed CLI success output to direct JSON on stdout and structured error JSON on stderr.
+
+### Removed
+
+- Removed the legacy slash-style public procedure map, selected/configured-account fallback, dedicated list/get/metrics/history/ASIN command paths, aliases, offset pagination, and dedicated pause/resume/delete mutation paths.
+
 ## v0.7.0 - 2026-06-15
 
 ### Added

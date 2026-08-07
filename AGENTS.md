@@ -364,9 +364,9 @@ Publish (public):
 
 ```bash
 cd packages/bidbeacon-api-client
-# Load NPM_TOKEN from the macOS Keychain item `rankwrangler-npm-token`
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm whoami
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm publish --access public
+# Load NPM_TOKEN from the repository .env
+NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm whoami
+NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm publish --access public --provenance=false
 ```
 
 Update `packages/bidbeacon-api-client/package.json` version before each publish.

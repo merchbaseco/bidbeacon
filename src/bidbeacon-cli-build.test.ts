@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import { constants } from 'node:fs';
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { dirname, join, resolve } from 'node:path';
+import { access, copyFile, mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
+import { join, resolve } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 
 const repoRoot = resolve(import.meta.dirname, '..');
@@ -13,144 +13,100 @@ afterEach(async () => {
 });
 
 describe('bidbeacon cli build', () => {
-    it('emits a runnable node entrypoint without bundling server-only code', async () => {
+    it('emits a runnable canonical entrypoint without bundling server-only code', async () => {
         const tempDir = await createTempDir('bidbeacon-cli-build-');
         tempDirs.push(tempDir);
-
         const outputFile = join(tempDir, 'bb.js');
 
-        execFileSync('bun', ['build', '../../packages/bidbeacon-cli/src/index.ts', '--target=node', '--format=esm', '--packages=external', '--outfile', outputFile], {
-            cwd: cliPackageDir,
-            stdio: 'pipe',
-        });
+        buildCli(outputFile);
 
         const artifact = await readFile(outputFile, 'utf8');
         expect(artifact.startsWith('#!/usr/bin/env node\n')).toBe(true);
         expect(artifact).not.toContain('BIDBEACON_DATABASE_PASSWORD');
         await expect(access(outputFile, constants.X_OK)).resolves.toBeUndefined();
 
-        const helpOutput = execFileSync(outputFile, ['--help'], {
-            cwd: repoRoot,
-            encoding: 'utf8',
-            stdio: 'pipe',
-        });
-
-        expect(helpOutput).toContain('Usage: bb [options] [command]');
+        const helpOutput = execFileSync(outputFile, ['--help'], { cwd: repoRoot, encoding: 'utf8', stdio: 'pipe' });
         expect(helpOutput).toContain('BidBeacon CLI');
-        expect(helpOutput).toContain('auth');
+        expect(helpOutput).toContain('advertiser-accounts list');
+        expect(helpOutput).not.toContain('campaigns list');
+        expect(helpOutput).not.toContain('metrics');
+        expect(helpOutput).not.toContain('asins');
     });
 
-    it('persists a custom storage directory across commands', async () => {
+    it('persists only transport configuration and never an account selection', async () => {
         const tempDir = await createTempDir('bidbeacon-cli-storage-');
         tempDirs.push(tempDir);
-
         const outputFile = join(tempDir, 'bb.js');
         const homeDir = join(tempDir, 'home');
         const customStorageDir = join(tempDir, 'custom-storage');
-        const cliEnv = { MERCHBASE_API_KEY: 'ak_test' };
-
         await mkdir(homeDir, { recursive: true });
+        buildCli(outputFile);
 
-        execFileSync('bun', ['build', '../../packages/bidbeacon-cli/src/index.ts', '--target=node', '--format=esm', '--packages=external', '--outfile', outputFile], {
-            cwd: cliPackageDir,
-            stdio: 'pipe',
-        });
-
-        runCli(outputFile, homeDir, ['config', 'set', 'base-url', 'https://example.com'], cliEnv);
-        runCli(outputFile, homeDir, ['config', 'set', 'storage-dir', customStorageDir], cliEnv);
-        runCli(outputFile, homeDir, ['config', 'set', 'account', '123', 'US'], cliEnv);
+        runCli(outputFile, homeDir, ['config', 'set', 'base-url', 'https://example.com']);
+        runCli(outputFile, homeDir, ['config', 'set', 'storage-dir', customStorageDir]);
 
         const settingsPath = join(homeDir, '.bidbeacon', 'settings.json');
-        const defaultConfigPath = join(homeDir, '.bidbeacon', 'config.json');
-        const customConfigPath = join(customStorageDir, 'config.json');
+        const configPath = join(customStorageDir, 'config.json');
+        expect(await readJson(settingsPath)).toEqual({ storageDir: customStorageDir });
+        expect(await readJson(configPath)).toEqual({ baseUrl: 'https://example.com' });
 
-        await expect(readJson(settingsPath)).resolves.toEqual({ storageDir: customStorageDir });
-        await expect(readJson(defaultConfigPath)).resolves.toEqual({ baseUrl: 'https://example.com' });
-        await expect(readJson(customConfigPath)).resolves.toEqual({
-            baseUrl: 'https://example.com',
-            accountId: '123',
-            countryCode: 'US',
-        });
-
-        const showOutput = runCli(outputFile, homeDir, ['config', 'show'], cliEnv);
-        const parsed = JSON.parse(showOutput) as {
-            data: { storageDir: string; configPath: string; config: { baseUrl?: string; accountId?: string; countryCode?: string } };
+        const show = JSON.parse(runCli(outputFile, homeDir, ['config', 'show'])) as {
+            storageDir: string;
+            configPath: string;
+            config: Record<string, unknown>;
         };
+        expect(show.storageDir).toBe(customStorageDir);
+        expect(show.configPath).toBe(configPath);
+        expect(show.config).toEqual({ baseUrl: 'https://example.com' });
 
-        expect(parsed.data.storageDir).toBe(customStorageDir);
-        expect(parsed.data.configPath).toBe(customConfigPath);
-        expect(parsed.data.config).toEqual({
-            baseUrl: 'https://example.com',
-            accountId: '123',
-            countryCode: 'US',
-        });
-
-        const getOutput = runCli(outputFile, homeDir, ['config', 'get', 'base-url'], cliEnv);
-        expect(JSON.parse(getOutput)).toMatchObject({
-            data: {
-                key: 'base-url',
-                value: 'https://example.com',
-            },
-        });
-
-        runCli(outputFile, homeDir, ['config', 'unset', 'account'], cliEnv);
-        const unsetOutput = runCli(outputFile, homeDir, ['config', 'show'], cliEnv);
-        expect(JSON.parse(unsetOutput).data.config).toEqual({
-            baseUrl: 'https://example.com',
-        });
-
-        runCli(outputFile, homeDir, ['config', 'reset'], cliEnv);
-        const resetOutput = runCli(outputFile, homeDir, ['config', 'show'], cliEnv);
-        expect(JSON.parse(resetOutput).data.config).toEqual({});
+        expect(() =>
+            execFileSync(outputFile, ['config', 'set', 'account', '123'], {
+                cwd: repoRoot,
+                env: { ...process.env, HOME: homeDir },
+                encoding: 'utf8',
+                stdio: 'pipe',
+            })
+        ).toThrow();
     });
 
-    it('applies env overrides for all CLI config values', async () => {
-        const tempDir = await createTempDir('bidbeacon-cli-env-');
+    it('reads release notes from the installed package layout', async () => {
+        const tempDir = await createTempDir('bidbeacon-cli-package-');
         tempDirs.push(tempDir);
+        const packageDir = join(tempDir, 'node_modules', '@bidbeacon', 'cli');
+        const outputFile = join(packageDir, 'dist', 'index.js');
+        await mkdir(join(packageDir, 'dist'), { recursive: true });
+        await Promise.all([copyFile(join(cliPackageDir, 'package.json'), join(packageDir, 'package.json')), copyFile(join(cliPackageDir, 'CHANGELOG.md'), join(packageDir, 'CHANGELOG.md'))]);
+        buildCli(outputFile);
 
-        const outputFile = join(tempDir, 'bb.js');
-        const homeDir = join(tempDir, 'home');
-        const envStorageDir = join(tempDir, 'env-storage');
-
-        await mkdir(homeDir, { recursive: true });
-        await mkdir(envStorageDir, { recursive: true });
-
-        execFileSync('bun', ['build', '../../packages/bidbeacon-cli/src/index.ts', '--target=node', '--format=esm', '--packages=external', '--outfile', outputFile], {
-            cwd: cliPackageDir,
+        const output = execFileSync(outputFile, ['changelog'], {
+            cwd: tempDir,
+            encoding: 'utf8',
+            env: { ...process.env, HOME: tempDir, MERCHBASE_API_KEY: 'ak_test' },
             stdio: 'pipe',
         });
 
-        await writeJson(join(homeDir, '.bidbeacon', 'config.json'), {
-            baseUrl: 'https://config.example',
-            accountId: '111',
-            countryCode: 'US',
-        });
-        await writeJson(join(envStorageDir, 'config.json'), {
-            baseUrl: 'https://env-storage.example',
-            accountId: '222',
-            countryCode: 'GB',
-        });
-
-        const showOutput = runCli(outputFile, homeDir, ['config', 'show'], {
-            MERCHBASE_API_KEY: 'ak_test',
-            BB_STORAGE_DIR: envStorageDir,
-            BB_BASE_URL: 'https://env.example',
-            BB_ACCOUNT_ID: '333',
-            BB_COUNTRY_CODE: 'CA',
-        });
-        const parsed = JSON.parse(showOutput) as {
-            data: { storageDir: string; configPath: string; config: { baseUrl?: string; accountId?: string; countryCode?: string } };
-        };
-
-        expect(parsed.data.storageDir).toBe(envStorageDir);
-        expect(parsed.data.configPath).toBe(join(envStorageDir, 'config.json'));
-        expect(parsed.data.config).toEqual({
-            baseUrl: 'https://env.example',
-            accountId: '333',
-            countryCode: 'CA',
+        expect(JSON.parse(output)).toMatchObject({
+            currentVersion: '1.0.0',
+            selectedVersion: '1.0.0',
+            entry: { version: '1.0.0' },
         });
     });
 });
+
+const buildCli = (outputFile: string) => {
+    execFileSync('bun', ['build', '../../packages/bidbeacon-cli/src/index.ts', '--target=node', '--format=esm', '--packages=external', '--outfile', outputFile], {
+        cwd: cliPackageDir,
+        stdio: 'pipe',
+    });
+};
+
+const runCli = (outputFile: string, homeDir: string, args: string[]) =>
+    execFileSync(outputFile, args, {
+        cwd: repoRoot,
+        encoding: 'utf8',
+        env: { ...process.env, HOME: homeDir, MERCHBASE_API_KEY: 'ak_test' },
+        stdio: 'pipe',
+    });
 
 const createTempDir = async (prefix: string) => {
     const tempRoot = join(repoRoot, '.context');
@@ -158,27 +114,4 @@ const createTempDir = async (prefix: string) => {
     return mkdtemp(join(tempRoot, prefix));
 };
 
-const runCli = (outputFile: string, homeDir: string, args: string[], extraEnv?: Record<string, string>) => {
-    const { BB_ACCOUNT_ID: _bbAccountId, MERCHBASE_API_KEY: _merchbaseApiKey, BB_BASE_URL: _bbBaseUrl, BB_COUNTRY_CODE: _bbCountryCode, BB_STORAGE_DIR: _bbStorageDir, ...baseEnv } = process.env;
-
-    return execFileSync(outputFile, args, {
-        cwd: repoRoot,
-        encoding: 'utf8',
-        env: {
-            ...baseEnv,
-            HOME: homeDir,
-            ...extraEnv,
-        },
-        stdio: 'pipe',
-    });
-};
-
-const readJson = async (path: string) => {
-    const raw = await readFile(path, 'utf8');
-    return JSON.parse(raw) as unknown;
-};
-
-const writeJson = async (path: string, value: unknown) => {
-    await mkdir(dirname(path), { recursive: true });
-    await writeFile(path, JSON.stringify(value, null, 2));
-};
+const readJson = async (path: string) => JSON.parse(await readFile(path, 'utf8')) as unknown;
