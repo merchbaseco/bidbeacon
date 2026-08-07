@@ -33,6 +33,11 @@ const SUPPORTED_APIS = [
     'spCreateTargets',
     'spUpdateTargets',
     'spDeleteTargets',
+    'spDeleteKeywords',
+    'spDeleteNegativeKeywords',
+    'spDeleteCampaignNegativeKeywords',
+    'spDeleteNegativeTargets',
+    'spDeleteCampaignNegativeTargets',
 ] as const;
 const SUPPORTED_JOBS = [
     'dispatch-due-reports',

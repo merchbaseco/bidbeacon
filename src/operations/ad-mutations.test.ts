@@ -111,7 +111,7 @@ describe('Ad-group and Ad mutation operations', () => {
         ]);
     });
 
-    it('updates an Ad group with absolute controls, archives the accepted result, and records only changed fields', async () => {
+    it('updates an Ad group with absolute controls and records only changed fields', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-08-06T16:00:00.000Z'));
         database = await createTestDatabase();
@@ -126,8 +126,8 @@ describe('Ad-group and Ad mutation operations', () => {
                         {
                             adGroup: buildAmazonAdGroupResponse({
                                 adGroupId: 'ad-mutation-ad-group-1',
-                                state: 'ARCHIVED',
-                                status: { deliveryStatus: 'NOT_DELIVERING' },
+                                state: 'ENABLED',
+                                status: { deliveryStatus: 'DELIVERING' },
                                 bid: { defaultBid: 0.5 },
                             }),
                         },
@@ -148,7 +148,7 @@ describe('Ad-group and Ad mutation operations', () => {
         const result = await updateAdGroup(context, {
             accountId: adMutationAccountId,
             adGroupId: 'ad-mutation-ad-group-1',
-            changes: { state: 'ARCHIVED', defaultBid: 0.5 },
+            changes: { state: 'ENABLED', defaultBid: 0.5 },
         });
 
         expect(amazonAds.calls).toEqual([
@@ -160,7 +160,7 @@ describe('Ad-group and Ad mutation operations', () => {
                     adGroups: [
                         {
                             adGroupId: 'ad-mutation-ad-group-1',
-                            state: 'ARCHIVED',
+                            state: 'ENABLED',
                             bid: { defaultBid: 0.5 },
                         },
                     ],
@@ -171,8 +171,8 @@ describe('Ad-group and Ad mutation operations', () => {
             id: 'ad-mutation-ad-group-1',
             campaignId: 'ad-mutation-campaign-1',
             name: 'Created ad group',
-            state: 'ARCHIVED',
-            deliveryStatus: 'NOT_DELIVERING',
+            state: 'ENABLED',
+            deliveryStatus: 'DELIVERING',
             defaultBid: 0.5,
         });
 
@@ -180,8 +180,8 @@ describe('Ad-group and Ad mutation operations', () => {
             {
                 id: 'ad-mutation-ad-group-row-1',
                 adGroupId: 'ad-mutation-ad-group-1',
-                state: 'ARCHIVED',
-                deliveryStatus: 'NOT_DELIVERING',
+                state: 'ENABLED',
+                deliveryStatus: 'DELIVERING',
                 bidAmount: '0.50',
             },
         ]);
@@ -198,8 +198,41 @@ describe('Ad-group and Ad mutation operations', () => {
             .orderBy(asc(entityChangeHistory.fieldName));
         expect(changes).toEqual([
             { eventType: 'bid_change', fieldName: 'bidAmount', previousValue: '0.25', newValue: '0.5' },
-            { eventType: 'state_change', fieldName: 'state', previousValue: 'PAUSED', newValue: 'ARCHIVED' },
+            { eventType: 'state_change', fieldName: 'state', previousValue: 'PAUSED', newValue: 'ENABLED' },
         ]);
+    });
+
+    it('archives an Ad group through the Amazon delete endpoint', async () => {
+        database = await createTestDatabase();
+        await database.db.insert(advertiserAccount).values(buildAdMutationAccount());
+        await database.db.insert(campaign).values(buildAdMutationCampaign());
+        await database.db.insert(adGroup).values(buildAdMutationAdGroup());
+        const amazonAds = createFakeAmazonAdsGateway({
+            responses: { deleteAdGroups: { success: [{ adGroupId: 'ad-mutation-ad-group-1' }] } },
+        });
+        const context = createOperationContext({
+            amazonAds,
+            db: database.db,
+            principal: {
+                accessibleAccountIds: [adMutationAccountId],
+                credentialKind: 'session',
+                merchbaseUserId: 'ad-mutation-user',
+            },
+        });
+
+        const result = await updateAdGroup(context, {
+            accountId: adMutationAccountId,
+            adGroupId: 'ad-mutation-ad-group-1',
+            changes: { state: 'ARCHIVED' },
+        });
+
+        expect(amazonAds.calls).toEqual([
+            {
+                operation: 'deleteAdGroups',
+                input: { profileId: 2001, region: 'na', adGroups: [{ adGroupId: 'ad-mutation-ad-group-1' }] },
+            },
+        ]);
+        expect(result).toMatchObject({ id: 'ad-mutation-ad-group-1', state: 'ARCHIVED', deliveryStatus: 'NOT_DELIVERING' });
     });
 
     it('creates an Ad for an owned Ad group, maps the ASIN creative, reconciles the archive, and records a Change event', async () => {
@@ -304,17 +337,7 @@ describe('Ad-group and Ad mutation operations', () => {
 
         const amazonAds = createFakeAmazonAdsGateway({
             responses: {
-                updateAds: {
-                    success: [
-                        {
-                            ad: buildAmazonAdResponse({
-                                adId: 'ad-mutation-ad-1',
-                                state: 'ARCHIVED',
-                                status: { deliveryStatus: 'NOT_DELIVERING' },
-                            }),
-                        },
-                    ],
-                },
+                deleteAds: { success: [{ adId: 'ad-mutation-ad-1' }] },
             },
         });
         const context = createOperationContext({
@@ -335,11 +358,11 @@ describe('Ad-group and Ad mutation operations', () => {
 
         expect(amazonAds.calls).toEqual([
             {
-                operation: 'updateAds',
+                operation: 'deleteAds',
                 input: {
                     profileId: 2001,
                     region: 'na',
-                    ads: [{ adId: 'ad-mutation-ad-1', state: 'ARCHIVED' }],
+                    ads: [{ adId: 'ad-mutation-ad-1' }],
                 },
             },
         ]);
@@ -350,7 +373,7 @@ describe('Ad-group and Ad mutation operations', () => {
             state: 'ARCHIVED',
             deliveryStatus: 'NOT_DELIVERING',
             asin: 'B000000001',
-            productTitle: 'Created product',
+            productTitle: 'Existing product',
         });
 
         await expect(database.db.select().from(ad)).resolves.toMatchObject([
@@ -485,6 +508,9 @@ describe('Ad-group and Ad mutation operations', () => {
             })
         ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
         await expect(updateAdGroup(context, { accountId: adMutationAccountId, adGroupId: 'ad-mutation-ad-group-1', changes: {} })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+        await expect(updateAdGroup(context, { accountId: adMutationAccountId, adGroupId: 'ad-mutation-ad-group-1', changes: { state: 'ARCHIVED', defaultBid: 0.5 } })).rejects.toMatchObject({
+            code: 'INVALID_INPUT',
+        });
         await expect(updateAd(context, { accountId: adMutationAccountId, adId: 'ad-mutation-ad-1', changes: { state: 'INVALID' } })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
 
         await expect(

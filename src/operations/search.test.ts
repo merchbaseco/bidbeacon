@@ -281,7 +281,8 @@ describe('Campaign Search operation', () => {
         await expect(
             search(createSearchContext(database), { ...input, fields: ['campaign.id', 'segments.date', 'metrics.spend', 'metrics.clicks'], cursor: firstPage.nextCursor })
         ).rejects.toMatchObject({ code: 'CURSOR_INVALID' });
-        const tamperedCursor = `${firstPage.nextCursor?.slice(0, -1)}${firstPage.nextCursor?.endsWith('x') ? 'y' : 'x'}`;
+        const [cursorPayload, cursorSignature] = firstPage.nextCursor!.split('.');
+        const tamperedCursor = `${cursorPayload}.${cursorSignature.startsWith('x') ? 'y' : 'x'}${cursorSignature.slice(1)}`;
         await expect(search(createSearchContext(database), { ...input, cursor: tamperedCursor })).rejects.toMatchObject({ code: 'CURSOR_INVALID' });
         await expect(search(createSearchContext(database), { ...input, limit: 201 })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });

@@ -103,13 +103,21 @@ export const updateCampaign = async (context: OperationContext, input: unknown):
             campaignId: parsedInput.campaignId,
         });
     }
+    assertArchiveOnlyPatch(parsedInput.changes, 'Campaign');
 
     const profileId = resolveProfileId(account);
-    const response = await callAmazon(context, 'updateCampaigns', {
-        profileId,
-        region: resolveApiRegion(account.countryCode),
-        campaigns: [buildUpdatePayload(parsedInput.campaignId, parsedInput.changes, account)],
-    });
+    const response =
+        parsedInput.changes.state === 'ARCHIVED'
+            ? await callAmazon(context, 'deleteCampaigns', {
+                  profileId,
+                  region: resolveApiRegion(account.countryCode),
+                  campaigns: [{ campaignId: parsedInput.campaignId }],
+              })
+            : await callAmazon(context, 'updateCampaigns', {
+                  profileId,
+                  region: resolveApiRegion(account.countryCode),
+                  campaigns: [buildUpdatePayload(parsedInput.campaignId, parsedInput.changes, account)],
+              });
     const amazonCampaign = extractCampaign(response);
     const previous = mapArchiveFallback(current);
     const canonical = mapCanonicalCampaign({
@@ -590,11 +598,23 @@ const recordCampaignChanges = async (context: OperationContext, account: Resolve
     }
 };
 
-const callAmazon = async (context: OperationContext, operation: 'createCampaigns' | 'updateCampaigns', input: { profileId: number; region: 'na' | 'eu' | 'fe'; campaigns: AmazonRecord[] }) => {
+const callAmazon = async (
+    context: OperationContext,
+    operation: 'createCampaigns' | 'deleteCampaigns' | 'updateCampaigns',
+    input: { profileId: number; region: 'na' | 'eu' | 'fe'; campaigns: AmazonRecord[] }
+) => {
     try {
         return (await context.amazonAds[operation](input)) as CampaignResponse;
     } catch (error) {
         throw mapAmazonException(error);
+    }
+};
+
+const assertArchiveOnlyPatch = (changes: CampaignUpdateChanges, entityLabel: string) => {
+    if (changes.state === 'ARCHIVED' && Object.keys(changes).length > 1) {
+        throw new OperationError('INVALID_INPUT', `${entityLabel} ARCHIVED state must be the only requested change.`, {
+            fields: Object.keys(changes),
+        });
     }
 };
 

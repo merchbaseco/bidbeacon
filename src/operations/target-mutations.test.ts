@@ -514,6 +514,66 @@ describe('Target mutation operations', () => {
         ]);
     });
 
+    it.each([
+        {
+            label: 'positive keyword',
+            operation: 'deleteKeywords',
+            overrides: {},
+        },
+        {
+            label: 'positive Product target',
+            operation: 'deleteTargets',
+            overrides: { targetType: 'PRODUCT', targetAsin: 'B000000001', targetKeyword: null },
+        },
+        {
+            label: 'negative keyword',
+            operation: 'deleteNegativeKeywords',
+            overrides: { negative: true, bidAmount: null },
+        },
+        {
+            label: 'negative Product target',
+            operation: 'deleteNegativeTargets',
+            overrides: { targetType: 'PRODUCT', targetAsin: 'B000000002', targetKeyword: null, negative: true, bidAmount: null },
+        },
+        {
+            label: 'Campaign negative Product target',
+            operation: 'deleteCampaignNegativeTargets',
+            overrides: { adGroupId: null, targetType: 'PRODUCT', targetAsin: 'B000000003', targetKeyword: null, negative: true, bidAmount: null },
+        },
+    ] as const)('archives a $label through its Amazon delete endpoint', async ({ operation, overrides }) => {
+        database = await createTestDatabase();
+        await database.db.insert(advertiserAccount).values(buildTargetMutationAccount());
+        await database.db.insert(campaign).values(buildTargetMutationCampaign());
+        await database.db.insert(adGroup).values(buildTargetMutationAdGroup());
+        await database.db.insert(target).values(buildTargetMutationTarget(overrides));
+        const amazonAds = createFakeAmazonAdsGateway({
+            responses: { [operation]: { success: [{ targetId: 'target-mutation-target-1' }] } },
+        });
+        const context = createOperationContext({
+            amazonAds,
+            db: database.db,
+            principal: {
+                accessibleAccountIds: [targetMutationAccountId],
+                credentialKind: 'session',
+                merchbaseUserId: 'target-mutation-user',
+            },
+        });
+
+        const result = await updateTarget(context, {
+            accountId: targetMutationAccountId,
+            targetId: 'target-mutation-target-1',
+            changes: { state: 'ARCHIVED' },
+        });
+
+        expect(amazonAds.calls).toEqual([
+            {
+                operation,
+                input: { profileId: 3001, region: 'na', targets: [{ targetId: 'target-mutation-target-1' }] },
+            },
+        ]);
+        expect(result).toMatchObject({ id: 'target-mutation-target-1', state: 'ARCHIVED', deliveryStatus: 'NOT_DELIVERING' });
+    });
+
     it('archives an existing campaign-level negative by Target ID without allowing creation semantics', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-08-06T16:00:00.000Z'));
@@ -534,19 +594,7 @@ describe('Target mutation operations', () => {
 
         const amazonAds = createFakeAmazonAdsGateway({
             responses: {
-                updateTargets: {
-                    success: [
-                        {
-                            target: buildAmazonNegativeKeywordTargetResponse({
-                                targetId: 'target-mutation-campaign-negative-1',
-                                adGroupId: null,
-                                state: 'ARCHIVED',
-                                status: { deliveryStatus: 'NOT_DELIVERING' },
-                                targetDetails: { keywordTarget: { keyword: 'free', matchType: 'EXACT' } },
-                            }),
-                        },
-                    ],
-                },
+                deleteCampaignNegativeKeywords: { success: [{ targetId: 'target-mutation-campaign-negative-1' }] },
             },
         });
         const context = createOperationContext({
@@ -567,11 +615,11 @@ describe('Target mutation operations', () => {
 
         expect(amazonAds.calls).toEqual([
             {
-                operation: 'updateTargets',
+                operation: 'deleteCampaignNegativeKeywords',
                 input: {
                     profileId: 3001,
                     region: 'na',
-                    targets: [{ targetId: 'target-mutation-campaign-negative-1', campaignId: 'target-mutation-campaign-1', state: 'ARCHIVED' }],
+                    targets: [{ targetId: 'target-mutation-campaign-negative-1' }],
                 },
             },
         ]);
@@ -700,6 +748,9 @@ describe('Target mutation operations', () => {
         ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
         await expect(updateTarget(context, { accountId: targetMutationAccountId, targetId: 'target-mutation-target-1', changes: {} })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
         await expect(updateTarget(context, { accountId: targetMutationAccountId, targetId: 'target-mutation-negative-1', changes: { bid: 0.5 } })).rejects.toMatchObject({
+            code: 'INVALID_INPUT',
+        });
+        await expect(updateTarget(context, { accountId: targetMutationAccountId, targetId: 'target-mutation-target-1', changes: { state: 'ARCHIVED', bid: 0.5 } })).rejects.toMatchObject({
             code: 'INVALID_INPUT',
         });
         await expect(updateTarget(context, { accountId: targetMutationAccountId, targetId: 'target-mutation-campaign-negative-2', changes: { state: 'PAUSED' } })).rejects.toMatchObject({

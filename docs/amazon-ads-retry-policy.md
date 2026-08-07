@@ -65,6 +65,10 @@ The API health rate-limit count sums attempt-level 429s. Rows recorded before th
   gateway's `spRequest` wrapper. They therefore remain synchronous and inherit request tracking,
   the ordinary limiter, 30-second attempt timeouts, and the three-attempt retry policy; operation
   errors are mapped only after that gateway call has definitively completed.
+- `ARCHIVED` updates route through Amazon's v3 Campaign, Ad group, Product ad, Keyword,
+  Negative keyword, Targeting clause, or Negative targeting clause delete endpoint according to
+  the canonical resource kind and Campaign/Ad-group scope. Archive must be the only requested
+  change; an already-missing Amazon entity is treated as satisfying the absolute archived state.
 - Target mutations call `createTargets` / `updateTargets` through the same production gateway
   wrapper and inherit the same synchronous limiter, timeout, retry, and final-error mapping.
 - Composite Sponsored Products creation invokes those Campaign, Ad group, Ad, and Target

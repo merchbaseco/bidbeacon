@@ -190,9 +190,10 @@ present.
 `update_campaign` requires an explicit Account UUID, an existing Campaign ID in that account, and
 a non-empty `changes` object. The object is limited to absolute `state`, `dailyBudget`,
 `bidStrategy`, and `placementBidAdjustments` values. `ARCHIVED` is accepted only here, for an
-existing Campaign. An omitted placement key remains unchanged at Amazon; a placement value of
-`0` removes that adjustment. The gateway call is synchronous, so the operation does not return
-until Amazon's normal throttling and retry policy has completed.
+existing Campaign, must be the only requested change, and routes to Amazon's Campaign delete
+endpoint. An omitted placement key remains unchanged at Amazon; a placement value of `0` removes
+that adjustment. The gateway call is synchronous, so the operation does not return until Amazon's
+normal throttling and retry policy has completed.
 
 Successful updates reconcile the Campaign archive and write immediate `bidbeacon` Change events.
 Amazon rejection, exhausted unavailability, invalid input, missing Campaigns, and denied Account
@@ -210,8 +211,9 @@ with `bid.defaultBid` and returns the canonical Ad group.
 
 `update_ad_group` requires an account-owned `adGroupId` and a non-empty `changes` object limited to
 absolute `state`, `defaultBid` values. `ARCHIVED` is accepted for an existing Ad group. The
-operation writes `state_change` and `bid_change` events for controls present in the patch when the
-accepted value differs from the archive.
+archive state must be the only requested change and routes to Amazon's Ad-group delete endpoint.
+The operation writes `state_change` and `bid_change` events for controls present in the patch when
+the accepted value differs from the archive.
 
 ### `create_ad`
 
@@ -222,9 +224,10 @@ creative and returns the canonical Ad.
 ### `update_ad`
 
 `update_ad` requires an account-owned `adId` and a non-empty `changes` object limited to `state`.
-`ARCHIVED` is accepted for an existing Ad. Successful updates reconcile the Ad archive and write
-an immediate `state_change` event. Amazon rejection, exhausted unavailability, invalid input,
-missing ancestry, and denied Account UUIDs use the stable shared operation error codes.
+`ARCHIVED` is accepted for an existing Ad and routes to Amazon's Product-ad delete endpoint.
+Successful updates reconcile the Ad archive and write an immediate `state_change` event. Amazon
+rejection, exhausted unavailability, invalid input, missing ancestry, and denied Account UUIDs use
+the stable shared operation error codes.
 
 ### Target mutations
 
@@ -238,8 +241,9 @@ Category targets and refinement expressions are not part of this surface.
 `update_target` requires an existing Target in the explicit Advertiser Account and a non-empty
 absolute patch containing `state` and/or `bid`. Bids are accepted only for positive ad-group
 Targets. Negative Targets reject bid changes. Existing campaign-level negatives may be archived
-by ID, and cannot be created; their archive update includes the Campaign ID at the Amazon
-boundary. `ARCHIVED` remains terminal.
+by ID, and cannot be created. `ARCHIVED` must be the only requested change, remains terminal, and
+routes to the Amazon delete endpoint for the Target's positive/negative, keyword/Product, and
+Campaign/Ad-group scope.
 
 Each successful Target mutation waits for the synchronous Amazon gateway response, returns the
 canonical Target representation, upserts the Target archive, and records immediate `bidbeacon`

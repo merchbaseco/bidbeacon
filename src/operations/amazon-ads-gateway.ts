@@ -16,6 +16,15 @@ export type AmazonAdsGateway = {
     createAds: (input: AmazonAdsRequest & { ads: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
     createCampaigns: (input: AmazonAdsRequest & { campaigns: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
     createTargets: (input: AmazonAdsRequest & { targets: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
+    deleteAdGroups: (input: AmazonAdsRequest & { adGroups: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
+    deleteAds: (input: AmazonAdsRequest & { ads: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
+    deleteCampaignNegativeKeywords: (input: AmazonAdsRequest & { targets: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
+    deleteCampaignNegativeTargets: (input: AmazonAdsRequest & { targets: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
+    deleteCampaigns: (input: AmazonAdsRequest & { campaigns: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
+    deleteKeywords: (input: AmazonAdsRequest & { targets: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
+    deleteNegativeKeywords: (input: AmazonAdsRequest & { targets: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
+    deleteNegativeTargets: (input: AmazonAdsRequest & { targets: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
+    deleteTargets: (input: AmazonAdsRequest & { targets: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
     updateAdGroups: (input: AmazonAdsRequest & { adGroups: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
     updateAds: (input: AmazonAdsRequest & { ads: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
     updateCampaigns: (input: AmazonAdsRequest & { campaigns: unknown[] }) => Promise<AmazonAdsGatewayResponse>;
@@ -70,6 +79,15 @@ export const createFakeAmazonAdsGateway = ({
         createAds: input => request('createAds', input),
         createCampaigns: input => request('createCampaigns', input),
         createTargets: input => request('createTargets', input),
+        deleteAdGroups: input => request('deleteAdGroups', input),
+        deleteAds: input => request('deleteAds', input),
+        deleteCampaignNegativeKeywords: input => request('deleteCampaignNegativeKeywords', input),
+        deleteCampaignNegativeTargets: input => request('deleteCampaignNegativeTargets', input),
+        deleteCampaigns: input => request('deleteCampaigns', input),
+        deleteKeywords: input => request('deleteKeywords', input),
+        deleteNegativeKeywords: input => request('deleteNegativeKeywords', input),
+        deleteNegativeTargets: input => request('deleteNegativeTargets', input),
+        deleteTargets: input => request('deleteTargets', input),
         updateAdGroups: input => request('updateAdGroups', input),
         updateAds: input => request('updateAds', input),
         updateCampaigns: input => request('updateCampaigns', input),
@@ -82,6 +100,15 @@ const defaultResponses: Record<AmazonAdsOperation, AmazonAdsGatewayResponse> = {
     createAds: { success: [{ adId: 'ad-1' }] },
     createCampaigns: { success: [{ campaignId: 'campaign-1' }] },
     createTargets: { success: [{ targetId: 'target-1' }] },
+    deleteAdGroups: { success: [{ adGroupId: 'ad-group-1' }] },
+    deleteAds: { success: [{ adId: 'ad-1' }] },
+    deleteCampaignNegativeKeywords: { success: [{ targetId: 'target-1' }] },
+    deleteCampaignNegativeTargets: { success: [{ targetId: 'target-1' }] },
+    deleteCampaigns: { success: [{ campaignId: 'campaign-1' }] },
+    deleteKeywords: { success: [{ targetId: 'target-1' }] },
+    deleteNegativeKeywords: { success: [{ targetId: 'target-1' }] },
+    deleteNegativeTargets: { success: [{ targetId: 'target-1' }] },
+    deleteTargets: { success: [{ targetId: 'target-1' }] },
     updateAdGroups: { success: [{ adGroupId: 'ad-group-1' }] },
     updateAds: { success: [{ adId: 'ad-1' }] },
     updateCampaigns: { success: [{ campaignId: 'campaign-1' }] },

@@ -12,6 +12,7 @@ const temporaryDirectories: string[] = [];
 const execFileAsync = promisify(execFile);
 const expectedSkillFiles = ['SKILL.md', 'agents/openai.yaml', 'references/diagnosis.md', 'references/optimization-and-launch.md', 'references/partial-failure-recovery.md'];
 const expectedDockerBuildScripts = ['!scripts/account-management-skill-package.ts', '!scripts/package-account-management-skill.ts'];
+const LINE_BREAK_PATTERN = /\r?\n/;
 
 describe('BidBeacon account-management skill package', () => {
     afterEach(async () => {
@@ -50,8 +51,8 @@ describe('BidBeacon account-management skill package', () => {
         expect(packageJson.scripts['skill:package']).toBe('bun scripts/package-account-management-skill.ts');
         expect(dockerfile).toContain('bun run build');
         expect(dockerfile).toContain('COPY --from=build /app/dist ./dist');
-        expect(dockerignore.split(/\r?\n/)).not.toContain('scripts');
-        expect(dockerignore.split(/\r?\n/).filter(line => line.startsWith('!scripts/'))).toEqual(expectedDockerBuildScripts);
+        expect(dockerignore.split(LINE_BREAK_PATTERN)).not.toContain('scripts');
+        expect(dockerignore.split(LINE_BREAK_PATTERN).filter(line => line.startsWith('!scripts/'))).toEqual(expectedDockerBuildScripts);
     });
 
     it('uses only exact operation names exposed by the MCP', async () => {

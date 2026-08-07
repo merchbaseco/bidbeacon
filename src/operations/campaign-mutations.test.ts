@@ -168,7 +168,7 @@ describe('Campaign mutation operations', () => {
         ]);
     });
 
-    it('updates every supported Campaign control, preserves omitted placement keys, and archives the canonical result', async () => {
+    it('updates every supported Campaign control and preserves omitted placement keys', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-08-06T16:00:00.000Z'));
         database = await createTestDatabase();
@@ -178,8 +178,8 @@ describe('Campaign mutation operations', () => {
         const amazonCampaign = buildAmazonCampaignResponse({
             campaignId: 'campaign-existing-1',
             name: 'Existing campaign',
-            state: 'ARCHIVED',
-            status: { deliveryStatus: 'NOT_DELIVERING' },
+            state: 'ENABLED',
+            status: { deliveryStatus: 'DELIVERING' },
             startDateTime: '2026-08-01T07:00:00.000Z',
             endDateTime: '2026-09-01T06:59:59.999Z',
             budgets: [
@@ -220,7 +220,7 @@ describe('Campaign mutation operations', () => {
             accountId: campaignMutationAccountId,
             campaignId: 'campaign-existing-1',
             changes: {
-                state: 'ARCHIVED',
+                state: 'ENABLED',
                 dailyBudget: 40,
                 bidStrategy: 'DYNAMIC_UP_AND_DOWN',
                 placementBidAdjustments: { restOfSearch: 0, productPages: 20 },
@@ -236,7 +236,7 @@ describe('Campaign mutation operations', () => {
                     campaigns: [
                         {
                             campaignId: 'campaign-existing-1',
-                            state: 'ARCHIVED',
+                            state: 'ENABLED',
                             budgets: [
                                 {
                                     budgetType: 'MONETARY',
@@ -267,8 +267,8 @@ describe('Campaign mutation operations', () => {
         expect(result).toEqual({
             id: 'campaign-existing-1',
             name: 'Existing campaign',
-            state: 'ARCHIVED',
-            deliveryStatus: 'NOT_DELIVERING',
+            state: 'ENABLED',
+            deliveryStatus: 'DELIVERING',
             dailyBudget: 40,
             bidStrategy: 'DYNAMIC_UP_AND_DOWN',
             targetingMode: 'MANUAL_KEYWORD',
@@ -281,7 +281,7 @@ describe('Campaign mutation operations', () => {
             {
                 id: 'campaign-archive-1',
                 campaignId: 'campaign-existing-1',
-                state: 'ARCHIVED',
+                state: 'ENABLED',
                 budgetAmount: '40.00',
                 bidStrategy: 'SALES_UP_AND_DOWN',
             },
@@ -295,8 +295,41 @@ describe('Campaign mutation operations', () => {
             { eventType: 'bid_change', fieldName: 'bidStrategy', previousValue: 'DYNAMIC_DOWN_ONLY', newValue: 'DYNAMIC_UP_AND_DOWN' },
             { eventType: 'budget_change', fieldName: 'budgetAmount', previousValue: '25', newValue: '40' },
             { eventType: 'bid_change', fieldName: 'placementBidAdjustments', previousValue: null, newValue: '{"productPages":20}' },
-            { eventType: 'state_change', fieldName: 'state', previousValue: 'PAUSED', newValue: 'ARCHIVED' },
+            { eventType: 'state_change', fieldName: 'state', previousValue: 'PAUSED', newValue: 'ENABLED' },
         ]);
+    });
+
+    it('archives a Campaign through the Amazon delete endpoint', async () => {
+        database = await createTestDatabase();
+        await database.db.insert(advertiserAccount).values(buildCampaignMutationAccount());
+        await database.db.insert(campaign).values(buildCampaignMutationArchiveRow());
+        const amazonAds = createFakeAmazonAdsGateway({
+            responses: { deleteCampaigns: { success: [{ campaignId: 'campaign-existing-1' }] } },
+        });
+        const context = createOperationContext({
+            amazonAds,
+            db: database.db,
+            principal: {
+                accessibleAccountIds: [campaignMutationAccountId],
+                credentialKind: 'session',
+                merchbaseUserId: 'campaign-mutation-user',
+            },
+        });
+
+        const result = await updateCampaign(context, {
+            accountId: campaignMutationAccountId,
+            campaignId: 'campaign-existing-1',
+            changes: { state: 'ARCHIVED' },
+        });
+
+        expect(amazonAds.calls).toEqual([
+            {
+                operation: 'deleteCampaigns',
+                input: { profileId: 1001, region: 'na', campaigns: [{ campaignId: 'campaign-existing-1' }] },
+            },
+        ]);
+        expect(result).toMatchObject({ id: 'campaign-existing-1', state: 'ARCHIVED', deliveryStatus: 'NOT_DELIVERING' });
+        await expect(database.db.select().from(campaign)).resolves.toMatchObject([{ campaignId: 'campaign-existing-1', state: 'ARCHIVED' }]);
     });
 
     it('maps the fixed strategy and automatic targeting mode without leaking public enum names to Amazon', async () => {
@@ -467,6 +500,9 @@ describe('Campaign mutation operations', () => {
         ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
         await expect(updateCampaign(context, { accountId: campaignMutationAccountId, campaignId: 'campaign-existing-1', changes: {} })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
         await expect(updateCampaign(context, { accountId: campaignMutationAccountId, campaignId: 'campaign-existing-1', changes: { name: 'not supported' } })).rejects.toMatchObject({
+            code: 'INVALID_INPUT',
+        });
+        await expect(updateCampaign(context, { accountId: campaignMutationAccountId, campaignId: 'campaign-existing-1', changes: { state: 'ARCHIVED', dailyBudget: 40 } })).rejects.toMatchObject({
             code: 'INVALID_INPUT',
         });
         await expect(updateCampaign(context, { accountId: campaignMutationAccountId, campaignId: 'missing', changes: { state: 'ARCHIVED' } })).rejects.toMatchObject({ code: 'RESOURCE_NOT_FOUND' });

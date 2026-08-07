@@ -1,4 +1,22 @@
-import { createAdGroups, createAds, createCampaigns, createTargets, updateAdGroups, updateAds, updateCampaigns, updateTargets } from '@/amazon-ads/sp-entities';
+import {
+    createAdGroups,
+    createAds,
+    createCampaigns,
+    createTargets,
+    deleteAdGroups,
+    deleteAds,
+    deleteCampaignNegativeKeywords,
+    deleteCampaignNegativeTargets,
+    deleteCampaigns,
+    deleteKeywords,
+    deleteNegativeKeywords,
+    deleteNegativeTargets,
+    deleteTargets,
+    updateAdGroups,
+    updateAds,
+    updateCampaigns,
+    updateTargets,
+} from '@/amazon-ads/sp-entities';
 import type { AmazonAdsGateway } from './amazon-ads-gateway';
 
 export const productionAmazonAdsGateway = {
@@ -6,6 +24,15 @@ export const productionAmazonAdsGateway = {
     createAds,
     createCampaigns,
     createTargets,
+    deleteAdGroups,
+    deleteAds,
+    deleteCampaignNegativeKeywords,
+    deleteCampaignNegativeTargets,
+    deleteCampaigns,
+    deleteKeywords,
+    deleteNegativeKeywords,
+    deleteNegativeTargets,
+    deleteTargets,
     updateAdGroups,
     updateAds,
     updateCampaigns,

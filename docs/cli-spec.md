@@ -829,6 +829,8 @@ Returns one canonical Target with `negative: true`. Campaign-level negative crea
 ## Updates
 
 Each update requires `accountId`, the resource ID, and a non-empty `changes` object. Omitted properties remain unchanged.
+When `state` is `ARCHIVED`, it must be the only property in `changes`; BidBeacon routes that
+absolute terminal state through Amazon's resource-specific archive endpoint.
 
 ### `update_campaign`
 

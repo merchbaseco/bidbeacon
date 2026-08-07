@@ -94,12 +94,20 @@ export const updateAdGroup = async (context: OperationContext, input: unknown): 
         });
     }
     assertTerminalStateTransition(current.state, parsedInput.changes.state, 'Ad group');
+    assertArchiveOnlyPatch(parsedInput.changes, 'Ad group');
 
-    const response = await callAmazon(context, 'updateAdGroups', {
-        profileId: resolveProfileId(account),
-        region: resolveApiRegion(account.countryCode),
-        adGroups: [buildUpdatePayload(parsedInput.adGroupId, parsedInput.changes)],
-    });
+    const response =
+        parsedInput.changes.state === 'ARCHIVED'
+            ? await callAmazon(context, 'deleteAdGroups', {
+                  profileId: resolveProfileId(account),
+                  region: resolveApiRegion(account.countryCode),
+                  adGroups: [{ adGroupId: parsedInput.adGroupId }],
+              })
+            : await callAmazon(context, 'updateAdGroups', {
+                  profileId: resolveProfileId(account),
+                  region: resolveApiRegion(account.countryCode),
+                  adGroups: [buildUpdatePayload(parsedInput.adGroupId, parsedInput.changes)],
+              });
     const amazonAdGroup = extractAdGroup(response);
     const previous = mapArchiveAdGroup(current);
     const canonical = mapCanonicalAdGroup({
@@ -190,11 +198,18 @@ export const updateAd = async (context: OperationContext, input: unknown): Promi
     }
     assertTerminalStateTransition(current.state, parsedInput.changes.state, 'Ad');
 
-    const response = await callAdsAmazon(context, 'updateAds', {
-        profileId: resolveProfileId(account),
-        region: resolveApiRegion(account.countryCode),
-        ads: [buildAdUpdatePayload(parsedInput.adId, parsedInput.changes)],
-    });
+    const response =
+        parsedInput.changes.state === 'ARCHIVED'
+            ? await callAdsAmazon(context, 'deleteAds', {
+                  profileId: resolveProfileId(account),
+                  region: resolveApiRegion(account.countryCode),
+                  ads: [{ adId: parsedInput.adId }],
+              })
+            : await callAdsAmazon(context, 'updateAds', {
+                  profileId: resolveProfileId(account),
+                  region: resolveApiRegion(account.countryCode),
+                  ads: [buildAdUpdatePayload(parsedInput.adId, parsedInput.changes)],
+              });
     const amazonAd = extractAd(response);
     const previous = mapArchiveAd(current);
     const canonical = mapCanonicalAd({
@@ -508,7 +523,11 @@ const recordAdGroupChanges = async (context: OperationContext, account: Resolved
     }
 };
 
-const callAmazon = async (context: OperationContext, operation: 'createAdGroups' | 'updateAdGroups', input: { profileId: number; region: 'na' | 'eu' | 'fe'; adGroups: AmazonRecord[] }) => {
+const callAmazon = async (
+    context: OperationContext,
+    operation: 'createAdGroups' | 'deleteAdGroups' | 'updateAdGroups',
+    input: { profileId: number; region: 'na' | 'eu' | 'fe'; adGroups: AmazonRecord[] }
+) => {
     try {
         return (await context.amazonAds[operation](input)) as AdGroupResponse;
     } catch (error) {
@@ -516,11 +535,19 @@ const callAmazon = async (context: OperationContext, operation: 'createAdGroups'
     }
 };
 
-const callAdsAmazon = async (context: OperationContext, operation: 'createAds' | 'updateAds', input: { profileId: number; region: 'na' | 'eu' | 'fe'; ads: AmazonRecord[] }) => {
+const callAdsAmazon = async (context: OperationContext, operation: 'createAds' | 'deleteAds' | 'updateAds', input: { profileId: number; region: 'na' | 'eu' | 'fe'; ads: AmazonRecord[] }) => {
     try {
         return (await context.amazonAds[operation](input)) as AdResponse;
     } catch (error) {
         throw mapAmazonException(error, 'Ad');
+    }
+};
+
+const assertArchiveOnlyPatch = (changes: Record<string, unknown>, entityLabel: string) => {
+    if (changes.state === 'ARCHIVED' && Object.keys(changes).length > 1) {
+        throw new OperationError('INVALID_INPUT', `${entityLabel} ARCHIVED state must be the only requested change.`, {
+            fields: Object.keys(changes),
+        });
     }
 };
 

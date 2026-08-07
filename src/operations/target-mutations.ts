@@ -273,12 +273,20 @@ export const updateTarget = async (context: OperationContext, input: unknown): P
         throw new OperationError('RESOURCE_NOT_FOUND', 'Target not found in the requested Advertiser Account.', { targetId: parsedInput.targetId });
     }
     assertTargetChangeEligibility(current, parsedInput.changes);
+    assertArchiveOnlyPatch(parsedInput.changes);
 
-    const response = await callAmazon(context, 'updateTargets', {
-        profileId: resolveProfileId(account),
-        region: resolveApiRegion(account.countryCode),
-        targets: [buildUpdatePayload(parsedInput.targetId, parsedInput.changes, current.adGroupId === null ? current.campaignId : undefined)],
-    });
+    const response =
+        parsedInput.changes.state === 'ARCHIVED'
+            ? await callAmazon(context, resolveTargetArchiveOperation(current), {
+                  profileId: resolveProfileId(account),
+                  region: resolveApiRegion(account.countryCode),
+                  targets: [{ targetId: parsedInput.targetId }],
+              })
+            : await callAmazon(context, 'updateTargets', {
+                  profileId: resolveProfileId(account),
+                  region: resolveApiRegion(account.countryCode),
+                  targets: [buildUpdatePayload(parsedInput.targetId, parsedInput.changes, current.adGroupId === null ? current.campaignId : undefined)],
+              });
     const amazonTarget = extractTarget(response);
     const previous = mapArchiveTarget(current);
     const canonical = mapCanonicalTarget({
@@ -580,11 +588,42 @@ const recordTargetChanges = async (context: OperationContext, account: ResolvedA
     }
 };
 
-const callAmazon = async (context: OperationContext, operation: 'createTargets' | 'updateTargets', input: { profileId: number; region: 'na' | 'eu' | 'fe'; targets: AmazonRecord[] }) => {
+const callAmazon = async (
+    context: OperationContext,
+    operation:
+        | 'createTargets'
+        | 'deleteCampaignNegativeKeywords'
+        | 'deleteCampaignNegativeTargets'
+        | 'deleteKeywords'
+        | 'deleteNegativeKeywords'
+        | 'deleteNegativeTargets'
+        | 'deleteTargets'
+        | 'updateTargets',
+    input: { profileId: number; region: 'na' | 'eu' | 'fe'; targets: AmazonRecord[] }
+) => {
     try {
         return (await context.amazonAds[operation](input)) as TargetResponse;
     } catch (error) {
         throw mapAmazonException(error);
+    }
+};
+
+const resolveTargetArchiveOperation = (current: typeof target.$inferSelect) => {
+    const productTarget = current.targetType === 'PRODUCT' || current.targetType === 'AUTO';
+    if (!current.negative) {
+        return productTarget ? ('deleteTargets' as const) : ('deleteKeywords' as const);
+    }
+    if (current.adGroupId === null) {
+        return productTarget ? ('deleteCampaignNegativeTargets' as const) : ('deleteCampaignNegativeKeywords' as const);
+    }
+    return productTarget ? ('deleteNegativeTargets' as const) : ('deleteNegativeKeywords' as const);
+};
+
+const assertArchiveOnlyPatch = (changes: TargetUpdateChanges) => {
+    if (changes.state === 'ARCHIVED' && Object.keys(changes).length > 1) {
+        throw new OperationError('INVALID_INPUT', 'Target ARCHIVED state must be the only requested change.', {
+            fields: Object.keys(changes),
+        });
     }
 };
 
