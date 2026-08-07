@@ -43,11 +43,14 @@ describe('BidBeacon account-management skill package', () => {
     it('wires the package command into the server build and runtime image', async () => {
         const packageJson = JSON.parse(await readFile(resolve('package.json'), 'utf8')) as { scripts: Record<string, string> };
         const dockerfile = await readFile(resolve('Dockerfile'), 'utf8');
+        const dockerignore = await readFile(resolve('.dockerignore'), 'utf8');
 
         expect(packageJson.scripts.build).toBe('vite build && bun run skill:package');
         expect(packageJson.scripts['skill:package']).toBe('bun scripts/package-account-management-skill.ts');
         expect(dockerfile).toContain('bun run build');
         expect(dockerfile).toContain('COPY --from=build /app/dist ./dist');
+        expect(dockerignore.split(/\r?\n/)).not.toContain('scripts');
+        expect(dockerignore.split(/\r?\n/)).toContain('!scripts/package-account-management-skill.ts');
     });
 
     it('uses only exact operation names exposed by the MCP', async () => {

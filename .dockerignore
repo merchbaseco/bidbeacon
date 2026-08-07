@@ -11,6 +11,6 @@ coverage
 README.md
 DEPLOYMENT.md
 test-api.sh
-scripts
+scripts/*
+!scripts/package-account-management-skill.ts
 *.md
-
