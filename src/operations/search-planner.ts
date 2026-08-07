@@ -92,10 +92,12 @@ export type SearchDateRange = {
     source: 'DEFAULT' | 'EXPLICIT';
 };
 
+export type SearchFilterValue = null | boolean | string | number | readonly SearchFilterValue[] | { readonly [key: string]: SearchFilterValue };
+
 export type SearchFilter = {
     field: SearchField;
     operator: SearchOperator;
-    value: string | number | readonly (string | number)[];
+    value: SearchFilterValue;
 };
 
 export type SearchOrder = {
@@ -172,11 +174,11 @@ export const planSearch = (input: unknown, options: { timezone: string; now?: Da
             compatibleFields: fieldsForResource(resource).filter(field => field === 'segments.date' || field === 'segments.hour'),
         });
     }
-    if (!performance && parsedInput.data.dateRange) {
+    if (!performance && resource !== 'change_event' && parsedInput.data.dateRange) {
         throw invalidInput('dateRange requires a metric or segment Field.');
     }
 
-    const dateRange = performance ? resolveDateRange(parsedInput.data.dateRange, options) : undefined;
+    const dateRange = performance || resource === 'change_event' ? resolveDateRange(parsedInput.data.dateRange, options) : undefined;
     const orderBy = appendTieBreakers(resource, requestedOrder.length > 0 ? requestedOrder : getDefaultOrder(resource, performance, segmented, segmentFields), segmentFields);
     const fingerprint = createSearchQueryFingerprint({
         accountId: parsedInput.data.accountId,
@@ -273,13 +275,13 @@ const resolveOrder = (resource: SearchResource, orderBy: readonly z.infer<typeof
 
 const validateFilterValue = (field: SearchFieldDefinition, operator: SearchOperator, value: unknown): SearchFilter['value'] => {
     if (operator === 'in') {
-        if (!Array.isArray(value) || value.length === 0 || value.some(item => !(isScalarValue(field, item) && isValidFieldValue(field, item)))) {
+        if (!Array.isArray(value) || value.length === 0 || value.some(item => !(isFieldValue(field, item) && isValidFieldValue(field, item)))) {
             throw invalidInput('The in operator requires a non-empty array of values matching the Field type.', { field: field.field });
         }
         if (field.field === 'segments.placement' && value.some(item => !isPublicPlacement(item))) {
             throw invalidInput('Placement filters must use the public placement vocabulary.', { field: field.field, allowedValues: PLACEMENT_VALUES });
         }
-        return value as string[] | number[];
+        return value.map(item => normalizeFilterValue(field, item as SearchFilterValue));
     }
 
     if (operator === 'contains') {
@@ -289,28 +291,59 @@ const validateFilterValue = (field: SearchFieldDefinition, operator: SearchOpera
         return value;
     }
 
-    if (!(isScalarValue(field, value) && isValidFieldValue(field, value))) {
+    if (!(isFieldValue(field, value) && isValidFieldValue(field, value))) {
         throw invalidInput('Search filter value does not match the Field type.', { field: field.field });
     }
     if (field.field === 'segments.placement' && !isPublicPlacement(value)) {
         throw invalidInput('Placement filters must use the public placement vocabulary.', { field: field.field, allowedValues: PLACEMENT_VALUES });
     }
 
-    return value;
+    return normalizeFilterValue(field, value);
 };
 
-const isScalarValue = (field: SearchFieldDefinition, value: unknown): value is string | number => {
+const isFieldValue = (field: SearchFieldDefinition, value: unknown): value is SearchFilterValue => {
+    if (field.kind === 'boolean') {
+        return typeof value === 'boolean';
+    }
     if (field.kind === 'number') {
         return typeof value === 'number' && Number.isFinite(value);
+    }
+    if (field.kind === 'json') {
+        return isJsonValue(value);
     }
     if (typeof value !== 'string') {
         return false;
     }
-    return field.kind !== 'date' || isIsoDate(value);
+    if (field.kind === 'date') {
+        return isIsoDate(value);
+    }
+    if (field.kind === 'datetime') {
+        return isIsoDateTime(value);
+    }
+    return true;
 };
 
-const isValidFieldValue = (field: SearchFieldDefinition, value: string | number) =>
+const isValidFieldValue = (field: SearchFieldDefinition, value: SearchFilterValue) =>
     field.field !== 'segments.hour' || (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 23);
+
+const normalizeFilterValue = (field: SearchFieldDefinition, value: SearchFilterValue): SearchFilterValue => (field.kind === 'datetime' ? new Date(value as string).toISOString() : value);
+
+const isJsonValue = (value: unknown): value is SearchFilterValue => {
+    if (value === null || typeof value === 'string' || typeof value === 'boolean') {
+        return true;
+    }
+    if (typeof value === 'number') {
+        return Number.isFinite(value);
+    }
+    if (Array.isArray(value)) {
+        return value.every(isJsonValue);
+    }
+    if (!value || typeof value !== 'object') {
+        return false;
+    }
+    const prototype = Object.getPrototypeOf(value);
+    return (prototype === Object.prototype || prototype === null) && Object.values(value).every(isJsonValue);
+};
 
 const resolveDateRange = (input: z.infer<typeof searchDateRangeInputSchema> | undefined, options: { timezone: string; now?: Date }): SearchDateRange => {
     if (input) {
@@ -349,13 +382,22 @@ const getDefaultOrder = (resource: SearchResource, performance: boolean, segment
     if (performance) {
         return [{ field: 'metrics.spend', direction: 'desc' }];
     }
+    if (resource === 'change_event') {
+        return [{ field: 'changeEvent.changedAt', direction: 'desc' }];
+    }
     if (resource === 'product') {
         return [
             { field: 'product.title', direction: 'asc' },
             { field: 'product.asin', direction: 'asc' },
         ];
     }
-    return [resource === 'ad' ? { field: 'ad.id', direction: 'asc' } : { field: resource === 'campaign' ? 'campaign.name' : 'adGroup.name', direction: 'asc' }];
+    return [
+        resource === 'ad'
+            ? { field: 'ad.id', direction: 'asc' }
+            : resource === 'target'
+              ? { field: 'target.id', direction: 'asc' }
+              : { field: resource === 'campaign' ? 'campaign.name' : 'adGroup.name', direction: 'asc' },
+    ];
 };
 
 const appendTieBreakers = (resource: SearchResource, orderBy: readonly SearchOrder[], segmentFields: readonly SearchField[]): SearchOrder[] => {
@@ -365,7 +407,18 @@ const appendTieBreakers = (resource: SearchResource, orderBy: readonly SearchOrd
             resolved.push({ field, direction: 'asc' });
         }
     }
-    const tieBreaker = resource === 'campaign' ? 'campaign.id' : resource === 'ad_group' ? 'adGroup.id' : resource === 'ad' ? 'ad.id' : 'product.asin';
+    const tieBreaker =
+        resource === 'campaign'
+            ? 'campaign.id'
+            : resource === 'ad_group'
+              ? 'adGroup.id'
+              : resource === 'ad'
+                ? 'ad.id'
+                : resource === 'target'
+                  ? 'target.id'
+                  : resource === 'product'
+                    ? 'product.asin'
+                    : 'changeEvent.id';
     if (!resolved.some(order => order.field === tieBreaker)) {
         resolved.push({ field: tieBreaker, direction: 'asc' });
     }
@@ -383,6 +436,8 @@ const isIsoDate = (value: string) => {
     const parsed = new Date(`${value}T00:00:00.000Z`);
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 };
+
+const isIsoDateTime = (value: string) => !Number.isNaN(Date.parse(value)) && value.includes('T');
 
 const invalidInput = (message: string, details: Record<string, unknown> = {}) => new OperationError('INVALID_INPUT', message, details);
 

@@ -17,6 +17,21 @@ export const queryCampaignSearchCoverage = async (
     account: { adsAccountId: string; countryCode: string },
     dateRange: SearchDateRange,
     timezone: string
+): Promise<SearchCoverage> => querySearchCoverage(context, account, dateRange, timezone, 'product');
+
+export const queryTargetSearchCoverage = async (
+    context: OperationContext,
+    account: { adsAccountId: string; countryCode: string },
+    dateRange: SearchDateRange,
+    timezone: string
+): Promise<SearchCoverage> => querySearchCoverage(context, account, dateRange, timezone, 'target');
+
+const querySearchCoverage = async (
+    context: OperationContext,
+    account: { adsAccountId: string; countryCode: string },
+    dateRange: SearchDateRange,
+    timezone: string,
+    entityType: 'product' | 'target'
 ): Promise<SearchCoverage> => {
     const start = fromZonedTime(`${dateRange.startDate}T00:00:00`, timezone);
     const endExclusive = fromZonedTime(
@@ -33,7 +48,7 @@ export const queryCampaignSearchCoverage = async (
                 eq(reportDatasetMetadata.accountId, account.adsAccountId),
                 eq(reportDatasetMetadata.countryCode, account.countryCode),
                 eq(reportDatasetMetadata.aggregation, 'daily'),
-                eq(reportDatasetMetadata.entityType, 'product'),
+                eq(reportDatasetMetadata.entityType, entityType),
                 gte(reportDatasetMetadata.periodStart, start),
                 lt(reportDatasetMetadata.periodStart, endExclusive)
             )

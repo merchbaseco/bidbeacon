@@ -46,6 +46,15 @@ production projection and verifies source normalization, normalized-key aggregat
 accounting, authoritative stale-row reconciliation, marketplace-scoped metadata, idempotence,
 account-local dates, and changed-row counts.
 
+Target Search acceptance lives in `src/operations/search-target.test.ts` with builders in
+`src/operations/testing/search-target-fixtures.ts`. It uses production target settings,
+target-grain daily performance, and target report metadata through embedded PGlite; coverage
+must not use advertised-ASIN rows. Change-event Search acceptance lives in
+`src/operations/search-change-events.test.ts` with builders in
+`src/operations/testing/search-change-event-fixtures.ts`; it verifies inclusive account-local
+history dates, public event mappings, JSON values, deterministic cursors, and the absence of
+performance coverage.
+
 Target mutation acceptance lives at the same seam in `src/operations/target-mutations.test.ts`.
 It asserts positive keyword/product and ad-group negative keyword/product creation, broad/phrase/
 exact keyword match types, individual-ASIN-only product targeting, explicit Campaign/Ad-group

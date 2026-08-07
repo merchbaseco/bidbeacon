@@ -400,7 +400,7 @@ describe('Campaign Search operation', () => {
         await expect(search(createSearchContext(database), { accountId: SEARCH_OTHER_ACCOUNT_ID, resource: 'campaign' })).rejects.toMatchObject({ code: 'ACCOUNT_ACCESS_DENIED' });
     });
 
-    it('rejects unsupported fields, invalid filter values, settings date ranges, and future Search resources with the stable public error shape', async () => {
+    it('rejects unsupported fields, invalid filter values, settings date ranges, and unavailable Search resources with the stable public error shape', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchAdvertiserAccount());
 
@@ -419,7 +419,7 @@ describe('Campaign Search operation', () => {
         await expect(
             search(createSearchContext(database), { accountId: SEARCH_ACCOUNT_ID, resource: 'campaign', fields: ['campaign.id'], dateRange: { startDate: '2026-08-01', endDate: '2026-08-02' } })
         ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
-        await expect(search(createSearchContext(database), { accountId: SEARCH_ACCOUNT_ID, resource: 'target' })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+        await expect(search(createSearchContext(database), { accountId: SEARCH_ACCOUNT_ID, resource: 'future' })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 });
 

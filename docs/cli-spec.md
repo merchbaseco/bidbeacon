@@ -7,9 +7,9 @@ read_when:
 # BidBeacon MCP and CLI specification
 
 **Status:** Accepted design; account discovery and UUID authorization plus Campaign, Ad-group, and
-Ad, and Product Search and Campaign, Ad-group, Ad, and Target mutation slices are implemented in the
-shared operation layer, along with composite Sponsored Products campaign creation. Target Search,
-Change-event Search, and operation adapters are pending.
+Ad, Target, Product, and Change-event Search and Campaign, Ad-group, Ad, and Target mutation slices
+are implemented in the shared operation layer, along with composite Sponsored Products campaign
+creation. Operation adapters remain transport work.
 
 This specification defines one public operation layer projected through:
 
@@ -179,7 +179,7 @@ campaign | ad_group | ad | target | product | change_event
 
 The resource determines row grain. A row may select fields from that resource and its ancestors, never its children. `product` is a read-only ASIN-grain view aggregated across matching ads.
 
-The delivered Search slice supports `resource: campaign`, `resource: ad_group`, `resource: ad`, and `resource: product`. Each resource accepts its own fields, compatible Campaign ancestry where applicable, standard metrics, and the segments supported by its archive projection. Campaign Search accepts `segments.placement`; Ad-group, Ad, and Product Search accept `segments.hour`, which requires `segments.date`. Placement can be selected alone or with date only at Campaign grain. Search still rejects fields owned by the pending Target and Change-event slices.
+The delivered Search slice supports `resource: campaign`, `resource: ad_group`, `resource: ad`, `resource: target`, `resource: product`, and `resource: change_event`. Each resource accepts its own fields, compatible ancestry where applicable, standard metrics where applicable, and the segments supported by its archive projection. Campaign Search accepts `segments.placement`; Ad-group, Ad, and Product Search accept `segments.hour`, which requires `segments.date`. Target Search uses the daily target archive and accepts `segments.date`; Change-event Search is settings/history-only and accepts no performance fields or segments. Placement can be selected alone or with date only at Campaign grain.
 
 ### Filters
 
@@ -190,10 +190,10 @@ Each filter contains one Field, one operator, and one value. Supported operators
 | `eq` | scalar | Equal |
 | `in` | non-empty scalar array | Equal to any supplied value |
 | `contains` | string | Case-insensitive text containment |
-| `gt` | number or date | Greater than |
-| `gte` | number or date | Greater than or equal |
-| `lt` | number or date | Less than |
-| `lte` | number or date | Less than or equal |
+| `gt` | number, date, or datetime | Greater than |
+| `gte` | number, date, or datetime | Greater than or equal |
+| `lt` | number, date, or datetime | Less than |
+| `lte` | number, date, or datetime | Less than or equal |
 
 Every filter must match. `in` expresses alternatives for one field; Search has no general-purpose `OR`, nested filter groups, or query-language string.
 
@@ -212,7 +212,7 @@ The complete field vocabulary lives in [search-field-catalog.md](search-field-ca
 - Ad-group, Ad, and Product Search accept account-local `segments.hour`, which requires `segments.date`.
 - A validation error names incompatible fields and the fields permitted for that resource.
 
-Campaign, Ad-group, and Ad performance use the advertised-ASIN archive (`entity_type = product`) as their canonical ordinary source grain. Product performance is one row per advertised ASIN after aggregating that same archive across matching Ads and Campaigns; target-grain rows are excluded. Aggregate and date-segmented searches use the daily archive; hour-segmented Ad-group, Ad, and Product searches use the hourly archive. Placement-segmented Campaign performance instead uses the dedicated `performance_daily_placement` Campaign/date/placement projection and `entity_type = placement` metadata. Component rows are aggregated once at the selected resource grain, and segmented rows are account-local and zero-filled across the requested range. Coverage uses the matching report metadata source, including valid completed zero-record reports.
+Campaign, Ad-group, and Ad performance use the advertised-ASIN archive (`entity_type = product`) as their canonical ordinary source grain. Target performance uses target identity plus `entity_type = target`, without advertised-ASIN joins. Product performance is one row per advertised ASIN after aggregating that same archive across matching Ads and Campaigns; target-grain rows are excluded. Aggregate and date-segmented searches use the daily archive; hour-segmented Ad-group, Ad, and Product searches use the hourly archive. Placement-segmented Campaign performance instead uses the dedicated `performance_daily_placement` Campaign/date/placement projection and `entity_type = placement` metadata. Component rows are aggregated once at the selected resource grain, and segmented rows are account-local and zero-filled across the requested range. Coverage uses the matching report metadata source, including valid completed zero-record reports. Change-event Search reads account- and marketplace-scoped entity history and does not report performance coverage.
 
 The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` include the nine Standard performance metrics. A default campaign Search therefore behaves like the campaign table in the Amazon Ads dashboard: it returns campaign settings and recent performance together.
 
@@ -220,6 +220,7 @@ The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` inc
 
 - A Performance search without `dateRange` uses the last seven account-local dates, including the current date.
 - A `change_event` Search without `dateRange` uses the same seven-date default.
+- Change-event date ranges are inclusive account-local dates applied to the history row's `local_date`, not UTC timestamp truncation.
 - A settings-only Search does not resolve or report a date range.
 - The response always identifies an explicit or defaulted range and never silently substitutes a different range.
 

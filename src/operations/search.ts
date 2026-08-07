@@ -3,7 +3,7 @@ import { resolveAdvertiserAccount } from './advertiser-accounts';
 import type { OperationContext } from './operation-context';
 import { OperationError } from './operation-errors';
 import { queryCampaignPlacementSearchCoverage } from './placement-search-coverage';
-import { queryCampaignSearchCoverage } from './search-coverage';
+import { queryCampaignSearchCoverage, queryTargetSearchCoverage } from './search-coverage';
 import { decodeSearchCursor, encodeSearchCursor } from './search-cursor';
 import { planSearch, searchOutputSchema } from './search-planner';
 import { compareSearchRowToBoundary, filterSearchRows, querySearchRows, sortSearchRows } from './search-query';
@@ -24,10 +24,12 @@ export const search = async (context: OperationContext, input: unknown, options:
 
     const [queriedRows, coverage] = await Promise.all([
         querySearchRows(context, account, plan),
-        plan.dateRange
+        plan.performance && plan.dateRange
             ? plan.placement
                 ? queryCampaignPlacementSearchCoverage(context, account, plan.dateRange, metadata.timezone)
-                : queryCampaignSearchCoverage(context, account, plan.dateRange, metadata.timezone)
+                : plan.resource === 'target'
+                  ? queryTargetSearchCoverage(context, account, plan.dateRange, metadata.timezone)
+                  : queryCampaignSearchCoverage(context, account, plan.dateRange, metadata.timezone)
             : Promise.resolve(undefined),
     ]);
 

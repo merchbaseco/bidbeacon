@@ -71,7 +71,7 @@ This keeps one canonical per-day result while still allowing immediate local wri
 
 ## Read path
 
-The accepted public contract reads history with `search` and `resource: "change_event"` as defined in [cli-spec.md](cli-spec.md). Change events use the same explicit Account ID, field selection, filters, date range, ordering, and cursor contract as other Searches.
+The implemented public contract reads history with `search` and `resource: "change_event"` as defined in [cli-spec.md](cli-spec.md). Change events use the same explicit Account ID, field selection, filters, inclusive account-local date range, ordering, and cursor contract as other Searches. Search maps internal entity/event/field/source values to the public `changeEvent.*` vocabulary and returns previous/current values with their JSON types, including structured placement-adjustment objects.
 
 ### Current pre-migration path
 

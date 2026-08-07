@@ -1,10 +1,13 @@
 import { addDays } from 'date-fns';
 import { and, asc, eq, gt, gte, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
 import { ad, adGroup, campaign, performanceDaily, performanceHourly, target } from '@/db/schema';
+import { queryChangeEventSearchRows } from './change-event-search-query';
 import type { OperationContext } from './operation-context';
 import { queryCampaignPlacementSearchRows } from './placement-search-query';
+import { serializeSearchValue } from './search-cursor';
 import { isSearchSegmentField } from './search-field-registry';
 import type { CampaignSearchPlan, SearchFilter, SearchOrder, SearchPlan } from './search-planner';
+import { queryTargetSearchRows } from './target-search-query';
 
 type CampaignRow = typeof campaign.$inferSelect;
 type CampaignSettings = Pick<CampaignRow, 'campaignId' | 'name' | 'state' | 'deliveryStatus' | 'budgetAmount' | 'targetingSettings' | 'bidStrategy' | 'startDate' | 'endDate'>;
@@ -18,7 +21,7 @@ type MetricTotals = {
 };
 
 export type SearchRow = {
-    values: Record<string, string | number | null>;
+    values: Record<string, unknown>;
 };
 
 export type CampaignSearchRow = SearchRow;
@@ -32,6 +35,12 @@ export const querySearchRows = async (context: OperationContext, account: { adsA
     }
     if (plan.resource === 'ad') {
         return queryAdSearchRows(context, account, plan);
+    }
+    if (plan.resource === 'target') {
+        return queryTargetSearchRows(context, account, plan);
+    }
+    if (plan.resource === 'change_event') {
+        return queryChangeEventSearchRows(context, account, plan);
     }
     return queryProductSearchRows(context, account, plan);
 };
@@ -1084,9 +1093,12 @@ const buildMetricValues = (totals: MetricTotals) => ({
     cvr: ratioAsPercentage(totals.orders, totals.clicks),
 });
 
-const matchesFilter = (actual: string | number | null | undefined, filter: SearchFilter) => {
-    if (actual === undefined || actual === null) {
+const matchesFilter = (actual: unknown, filter: SearchFilter) => {
+    if (actual === undefined) {
         return false;
+    }
+    if (actual === null) {
+        return filter.operator === 'eq' ? filter.value === null : filter.operator === 'in' && Array.isArray(filter.value) && filter.value.includes(null);
     }
     if (filter.operator === 'contains') {
         return String(actual).toLocaleLowerCase().includes(String(filter.value).toLocaleLowerCase());
@@ -1125,9 +1137,12 @@ const compareValues = (left: unknown, right: unknown) => {
     if (typeof left === 'number' && typeof right === 'number') {
         return left < right ? -1 : 1;
     }
-    const leftString = String(left);
-    const rightString = String(right);
-    return leftString < rightString ? -1 : 1;
+    const serializedLeft = serializeSearchValue(left);
+    const serializedRight = serializeSearchValue(right);
+    if (serializedLeft === serializedRight) {
+        return 0;
+    }
+    return serializedLeft < serializedRight ? -1 : 1;
 };
 
 const getDateSequence = (startDate: string, endDate: string) => {

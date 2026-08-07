@@ -12,7 +12,18 @@ export type SearchCursorPayload = {
     boundary: SearchCursorBoundary;
 };
 
-export const createSearchQueryFingerprint = (query: unknown) => createHash('sha256').update(stableSerialize(query)).digest('hex');
+export const createSearchQueryFingerprint = (query: unknown) => createHash('sha256').update(serializeSearchValue(query)).digest('hex');
+
+export const serializeSearchValue = (value: unknown): string => {
+    if (Array.isArray(value)) {
+        return `[${value.map(serializeSearchValue).join(',')}]`;
+    }
+    if (value && typeof value === 'object') {
+        const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
+        return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${serializeSearchValue(entryValue)}`).join(',')}}`;
+    }
+    return JSON.stringify(value) ?? 'null';
+};
 
 export const encodeSearchCursor = (fingerprint: string, boundary: SearchCursorBoundary) => {
     const payload: SearchCursorPayload = { version: CURSOR_VERSION, fingerprint, boundary };
@@ -53,14 +64,3 @@ export const decodeSearchCursor = (cursor: string, expectedFingerprint: string):
 const getCursorSecret = () => process.env.BIDBEACON_SEARCH_CURSOR_SECRET ?? processCursorSecret;
 
 const encodeBase64Url = (value: string) => Buffer.from(value, 'utf8').toString('base64url');
-
-const stableSerialize = (value: unknown): string => {
-    if (Array.isArray(value)) {
-        return `[${value.map(stableSerialize).join(',')}]`;
-    }
-    if (value && typeof value === 'object') {
-        const entries = Object.entries(value as Record<string, unknown>).sort(([left], [right]) => left.localeCompare(right));
-        return `{${entries.map(([key, entryValue]) => `${JSON.stringify(key)}:${stableSerialize(entryValue)}`).join(',')}}`;
-    }
-    return JSON.stringify(value) ?? 'null';
-};
