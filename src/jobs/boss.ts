@@ -25,11 +25,6 @@ interface DebounceOptions<T> {
     key?: (data: T) => string;
 }
 
-interface ThrottleOptions<T> {
-    seconds: number;
-    key?: (data: T) => string;
-}
-
 interface ScheduleOptions<T> {
     cron: string;
     data?: T;
@@ -53,7 +48,6 @@ class Job<T extends JobData> {
     private retryOptions?: RetryOptions;
     private delayOptions?: DelayOptions;
     private debounceOptions?: DebounceOptions<T>;
-    private throttleOptions?: ThrottleOptions<T>;
     private scheduleOptions?: ScheduleOptions<T>;
     private workFn?: WorkHandler<T>;
     private workOpts?: WorkOptions;
@@ -93,14 +87,6 @@ class Job<T extends JobData> {
      */
     debounce(options: DebounceOptions<T>): this {
         this.debounceOptions = options;
-        return this;
-    }
-
-    /**
-     * Run the first job immediately and suppress duplicate sends in the same interval.
-     */
-    throttle(options: ThrottleOptions<T>): this {
-        this.throttleOptions = options;
         return this;
     }
 
@@ -198,10 +184,7 @@ class Job<T extends JobData> {
         }
 
         let jobId: string | null;
-        if (this.throttleOptions) {
-            const key = this.throttleOptions.key?.(data) ?? this.jobName;
-            jobId = await pgBoss.sendThrottled(this.jobName, data, options, this.throttleOptions.seconds, key);
-        } else if (this.debounceOptions) {
+        if (this.debounceOptions) {
             const key = this.debounceOptions.key?.(data) ?? this.jobName;
             jobId = await pgBoss.sendDebounced(this.jobName, data, options, this.debounceOptions.seconds, key);
         } else {

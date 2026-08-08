@@ -76,7 +76,7 @@ export const productMetadata = pgTable(
         countryCode: text('country_code').notNull(),
         asin: text('asin').notNull(),
         title: text('title'),
-        lastSyncedAt: timestamp('last_synced_at', { withTimezone: true, mode: 'date' }).notNull(),
+        lastFetchedAt: timestamp('last_fetched_at', { withTimezone: true, mode: 'date' }).notNull(),
     },
     table => [primaryKey({ columns: [table.countryCode, table.asin] }), index('product_metadata_asin_idx').on(table.asin)]
 );

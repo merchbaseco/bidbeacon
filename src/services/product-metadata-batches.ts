@@ -3,7 +3,7 @@ const AMAZON_PRODUCT_METADATA_BATCH_SIZE = 300;
 export const fetchProductMetadataBatches = async (input: {
     asins: string[];
     fetchBatch: (asins: string[]) => Promise<Array<{ asin: string; title: string | null }>>;
-    onBatch?: (products: Array<{ asin: string; title: string | null }>) => Promise<void>;
+    onBatch?: (asins: string[], products: Array<{ asin: string; title: string | null }>) => Promise<void>;
 }) => {
     const asins = [...new Set(input.asins)];
     const requestedAsins = new Set(asins);
@@ -18,14 +18,14 @@ export const fetchProductMetadataBatches = async (input: {
     const preflightProducts = new Map<string, { asin: string; title: string | null }>();
     batchSizes.push(1);
     for (const product of await input.fetchBatch([preflightAsin])) {
-        if (product.asin === preflightAsin && product.title?.trim()) {
+        if (product.asin === preflightAsin) {
             preflightProducts.set(product.asin, product);
         }
     }
-    if (preflightProducts.size === 0) {
+    await input.onBatch?.([preflightAsin], [...preflightProducts.values()]);
+    if (![...preflightProducts.values()].some(product => product.title?.trim())) {
         throw new Error(`Amazon Product Metadata returned no titled inventory record for advertised ASIN ${preflightAsin}.`);
     }
-    await input.onBatch?.([...preflightProducts.values()]);
     for (const product of preflightProducts.values()) {
         productsByAsin.set(product.asin, product);
     }
@@ -40,7 +40,7 @@ export const fetchProductMetadataBatches = async (input: {
                 batchProducts.set(product.asin, product);
             }
         }
-        await input.onBatch?.([...batchProducts.values()]);
+        await input.onBatch?.(batch, [...batchProducts.values()]);
         for (const product of batchProducts.values()) {
             productsByAsin.set(product.asin, product);
         }

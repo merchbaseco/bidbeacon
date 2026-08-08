@@ -5,10 +5,10 @@ import { db } from '@/db/index';
 import { productMetadata } from '@/db/schema';
 import { AMAZON_PRODUCT_METADATA_BATCH_SIZE, fetchProductMetadataBatches } from './product-metadata-batches';
 
-export const updateProductMetadata = async (input: { countryCode: string; profileId: number; region: ApiRegion; asins: string[]; skipExisting?: boolean; skipSyncedAtOrAfter?: Date }) => {
+export const updateProductMetadata = async (input: { countryCode: string; profileId: number; region: ApiRegion; asins: string[]; skipExisting?: boolean; skipFetchedAtOrAfter?: Date }) => {
     const requestedAsins = [...new Set(input.asins)];
     const skippedAsins = new Set<string>();
-    if (input.skipExisting || input.skipSyncedAtOrAfter) {
+    if (input.skipExisting || input.skipFetchedAtOrAfter) {
         for (let offset = 0; offset < requestedAsins.length; offset += AMAZON_PRODUCT_METADATA_BATCH_SIZE) {
             const rows = await db
                 .select({ asin: productMetadata.asin })
@@ -17,7 +17,7 @@ export const updateProductMetadata = async (input: { countryCode: string; profil
                     and(
                         eq(productMetadata.countryCode, input.countryCode),
                         inArray(productMetadata.asin, requestedAsins.slice(offset, offset + AMAZON_PRODUCT_METADATA_BATCH_SIZE)),
-                        ...(input.skipSyncedAtOrAfter ? [gte(productMetadata.lastSyncedAt, input.skipSyncedAtOrAfter)] : [])
+                        ...(input.skipFetchedAtOrAfter ? [gte(productMetadata.lastFetchedAt, input.skipFetchedAtOrAfter)] : [])
                     )
                 );
             for (const row of rows) {
@@ -29,24 +29,22 @@ export const updateProductMetadata = async (input: { countryCode: string; profil
     const fetched = await fetchProductMetadataBatches({
         asins,
         fetchBatch: asins => getProductMetadata({ profileId: input.profileId, region: input.region, asins }),
-        onBatch: async products => {
-            if (products.length === 0) {
-                return;
-            }
+        onBatch: async (batchAsins, products) => {
             const now = new Date();
+            const productsByAsin = new Map(products.map(product => [product.asin, product]));
             await db
                 .insert(productMetadata)
-                .values(products.map(product => ({ asin: product.asin, countryCode: input.countryCode, title: product.title, lastSyncedAt: now })))
+                .values(batchAsins.map(asin => ({ asin, countryCode: input.countryCode, title: productsByAsin.get(asin)?.title ?? null, lastFetchedAt: now })))
                 .onConflictDoUpdate({
                     target: [productMetadata.countryCode, productMetadata.asin],
-                    set: { title: sql`coalesce(excluded.title, ${productMetadata.title})`, lastSyncedAt: now },
+                    set: { title: sql`coalesce(excluded.title, ${productMetadata.title})`, lastFetchedAt: now },
                 });
         },
     });
 
     return {
         requestedCount: requestedAsins.length,
-        returnedCount: skippedAsins.size + fetched.products.length,
+        returnedCount: fetched.products.length,
         updatedCount: fetched.products.length,
         skippedCount: skippedAsins.size,
         requestCount: fetched.batchSizes.length,

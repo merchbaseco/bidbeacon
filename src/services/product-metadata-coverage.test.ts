@@ -23,8 +23,8 @@ describe('getProductMetadataCoverage', () => {
                 buildSearchProductAd({ id: 'coverage-ad-row-3', adId: 'coverage-ad-3', productAsin: 'B0PRODUCT002' }),
             ]);
         await database.db.insert(productMetadata).values([
-            { countryCode: 'US', asin: 'B0PRODUCT001', title: 'Hydrated title', lastSyncedAt: new Date('2026-08-08T00:00:00Z') },
-            { countryCode: 'US', asin: 'B0PRODUCT002', title: null, lastSyncedAt: new Date('2026-08-08T00:00:00Z') },
+            { countryCode: 'US', asin: 'B0PRODUCT001', title: 'Hydrated title', lastFetchedAt: new Date('2026-08-08T00:00:00Z') },
+            { countryCode: 'US', asin: 'B0PRODUCT002', title: null, lastFetchedAt: new Date('2026-08-08T00:00:00Z') },
         ]);
 
         await expect(getProductMetadataCoverage(database.db, { accountId: 'search-products-ads-account-1', countryCode: 'US' })).resolves.toEqual({

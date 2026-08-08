@@ -1,0 +1,1 @@
+ALTER TABLE "product_metadata" RENAME COLUMN "last_synced_at" TO "last_fetched_at";

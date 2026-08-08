@@ -178,7 +178,7 @@ describe('Product Search operation', () => {
                 buildSearchProductAd({ productAsin: 'B0PRODUCT001', productTitle: 'Zulu product' }),
                 buildSearchProductAd({ id: 'search-products-ad-row-2', adId: 'search-products-ad-2', productAsin: 'B0PRODUCT002', productTitle: 'Alpha product' }),
             ]);
-        await database.db.insert(productMetadata).values({ countryCode: 'US', asin: 'B0PRODUCT002', title: 'Projected product title', lastSyncedAt: new Date('2026-08-08T00:00:00Z') });
+        await database.db.insert(productMetadata).values({ countryCode: 'US', asin: 'B0PRODUCT002', title: 'Projected product title', lastFetchedAt: new Date('2026-08-08T00:00:00Z') });
 
         const titleResult = await search(createSearchContext(database), {
             accountId: SEARCH_PRODUCTS_ACCOUNT_ID,

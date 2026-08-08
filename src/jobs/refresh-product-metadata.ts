@@ -18,10 +18,6 @@ export const refreshProductMetadataJob = boss
             .refine(input => Boolean(input.accountId) === Boolean(input.countryCode), 'accountId and countryCode must be provided together')
     )
     .retry({ limit: 0 })
-    .throttle({
-        seconds: 20 * 60,
-        key: data => (data.accountId && data.countryCode ? `${data.accountId}:${data.countryCode}` : 'all-accounts'),
-    })
     .work(async jobs => {
         for (const job of jobs) {
             await withJobMetrics(
@@ -86,7 +82,7 @@ export const refreshProductMetadataJob = boss
                             profileId: Number(account.profileId),
                             region: resolveApiRegion(account.countryCode),
                             asins,
-                            skipSyncedAtOrAfter: subDays(new Date(), 7),
+                            skipFetchedAtOrAfter: subDays(new Date(), 7),
                         });
                     } catch (error) {
                         recorder.setErrorEvent({

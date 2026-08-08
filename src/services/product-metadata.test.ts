@@ -42,7 +42,7 @@ describe('fetchProductMetadataBatches', () => {
                     }
                     return asins.map(asin => ({ asin, title: asin }));
                 },
-                onBatch: async products => {
+                onBatch: async (_batchAsins, products) => {
                     persistedCount += products.length;
                 },
             })
@@ -63,9 +63,17 @@ describe('fetchProductMetadataBatches', () => {
     });
 
     it('requires the preflight response to contain a title', async () => {
-        await expect(fetchProductMetadataBatches({ asins: ['B000000001'], fetchBatch: async asins => asins.map(asin => ({ asin, title: null })) })).rejects.toThrow(
-            'Amazon Product Metadata returned no titled inventory record for advertised ASIN B000000001.'
-        );
+        const attemptedAsins: string[] = [];
+        await expect(
+            fetchProductMetadataBatches({
+                asins: ['B000000001'],
+                fetchBatch: async asins => asins.map(asin => ({ asin, title: null })),
+                onBatch: async asins => {
+                    attemptedAsins.push(...asins);
+                },
+            })
+        ).rejects.toThrow('Amazon Product Metadata returned no titled inventory record for advertised ASIN B000000001.');
+        expect(attemptedAsins).toEqual(['B000000001']);
     });
 });
 
