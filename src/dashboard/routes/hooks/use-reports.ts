@@ -3,7 +3,7 @@ import { useAtomValue } from 'jotai';
 import { useEffect, useMemo } from 'react';
 import { useSearchParams } from 'react-router';
 import { api, type RouterOutputs } from '../../lib/trpc';
-import { aggregationAtom, entityTypeAtom, limitAtom, offsetAtom, statusFilterAtom } from '../components/reports-table/atoms';
+import { aggregationAtom, limitAtom, offsetAtom, statusFilterAtom } from '../components/reports-table/atoms';
 import { roundUpToNearestMinute } from '../utils';
 import { useSelectedAccountId } from './use-selected-accountid';
 import { useSelectedCountryCode } from './use-selected-country-code';
@@ -16,7 +16,6 @@ export const useReports = () => {
     const accountId = useSelectedAccountId();
     const countryCode = useSelectedCountryCode();
     const aggregation = useAtomValue(aggregationAtom);
-    const entityType = useAtomValue(entityTypeAtom);
     const statusFilter = useAtomValue(statusFilterAtom);
     const limit = useAtomValue(limitAtom);
     const offset = useAtomValue(offsetAtom);
@@ -38,7 +37,6 @@ export const useReports = () => {
             accountId: accountId ?? '',
             countryCode,
             aggregation,
-            entityType,
             statusFilter,
             from: dateRange.from,
             to: dateRange.to,

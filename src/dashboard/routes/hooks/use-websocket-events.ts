@@ -45,7 +45,7 @@ type Event =
               countryCode: string;
               periodStart: string;
               aggregation: 'hourly' | 'daily';
-              entityType: 'target' | 'product';
+              entityType: 'target';
               error: string;
           };
           timestamp: string;

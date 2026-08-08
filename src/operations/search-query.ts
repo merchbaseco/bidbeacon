@@ -166,7 +166,7 @@ const queryProductPerformanceRows = async (context: OperationContext, account: {
         };
         const rows = await context.db
             .select({
-                productAsin: performanceHourly.entityId,
+                productAsin: sql<string>`${ad.productAsin}`.as('product_asin'),
                 bucketDate: plan.segmentFields.includes('segments.date') ? performanceHourly.bucketDate : sql<string | null>`NULL`.as('bucket_date'),
                 bucketHour: plan.segmentFields.includes('segments.hour') ? performanceHourly.bucketHour : sql<number | null>`NULL`.as('bucket_hour'),
                 impressions: metrics.impressions,
@@ -176,10 +176,7 @@ const queryProductPerformanceRows = async (context: OperationContext, account: {
                 sales: metrics.sales,
             })
             .from(performanceHourly)
-            .innerJoin(
-                ad,
-                and(eq(ad.adId, performanceHourly.adId), eq(ad.campaignId, performanceHourly.campaignId), eq(ad.productAsin, performanceHourly.entityId), eq(ad.adProduct, 'SPONSORED_PRODUCTS'))
-            )
+            .innerJoin(ad, and(eq(ad.adId, performanceHourly.adId), eq(ad.campaignId, performanceHourly.campaignId), eq(ad.adProduct, 'SPONSORED_PRODUCTS')))
             .innerJoin(adGroup, and(eq(adGroup.adGroupId, ad.adGroupId), eq(adGroup.campaignId, ad.campaignId), eq(adGroup.adProduct, 'SPONSORED_PRODUCTS')))
             .innerJoin(
                 campaign,
@@ -193,19 +190,20 @@ const queryProductPerformanceRows = async (context: OperationContext, account: {
             .where(
                 and(
                     eq(performanceHourly.accountId, account.adsAccountId),
-                    eq(performanceHourly.entityType, 'product'),
+                    eq(performanceHourly.entityType, 'target'),
+                    isNotNull(ad.productAsin),
                     gte(performanceHourly.bucketDate, plan.dateRange?.startDate ?? ''),
                     lte(performanceHourly.bucketDate, plan.dateRange?.endDate ?? ''),
                     ...plan.filters.filter(filter => isSearchSegmentField(filter.field)).map(buildHourlySegmentCondition)
                 )
             )
             .groupBy(
-                performanceHourly.entityId,
+                ad.productAsin,
                 ...(plan.segmentFields.includes('segments.date') ? [performanceHourly.bucketDate] : []),
                 ...(plan.segmentFields.includes('segments.hour') ? [performanceHourly.bucketHour] : [])
             )
             .orderBy(
-                asc(performanceHourly.entityId),
+                asc(ad.productAsin),
                 ...(plan.segmentFields.includes('segments.date') ? [asc(performanceHourly.bucketDate)] : []),
                 ...(plan.segmentFields.includes('segments.hour') ? [asc(performanceHourly.bucketHour)] : [])
             );
@@ -221,7 +219,7 @@ const queryProductPerformanceRows = async (context: OperationContext, account: {
     };
     const rows = await context.db
         .select({
-            productAsin: performanceDaily.entityId,
+            productAsin: sql<string>`${ad.productAsin}`.as('product_asin'),
             bucketDate: plan.segmentFields.includes('segments.date') ? performanceDaily.bucketDate : sql<string | null>`NULL`.as('bucket_date'),
             bucketHour: sql<number | null>`NULL`.as('bucket_hour'),
             impressions: metrics.impressions,
@@ -231,7 +229,7 @@ const queryProductPerformanceRows = async (context: OperationContext, account: {
             sales: metrics.sales,
         })
         .from(performanceDaily)
-        .innerJoin(ad, and(eq(ad.adId, performanceDaily.adId), eq(ad.campaignId, performanceDaily.campaignId), eq(ad.productAsin, performanceDaily.entityId), eq(ad.adProduct, 'SPONSORED_PRODUCTS')))
+        .innerJoin(ad, and(eq(ad.adId, performanceDaily.adId), eq(ad.campaignId, performanceDaily.campaignId), eq(ad.adProduct, 'SPONSORED_PRODUCTS')))
         .innerJoin(adGroup, and(eq(adGroup.adGroupId, ad.adGroupId), eq(adGroup.campaignId, ad.campaignId), eq(adGroup.adProduct, 'SPONSORED_PRODUCTS')))
         .innerJoin(
             campaign,
@@ -245,14 +243,15 @@ const queryProductPerformanceRows = async (context: OperationContext, account: {
         .where(
             and(
                 eq(performanceDaily.accountId, account.adsAccountId),
-                eq(performanceDaily.entityType, 'product'),
+                eq(performanceDaily.entityType, 'target'),
+                isNotNull(ad.productAsin),
                 gte(performanceDaily.bucketDate, plan.dateRange?.startDate ?? ''),
                 lte(performanceDaily.bucketDate, plan.dateRange?.endDate ?? ''),
                 ...plan.filters.filter(filter => filter.field === 'segments.date').map(buildDailySegmentCondition)
             )
         )
-        .groupBy(performanceDaily.entityId, ...(plan.segmentFields.includes('segments.date') ? [performanceDaily.bucketDate] : []))
-        .orderBy(asc(performanceDaily.entityId), ...(plan.segmentFields.includes('segments.date') ? [asc(performanceDaily.bucketDate)] : []));
+        .groupBy(ad.productAsin, ...(plan.segmentFields.includes('segments.date') ? [performanceDaily.bucketDate] : []))
+        .orderBy(asc(ad.productAsin), ...(plan.segmentFields.includes('segments.date') ? [asc(performanceDaily.bucketDate)] : []));
     return rows;
 };
 
@@ -413,7 +412,7 @@ const queryAdGroupPerformanceRows = async (
         const archiveJoin = and(
             eq(performanceHourly.accountId, account.adsAccountId),
             eq(performanceHourly.adGroupId, adGroup.adGroupId),
-            eq(performanceHourly.entityType, 'product'),
+            eq(performanceHourly.entityType, 'target'),
             gte(performanceHourly.bucketDate, plan.dateRange?.startDate ?? ''),
             lte(performanceHourly.bucketDate, plan.dateRange?.endDate ?? ''),
             ...plan.filters.filter(filter => isSearchSegmentField(filter.field)).map(buildHourlySegmentCondition)
@@ -490,7 +489,7 @@ const queryAdGroupPerformanceRows = async (
     const archiveJoin = and(
         eq(performanceDaily.accountId, account.adsAccountId),
         eq(performanceDaily.adGroupId, adGroup.adGroupId),
-        eq(performanceDaily.entityType, 'product'),
+        eq(performanceDaily.entityType, 'target'),
         gte(performanceDaily.bucketDate, plan.dateRange?.startDate ?? ''),
         lte(performanceDaily.bucketDate, plan.dateRange?.endDate ?? ''),
         ...plan.filters.filter(filter => filter.field === 'segments.date').map(buildDailySegmentCondition)
@@ -563,7 +562,7 @@ const queryAdPerformanceRows = async (
         const archiveJoin = and(
             eq(performanceHourly.accountId, account.adsAccountId),
             eq(performanceHourly.adId, ad.adId),
-            eq(performanceHourly.entityType, 'product'),
+            eq(performanceHourly.entityType, 'target'),
             gte(performanceHourly.bucketDate, plan.dateRange?.startDate ?? ''),
             lte(performanceHourly.bucketDate, plan.dateRange?.endDate ?? ''),
             ...plan.filters.filter(filter => isSearchSegmentField(filter.field)).map(buildHourlySegmentCondition)
@@ -648,7 +647,7 @@ const queryAdPerformanceRows = async (
     const archiveJoin = and(
         eq(performanceDaily.accountId, account.adsAccountId),
         eq(performanceDaily.adId, ad.adId),
-        eq(performanceDaily.entityType, 'product'),
+        eq(performanceDaily.entityType, 'target'),
         gte(performanceDaily.bucketDate, plan.dateRange?.startDate ?? ''),
         lte(performanceDaily.bucketDate, plan.dateRange?.endDate ?? ''),
         ...plan.filters.filter(filter => filter.field === 'segments.date').map(buildDailySegmentCondition)
@@ -828,7 +827,7 @@ const buildProductSearchRow = (row: ProductSearchSettings, totals: MetricTotals,
 
 const buildDailySegmentCondition = (filter: SearchFilter) => {
     if (filter.field !== 'segments.date') {
-        throw new Error('Only segments.date filters can constrain the daily advertised-ASIN archive.');
+        throw new Error('Only segments.date filters can constrain the daily performance archive.');
     }
     switch (filter.operator) {
         case 'eq':
@@ -844,7 +843,7 @@ const buildDailySegmentCondition = (filter: SearchFilter) => {
         case 'lte':
             return lte(performanceDaily.bucketDate, filter.value as string);
         default:
-            throw new Error('The daily advertised-ASIN archive does not support this segment operator.');
+            throw new Error('The daily performance archive does not support this segment operator.');
     }
 };
 
@@ -864,7 +863,7 @@ const buildHourlySegmentCondition = (filter: SearchFilter) => {
             case 'lte':
                 return lte(performanceHourly.bucketDate, filter.value as string);
             default:
-                throw new Error('The hourly advertised-ASIN archive does not support this date operator.');
+                throw new Error('The hourly performance archive does not support this date operator.');
         }
     }
     if (filter.field === 'segments.hour') {
@@ -882,10 +881,10 @@ const buildHourlySegmentCondition = (filter: SearchFilter) => {
             case 'lte':
                 return lte(performanceHourly.bucketHour, filter.value as number);
             default:
-                throw new Error('The hourly advertised-ASIN archive does not support this hour operator.');
+                throw new Error('The hourly performance archive does not support this hour operator.');
         }
     }
-    throw new Error('Only segments.date and segments.hour filters can constrain the hourly advertised-ASIN archive.');
+    throw new Error('Only segments.date and segments.hour filters can constrain the hourly performance archive.');
 };
 
 export const queryCampaignSearchRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, plan: CampaignSearchPlan): Promise<CampaignSearchRow[]> => {
@@ -909,7 +908,7 @@ export const queryCampaignSearchRows = async (context: OperationContext, account
     const archiveJoin = and(
         eq(performanceDaily.accountId, account.adsAccountId),
         eq(performanceDaily.campaignId, campaign.campaignId),
-        eq(performanceDaily.entityType, 'product'),
+        eq(performanceDaily.entityType, 'target'),
         gte(performanceDaily.bucketDate, plan.dateRange?.startDate ?? ''),
         lte(performanceDaily.bucketDate, plan.dateRange?.endDate ?? ''),
         ...plan.filters.filter(filter => filter.field === 'segments.date').map(buildSegmentDateCondition)

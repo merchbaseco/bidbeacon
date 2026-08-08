@@ -20,6 +20,10 @@ _Avoid_: Unstated reporting window
 A conservative account-local date assessment derived from report dataset metadata. A date is complete only when its daily report completed without parse errors; pending, failed, or partially parsed dates are reported as issues, and dates without retained metadata are unknown rather than assumed missing or complete. Completed daily metadata is retained beyond Amazon's report retrieval window as durable coverage evidence.
 _Avoid_: Inferring coverage from performance rows, assuming absent rows mean missing data
 
+**Performance archive**:
+BidBeacon's canonical Target-grain advertising observations. Search regroups the same observations through Campaign, Ad-group, Ad, Target, or advertised-ASIN topology; Amazon report shapes never select the public query grain.
+_Avoid_: Product archive, report-specific Search mode
+
 **Search filter**:
 A structured field, operator, and value constraint applied by Search. All filters must match; the `in` operator expresses alternative values for one field.
 _Avoid_: Where clause, condition string

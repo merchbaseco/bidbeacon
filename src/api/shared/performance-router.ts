@@ -30,7 +30,7 @@ export const buildPerformanceRouter = (procedure: typeof apiProcedure) =>
                     eq(performanceDaily.accountId, input.accountId),
                     gte(performanceDaily.bucketDate, startDateSql),
                     lte(performanceDaily.bucketDate, endDateSql),
-                    eq(performanceDaily.entityType, input.metricsEntityType),
+                    eq(performanceDaily.entityType, 'target'),
                 ];
 
                 const filterConditions = buildPerformanceFilters(input.dimension, input.filters);

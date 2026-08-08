@@ -10,12 +10,12 @@ import type { NextAction } from './types';
  * 1. If report exists AND status is COMPLETED → 'process'
  * 2. If report exists AND status is terminal → 'fail'
  * 3. If report exists AND status is still pending → 'none'
- * 3. If no report AND eligible AND (target + daily) → 'create'
- * 4. If no report AND not eligible OR not (target + daily) → 'none'
+ * 3. If no report AND eligible → 'create'
+ * 4. If no report AND not eligible → 'none'
  *
  * @param timestamp - Report timestamp
  * @param aggregation - Report aggregation type
- * @param entityType - Report source (target or product)
+ * @param entityType - Canonical report source (`target`)
  * @param lastReportCreatedAt - Last time a report was created for this datum
  * @param reportId - Report ID if a report exists, null otherwise
  * @param countryCode - Country code for timezone calculations
@@ -65,11 +65,9 @@ export async function getNextAction(
         }
     }
 
-    // No report - check eligibility. Product reports are not enabled yet.
-    if (isEligibleForReport(timestamp, aggregation, lastReportCreatedAt, countryCode, now) && entityType === 'target') {
+    if (isEligibleForReport(timestamp, aggregation, lastReportCreatedAt, countryCode, now)) {
         return 'create';
     }
 
-    // Not eligible or not supported report type
     return 'none';
 }

@@ -198,7 +198,7 @@ export const reportDatasetMetadata = pgTable(
         countryCode: text('country_code').notNull(),
         periodStart: timestamp('period_start', { withTimezone: true, mode: 'date' }).notNull(),
         aggregation: text('aggregation').notNull(), // hourly, daily
-        entityType: text('entity_type').notNull(), // target, product
+        entityType: text('entity_type').notNull(), // target; historical product rows may remain
 
         status: text('status').notNull(), // enum: missing, fetching, parsing, completed, failed
         refreshing: boolean('refreshing').notNull().default(false), // whether a refresh is currently in progress

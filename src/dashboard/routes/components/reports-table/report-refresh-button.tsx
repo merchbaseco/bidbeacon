@@ -22,7 +22,7 @@ export function ReportRefreshButton({ row, accountId }: ReportRefreshButtonProps
             countryCode: row.countryCode,
             timestamp: row.periodStart,
             aggregation: row.aggregation as 'hourly' | 'daily',
-            entityType: row.entityType as 'target' | 'product',
+            entityType: 'target',
         });
         apiUtils.reports.get.setData({ uid: row.uid }, prev => {
             if (!prev) {

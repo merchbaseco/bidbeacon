@@ -184,7 +184,7 @@ describe('Ad-group and Ad Search operations', () => {
         ]);
     });
 
-    it('uses account-local date rows and the canonical hourly product archive at both child grains', async () => {
+    it('uses account-local date rows from the canonical Target archive at both child grains', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchAdResourcesAdvertiserAccount());
         await database.db

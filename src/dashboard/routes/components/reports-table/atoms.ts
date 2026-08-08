@@ -2,7 +2,6 @@ import { atom } from 'jotai';
 import { atomWithStorage } from 'jotai/utils';
 
 export const aggregationAtom = atomWithStorage<'daily' | 'hourly'>('bidbeacon.reportsTable.aggregation', 'daily');
-export const entityTypeAtom = atomWithStorage<'target' | 'product'>('bidbeacon.reportsTable.entityType', 'target');
 export const statusFilterAtom = atomWithStorage<string>('bidbeacon.reportsTable.statusFilter', 'all');
 export const limitAtom = atomWithStorage<number>('bidbeacon.reportsTable.limit', 15);
 export const offsetAtom = atom<number>(0);

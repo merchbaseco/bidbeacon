@@ -73,7 +73,6 @@ const PerformanceTableContent = ({ accountId, className, countryCode }: { accoun
         accountId,
         range: tableRange,
         dimension,
-        metricsEntityType: 'target',
         filters,
     });
 

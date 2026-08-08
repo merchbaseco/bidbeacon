@@ -19,7 +19,6 @@ export const buildReportsRouter = (procedure: typeof apiProcedure) =>
                     accountId: z.string(),
                     countryCode: z.string().optional(),
                     aggregation: z.enum(['hourly', 'daily']).default('daily'),
-                    entityType: z.enum(['target', 'product']).optional(),
                     statusFilter: z.string().optional(),
                     from: z.string().datetime().optional(),
                     to: z.string().datetime().optional(),
@@ -43,9 +42,7 @@ export const buildReportsRouter = (procedure: typeof apiProcedure) =>
                     conditions.push(eq(reportDatasetMetadata.countryCode, input.countryCode));
                 }
 
-                if (input.entityType) {
-                    conditions.push(eq(reportDatasetMetadata.entityType, input.entityType));
-                }
+                conditions.push(eq(reportDatasetMetadata.entityType, 'target'));
 
                 if (input.statusFilter && input.statusFilter !== 'all') {
                     conditions.push(eq(reportDatasetMetadata.status, input.statusFilter));
@@ -126,7 +123,7 @@ export const buildReportsRouter = (procedure: typeof apiProcedure) =>
                     accountId: z.string(),
                     timestamp: z.string(),
                     aggregation: z.enum(['hourly', 'daily']),
-                    entityType: z.enum(['target', 'product']),
+                    entityType: z.enum(ENTITY_TYPES),
                 })
             )
             .mutation(async ({ ctx, input }) => {

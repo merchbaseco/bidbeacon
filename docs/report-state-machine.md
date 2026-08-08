@@ -16,7 +16,7 @@ The `reportDatasetMetadata` table tracks the state of each report dataset:
 - **`lastReportCreatedAt`**: When the last report was created (used for eligibility calculations)
 - **`periodStart`**: The UTC instant for the account-local report date's midnight
 - **`aggregation`**: Report type (`hourly` or `daily`)
-- **`entityType`**: Report source (`target` or `product`)
+- **`entityType`**: Canonical report source (`target`)
 
 ## Scheduled Job and Polling
 

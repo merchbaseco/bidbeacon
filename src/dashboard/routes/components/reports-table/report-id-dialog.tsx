@@ -24,7 +24,7 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
                 accountId,
                 timestamp: row.periodStart,
                 aggregation: row.aggregation as 'hourly' | 'daily',
-                entityType: row.entityType as 'target' | 'product',
+                entityType: 'target',
             });
         }
     };

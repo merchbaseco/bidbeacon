@@ -7,7 +7,7 @@ import type { z } from 'zod';
 export const AGGREGATION_TYPES = ['hourly', 'daily'] as const;
 export type AggregationType = (typeof AGGREGATION_TYPES)[number];
 
-export const ENTITY_TYPES = ['target', 'product'] as const;
+export const ENTITY_TYPES = ['target'] as const;
 export type EntityType = (typeof ENTITY_TYPES)[number];
 
 /**

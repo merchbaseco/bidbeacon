@@ -25,7 +25,7 @@ describe('Target Search operation', () => {
         database = undefined;
     });
 
-    it('returns target details and target-grain performance without multiplying by advertised-ASIN rows', async () => {
+    it('returns Target details from the canonical archive while ignoring legacy noncanonical rows', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchTargetAdvertiserAccount());
         await database.db.insert(campaign).values(buildSearchTargetCampaign());

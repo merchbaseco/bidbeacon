@@ -6,10 +6,6 @@ export const PERFORMANCE_DIMENSIONS = ['campaign', 'adGroup', 'ad', 'target'] as
 export const performanceDimensionEnum = z.enum(PERFORMANCE_DIMENSIONS);
 export type PerformanceDimension = z.infer<typeof performanceDimensionEnum>;
 
-export const METRICS_ENTITY_TYPES = ['target', 'product'] as const;
-export const metricsEntityTypeEnum = z.enum(METRICS_ENTITY_TYPES);
-export type MetricsEntityType = z.infer<typeof metricsEntityTypeEnum>;
-
 export const SORT_DIRECTIONS = ['asc', 'desc'] as const;
 export const sortDirectionEnum = z.enum(SORT_DIRECTIONS);
 export type SortDirection = z.infer<typeof sortDirectionEnum>;
@@ -36,35 +32,24 @@ export const performanceTableFiltersSchema = z
     })
     .optional();
 
-export const performanceTableInputSchema = z
-    .object({
-        accountId: z.string(),
-        range: performanceRangeSchema,
-        dimension: performanceDimensionEnum,
-        metricsEntityType: metricsEntityTypeEnum,
-        filters: performanceTableFiltersSchema,
-        sort: z
-            .object({
-                field: sortFieldEnum,
-                direction: sortDirectionEnum,
-            })
-            .optional(),
-        pagination: z
-            .object({
-                limit: z.number().min(1).max(200).default(50),
-                cursor: z.string().optional(),
-            })
-            .optional(),
-    })
-    .superRefine((value, ctx) => {
-        if (value.dimension === 'target' && value.metricsEntityType !== 'target') {
-            ctx.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: 'metricsEntityType must be "target" when dimension is "target".',
-                path: ['metricsEntityType'],
-            });
-        }
-    });
+export const performanceTableInputSchema = z.object({
+    accountId: z.string(),
+    range: performanceRangeSchema,
+    dimension: performanceDimensionEnum,
+    filters: performanceTableFiltersSchema,
+    sort: z
+        .object({
+            field: sortFieldEnum,
+            direction: sortDirectionEnum,
+        })
+        .optional(),
+    pagination: z
+        .object({
+            limit: z.number().min(1).max(200).default(50),
+            cursor: z.string().optional(),
+        })
+        .optional(),
+});
 
 export const metricsSchema = z.object({
     impressions: z.number(),

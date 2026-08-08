@@ -85,13 +85,12 @@ describe('Product Search operation', () => {
             }),
             buildSearchProductPerformanceDaily({
                 adId: 'search-products-ad-1',
-                entityType: 'target',
-                entityId: 'target-grain-noise',
-                spend: '99.00',
-                sales: '99.00',
-                purchases: 99,
-                impressions: 99,
-                clicks: 99,
+                entityId: 'search-products-target-2',
+                spend: '1.00',
+                sales: '2.00',
+                purchases: 1,
+                impressions: 10,
+                clicks: 1,
             }),
         ]);
         await database.db.insert(reportDatasetMetadata).values(buildSearchProductReportMetadata('2026-08-06'));
@@ -128,15 +127,15 @@ describe('Product Search operation', () => {
         expect(result.rows).toContainEqual({
             'product.asin': 'B0PRODUCT001',
             'product.title': 'Blue product',
-            'metrics.impressions': 200,
-            'metrics.clicks': 20,
-            'metrics.spend': 20,
-            'metrics.orders': 4,
-            'metrics.sales': 60,
-            'metrics.acos': 33.33,
+            'metrics.impressions': 210,
+            'metrics.clicks': 21,
+            'metrics.spend': 21,
+            'metrics.orders': 5,
+            'metrics.sales': 62,
+            'metrics.acos': 33.87,
             'metrics.cpc': 1,
             'metrics.ctr': 10,
-            'metrics.roas': 3,
+            'metrics.roas': 2.95,
         });
         expect(result.rows).toContainEqual({
             'product.asin': 'B0PRODUCT002',
@@ -160,7 +159,7 @@ describe('Product Search operation', () => {
             dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
         });
         expect(cvrResult.rows).toEqual([
-            { 'product.asin': 'B0PRODUCT001', 'metrics.cvr': 20 },
+            { 'product.asin': 'B0PRODUCT001', 'metrics.cvr': 23.81 },
             { 'product.asin': 'B0PRODUCT002', 'metrics.cvr': 0 },
         ]);
     });
@@ -213,7 +212,7 @@ describe('Product Search operation', () => {
         ).rejects.toMatchObject({ code: 'INVALID_INPUT', details: { fields: ['campaign.id'] } });
     });
 
-    it('zero-fills account-local date and hour segments from the canonical product archives', async () => {
+    it('zero-fills account-local date and hour segments from the canonical Target archive', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchProductAdvertiserAccount());
         await database.db

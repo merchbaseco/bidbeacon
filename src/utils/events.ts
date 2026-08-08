@@ -91,7 +91,7 @@ export interface ReportDatasetMetadataErrorEvent extends BaseEvent {
         countryCode: string;
         periodStart: string;
         aggregation: 'hourly' | 'daily';
-        entityType: 'target' | 'product';
+        entityType: 'target';
         error: string;
     };
 }

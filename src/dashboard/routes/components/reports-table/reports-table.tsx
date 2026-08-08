@@ -7,7 +7,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { useReports } from '../../hooks/use-reports.js';
 import { limitAtom, offsetAtom } from './atoms.js';
 import { EntityAggregationFilter } from './entity-aggregation-filter.js';
-import { EntityTypeFilter } from './entity-type-filter.js';
 import { RefreshButton } from './refresh-button.js';
 import { ReportRow } from './report-row.js';
 import { StatusFilter } from './status-filter.js';
@@ -31,7 +30,6 @@ export const ReportsTable = ({ className }: { className?: string }) => {
         <div className={cn('w-full', className)}>
             <div className="mb-2 flex flex-wrap items-center gap-2">
                 <EntityAggregationFilter />
-                <EntityTypeFilter />
                 <StatusFilter />
                 <RefreshButton />
             </div>

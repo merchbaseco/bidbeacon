@@ -3,9 +3,7 @@ import { reportConfigs } from '@/config/reports/configs';
 import { db } from '@/db';
 import { reportDatasetMetadata } from '@/db/schema';
 import type { EntityType } from '@/types/reports';
-import { handleDailyProduct } from './handlers/daily-product';
 import { handleDailyTarget } from './handlers/daily-target';
-import { handleHourlyProduct } from './handlers/hourly-product';
 import { handleHourlyTarget } from './handlers/hourly-target';
 import type { ParseReportInput, ParseReportOutput } from './handlers/input';
 import { validateReportReady } from './validate-report-ready';
@@ -45,10 +43,6 @@ export async function parseReport(reportUid: InferSelectModel<typeof reportDatas
             return handleHourlyTarget(input);
         case 'daily-target':
             return handleDailyTarget(input);
-        case 'hourly-product':
-            return handleHourlyProduct(input);
-        case 'daily-product':
-            return handleDailyProduct(input);
         default:
             throw new Error(`No handler found for aggregation: ${aggregation}, entityType: ${entityType}`);
     }

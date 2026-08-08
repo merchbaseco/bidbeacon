@@ -121,7 +121,7 @@ const claimAndEnqueue = async (row: typeof reportDatasetMetadata.$inferSelect): 
             countryCode: claimedRow.countryCode,
             timestamp: claimedRow.periodStart.toISOString(),
             aggregation: claimedRow.aggregation as 'hourly' | 'daily',
-            entityType: claimedRow.entityType as 'target' | 'product',
+            entityType: 'target',
             claimed: true,
         });
 
