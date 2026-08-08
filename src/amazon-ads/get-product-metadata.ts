@@ -4,16 +4,14 @@ import { spRequest } from './sp-api';
 
 const productMetadataResponseSchema = z
     .object({
-        ProductMetadataList: z
-            .array(
-                z
-                    .object({
-                        asin: z.string(),
-                        title: z.string().nullish(),
-                    })
-                    .passthrough()
-            )
-            .default([]),
+        ProductMetadataList: z.array(
+            z
+                .object({
+                    asin: z.string(),
+                    title: z.string().nullish(),
+                })
+                .passthrough()
+        ),
     })
     .passthrough();
 
@@ -41,5 +39,5 @@ export const getProductMetadata = async (input: { profileId: number; asins: stri
         input.region
     );
 
-    return (response.ProductMetadataList ?? []).map(product => ({ asin: product.asin, title: product.title ?? null }));
+    return response.ProductMetadataList.map(product => ({ asin: product.asin, title: product.title ?? null }));
 };

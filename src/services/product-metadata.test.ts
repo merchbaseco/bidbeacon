@@ -3,8 +3,8 @@ import { buildProductMetadataEvent, fetchProductMetadataBatches } from './produc
 
 describe('fetchProductMetadataBatches', () => {
     it.each([
-        { count: 300, calls: 1, batchSizes: [300] },
-        { count: 301, calls: 2, batchSizes: [300, 1] },
+        { count: 300, calls: 2, batchSizes: [1, 299] },
+        { count: 301, calls: 2, batchSizes: [1, 300] },
     ])('fetches $count ASINs in $calls Amazon requests', async ({ count, calls, batchSizes }) => {
         const fetchBatch = vi.fn(async (asins: string[]) => asins.map(asin => ({ asin, title: asin })));
         const asins = Array.from({ length: count }, (_, index) => `B${String(index).padStart(9, '0')}`);
@@ -47,7 +47,7 @@ describe('fetchProductMetadataBatches', () => {
                 },
             })
         ).rejects.toThrow('Amazon unavailable');
-        expect(persistedCount).toBe(300);
+        expect(persistedCount).toBe(1);
     });
 
     it('stops after the first empty inventory response', async () => {
@@ -58,8 +58,14 @@ describe('fetchProductMetadataBatches', () => {
                 asins: Array.from({ length: 301 }, (_, index) => `B${String(index).padStart(9, '0')}`),
                 fetchBatch,
             })
-        ).rejects.toThrow('Amazon Product Metadata returned no matching inventory for 300 advertised ASINs.');
+        ).rejects.toThrow('Amazon Product Metadata returned no titled inventory record for advertised ASIN B000000000.');
         expect(fetchBatch).toHaveBeenCalledTimes(1);
+    });
+
+    it('requires the preflight response to contain a title', async () => {
+        await expect(fetchProductMetadataBatches({ asins: ['B000000001'], fetchBatch: async asins => asins.map(asin => ({ asin, title: null })) })).rejects.toThrow(
+            'Amazon Product Metadata returned no titled inventory record for advertised ASIN B000000001.'
+        );
     });
 });
 

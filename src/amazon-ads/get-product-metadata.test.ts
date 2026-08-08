@@ -28,4 +28,12 @@ describe('getProductMetadata', () => {
         await expect(getProductMetadata({ profileId: 123, region: 'na', asins: Array.from({ length: 301 }, (_, index) => `B${index}`) })).rejects.toThrow('between 1 and 300');
         expect(spRequest).not.toHaveBeenCalled();
     });
+
+    it('rejects a response without the documented product list', async () => {
+        vi.mocked(spRequest).mockResolvedValue({ ProductMetadataList: [] });
+        await getProductMetadata({ profileId: 123, region: 'na', asins: ['B000000001'] });
+        const options = vi.mocked(spRequest).mock.calls[0]?.[0];
+
+        expect(() => options?.responseSchema?.parse({})).toThrow('ProductMetadataList');
+    });
 });

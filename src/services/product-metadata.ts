@@ -6,7 +6,7 @@ import { productMetadata } from '@/db/schema';
 import { AMAZON_PRODUCT_METADATA_BATCH_SIZE, fetchProductMetadataBatches } from './product-metadata-batches';
 
 export const updateProductMetadata = async (input: { countryCode: string; profileId: number; region: ApiRegion; asins: string[]; skipExisting?: boolean; skipSyncedAtOrAfter?: Date }) => {
-    const requestedAsins = [...new Set(input.asins)].sort();
+    const requestedAsins = [...new Set(input.asins)];
     const skippedAsins = new Set<string>();
     if (input.skipExisting || input.skipSyncedAtOrAfter) {
         for (let offset = 0; offset < requestedAsins.length; offset += AMAZON_PRODUCT_METADATA_BATCH_SIZE) {
@@ -50,7 +50,7 @@ export const updateProductMetadata = async (input: { countryCode: string; profil
         updatedCount: fetched.products.length,
         skippedCount: skippedAsins.size,
         requestCount: fetched.batchSizes.length,
-        idealRequestCount: Math.ceil(asins.length / AMAZON_PRODUCT_METADATA_BATCH_SIZE),
+        idealRequestCount: asins.length === 0 ? 0 : 1 + Math.ceil((asins.length - 1) / AMAZON_PRODUCT_METADATA_BATCH_SIZE),
         minBatchSize: fetched.batchSizes.length > 0 ? Math.min(...fetched.batchSizes) : 0,
         maxBatchSize: fetched.batchSizes.length > 0 ? Math.max(...fetched.batchSizes) : 0,
         averageBatchSize: fetched.batchSizes.length > 0 ? fetched.batchSizes.reduce((sum, size) => sum + size, 0) / fetched.batchSizes.length : 0,

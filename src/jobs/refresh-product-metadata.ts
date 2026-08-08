@@ -58,7 +58,21 @@ export const refreshProductMetadataJob = boss
                         .from(ad)
                         .innerJoin(campaign, eq(campaign.campaignId, ad.campaignId))
                         .where(and(eq(campaign.accountId, account.adsAccountId), eq(campaign.countryCode, account.countryCode), isNotNull(ad.productAsin)));
-                    const asins = rows.flatMap(row => (row.asin ? [row.asin] : []));
+                    const enabledRow = await db
+                        .selectDistinct({ asin: ad.productAsin })
+                        .from(ad)
+                        .innerJoin(campaign, eq(campaign.campaignId, ad.campaignId))
+                        .where(
+                            and(
+                                eq(campaign.accountId, account.adsAccountId),
+                                eq(campaign.countryCode, account.countryCode),
+                                eq(campaign.state, 'ENABLED'),
+                                eq(ad.state, 'ENABLED'),
+                                isNotNull(ad.productAsin)
+                            )
+                        )
+                        .limit(1);
+                    const asins = [...new Set([...enabledRow, ...rows].flatMap(row => (row.asin ? [row.asin] : [])))];
                     if (asins.length === 0) {
                         recorder.addEvent({ message: 'No advertised products to refresh.', payload: { trigger: 'weekly_refresh', requestedCount: 0, requestCount: 0 } });
                         return;
