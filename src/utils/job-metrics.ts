@@ -78,6 +78,10 @@ export class JobMetricsRecorder {
         this.errorEvent = event;
     }
 
+    setDefaultErrorEvent(event: JobEventDraft) {
+        this.errorEvent ??= event;
+    }
+
     addEvent(event: JobEventDraft) {
         this.events.push(event);
     }
@@ -136,7 +140,7 @@ export const withJobMetrics = async <T>(options: StartJobMetricsOptions, handler
         return result;
     } catch (error) {
         const message = formatError(error);
-        recorder.setErrorEvent({
+        recorder.setDefaultErrorEvent({
             payload: {
                 error: serializeError(error),
             },

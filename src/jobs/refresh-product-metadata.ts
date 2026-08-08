@@ -1,3 +1,4 @@
+import { subDays } from 'date-fns';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
@@ -13,13 +14,14 @@ export const refreshProductMetadataJob = boss
     .createJob('refresh-product-metadata')
     .input(
         z
-            .object({ accountId: z.string().optional(), countryCode: z.string().optional(), refreshStartedAt: z.string().datetime().optional() })
-            .refine(
-                input => Boolean(input.accountId) === Boolean(input.countryCode) && Boolean(input.accountId) === Boolean(input.refreshStartedAt),
-                'accountId, countryCode, and refreshStartedAt must be provided together'
-            )
+            .object({ accountId: z.string().optional(), countryCode: z.string().optional(), trigger: z.enum(['manual_refresh', 'weekly_refresh']).default('weekly_refresh') })
+            .refine(input => Boolean(input.accountId) === Boolean(input.countryCode), 'accountId and countryCode must be provided together')
     )
-    .retry({ limit: 3, delay: 60, backoff: true })
+    .retry({ limit: 0 })
+    .throttle({
+        seconds: 20 * 60,
+        key: data => (data.accountId && data.countryCode ? `${data.accountId}:${data.countryCode}` : 'all-accounts'),
+    })
     .work(async jobs => {
         for (const job of jobs) {
             await withJobMetrics(
@@ -31,13 +33,12 @@ export const refreshProductMetadataJob = boss
                     countryCode: job.data.countryCode,
                 },
                 async recorder => {
-                    if (!(job.data.accountId && job.data.countryCode && job.data.refreshStartedAt)) {
+                    if (!(job.data.accountId && job.data.countryCode)) {
                         const accounts = await db
                             .select({ adsAccountId: advertiserAccount.adsAccountId, countryCode: advertiserAccount.countryCode })
                             .from(advertiserAccount)
                             .where(eq(advertiserAccount.enabled, true));
-                        const refreshStartedAt = new Date().toISOString();
-                        await Promise.all(accounts.map(account => refreshProductMetadataJob.emit({ accountId: account.adsAccountId, countryCode: account.countryCode, refreshStartedAt })));
+                        await Promise.all(accounts.map(account => refreshProductMetadataJob.emit({ accountId: account.adsAccountId, countryCode: account.countryCode, trigger: 'weekly_refresh' })));
                         recorder.addEvent({ message: `Queued product metadata refresh for ${accounts.length} accounts.`, payload: { accountCount: accounts.length, trigger: 'weekly_refresh' } });
                         return;
                     }
@@ -74,7 +75,7 @@ export const refreshProductMetadataJob = boss
                         .limit(1);
                     const asins = [...new Set([...enabledRow, ...rows].flatMap(row => (row.asin ? [row.asin] : [])))];
                     if (asins.length === 0) {
-                        recorder.addEvent({ message: 'No advertised products to refresh.', payload: { trigger: 'weekly_refresh', requestedCount: 0, requestCount: 0 } });
+                        recorder.addEvent({ message: 'No advertised products to refresh.', payload: { trigger: job.data.trigger, requestedCount: 0, requestCount: 0 } });
                         return;
                     }
 
@@ -85,19 +86,19 @@ export const refreshProductMetadataJob = boss
                             profileId: Number(account.profileId),
                             region: resolveApiRegion(account.countryCode),
                             asins,
-                            skipSyncedAtOrAfter: new Date(job.data.refreshStartedAt),
+                            skipSyncedAtOrAfter: subDays(new Date(), 7),
                         });
                     } catch (error) {
                         recorder.setErrorEvent({
                             message: 'Product metadata refresh failed.',
-                            payload: { trigger: 'weekly_refresh', requestedCount: asins.length, failureCount: 1, error: error instanceof Error ? error.message : String(error) },
+                            payload: { trigger: job.data.trigger, requestedCount: asins.length, failureCount: 1, error: error instanceof Error ? error.message : String(error) },
                         });
                         throw error;
                     } finally {
                         emitEvent({ type: 'product-metadata:updated', accountId: account.adsAccountId, countryCode: account.countryCode });
                     }
                     recorder.addEvent({
-                        ...buildProductMetadataEvent('Refreshed', result, { trigger: 'weekly_refresh' }),
+                        ...buildProductMetadataEvent('Refreshed', result, { trigger: job.data.trigger }),
                         accountId: account.adsAccountId,
                         countryCode: account.countryCode,
                     });

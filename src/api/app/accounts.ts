@@ -2,6 +2,7 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { advertiserAccount } from '@/db/schema';
+import { refreshProductMetadataJob } from '@/jobs/refresh-product-metadata';
 import { syncAdEntitiesForAccountJob } from '@/jobs/sync-ad-entities-for-account';
 import { expandAdvertiserAccountMemberships } from '@/services/access/advertiser-account-memberships';
 import { getProductMetadataCoverage } from '@/services/product-metadata-coverage';
@@ -135,10 +136,17 @@ export const accountsRouter = router({
         .mutation(async ({ ctx, input }) => {
             ctx.assertAccountAccess(input.accountId);
 
-            await syncAdEntitiesForAccountJob.emit({
-                accountId: input.accountId,
-                countryCode: input.countryCode,
-            });
+            await Promise.all([
+                syncAdEntitiesForAccountJob.emit({
+                    accountId: input.accountId,
+                    countryCode: input.countryCode,
+                }),
+                refreshProductMetadataJob.emit({
+                    accountId: input.accountId,
+                    countryCode: input.countryCode,
+                    trigger: 'manual_refresh',
+                }),
+            ]);
             return true;
         }),
 });
