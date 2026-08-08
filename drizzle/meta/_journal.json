@@ -428,6 +428,13 @@
       "when": 1786228911148,
       "tag": "0060_little_grim_reaper",
       "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1786232092449,
+      "tag": "0061_open_lester",
+      "breakpoints": true
     }
   ]
 }

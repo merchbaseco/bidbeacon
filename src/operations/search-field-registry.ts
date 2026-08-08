@@ -88,6 +88,7 @@ export type SearchFieldDefinition = {
     default: boolean;
     performance: boolean;
     segment: boolean;
+    sortable: boolean;
 };
 
 const performanceResources = ['campaign', 'ad_group', 'ad', 'target', 'product'] as const satisfies readonly SearchResource[];
@@ -112,7 +113,7 @@ const definition = <TField extends SearchField>(
     filterOperators: readonly SearchOperator[],
     compatibleResources: readonly SearchResource[],
     defaultResources: readonly SearchResource[] = [],
-    options: { performance?: boolean; segment?: boolean } = {}
+    options: { performance?: boolean; segment?: boolean; sortable?: boolean } = {}
 ): SearchFieldDefinition => ({
     field,
     kind,
@@ -122,6 +123,7 @@ const definition = <TField extends SearchField>(
     default: defaultResources.length > 0,
     performance: options.performance ?? false,
     segment: options.segment ?? false,
+    sortable: options.sortable ?? true,
 });
 
 export const searchFieldRegistry: Readonly<Record<SearchField, SearchFieldDefinition>> = {
@@ -143,7 +145,7 @@ export const searchFieldRegistry: Readonly<Record<SearchField, SearchFieldDefini
     'ad.state': definition('ad.state', 'string', stringEqualityOperators, adResource, ['ad']),
     'ad.deliveryStatus': definition('ad.deliveryStatus', 'string', stringEqualityOperators, adResource, ['ad']),
     'ad.asin': definition('ad.asin', 'string', stringEqualityOperators, adResource, ['ad']),
-    'ad.productTitle': definition('ad.productTitle', 'string', nameOperators, adResource, ['ad']),
+    'ad.productTitle': definition('ad.productTitle', 'string', [], adResource, ['ad'], { sortable: false }),
     'ad.type': definition('ad.type', 'string', stringEqualityOperators, adResource),
     'target.id': definition('target.id', 'string', stringEqualityOperators, targetResource, ['target']),
     'target.state': definition('target.state', 'string', stringEqualityOperators, targetResource, ['target']),
@@ -177,7 +179,7 @@ export const searchFieldRegistry: Readonly<Record<SearchField, SearchFieldDefini
     'segments.date': definition('segments.date', 'date', dateOperators, performanceResources, [], { performance: true, segment: true }),
     'segments.hour': definition('segments.hour', 'number', numericOperators, productAndChildResources, [], { performance: true, segment: true }),
     'product.asin': definition('product.asin', 'string', stringEqualityOperators, productResource, ['product']),
-    'product.title': definition('product.title', 'string', nameOperators, productResource, ['product']),
+    'product.title': definition('product.title', 'string', [], productResource, ['product'], { sortable: false }),
 };
 
 export const CAMPAIGN_DEFAULT_FIELDS = CAMPAIGN_SEARCH_FIELDS.filter(field => searchFieldRegistry[field].defaultResources.includes('campaign')) as CampaignSearchField[];

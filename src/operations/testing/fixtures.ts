@@ -76,7 +76,6 @@ export const buildAd = (overrides: Partial<AdInsert> = {}): AdInsert => ({
     state: 'ENABLED',
     deliveryStatus: 'DELIVERING',
     productAsin: 'asin-1',
-    productTitle: 'Test product',
     creationDateTime: new Date('2026-08-01T12:00:00.000Z'),
     lastUpdatedDateTime: new Date('2026-08-05T12:00:00.000Z'),
     ...overrides,

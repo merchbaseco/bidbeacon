@@ -2,10 +2,8 @@ import { and, eq, inArray } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
 import { advertiserAccount } from '@/db/schema';
-import { refreshProductMetadataJob } from '@/jobs/refresh-product-metadata';
 import { syncAdEntitiesForAccountJob } from '@/jobs/sync-ad-entities-for-account';
 import { expandAdvertiserAccountMemberships } from '@/services/access/advertiser-account-memberships';
-import { getProductMetadataCoverage } from '@/services/product-metadata-coverage';
 import { privateProcedure, router } from '../trpc';
 
 export const accountsRouter = router({
@@ -121,11 +119,6 @@ export const accountsRouter = router({
             return data;
         }),
 
-    productMetadataCoverage: privateProcedure.input(z.object({ accountId: z.string(), countryCode: z.string() })).query(async ({ ctx, input }) => {
-        ctx.assertAccountAccess(input.accountId);
-        return getProductMetadataCoverage(db, input);
-    }),
-
     syncAdEntities: privateProcedure
         .input(
             z.object({
@@ -136,17 +129,10 @@ export const accountsRouter = router({
         .mutation(async ({ ctx, input }) => {
             ctx.assertAccountAccess(input.accountId);
 
-            await Promise.all([
-                syncAdEntitiesForAccountJob.emit({
-                    accountId: input.accountId,
-                    countryCode: input.countryCode,
-                }),
-                refreshProductMetadataJob.emit({
-                    accountId: input.accountId,
-                    countryCode: input.countryCode,
-                    trigger: 'manual_refresh',
-                }),
-            ]);
+            await syncAdEntitiesForAccountJob.emit({
+                accountId: input.accountId,
+                countryCode: input.countryCode,
+            });
             return true;
         }),
 });

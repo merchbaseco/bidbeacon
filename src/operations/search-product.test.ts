@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { ad, adGroup, advertiserAccount, campaign, performanceDaily, performanceHourly, productMetadata, reportDatasetMetadata } from '@/db/schema';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { ad, adGroup, advertiserAccount, campaign, performanceDaily, performanceHourly, reportDatasetMetadata } from '@/db/schema';
 import { createFakeAmazonAdsGateway } from './amazon-ads-gateway';
 import { createOperationContext, type OperationContext } from './operation-context';
 import { search } from './search';
@@ -48,7 +48,6 @@ describe('Product Search operation', () => {
             buildSearchProductAd({
                 id: 'search-products-ad-row-2',
                 adId: 'search-products-ad-2',
-                productTitle: null,
             }),
             buildSearchProductAd({
                 id: 'search-products-ad-row-3',
@@ -60,7 +59,6 @@ describe('Product Search operation', () => {
                 id: 'search-products-ad-row-4',
                 adId: 'search-products-ad-4',
                 productAsin: 'B0PRODUCT002',
-                productTitle: null,
             }),
         ]);
         await database.db.insert(performanceDaily).values([
@@ -95,7 +93,7 @@ describe('Product Search operation', () => {
         ]);
         await database.db.insert(reportDatasetMetadata).values(buildSearchProductReportMetadata('2026-08-06'));
 
-        const result = await search(createSearchContext(database), {
+        const result = await search(createSearchContext(database, undefined, { B0PRODUCT001: 'Blue product' }), {
             accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
             resource: 'product',
             dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
@@ -167,45 +165,52 @@ describe('Product Search operation', () => {
         ]);
     });
 
-    it('supports Product-only fields, ASIN and title filters, and title-then-ASIN settings ordering', async () => {
+    it('resolves display titles for the final Product page while keeping filtering, ordering, and pagination local', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchProductAdvertiserAccount());
         await database.db.insert(campaign).values(buildSearchProductCampaign());
         await database.db.insert(adGroup).values(buildSearchProductAdGroup());
         await database.db
             .insert(ad)
-            .values([
-                buildSearchProductAd({ productAsin: 'B0PRODUCT001', productTitle: 'Zulu product' }),
-                buildSearchProductAd({ id: 'search-products-ad-row-2', adId: 'search-products-ad-2', productAsin: 'B0PRODUCT002', productTitle: 'Alpha product' }),
-            ]);
-        await database.db.insert(productMetadata).values({ countryCode: 'US', asin: 'B0PRODUCT002', title: 'Projected product title', lastFetchedAt: new Date('2026-08-08T00:00:00Z') });
+            .values([buildSearchProductAd({ productAsin: 'B0PRODUCT001' }), buildSearchProductAd({ id: 'search-products-ad-row-2', adId: 'search-products-ad-2', productAsin: 'B0PRODUCT002' })]);
 
-        const titleResult = await search(createSearchContext(database), {
+        const resolveProducts = vi.fn(async ({ asins }: { marketplaceId: string; asins: string[] }) =>
+            asins.map(asin => ({ asin, title: asin === 'B0PRODUCT001' ? 'Zulu product' : 'Alpha product' }))
+        );
+        const titleResult = await search(createSearchContext(database, undefined, undefined, resolveProducts), {
             accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
             resource: 'product',
             fields: ['product.asin', 'product.title'],
-            filters: [{ field: 'product.title', operator: 'contains', value: 'PROJECTED' }],
-            orderBy: [{ field: 'product.title', direction: 'asc' }],
+            limit: 1,
         });
 
-        expect(titleResult.context).toEqual({
-            account: { id: SEARCH_PRODUCTS_ACCOUNT_ID, timezone: 'America/Los_Angeles', currency: 'USD' },
-            resource: 'product',
-            fields: ['product.asin', 'product.title'],
-            orderBy: [
-                { field: 'product.title', direction: 'asc' },
-                { field: 'product.asin', direction: 'asc' },
-            ],
-        });
-        expect(titleResult.rows).toEqual([{ 'product.asin': 'B0PRODUCT002', 'product.title': 'Projected product title' }]);
+        expect(titleResult.context.orderBy).toEqual([{ field: 'product.asin', direction: 'asc' }]);
+        expect(titleResult.rows).toEqual([{ 'product.asin': 'B0PRODUCT001', 'product.title': 'Zulu product' }]);
+        expect(resolveProducts).toHaveBeenCalledWith({ marketplaceId: 'ATVPDKIKX0DER', asins: ['B0PRODUCT001'] });
 
-        const asinResult = await search(createSearchContext(database), {
+        const asinResult = await search(createSearchContext(database, undefined, undefined, resolveProducts), {
             accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
             resource: 'product',
             fields: ['product.asin'],
             filters: [{ field: 'product.asin', operator: 'in', value: ['B0PRODUCT001', 'B0PRODUCT002'] }],
         });
-        expect(asinResult.rows).toEqual([{ 'product.asin': 'B0PRODUCT002' }, { 'product.asin': 'B0PRODUCT001' }]);
+        expect(asinResult.rows).toEqual([{ 'product.asin': 'B0PRODUCT001' }, { 'product.asin': 'B0PRODUCT002' }]);
+        expect(resolveProducts).toHaveBeenCalledTimes(1);
+
+        await expect(
+            search(createSearchContext(database), {
+                accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
+                resource: 'product',
+                filters: [{ field: 'product.title', operator: 'contains', value: 'product' }],
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT', details: { field: 'product.title' } });
+        await expect(
+            search(createSearchContext(database), {
+                accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
+                resource: 'product',
+                orderBy: [{ field: 'product.title', direction: 'asc' }],
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT', details: { field: 'product.title' } });
 
         await expect(
             search(createSearchContext(database), {
@@ -214,6 +219,27 @@ describe('Product Search operation', () => {
                 fields: ['product.asin', 'campaign.id'],
             })
         ).rejects.toMatchObject({ code: 'INVALID_INPUT', details: { fields: ['campaign.id'] } });
+    });
+
+    it('returns null titles when RankWrangler resolution is unavailable', async () => {
+        database = await createTestDatabase();
+        await database.db.insert(advertiserAccount).values(buildSearchProductAdvertiserAccount());
+        await database.db.insert(campaign).values(buildSearchProductCampaign());
+        await database.db.insert(adGroup).values(buildSearchProductAdGroup());
+        await database.db.insert(ad).values(buildSearchProductAd());
+
+        const result = await search(
+            createSearchContext(database, undefined, undefined, async () => {
+                throw new Error('RankWrangler unavailable');
+            }),
+            {
+                accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
+                resource: 'product',
+                fields: ['product.asin', 'product.title'],
+            }
+        );
+
+        expect(result.rows).toEqual([{ 'product.asin': 'B0PRODUCT001', 'product.title': null }]);
     });
 
     it('zero-fills account-local date and hour segments from the canonical Target archive', async () => {
@@ -237,7 +263,6 @@ describe('Product Search operation', () => {
                 id: 'search-products-ad-row-2',
                 adId: 'search-products-ad-2',
                 productAsin: 'B0PRODUCT001',
-                productTitle: null,
             }),
             buildSearchProductAd({
                 id: 'search-products-ad-row-3',
@@ -245,7 +270,6 @@ describe('Product Search operation', () => {
                 adGroupId: 'search-products-ad-group-2',
                 campaignId: 'search-products-campaign-2',
                 productAsin: 'B0PRODUCT002',
-                productTitle: null,
             }),
         ]);
         await database.db.insert(performanceDaily).values([
@@ -358,7 +382,7 @@ describe('Product Search operation', () => {
         ]);
         await database.db.insert(ad).values([
             buildSearchProductAd(),
-            buildSearchProductAd({ id: 'search-products-ad-row-2', adId: 'search-products-ad-2', productAsin: 'B0PRODUCT002', productTitle: 'Second product' }),
+            buildSearchProductAd({ id: 'search-products-ad-row-2', adId: 'search-products-ad-2', productAsin: 'B0PRODUCT002' }),
             buildSearchProductAd({
                 id: 'search-products-ad-row-3',
                 adId: 'search-products-ad-3',
@@ -370,7 +394,6 @@ describe('Product Search operation', () => {
                 adId: 'search-products-ad-other',
                 adGroupId: 'search-products-ad-group-other',
                 campaignId: 'search-products-campaign-other',
-                productTitle: 'Other account product',
             }),
         ]);
         await database.db.insert(performanceDaily).values([
@@ -455,10 +478,16 @@ describe('Product Search operation', () => {
     });
 });
 
-const createSearchContext = (database: TestDatabase, accessibleAccountIds: string[] = [SEARCH_PRODUCTS_ACCOUNT_ID]): OperationContext =>
+const createSearchContext = (
+    database: TestDatabase,
+    accessibleAccountIds: string[] = [SEARCH_PRODUCTS_ACCOUNT_ID],
+    titles: Record<string, string> = {},
+    resolveProducts = async ({ asins }: { marketplaceId: string; asins: string[] }) => asins.flatMap(asin => (titles[asin] ? [{ asin, title: titles[asin] }] : []))
+): OperationContext =>
     createOperationContext({
         amazonAds: createFakeAmazonAdsGateway(),
         db: database.db,
+        products: { resolveProducts },
         principal: {
             accessibleAccountIds,
             credentialKind: 'session',

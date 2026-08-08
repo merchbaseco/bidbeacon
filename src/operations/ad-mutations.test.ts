@@ -309,7 +309,6 @@ describe('Ad-group and Ad mutation operations', () => {
                 state: 'ENABLED',
                 deliveryStatus: 'DELIVERING',
                 productAsin: 'B000000001',
-                productTitle: 'Created product',
             },
         ]);
 
@@ -373,7 +372,7 @@ describe('Ad-group and Ad mutation operations', () => {
             state: 'ARCHIVED',
             deliveryStatus: 'NOT_DELIVERING',
             asin: 'B000000001',
-            productTitle: 'Existing product',
+            productTitle: null,
         });
 
         await expect(database.db.select().from(ad)).resolves.toMatchObject([

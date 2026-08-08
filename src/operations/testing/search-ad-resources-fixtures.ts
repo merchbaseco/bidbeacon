@@ -69,7 +69,6 @@ export const buildSearchAdResourcesAd = (overrides: Partial<AdInsert> = {}): AdI
     state: 'ENABLED',
     deliveryStatus: 'DELIVERING',
     productAsin: 'B0SEARCHCHILD001',
-    productTitle: 'Search child-resource product',
     creationDateTime: new Date('2026-08-01T12:00:00.000Z'),
     lastUpdatedDateTime: new Date('2026-08-05T12:00:00.000Z'),
     ...overrides,

@@ -14,7 +14,7 @@ import { exportCampaigns } from '@/amazon-ads/export-campaigns';
 import { exportTargets } from '@/amazon-ads/export-targets';
 import { type ExportContentType, type ExportStatusResponse, getExportStatus } from '@/amazon-ads/get-export-status';
 import { db } from '@/db/index';
-import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, productMetadata, target } from '@/db/schema';
+import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, target } from '@/db/schema';
 import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
 import { utcNow } from '@/utils/date';
@@ -92,9 +92,6 @@ const adGroupsExportSchema = z.array(adGroupExportSchema);
 const productSchema = z.object({
     productIdType: z.string(),
     productId: z.string(), // This is the ASIN
-    title: z.string().optional(),
-    productTitle: z.string().optional(),
-    name: z.string().optional(),
 });
 
 const creativeSchema = z.object({
@@ -537,18 +534,6 @@ export const syncAdEntitiesForAccountJob = boss
                         const adGroupIds = adGroupsData.map(ag => ag.adGroupId);
                         const adIds = adsData.map(a => a.adId);
                         const targetIds = targetsData.map(t => t.targetId);
-                        const advertisedAsins = [...new Set(adsData.flatMap(a => a.creative.products[0]?.productId ?? []))];
-                        const knownProducts = new Map<string, string | null>();
-                        for (let offset = 0; offset < advertisedAsins.length; offset += 300) {
-                            const rows = await db
-                                .select({ asin: productMetadata.asin, title: productMetadata.title })
-                                .from(productMetadata)
-                                .where(and(eq(productMetadata.countryCode, countryCode), inArray(productMetadata.asin, advertisedAsins.slice(offset, offset + 300))));
-                            for (const row of rows) {
-                                knownProducts.set(row.asin, row.title);
-                            }
-                        }
-
                         await db.transaction(async tx => {
                             // Delete existing data for this account only (scoped to exported IDs)
                             // Delete in reverse dependency order to respect foreign key constraints
@@ -623,7 +608,6 @@ export const syncAdEntitiesForAccountJob = boss
                                         state: a.state,
                                         deliveryStatus: a.deliveryStatus,
                                         productAsin: product?.productId ?? null,
-                                        productTitle: product?.productId ? (knownProducts.get(product.productId) ?? resolveExportProductTitle(product)) : null,
                                         creationDateTime: new Date(a.creationDateTime),
                                         lastUpdatedDateTime: new Date(a.lastUpdatedDateTime),
                                     };
@@ -667,8 +651,6 @@ export const syncAdEntitiesForAccountJob = boss
                                 await batchInsert(tx, target, targetRecords);
                             }
                         });
-
-                        emitEvent({ type: 'product-metadata:updated', accountId, countryCode });
 
                         // Update metadata with success
                         await db
@@ -769,20 +751,6 @@ async function downloadAndParse<T>(url: string, schema: z.ZodType<T>): Promise<T
 
     return schema.parse(rawJson);
 }
-
-const resolveExportProductTitle = (product: z.infer<typeof productSchema> | undefined) => {
-    if (!product) {
-        return null;
-    }
-
-    const rawTitle = product.title ?? product.productTitle ?? product.name;
-    if (typeof rawTitle !== 'string') {
-        return null;
-    }
-
-    const title = rawTitle.trim();
-    return title.length > 0 ? title : null;
-};
 
 async function batchInsert<T extends Record<string, unknown>>(
     tx: Parameters<Parameters<typeof db.transaction>[0]>[0],

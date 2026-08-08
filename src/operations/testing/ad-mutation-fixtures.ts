@@ -66,7 +66,6 @@ export const buildAdMutationAd = (overrides: Partial<AdInsert> = {}): AdInsert =
     state: 'PAUSED',
     deliveryStatus: 'NOT_DELIVERING',
     productAsin: 'B000000001',
-    productTitle: 'Existing product',
     creationDateTime: new Date('2026-08-01T07:00:00.000Z'),
     lastUpdatedDateTime: new Date('2026-08-05T07:00:00.000Z'),
     ...overrides,

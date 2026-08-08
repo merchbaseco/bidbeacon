@@ -241,6 +241,9 @@ const resolveOrder = (resource: SearchResource, orderBy: readonly z.infer<typeof
         if (!(field && isSearchFieldCompatible(resource, order.field))) {
             throw invalidInput(`Search ordering Field is not compatible with ${resource}.`, { field: order.field, allowedFields: fieldsForResource(resource) });
         }
+        if (!field.sortable) {
+            throw invalidInput('Search ordering is not available for an externally resolved Field.', { field: order.field });
+        }
         if (seen.has(order.field)) {
             throw invalidInput('Search ordering Fields must be unique.', { field: order.field });
         }
@@ -352,10 +355,7 @@ const getDefaultOrder = (resource: SearchResource, performance: boolean, segment
         return [{ field: 'changeEvent.changedAt', direction: 'desc' }];
     }
     if (resource === 'product') {
-        return [
-            { field: 'product.title', direction: 'asc' },
-            { field: 'product.asin', direction: 'asc' },
-        ];
+        return [{ field: 'product.asin', direction: 'asc' }];
     }
     return [
         resource === 'ad'

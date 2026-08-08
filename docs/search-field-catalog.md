@@ -14,7 +14,7 @@ The shared Search operation implements `resource: campaign`, `resource: ad_group
 
 Every performance-bearing resource reads the canonical Target-grain archive (`entity_type = target`). Campaign, Ad-group, Ad, and Target group those observations by their stored topology identifiers. Product joins each observation's Ad to its advertised ASIN and groups by that ASIN across Ads and Campaigns. Aggregate and date-segmented searches use `performance_daily`; hour-segmented searches for Ad groups, Ads, and Products use `performance_hourly`. Rows are aggregated once at the selected resource grain, so topology joins never multiply metrics. Segmented rows are account-local and zero-filled across the requested range. Completed Target report metadata with zero records is complete while missing metadata remains unknown.
 
-`product.title` uses an available title from the account's matching Ads and is `null` when no matching Ad retains a title.
+`product.title` and `ad.productTitle` are resolved in one bounded RankWrangler call for the final Search page. BidBeacon stores no product titles. Missing products or resolver failures return `null` without failing Search. These display-only fields cannot filter or order Search because enrichment occurs after pagination.
 
 ## Resource fields
 

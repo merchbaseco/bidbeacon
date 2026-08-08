@@ -106,7 +106,6 @@ describe('Ad-group and Ad Search operations', () => {
                 id: 'search-ad-resources-ad-row-2',
                 adId: 'search-ad-resources-ad-2',
                 productAsin: 'B0SEARCHCHILD002',
-                productTitle: 'Second search child-resource product',
             }),
         ]);
         await database.db
@@ -116,11 +115,17 @@ describe('Ad-group and Ad Search operations', () => {
                 buildSearchAdResourcesPerformanceDaily({ adId: 'search-ad-resources-ad-2', entityId: 'B0SEARCHCHILD002', spend: '2.00', sales: '8.00', purchases: 1 }),
             ]);
 
-        const defaultResult = await search(createSearchContext(database), {
-            accountId: SEARCH_AD_RESOURCES_ACCOUNT_ID,
-            resource: 'ad',
-            dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
-        });
+        const defaultResult = await search(
+            createSearchContext(database, undefined, {
+                B0SEARCHCHILD001: 'First search child-resource product',
+                B0SEARCHCHILD002: 'Second search child-resource product',
+            }),
+            {
+                accountId: SEARCH_AD_RESOURCES_ACCOUNT_ID,
+                resource: 'ad',
+                dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
+            }
+        );
         expect(defaultResult.context.fields).toEqual([
             'ad.id',
             'ad.state',
@@ -143,6 +148,7 @@ describe('Ad-group and Ad Search operations', () => {
             'metrics.cvr',
         ]);
         expect(defaultResult.rows.map(row => row['ad.id'])).toEqual(['search-ad-resources-ad-1', 'search-ad-resources-ad-2']);
+        expect(defaultResult.rows.map(row => row['ad.productTitle'])).toEqual(['First search child-resource product', 'Second search child-resource product']);
 
         const filteredResult = await search(createSearchContext(database), {
             accountId: SEARCH_AD_RESOURCES_ACCOUNT_ID,
@@ -473,10 +479,13 @@ describe('Ad-group and Ad Search operations', () => {
     });
 });
 
-const createSearchContext = (database: TestDatabase, accessibleAccountIds: string[] = [SEARCH_AD_RESOURCES_ACCOUNT_ID]): OperationContext =>
+const createSearchContext = (database: TestDatabase, accessibleAccountIds: string[] = [SEARCH_AD_RESOURCES_ACCOUNT_ID], titles: Record<string, string> = {}): OperationContext =>
     createOperationContext({
         amazonAds: createFakeAmazonAdsGateway(),
         db: database.db,
+        products: {
+            resolveProducts: async ({ asins }) => asins.flatMap(asin => (titles[asin] ? [{ asin, title: titles[asin] }] : [])),
+        },
         principal: {
             accessibleAccountIds,
             credentialKind: 'session',

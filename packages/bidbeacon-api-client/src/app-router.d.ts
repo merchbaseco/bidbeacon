@@ -203,8 +203,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				state: "ENABLED" | "PAUSED" | "ARCHIVED";
 				deliveryStatus: string;
 				adGroupId: string;
-				productTitle: string | null;
 				asin: string;
+				productTitle: string | null;
 			}[];
 			targets: {
 				id: string;
@@ -289,8 +289,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 			state: "ENABLED" | "PAUSED" | "ARCHIVED";
 			deliveryStatus: string;
 			adGroupId: string;
-			productTitle: string | null;
 			asin: string;
+			productTitle: string | null;
 		};
 		meta: object;
 	}>;
@@ -456,8 +456,8 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 			state: "ENABLED" | "PAUSED" | "ARCHIVED";
 			deliveryStatus: string;
 			adGroupId: string;
-			productTitle: string | null;
 			asin: string;
+			productTitle: string | null;
 		};
 		meta: object;
 	}>;
@@ -673,8 +673,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				state: "ENABLED" | "PAUSED" | "ARCHIVED";
 				deliveryStatus: string;
 				adGroupId: string;
-				productTitle: string | null;
 				asin: string;
+				productTitle: string | null;
 			}[];
 			targets: {
 				id: string;
@@ -759,8 +759,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 			state: "ENABLED" | "PAUSED" | "ARCHIVED";
 			deliveryStatus: string;
 			adGroupId: string;
-			productTitle: string | null;
 			asin: string;
+			productTitle: string | null;
 		};
 		meta: object;
 	}>;
@@ -926,8 +926,8 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 			state: "ENABLED" | "PAUSED" | "ARCHIVED";
 			deliveryStatus: string;
 			adGroupId: string;
-			productTitle: string | null;
 			asin: string;
+			productTitle: string | null;
 		};
 		meta: object;
 	}>;

@@ -5,7 +5,7 @@ import { OperationError } from './operation-errors';
 import { queryCampaignSearchCoverage, queryTargetSearchCoverage } from './search-coverage';
 import { decodeSearchCursor, encodeSearchCursor } from './search-cursor';
 import { planSearch, searchOutputSchema } from './search-planner';
-import { compareSearchRowToBoundary, filterSearchRows, querySearchRows, sortSearchRows } from './search-query';
+import { compareSearchRowToBoundary, filterSearchRows, querySearchRows, type SearchRow, sortSearchRows } from './search-query';
 
 export type SearchExecutionOptions = {
     now?: Date;
@@ -42,6 +42,7 @@ export const search = async (context: OperationContext, input: unknown, options:
           )
         : undefined;
 
+    const enrichedRows = await enrichProductTitles(context, metadata.marketplaceId, plan.resource, plan.fields, pageRows);
     const result: {
         context: Record<string, unknown>;
         rows: Record<string, unknown>[];
@@ -55,7 +56,7 @@ export const search = async (context: OperationContext, input: unknown, options:
             orderBy: [...plan.orderBy],
             ...(coverage ? { coverage } : {}),
         },
-        rows: pageRows.map(row => Object.fromEntries(plan.fields.map(field => [field, row.values[field]]))),
+        rows: enrichedRows.map(row => Object.fromEntries(plan.fields.map(field => [field, row.values[field]]))),
     };
 
     if (nextCursor) {
@@ -63,4 +64,29 @@ export const search = async (context: OperationContext, input: unknown, options:
     }
 
     return searchOutputSchema.parse(result);
+};
+
+const enrichProductTitles = async (context: OperationContext, marketplaceId: string, resource: string, fields: readonly string[], rows: SearchRow[]) => {
+    const titleField = resource === 'product' ? 'product.title' : resource === 'ad' ? 'ad.productTitle' : null;
+    const asinField = resource === 'product' ? 'product.asin' : resource === 'ad' ? 'ad.asin' : null;
+    if (!(titleField && asinField && fields.includes(titleField))) {
+        return rows;
+    }
+
+    const asins = [...new Set(rows.flatMap(row => (typeof row.values[asinField] === 'string' ? [row.values[asinField] as string] : [])))];
+    if (asins.length === 0) {
+        return rows;
+    }
+
+    try {
+        const resolved = await context.products.resolveProducts({ marketplaceId, asins });
+        const titles = new Map(resolved.map(product => [product.asin, product.title]));
+        return rows.map(row => {
+            const asin = row.values[asinField];
+            const title = typeof asin === 'string' ? titles.get(asin) : undefined;
+            return title === undefined ? row : { values: { ...row.values, [titleField]: title } };
+        });
+    } catch {
+        return rows;
+    }
 };

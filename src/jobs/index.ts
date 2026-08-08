@@ -18,8 +18,6 @@ import './cleanup-ams-metrics';
 import './refresh-access-projections';
 import './sync-change-history';
 import './sync-change-history-for-account';
-import './update-product-metadata';
-import './refresh-product-metadata';
 
 export async function startJobs(): Promise<void> {
     if (boss.isStarted) {

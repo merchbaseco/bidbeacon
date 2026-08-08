@@ -15,7 +15,6 @@ export type EventType =
     | 'job-metrics:updated'
     | 'events:updated'
     | 'account-dataset-metadata:updated'
-    | 'product-metadata:updated'
     | 'report:refreshed'
     | 'report-dataset-metadata:error';
 
@@ -80,12 +79,6 @@ export interface AccountDatasetMetadataUpdatedEvent extends BaseEvent {
     countryCode: string;
 }
 
-export interface ProductMetadataUpdatedEvent extends BaseEvent {
-    type: 'product-metadata:updated';
-    accountId: string;
-    countryCode: string;
-}
-
 export interface ReportRefreshedEvent extends BaseEvent {
     type: 'report:refreshed';
     row: InferSelectModel<typeof reportDatasetMetadata>;
@@ -111,7 +104,6 @@ export type Event =
     | JobMetricsUpdatedEvent
     | EventsUpdatedEvent
     | AccountDatasetMetadataUpdatedEvent
-    | ProductMetadataUpdatedEvent
     | ReportRefreshedEvent
     | ReportDatasetMetadataErrorEvent;
 
@@ -204,7 +196,6 @@ const eventEmitter = new EventEmitter();
 type EventWithoutTimestamp =
     | Omit<AccountUpdatedEvent, 'timestamp'>
     | Omit<AccountDatasetMetadataUpdatedEvent, 'timestamp'>
-    | Omit<ProductMetadataUpdatedEvent, 'timestamp'>
     | Omit<ApiMetricsUpdatedEvent, 'timestamp'>
     | Omit<ErrorEvent, 'timestamp'>
     | Omit<EventsUpdatedEvent, 'timestamp'>

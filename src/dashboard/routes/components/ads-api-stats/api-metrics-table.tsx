@@ -38,7 +38,7 @@ export function ApiMetricsTable({ className }: { className?: string }) {
 
     // Ensure exactly 5 rows
     const rowsToRender = useMemo(() => {
-        const rows = apiTotals.map(api => ({ ...api, id: api.name }));
+        const rows: Array<((typeof apiTotals)[number] & { id: string }) | { id: string; placeholder: true }> = apiTotals.map(api => ({ ...api, id: api.name }));
         while (rows.length < 5) {
             rows.push({ id: `api-empty-placeholder-${rows.length}`, placeholder: true as const });
         }

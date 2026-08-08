@@ -199,7 +199,7 @@ Every filter must match. `in` expresses alternatives for one field; Search has n
 
 The Search schema constrains each field to its valid operators and value type. For example, IDs and states accept `eq` and `in`, names accept `eq`, `in`, and `contains`, and numeric metrics accept equality and comparison operators.
 
-A compatible Field may be filtered or ordered without being selected for output.
+A compatible database-backed Field may be filtered or ordered without being selected for output. RankWrangler-resolved title fields are display-only and cannot filter or order Search.
 
 ### Fields and defaults
 
@@ -210,6 +210,7 @@ The complete field vocabulary lives in [search-field-catalog.md](search-field-ca
 - Selecting a metric or segment makes the request a Performance search.
 - Campaign Search accepts `segments.date`.
 - Ad-group, Ad, and Product Search accept account-local `segments.hour`, which requires `segments.date`.
+- `product.title` and `ad.productTitle` are resolved through RankWrangler for only the final page; missing resolution returns `null` without failing Search.
 - A validation error names incompatible fields and the fields permitted for that resource.
 
 Every performance-bearing Search resource reads the canonical Target-grain archive (`entity_type = target`). Campaign, Ad-group, Ad, and Target group those observations by their topology identifiers. Product joins each observation's Ad to its advertised ASIN and groups by that ASIN across Ads and Campaigns. Aggregate and date-segmented searches use the daily archive; hour-segmented Ad-group, Ad, and Product searches use the hourly archive. Rows are aggregated once at the selected resource grain, and segmented rows are account-local and zero-filled across the requested range. Coverage uses Target report metadata, including valid completed zero-record reports. Change-event Search reads account- and marketplace-scoped entity history and does not report performance coverage.
@@ -232,7 +233,7 @@ The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` inc
 - segmented Performance searches order by the selected segments ascending;
 - settings-only Campaign and Ad-group searches order by name ascending;
 - settings-only Ad and Target searches order by ID ascending;
-- settings-only Product searches order by title and then ASIN ascending;
+- settings-only Product searches order by ASIN ascending;
 - `change_event` searches order by `changeEvent.changedAt desc`.
 
 BidBeacon preserves requested ordering and ensures the selected segment Fields plus Campaign ID, Ad-group ID, Ad ID, Target ID, Product ASIN, or Change-event ID are present as deterministic continuation keys.

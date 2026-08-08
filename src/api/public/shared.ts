@@ -260,7 +260,7 @@ export const listAds = async (config: PublicConfig, options?: ListOptions): Prom
             adGroupId: ad.adGroupId,
             state: ad.state,
             productId: ad.productAsin,
-            productTitle: ad.productTitle,
+            productTitle: sql<string | null>`NULL`,
         })
         .from(ad)
         .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
@@ -290,7 +290,7 @@ export const getAd = async (config: PublicConfig, adId: string): Promise<AdShape
             adGroupId: ad.adGroupId,
             state: ad.state,
             productId: ad.productAsin,
-            productTitle: ad.productTitle,
+            productTitle: sql<string | null>`NULL`,
         })
         .from(ad)
         .innerJoin(campaign, eq(ad.campaignId, campaign.campaignId))
@@ -315,7 +315,7 @@ export const getAsinCampaignTree = async (config: PublicConfig, asin: string): P
             campaignId: ad.campaignId,
             adState: ad.state,
             adProductId: ad.productAsin,
-            adProductTitle: ad.productTitle,
+            adProductTitle: sql<string | null>`NULL`,
             campaignName: campaign.name,
             campaignState: campaign.state,
             campaignCreationDateTime: campaign.creationDateTime,

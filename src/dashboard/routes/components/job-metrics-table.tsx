@@ -39,7 +39,7 @@ export function JobMetricsTable({ className }: { className?: string }) {
 
     // Ensure exactly 5 rows
     const rowsToRender = useMemo(() => {
-        const rows = jobTotals.map(job => ({ ...job, id: job.name }));
+        const rows: Array<((typeof jobTotals)[number] & { id: string }) | { id: string; placeholder: true }> = jobTotals.map(job => ({ ...job, id: job.name }));
         while (rows.length < 5) {
             rows.push({ id: `job-empty-placeholder-${rows.length}`, placeholder: true as const });
         }

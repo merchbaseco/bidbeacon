@@ -393,7 +393,7 @@ const mapArchiveAd = (row: typeof ad.$inferSelect): CanonicalAd => ({
     state: parseAdState(row.state, 'PAUSED'),
     deliveryStatus: row.deliveryStatus,
     asin: row.productAsin ?? '',
-    productTitle: row.productTitle,
+    productTitle: null,
 });
 
 const reconcileAd = async (context: OperationContext, canonical: CanonicalAd, current: typeof ad.$inferSelect | undefined, changedAt: Date) => {
@@ -407,7 +407,6 @@ const reconcileAd = async (context: OperationContext, canonical: CanonicalAd, cu
         state: canonical.state,
         deliveryStatus: canonical.deliveryStatus,
         productAsin: canonical.asin,
-        productTitle: canonical.productTitle,
         creationDateTime: current?.creationDateTime ?? changedAt,
         lastUpdatedDateTime: changedAt,
     };
