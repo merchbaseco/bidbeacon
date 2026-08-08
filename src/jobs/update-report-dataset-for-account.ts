@@ -1,11 +1,10 @@
-import { formatInTimeZone } from 'date-fns-tz';
 import { and, eq, lt } from 'drizzle-orm';
 import { z } from 'zod';
 import { db } from '@/db/index';
-import { performanceDailyPlacement, reportDatasetMetadata } from '@/db/schema';
+import { reportDatasetMetadata } from '@/db/schema';
 import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
-import { getHourlyReportRetentionWindow, getPlacementReportRetentionWindow } from '@/lib/report-retention';
+import { getHourlyReportRetentionWindow } from '@/lib/report-retention';
 import { getNextRefreshTime } from '@/lib/report-status-state-machine/eligibility';
 import type { AggregationType, EntityType } from '@/types/reports';
 import { zonedNow, zonedStartOfDay, zonedSubtractDays, zonedSubtractMonths } from '@/utils/date';
@@ -53,11 +52,9 @@ export const updateReportDatasetForAccountJob = boss
                         const now = zonedNow(timezone);
 
                         const dailyCleanup = await cleanupOutOfBoundsMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
-                        const dailyPlacementCleanup = await cleanupOutOfBoundsMetadataRecords(accountId, countryCode, now, 'daily', 'placement', timezone);
                         const hourlyCleanup = await cleanupOutOfBoundsMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
 
                         const dailyInsert = await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'target', timezone);
-                        const dailyPlacementInsert = await insertMissingMetadataRecords(accountId, countryCode, now, 'daily', 'placement', timezone);
                         const hourlyInsert = await insertMissingMetadataRecords(accountId, countryCode, now, 'hourly', 'target', timezone);
 
                         emitEvent({
@@ -75,11 +72,6 @@ export const updateReportDatasetForAccountJob = boss
                                         deletedCount: dailyCleanup.deletedCount,
                                         cutoff: dailyCleanup.cutoff.toISOString(),
                                     },
-                                    dailyPlacement: {
-                                        deletedCount: dailyPlacementCleanup.deletedCount,
-                                        deletedProjectionCount: dailyPlacementCleanup.deletedProjectionCount,
-                                        cutoff: dailyPlacementCleanup.cutoff.toISOString(),
-                                    },
                                     hourly: {
                                         deletedCount: hourlyCleanup.deletedCount,
                                         cutoff: hourlyCleanup.cutoff.toISOString(),
@@ -91,12 +83,6 @@ export const updateReportDatasetForAccountJob = boss
                                         totalPeriods: dailyInsert.totalPeriods,
                                         windowStart: dailyInsert.earliestPeriodStart.toISOString(),
                                         windowEnd: dailyInsert.latestPeriodStart.toISOString(),
-                                    },
-                                    dailyPlacement: {
-                                        insertedCount: dailyPlacementInsert.insertedCount,
-                                        totalPeriods: dailyPlacementInsert.totalPeriods,
-                                        windowStart: dailyPlacementInsert.earliestPeriodStart.toISOString(),
-                                        windowEnd: dailyPlacementInsert.latestPeriodStart.toISOString(),
                                     },
                                     hourly: {
                                         insertedCount: hourlyInsert.insertedCount,
@@ -171,7 +157,7 @@ async function cleanupOutOfBoundsMetadataRecords(
     aggregation: AggregationType,
     entityType: EntityType,
     timezone: string
-): Promise<{ deletedCount: number; deletedProjectionCount: number; cutoff: Date }> {
+): Promise<{ deletedCount: number; cutoff: Date }> {
     const cutoff = getReportRetentionWindow(now, aggregation, entityType, timezone).earliestPeriodStart;
 
     const deletedRows = await db
@@ -186,23 +172,8 @@ async function cleanupOutOfBoundsMetadataRecords(
             )
         )
         .returning({ uid: reportDatasetMetadata.uid });
-    const deletedProjectionRows =
-        aggregation === 'daily' && entityType === 'placement'
-            ? await db
-                  .delete(performanceDailyPlacement)
-                  .where(
-                      and(
-                          eq(performanceDailyPlacement.accountId, accountId),
-                          eq(performanceDailyPlacement.countryCode, countryCode),
-                          lt(performanceDailyPlacement.bucketDate, formatInTimeZone(cutoff, timezone, 'yyyy-MM-dd'))
-                      )
-                  )
-                  .returning({ campaignId: performanceDailyPlacement.campaignId })
-            : [];
-
     return {
         deletedCount: deletedRows.length,
-        deletedProjectionCount: deletedProjectionRows.length,
         cutoff,
     };
 }
@@ -241,10 +212,6 @@ const getReportRetentionWindow = (now: Date, aggregation: AggregationType, entit
     if (aggregation === 'hourly') {
         return getHourlyReportRetentionWindow(now, timezone);
     }
-    if (entityType === 'placement') {
-        return getPlacementReportRetentionWindow(now, timezone);
-    }
-
     const latestPeriodStart = zonedStartOfDay(now, timezone);
     return {
         earliestPeriodStart: zonedSubtractMonths(latestPeriodStart, DAILY_RETENTION_MONTHS, timezone),

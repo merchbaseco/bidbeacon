@@ -122,6 +122,19 @@ describe('Campaign Search operation', () => {
         ]);
     });
 
+    it('rejects the retired placement reporting segment', async () => {
+        database = await createTestDatabase();
+        await database.db.insert(advertiserAccount).values(buildSearchAdvertiserAccount());
+
+        await expect(
+            search(createSearchContext(database), {
+                accountId: SEARCH_ACCOUNT_ID,
+                resource: 'campaign',
+                fields: ['campaign.id', 'segments.placement'],
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    });
+
     it('explicit fields replace defaults and support every structured filter operator', async () => {
         database = await createTestDatabase();
         await seedTwoCampaigns(database);

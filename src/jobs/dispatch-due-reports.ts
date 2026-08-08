@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, isNotNull, isNull, lte } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, lte } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { advertiserAccount, reportDatasetMetadata } from '@/db/schema';
 import { gateAccountWork } from '@/jobs/account-access-gate';
@@ -72,7 +72,7 @@ const dispatchAccountDueReports = async (accountId: string, countryCode: string)
     const baseConditions = [
         eq(reportDatasetMetadata.accountId, accountId),
         eq(reportDatasetMetadata.countryCode, countryCode),
-        inArray(reportDatasetMetadata.entityType, ['target', 'placement']),
+        eq(reportDatasetMetadata.entityType, 'target'),
         eq(reportDatasetMetadata.refreshing, false),
         lte(reportDatasetMetadata.nextRefreshAt, now),
     ];
@@ -86,14 +86,7 @@ const dispatchAccountDueReports = async (accountId: string, countryCode: string)
     const [newReportInProgress] = await db
         .select({ uid: reportDatasetMetadata.uid })
         .from(reportDatasetMetadata)
-        .where(
-            and(
-                eq(reportDatasetMetadata.accountId, accountId),
-                inArray(reportDatasetMetadata.entityType, ['target', 'placement']),
-                eq(reportDatasetMetadata.refreshing, true),
-                isNull(reportDatasetMetadata.reportId)
-            )
-        )
+        .where(and(eq(reportDatasetMetadata.accountId, accountId), eq(reportDatasetMetadata.entityType, 'target'), eq(reportDatasetMetadata.refreshing, true), isNull(reportDatasetMetadata.reportId)))
         .limit(1);
 
     const newReports = newReportInProgress
@@ -128,7 +121,7 @@ const claimAndEnqueue = async (row: typeof reportDatasetMetadata.$inferSelect): 
             countryCode: claimedRow.countryCode,
             timestamp: claimedRow.periodStart.toISOString(),
             aggregation: claimedRow.aggregation as 'hourly' | 'daily',
-            entityType: claimedRow.entityType as 'target' | 'product' | 'placement',
+            entityType: claimedRow.entityType as 'target' | 'product',
             claimed: true,
         });
 

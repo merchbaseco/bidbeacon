@@ -78,7 +78,6 @@ const SEARCH_FIELD_NAMES = new Set([
     'metrics.cvr',
     'segments.date',
     'segments.hour',
-    'segments.placement',
 ]);
 
 const main = async () => {

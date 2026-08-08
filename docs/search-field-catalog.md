@@ -12,7 +12,7 @@ BidBeacon exposes a deliberately small, stable field vocabulary. The catalog is 
 
 The shared Search operation implements `resource: campaign`, `resource: ad_group`, `resource: ad`, `resource: target`, `resource: product`, and `resource: change_event`. Each resource accepts its own fields, compatible ancestry where applicable, the standard performance metrics where applicable, and the account-local segments documented below. Omitting `fields` returns the selected resource's Default fields plus the standard metrics; supplying `fields` replaces that set. Descendant or unrelated fields are rejected with the compatible Field list in the validation details.
 
-Campaign, Ad-group, and Ad aggregate component metrics from the canonical advertised-ASIN archive (`entity_type = product`) before deriving ACOS, CPC, CTR, ROAS, and CVR. Target Search reads the canonical target-grain archive (`entity_type = target`) keyed by target identity and never joins advertised-ASIN rows, so target metrics cannot be multiplied by advertised products. Product Search first deduplicates account-owned Ads by advertised ASIN, then aggregates matching Product archive rows across every Ad and Campaign without joining target-grain data. Aggregate and date-segmented searches use `performance_daily`; hour-segmented searches for Ad groups, Ads, and Products use `performance_hourly`. Placement-segmented Campaign Search instead reads the dedicated `performance_daily_placement` archive and its `entityType = placement` metadata; it never borrows ordinary ASIN/Target rows or coverage. Rows are aggregated at the selected resource grain, so source rows never multiply metrics. Segmented rows are account-local and zero-filled across the requested range. A completed matching report with zero records is complete while missing metadata remains unknown.
+Campaign, Ad-group, and Ad aggregate component metrics from the canonical advertised-ASIN archive (`entity_type = product`) before deriving ACOS, CPC, CTR, ROAS, and CVR. Target Search reads the canonical target-grain archive (`entity_type = target`) keyed by target identity and never joins advertised-ASIN rows, so target metrics cannot be multiplied by advertised products. Product Search first deduplicates account-owned Ads by advertised ASIN, then aggregates matching Product archive rows across every Ad and Campaign without joining target-grain data. Aggregate and date-segmented searches use `performance_daily`; hour-segmented searches for Ad groups, Ads, and Products use `performance_hourly`. Rows are aggregated at the selected resource grain, so source rows never multiply metrics. Segmented rows are account-local and zero-filled across the requested range. A completed matching report with zero records is complete while missing metadata remains unknown.
 
 `product.title` uses an available title from the account's matching Ads and is `null` when no matching Ad retains a title.
 
@@ -63,15 +63,11 @@ ACOS, CTR, and CVR are numeric percentage points. ROAS is a numeric multiplier. 
 
 - `segments.date`: account-local `YYYY-MM-DD`
 - `segments.hour`: account-local hour from `0` through `23`; available for Ad-group, Ad, and Product Search and requires `segments.date`. Target Search uses the daily target archive in this slice.
-- `segments.placement`: `TOP_OF_SEARCH`, `REST_OF_SEARCH`, `PRODUCT_PAGE`, or `AMAZON_BUSINESS`
-
 Selecting `segments.hour` also requires `segments.date`, preventing the same clock hour from being aggregated across multiple dates.
-
-`segments.placement` is available only for Campaign Search. Placement is a Campaign-level reporting and control dimension; BidBeacon does not imply Product-, Ad-, Ad-group-, or Target-grain placement attribution.
 
 ## Compatibility
 
-- `campaign`: Campaign fields, metrics, `segments.date`, and `segments.placement`
+- `campaign`: Campaign fields, metrics, and `segments.date`
 - `ad_group`: Ad-group and Campaign ancestor fields, metrics, `segments.date`, and `segments.hour`
 - `ad`: Ad, Ad-group, and Campaign ancestor fields, metrics, `segments.date`, and `segments.hour`
 - `product`: Product fields, metrics, `segments.date`, and `segments.hour`

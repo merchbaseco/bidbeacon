@@ -4,7 +4,6 @@
  */
 
 import type { ReportConfigMap } from '@/types/reports.js';
-import { dailyPlacementReportConfig } from './daily-placement';
 import { dailyProductReportConfig } from './daily-product.js';
 import { dailyTargetReportConfig } from './daily-target.js';
 import { hourlyProductReportConfig } from './hourly-product.js';
@@ -18,6 +17,5 @@ export const reportConfigs: ReportConfigMap = {
     daily: {
         target: dailyTargetReportConfig,
         product: dailyProductReportConfig,
-        placement: dailyPlacementReportConfig,
     },
 };

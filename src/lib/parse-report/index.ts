@@ -1,9 +1,8 @@
 import { eq, type InferSelectModel } from 'drizzle-orm';
 import { reportConfigs } from '@/config/reports/configs';
-import type { Database } from '@/db';
+import { db } from '@/db';
 import { reportDatasetMetadata } from '@/db/schema';
 import type { EntityType } from '@/types/reports';
-import { handleDailyPlacement } from './handlers/daily-placement';
 import { handleDailyProduct } from './handlers/daily-product';
 import { handleDailyTarget } from './handlers/daily-target';
 import { handleHourlyProduct } from './handlers/hourly-product';
@@ -11,9 +10,8 @@ import { handleHourlyTarget } from './handlers/hourly-target';
 import type { ParseReportInput, ParseReportOutput } from './handlers/input';
 import { validateReportReady } from './validate-report-ready';
 
-export async function parseReport(reportUid: InferSelectModel<typeof reportDatasetMetadata>['uid'], database?: Database): Promise<ParseReportOutput> {
-    const databaseClient = database ?? (await import('@/db')).db;
-    const reportMetadata = await databaseClient.query.reportDatasetMetadata.findFirst({
+export async function parseReport(reportUid: InferSelectModel<typeof reportDatasetMetadata>['uid']): Promise<ParseReportOutput> {
+    const reportMetadata = await db.query.reportDatasetMetadata.findFirst({
         where: eq(reportDatasetMetadata.uid, reportUid),
     });
 
@@ -32,9 +30,6 @@ export async function parseReport(reportUid: InferSelectModel<typeof reportDatas
     const aggregation = reportMetadata.aggregation as 'hourly' | 'daily';
     const entityType = reportMetadata.entityType as EntityType;
     const reportConfig = reportConfigs[aggregation][entityType];
-    if (!reportConfig) {
-        throw new Error(`No report configuration found for aggregation: ${aggregation}, entityType: ${entityType}`);
-    }
 
     const input: ParseReportInput = {
         reportUid: reportMetadata.uid,
@@ -54,8 +49,6 @@ export async function parseReport(reportUid: InferSelectModel<typeof reportDatas
             return handleHourlyProduct(input);
         case 'daily-product':
             return handleDailyProduct(input);
-        case 'daily-placement':
-            return handleDailyPlacement(input, databaseClient);
         default:
             throw new Error(`No handler found for aggregation: ${aggregation}, entityType: ${entityType}`);
     }

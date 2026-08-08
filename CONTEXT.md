@@ -84,8 +84,8 @@ An optional bid override for one of Amazon's four automatic Sponsored Products t
 _Avoid_: Requiring four redundant bids, unstated fallback behavior
 
 **Placement bid adjustment**:
-A campaign-level percentage-point bid increase for top of search, rest of search, product pages, or Amazon Business. Composite creation accepts optional adjustments, and `update_campaign` patches them later; omitted placements remain unchanged and `0` removes an adjustment. Search supports `segments.placement` so agents can evaluate placement performance before changing the control.
-_Avoid_: Dedicated placement mutation, relative adjustment command, write control without corresponding performance segment
+A campaign-level percentage-point bid increase for top of search, rest of search, product pages, or Amazon Business. Composite creation accepts optional adjustments, and `update_campaign` patches them later; omitted placements remain unchanged and `0` removes an adjustment.
+_Avoid_: Dedicated placement mutation, relative adjustment command
 
 **Bid strategy**:
 The campaign bidding behavior exposed as `FIXED`, `DYNAMIC_DOWN_ONLY`, or `DYNAMIC_UP_AND_DOWN`, matching Amazon's advertiser-facing dashboard language. BidBeacon maps Amazon API transport enums internally.

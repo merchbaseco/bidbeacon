@@ -16,7 +16,7 @@ Manual product targeting accepts individual ASIN targets only. Amazon category, 
 
 Automatic targeting uses the ad group's required `defaultBid` as its fallback and accepts optional bid overrides for Amazon's four automatic target groups: close match, loose match, substitutes, and complements. Omitted overrides inherit `defaultBid`.
 
-Composite campaign settings accept optional placement bid adjustments for top of search, rest of search, product pages, and Amazon Business. The same field is patchable through `update_campaign`, while Search exposes placement-segmented performance so agents can evaluate the control before changing it.
+Composite campaign settings accept optional placement bid adjustments for top of search, rest of search, product pages, and Amazon Business. The same field is patchable through `update_campaign`.
 
 Composite creation accepts optional ad-group negative keywords and negative ASINs. The primitive surface adds `create_negative_keyword` and `create_negative_product_target`, both requiring a Campaign ID and Ad group ID. Existing negatives remain Target resources and are removed by setting `state: ARCHIVED` through `update_target`.
 

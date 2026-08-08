@@ -15,7 +15,7 @@ import type { NextAction } from './types';
  *
  * @param timestamp - Report timestamp
  * @param aggregation - Report aggregation type
- * @param entityType - Report source (target, product, or daily placement)
+ * @param entityType - Report source (target or product)
  * @param lastReportCreatedAt - Last time a report was created for this datum
  * @param reportId - Report ID if a report exists, null otherwise
  * @param countryCode - Country code for timezone calculations
@@ -65,10 +65,8 @@ export async function getNextAction(
         }
     }
 
-    // No report - check eligibility. Placement is a daily Campaign report;
-    // hourly placement data has no archive projection.
-    const canCreate = entityType === 'target' || (entityType === 'placement' && aggregation === 'daily');
-    if (isEligibleForReport(timestamp, aggregation, lastReportCreatedAt, countryCode, now) && canCreate) {
+    // No report - check eligibility. Product reports are not enabled yet.
+    if (isEligibleForReport(timestamp, aggregation, lastReportCreatedAt, countryCode, now) && entityType === 'target') {
         return 'create';
     }
 

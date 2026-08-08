@@ -1,18 +1,5 @@
 import { z } from 'zod';
-import {
-    ad,
-    adGroup,
-    advertiserAccount,
-    campaign,
-    entityChangeHistory,
-    performanceDaily,
-    performanceDailyPlacement,
-    performanceHourly,
-    reportDatasetMetadata,
-    target,
-    userAccountAccess,
-    userPreferences,
-} from '@/db/schema';
+import { ad, adGroup, advertiserAccount, campaign, entityChangeHistory, performanceDaily, performanceHourly, reportDatasetMetadata, target, userAccountAccess, userPreferences } from '@/db/schema';
 
 export const operationSchema = {
     ad,
@@ -21,7 +8,6 @@ export const operationSchema = {
     campaign,
     entityChangeHistory,
     performanceDaily,
-    performanceDailyPlacement,
     performanceHourly,
     reportDatasetMetadata,
     target,

@@ -16,7 +16,7 @@ The `reportDatasetMetadata` table tracks the state of each report dataset:
 - **`lastReportCreatedAt`**: When the last report was created (used for eligibility calculations)
 - **`periodStart`**: The UTC instant for the account-local report date's midnight
 - **`aggregation`**: Report type (`hourly` or `daily`)
-- **`entityType`**: Report source (`target`, `product`, or daily `placement`)
+- **`entityType`**: Report source (`target` or `product`)
 
 ## Scheduled Job and Polling
 
@@ -70,8 +70,6 @@ Reports are eligible for refresh at specific time offsets after the dataset time
 
 - **Daily reports**: local-calendar T+1, T+3, T+5, T+7, T+14, T+30, T+60 days
 - **Hourly-grain reports**: every 3 hours during the first day after the local date closes, then local-calendar T+3 days, T+7 days, and T+13 days 21 hours
-
-Daily Campaign-placement reports follow the daily refresh schedule but retain exactly 90 account-local dates, including today, to match Amazon's placement-report lookback. Placement has no hourly report or hourly projection. Lifecycle cleanup removes both out-of-window placement metadata and its dedicated projection rows.
 
 All milestones are constructed in the account timezone and stored as UTC instants. They therefore remain on the intended local clock across daylight-saving transitions.
 

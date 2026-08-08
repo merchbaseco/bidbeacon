@@ -3,7 +3,6 @@ import { and, asc, eq, gt, gte, inArray, isNotNull, lt, lte, sql } from 'drizzle
 import { ad, adGroup, campaign, performanceDaily, performanceHourly, target } from '@/db/schema';
 import { queryChangeEventSearchRows } from './change-event-search-query';
 import type { OperationContext } from './operation-context';
-import { queryCampaignPlacementSearchRows } from './placement-search-query';
 import { serializeSearchValue } from './search-cursor';
 import { isSearchSegmentField } from './search-field-registry';
 import type { CampaignSearchPlan, SearchFilter, SearchOrder, SearchPlan } from './search-planner';
@@ -890,10 +889,6 @@ const buildHourlySegmentCondition = (filter: SearchFilter) => {
 };
 
 export const queryCampaignSearchRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, plan: CampaignSearchPlan): Promise<CampaignSearchRow[]> => {
-    if (plan.placement) {
-        return queryCampaignPlacementSearchRows(context, account, plan);
-    }
-
     if (!plan.performance) {
         const campaignRows = await context.db
             .select()
