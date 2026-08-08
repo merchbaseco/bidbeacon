@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ad, campaign, productMetadata } from '@/db/schema';
+import { ad, campaign, jobMetrics, productMetadata } from '@/db/schema';
 import { createTestDatabase, type TestDatabase } from '@/operations/testing/create-test-database';
 import { buildSearchProductAd, buildSearchProductCampaign } from '@/operations/testing/search-product-fixtures';
 import { getProductMetadataCoverage } from './product-metadata-coverage';
@@ -29,7 +29,34 @@ describe('getProductMetadataCoverage', () => {
 
         await expect(getProductMetadataCoverage(database.db, { accountId: 'search-products-ads-account-1', countryCode: 'US' })).resolves.toEqual({
             advertisedCount: 2,
+            fetching: false,
             hydratedCount: 1,
+        });
+    });
+
+    it('reports only a matching product metadata refresh as fetching', async () => {
+        database = await createTestDatabase();
+        await database.db.insert(jobMetrics).values([
+            {
+                jobName: 'refresh-product-metadata',
+                bossJobId: 'matching-refresh',
+                status: 'running',
+                startedAt: new Date(),
+                input: { accountId: 'search-products-ads-account-1', countryCode: 'US' },
+            },
+            {
+                jobName: 'refresh-product-metadata',
+                bossJobId: 'other-refresh',
+                status: 'running',
+                startedAt: new Date(),
+                input: { accountId: 'other-account', countryCode: 'US' },
+            },
+        ]);
+
+        await expect(getProductMetadataCoverage(database.db, { accountId: 'search-products-ads-account-1', countryCode: 'US' })).resolves.toEqual({
+            advertisedCount: 0,
+            fetching: true,
+            hydratedCount: 0,
         });
     });
 });

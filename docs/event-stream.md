@@ -25,7 +25,7 @@ BidBeacon treats every job execution as a **metric** with an optional **event** 
 
 ## Reading the stream
 
-The dashboard's *Event Stream* listens to `events:updated` WebSocket payloads. Each event displays:
+The dashboard's *Event Stream* listens to `events:updated` WebSocket payloads. Its rolling 12-hour query window advances on matching realtime events, so a job that outlives the page's initial time bucket still appears without a reload. Each event displays:
 
 - account-local timestamp
 - job name and outcome (`ok` or `error`)

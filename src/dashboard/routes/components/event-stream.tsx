@@ -3,7 +3,7 @@ import { CircleArrowDown02Icon, FilterResetIcon } from '@hugeicons-pro/core-soli
 import { formatInTimeZone } from 'date-fns-tz';
 import { useAtomValue } from 'jotai';
 import { Eye, EyeOff, RefreshCw } from 'lucide-react';
-import { type ReactNode, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
@@ -15,6 +15,7 @@ import { Spinner } from '../../components/ui/spinner';
 import { Tooltip, TooltipPopup, TooltipProvider, TooltipTrigger } from '../../components/ui/tooltip';
 import { cn } from '../../lib/utils';
 import { useEvents } from '../hooks/use-events';
+import { useWebSocketEvents } from '../hooks/use-websocket-events';
 import { selectedAccountIdAtom, selectedCountryCodeAtom } from './account-selector/atoms';
 
 type EventRow = RouterOutputs['metrics']['events']['events'][number];
@@ -47,10 +48,17 @@ export const EventStream = () => {
     const [appliedJobName, setAppliedJobName] = useState<string | null>(null);
     const [showEmptyMessages, setShowEmptyMessages] = useState(false);
 
-    const baseRange = useMemo(() => {
-        const to = roundUpToNearestFiveMinutes(new Date());
-        const from = new Date(to.getTime() - 12 * 60 * 60 * 1000);
-        return { from, to };
+    const [baseRange, setBaseRange] = useState(buildBaseRange);
+
+    useWebSocketEvents('events:updated', event => {
+        if (event.accountId === accountId) {
+            setBaseRange(buildBaseRange());
+        }
+    });
+
+    useEffect(() => {
+        const interval = window.setInterval(() => setBaseRange(buildBaseRange()), 60_000);
+        return () => window.clearInterval(interval);
     }, []);
 
     const filterRange = useMemo(() => {
@@ -293,7 +301,7 @@ export const EventStream = () => {
                                             return (
                                                 <button
                                                     className={cn(
-                                                        'grid min-w-0 cursor-pointer grid-cols-[140px_210px_56px_1fr] gap-4 border-0 bg-transparent px-4 py-2 text-left text-sm hover:bg-muted/50',
+                                                        'grid w-full min-w-0 cursor-pointer grid-cols-[140px_210px_56px_1fr] gap-4 border-0 bg-transparent px-4 py-2 text-left text-sm hover:bg-muted/50',
                                                         isError && 'bg-destructive/10'
                                                     )}
                                                     key={row.event.id}
@@ -463,6 +471,12 @@ const formatJobName = (jobName: string) => {
 
 const roundUpToNearestFiveMinutes = (date: Date): Date => {
     return new Date(Math.ceil(date.getTime() / (5 * 60 * 1000)) * (5 * 60 * 1000));
+};
+
+const buildBaseRange = () => {
+    const to = roundUpToNearestFiveMinutes(new Date());
+    const from = new Date(to.getTime() - 12 * 60 * 60 * 1000);
+    return { from, to };
 };
 
 const JOB_NAME_LABELS: Record<string, string> = {

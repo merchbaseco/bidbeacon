@@ -50,19 +50,19 @@ export const AccountDataCard = () => {
                     <EntityRow count={metadata?.adGroupsCount ?? null} isFetching={metadata?.fetchingAdGroups === true} label="Ad Groups" />
                     <EntityRow count={metadata?.adsCount ?? null} isFetching={metadata?.fetchingAds === true} label="Ads" />
                     <EntityRow count={metadata?.targetsCount ?? null} isFetching={metadata?.fetchingTargets === true} label="Targets" />
-                    <ProductCoverageRow coverage={productMetadataCoverage ?? null} isFetching={metadata?.fetchingAds === true} />
+                    <ProductCoverageRow coverage={productMetadataCoverage ?? null} />
                 </div>
             )}
         </Card>
     );
 };
 
-const ProductCoverageRow = ({ coverage, isFetching }: { coverage: { advertisedCount: number; hydratedCount: number } | null; isFetching: boolean }) => {
+const ProductCoverageRow = ({ coverage }: { coverage: { advertisedCount: number; fetching: boolean; hydratedCount: number } | null }) => {
     const complete = coverage !== null && coverage.hydratedCount === coverage.advertisedCount;
     return (
         <div className="flex h-9 items-center justify-between">
             <div className="flex items-center gap-2">
-                {isFetching ? <Spinner className="-mr-0.5 -ml-0.5 size-3" /> : <span className={`size-2 rounded-full ${complete ? 'bg-emerald-500' : 'bg-muted-foreground/50'}`} />}
+                {coverage?.fetching ? <Spinner className="-mr-0.5 -ml-0.5 size-3" /> : <span className={`size-2 rounded-full ${complete ? 'bg-emerald-500' : 'bg-muted-foreground/50'}`} />}
                 <span className="text-sm">Product Metadata</span>
             </div>
             <span className="text-muted-foreground text-sm tabular-nums">{coverage ? `${coverage.hydratedCount.toLocaleString()} / ${coverage.advertisedCount.toLocaleString()}` : '—'}</span>
