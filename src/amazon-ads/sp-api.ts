@@ -12,10 +12,11 @@ type SpRequestOptions<T> = {
     responseSchema?: z.ZodSchema<T>;
     accept?: string;
     contentType?: string;
+    itemCount?: number;
 };
 
 export const spRequest = async <T>(options: SpRequestOptions<T>, region: ApiRegion = 'na') => {
-    return withTracking({ apiName: options.apiName, region }, async recordRequestMetrics => {
+    return withTracking({ apiName: options.apiName, region, itemCount: options.itemCount }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
         const clientId = process.env.ADS_API_CLIENT_ID;
 

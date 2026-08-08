@@ -14,12 +14,13 @@ import { exportCampaigns } from '@/amazon-ads/export-campaigns';
 import { exportTargets } from '@/amazon-ads/export-targets';
 import { type ExportContentType, type ExportStatusResponse, getExportStatus } from '@/amazon-ads/get-export-status';
 import { db } from '@/db/index';
-import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, target } from '@/db/schema';
+import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, productMetadata, target } from '@/db/schema';
 import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
 import { utcNow } from '@/utils/date';
 import { emitEvent } from '@/utils/events';
 import { withJobMetrics } from '@/utils/job-metrics';
+import { updateProductMetadataJob } from './update-product-metadata';
 
 const gunzipAsync = promisify(gunzip);
 
@@ -537,6 +538,15 @@ export const syncAdEntitiesForAccountJob = boss
                         const adGroupIds = adGroupsData.map(ag => ag.adGroupId);
                         const adIds = adsData.map(a => a.adId);
                         const targetIds = targetsData.map(t => t.targetId);
+                        const advertisedAsins = [...new Set(adsData.flatMap(a => a.creative.products[0]?.productId ?? []))];
+                        const knownProducts = new Map<string, string | null>();
+                        for (let offset = 0; offset < advertisedAsins.length; offset += 300) {
+                            const rows = await db
+                                .select({ asin: productMetadata.asin, title: productMetadata.title })
+                                .from(productMetadata)
+                                .where(and(eq(productMetadata.countryCode, countryCode), inArray(productMetadata.asin, advertisedAsins.slice(offset, offset + 300))));
+                            for (const row of rows) knownProducts.set(row.asin, row.title);
+                        }
 
                         await db.transaction(async tx => {
                             // Delete existing data for this account only (scoped to exported IDs)
@@ -612,7 +622,7 @@ export const syncAdEntitiesForAccountJob = boss
                                         state: a.state,
                                         deliveryStatus: a.deliveryStatus,
                                         productAsin: product?.productId ?? null,
-                                        productTitle: resolveExportProductTitle(product),
+                                        productTitle: product?.productId ? (knownProducts.get(product.productId) ?? resolveExportProductTitle(product)) : null,
                                         creationDateTime: new Date(a.creationDateTime),
                                         lastUpdatedDateTime: new Date(a.lastUpdatedDateTime),
                                     };
@@ -656,6 +666,23 @@ export const syncAdEntitiesForAccountJob = boss
                                 await batchInsert(tx, target, targetRecords);
                             }
                         });
+
+                        const missingProductAsins = advertisedAsins.filter(asin => !knownProducts.has(asin));
+                        if (missingProductAsins.length > 0) {
+                            try {
+                                await updateProductMetadataJob.emit({ accountId, countryCode, asins: missingProductAsins });
+                            } catch (error) {
+                                recorder.addEvent({
+                                    message: 'Failed to queue product metadata update; Ad entity sync still completed.',
+                                    outcome: 'error',
+                                    payload: {
+                                        asinCount: missingProductAsins.length,
+                                        error: error instanceof Error ? error.message : String(error),
+                                    },
+                                });
+                            }
+                        }
+                        emitEvent({ type: 'product-metadata:updated', accountId, countryCode });
 
                         // Update metadata with success
                         await db

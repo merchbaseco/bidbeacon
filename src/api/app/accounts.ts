@@ -4,6 +4,7 @@ import { db } from '@/db/index';
 import { advertiserAccount } from '@/db/schema';
 import { syncAdEntitiesForAccountJob } from '@/jobs/sync-ad-entities-for-account';
 import { expandAdvertiserAccountMemberships } from '@/services/access/advertiser-account-memberships';
+import { getProductMetadataCoverage } from '@/services/product-metadata-coverage';
 import { privateProcedure, router } from '../trpc';
 
 export const accountsRouter = router({
@@ -117,6 +118,13 @@ export const accountsRouter = router({
             });
 
             return data;
+        }),
+
+    productMetadataCoverage: privateProcedure
+        .input(z.object({ accountId: z.string(), countryCode: z.string() }))
+        .query(async ({ ctx, input }) => {
+            ctx.assertAccountAccess(input.accountId);
+            return getProductMetadataCoverage(db, input);
         }),
 
     syncAdEntities: privateProcedure

@@ -214,7 +214,7 @@ The complete field vocabulary lives in [search-field-catalog.md](search-field-ca
 
 Every performance-bearing Search resource reads the canonical Target-grain archive (`entity_type = target`). Campaign, Ad-group, Ad, and Target group those observations by their topology identifiers. Product joins each observation's Ad to its advertised ASIN and groups by that ASIN across Ads and Campaigns. Aggregate and date-segmented searches use the daily archive; hour-segmented Ad-group, Ad, and Product searches use the hourly archive. Rows are aggregated once at the selected resource grain, and segmented rows are account-local and zero-filled across the requested range. Coverage uses Target report metadata, including valid completed zero-record reports. Change-event Search reads account- and marketplace-scoped entity history and does not report performance coverage.
 
-The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` include the nine Standard performance metrics. A default campaign Search therefore behaves like the campaign table in the Amazon Ads dashboard: it returns campaign settings and recent performance together.
+The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` include the ten Standard performance metrics, including CVR. A default campaign Search therefore behaves like the campaign table in the Amazon Ads dashboard: it returns campaign settings and recent performance together.
 
 ### Date defaults
 
@@ -955,7 +955,7 @@ Creation is additive but can begin spend when `state` is `ENABLED`. Tool annotat
 MCP server instructions contain only universal invariants:
 
 1. Discover the BidBeacon Account ID, then include it explicitly in every account-scoped call.
-2. Search defaults to settings plus the last seven account-local dates of performance; request fields and dates explicitly when the task requires another shape.
+2. Search defaults to legible settings plus the last seven account-local dates of performance. Omit `fields` for ordinary reads; supplying it replaces the defaults and is intended for narrower or segmented shapes.
 3. Inspect current settings and relevant performance before consequential updates.
 4. Prefer `create_sponsored_products_campaign` for ordinary launches and primitive creation only for bespoke topology or recovery.
 5. Treat coverage issues as uncertainty in the archive, not zero performance.

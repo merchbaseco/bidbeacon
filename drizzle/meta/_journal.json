@@ -414,6 +414,13 @@
       "when": 1786212047252,
       "tag": "0058_complete_dazzler",
       "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1786221157540,
+      "tag": "0059_fast_corsair",
+      "breakpoints": true
     }
   ]
 }

@@ -19,6 +19,7 @@ const SUPPORTED_APIS = [
     'exportTargets',
     'getExportStatus',
     'getChangeHistory',
+    'getProductMetadata',
     'updateAdGroupBid',
     'updateTargetBid',
     'spCreateCampaigns',
@@ -52,6 +53,8 @@ const SUPPORTED_JOBS = [
     'summarize-hourly-target-stream-for-account',
     'sync-change-history',
     'sync-change-history-for-account',
+    'update-product-metadata',
+    'refresh-product-metadata',
 ] as const;
 
 const WHITESPACE_REGEX = /\s+/;

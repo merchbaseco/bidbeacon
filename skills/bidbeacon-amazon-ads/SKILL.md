@@ -1,6 +1,6 @@
 ---
 name: bidbeacon-amazon-ads
-description: "Manage Amazon Ads through BidBeacon: audit accounts, investigate Campaign or ASIN performance, optimize resources, launch Sponsored Products ads, manage negatives or lifecycle, recover partial launches, or explicitly add or revise a recipe in this skill."
+description: "Manage Amazon Ads with BidBeacon: audit performance, investigate Campaigns or ASINs, optimize resources, launch Sponsored Products ads, manage negatives or lifecycle, recover partial launches, or maintain these recipes."
 ---
 
 # Manage Amazon Ads with BidBeacon
@@ -14,6 +14,7 @@ Use one recipe. Tool schemas own validation; this skill owns judgment.
 3. Inspect before writing. Show the exact proposed outcome, obtain approval at the consequential call, await it, and verify accepted state; read back when delivery or multiple writes matter.
 4. Treat the Campaign as the spend gate. Create paused unless enabled delivery is explicit.
 5. Join evidence by marketplace and ASIN: BidBeacon owns ad attribution, MerchBase actual sales and royalties, and RankWrangler external demand.
+6. Use Search defaults normally. Lead with names and ASINs; label IDs as follow-up handles.
 
 ## Recipes
 
@@ -25,8 +26,8 @@ Use one recipe. Tool schemas own validation; this skill owns judgment.
 - Negative keyword or ASIN changes: [negative targeting](references/manage-negatives.md)
 - Reactivation, pause, or permanent cleanup: [lifecycle](references/pause-or-archive.md)
 - `COMPOSITE_PARTIAL_FAILURE`: [recovery](references/recover-partial-launch.md)
-- Explicit request to add or revise a recipe in this skill: [add a recipe](references/add-recipe.md)
+- Explicit recipe-maintenance request: [add a recipe](references/add-recipe.md)
 
 Read only the selected recipe; follow a linked recipe only when that recipe branches.
 
-Finish with the evidence, result, identifiers, and uncertainty needed for follow-up.
+Finish with evidence, result, identifiers, and relevant uncertainty.

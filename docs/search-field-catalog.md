@@ -23,7 +23,7 @@ Every performance-bearing resource reads the canonical Target-grain archive (`en
 | `campaign` | `campaign.id`, `campaign.name`, `campaign.state`, `campaign.deliveryStatus`, `campaign.dailyBudget` | `campaign.targetingMode`, `campaign.bidStrategy`, `campaign.startDate`, `campaign.endDate` |
 | `ad_group` | `adGroup.id`, `adGroup.name`, `adGroup.state`, `adGroup.deliveryStatus`, `adGroup.defaultBid`, `campaign.id`, `campaign.name` | None |
 | `ad` | `ad.id`, `ad.state`, `ad.deliveryStatus`, `ad.asin`, `ad.productTitle`, `adGroup.id`, `adGroup.name`, `campaign.id`, `campaign.name` | `ad.type` |
-| `target` | `target.id`, `target.state`, `target.deliveryStatus`, `target.type`, `target.scope`, `target.bid`, `campaign.id`, `campaign.name`, `adGroup.id`, `adGroup.name` | `target.negative`, `target.keyword`, `target.asin`, `target.matchType` |
+| `target` | `target.id`, `target.state`, `target.deliveryStatus`, `target.type`, `target.scope`, `target.bid`, `target.negative`, `target.keyword`, `target.asin`, `target.matchType`, `campaign.id`, `campaign.name`, `adGroup.id`, `adGroup.name` | — |
 | `product` | `product.asin`, `product.title` | None |
 | `change_event` | `changeEvent.id`, `changeEvent.resourceType`, `changeEvent.resourceId`, `changeEvent.eventType`, `changeEvent.field`, `changeEvent.previousValue`, `changeEvent.newValue`, `changeEvent.changedAt`, `changeEvent.source` | None |
 
@@ -54,8 +54,9 @@ The following metrics are included by default in every performance-bearing resou
 - `metrics.cpc`
 - `metrics.ctr`
 - `metrics.roas`
+- `metrics.cvr`
 
-`metrics.cvr` is selectable but not part of the default field set. Cost per order is not a v1 Field.
+Cost per order is not a v1 Field.
 
 ACOS, CTR, and CVR are numeric percentage points. ROAS is a numeric multiplier. Spend, sales, and CPC use the Advertiser account's currency. Impressions, clicks, and orders are integer counts.
 

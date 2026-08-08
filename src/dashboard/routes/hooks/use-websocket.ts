@@ -42,6 +42,7 @@ type Event =
           timestamp: string;
       }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
+    | { type: 'product-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | {
           type: 'report:refreshed';
           row: {
@@ -121,6 +122,9 @@ export const useWebSocket = () => {
                             accountId: data.accountId,
                             countryCode: data.countryCode,
                         });
+                        break;
+                    case 'product-metadata:updated':
+                        utils.accounts.productMetadataCoverage.invalidate({ accountId: data.accountId, countryCode: data.countryCode });
                         break;
                     case 'report:refreshed':
                         // Update the individual report cache directly with the row data from the event

@@ -362,6 +362,10 @@ describe('Target Search operation', () => {
             'target.type',
             'target.scope',
             'target.bid',
+            'target.negative',
+            'target.keyword',
+            'target.asin',
+            'target.matchType',
             'adGroup.id',
             'adGroup.name',
             'campaign.id',
@@ -375,6 +379,7 @@ describe('Target Search operation', () => {
             'metrics.cpc',
             'metrics.ctr',
             'metrics.roas',
+            'metrics.cvr',
         ]);
         expect(defaultResult.context.dateRange).toEqual({ startDate: '2026-08-01', endDate: '2026-08-07', source: 'DEFAULT' });
         expect(defaultResult.context.coverage).toEqual({ status: 'COMPLETE', issues: [] });

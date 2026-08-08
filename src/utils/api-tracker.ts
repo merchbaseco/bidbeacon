@@ -15,6 +15,7 @@ const STATUS_PREFIX_REGEX = /^(\d{3})\s/;
 export interface ApiCallOptions {
     apiName: string;
     region: string;
+    itemCount?: number;
     requestMetrics?: ApiRequestMetrics;
 }
 
@@ -62,6 +63,7 @@ export async function trackApiCall(options: ApiCallOptions, startTime: number, s
                 rateLimitResponseContentType: options.requestMetrics?.rateLimitResponseContentType ?? null,
                 rateLimitResponseServer: options.requestMetrics?.rateLimitResponseServer ?? null,
                 queueWaitMs: options.requestMetrics?.queueWaitMs ?? 0,
+                itemCount: options.itemCount ?? null,
                 timestamp,
                 error: error ?? null,
             })

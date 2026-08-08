@@ -70,6 +70,17 @@ export const ad = pgTable(
     ]
 );
 
+export const productMetadata = pgTable(
+    'product_metadata',
+    {
+        countryCode: text('country_code').notNull(),
+        asin: text('asin').notNull(),
+        title: text('title'),
+        lastSyncedAt: timestamp('last_synced_at', { withTimezone: true, mode: 'date' }).notNull(),
+    },
+    table => [primaryKey({ columns: [table.countryCode, table.asin] }), index('product_metadata_asin_idx').on(table.asin)]
+);
+
 export const target = pgTable(
     'target',
     {
@@ -728,6 +739,7 @@ export const apiMetrics = pgTable(
         rateLimitResponseContentType: text('rate_limit_response_content_type'), // Distinguishes API JSON from edge HTML responses
         rateLimitResponseServer: text('rate_limit_response_server'), // Identifies the server layer that issued the latest 429
         queueWaitMs: integer('queue_wait_ms').notNull().default(0), // Total time spent waiting in the API governor
+        itemCount: integer('item_count'), // Number of logical items in a batched request
         timestamp: timestamp('timestamp', {
             withTimezone: true,
             mode: 'date',

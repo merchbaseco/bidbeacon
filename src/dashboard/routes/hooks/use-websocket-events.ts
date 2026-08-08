@@ -51,6 +51,7 @@ type Event =
           timestamp: string;
       }
     | { type: 'account-dataset-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
+    | { type: 'product-metadata:updated'; accountId: string; countryCode: string; timestamp: string }
     | { type: 'reports:refreshed'; accountId: string; timestamp: string }
     | { type: 'report:refreshed'; row: InferSelectModel<typeof reportDatasetMetadata>; timestamp: string }
     | { type: 'account:updated'; accountId: string; enabled: boolean; timestamp: string }

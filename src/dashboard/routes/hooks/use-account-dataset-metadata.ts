@@ -12,6 +12,10 @@ export const useAccountDatasetMetadata = (accountId: string, countryCode: string
             enabled: Boolean(accountId && countryCode),
         }
     );
+    const { data: productMetadataCoverage, isLoading: isProductMetadataCoverageLoading } = api.accounts.productMetadataCoverage.useQuery(
+        { accountId: accountId ?? '', countryCode: countryCode ?? '' },
+        { enabled: Boolean(accountId && countryCode) }
+    );
 
     const fetchingAnyDataset = data?.fetchingCampaigns === true || data?.fetchingAdGroups === true || data?.fetchingAds === true || data?.fetchingTargets === true;
 
@@ -23,8 +27,9 @@ export const useAccountDatasetMetadata = (accountId: string, countryCode: string
 
     return {
         data,
-        isLoading,
+        isLoading: isLoading || isProductMetadataCoverageLoading,
         isSyncing: fetchingAnyDataset,
+        productMetadataCoverage,
         sync,
     };
 };

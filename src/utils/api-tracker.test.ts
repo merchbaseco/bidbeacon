@@ -47,7 +47,7 @@ describe('API tracker request metrics', () => {
     });
 
     it('records attempt metrics supplied by throttledFetch', async () => {
-        await withTracking({ apiName: 'createReport', region: 'na' }, async recordRequestMetrics => {
+        await withTracking({ apiName: 'createReport', region: 'na', itemCount: 300 }, async recordRequestMetrics => {
             recordRequestMetrics({
                 amazonRetryAfterMs: null,
                 attemptCount: 1,
@@ -71,6 +71,7 @@ describe('API tracker request metrics', () => {
                 rateLimitResponseContentType: 'text/html',
                 rateLimitResponseServer: 'openresty',
                 retryCount: 0,
+                itemCount: 300,
             })
         );
     });

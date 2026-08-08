@@ -67,6 +67,7 @@ describe('Ad-group and Ad Search operations', () => {
                 'metrics.cpc',
                 'metrics.ctr',
                 'metrics.roas',
+                'metrics.cvr',
             ],
             dateRange: { startDate: '2026-08-01', endDate: '2026-08-07', source: 'DEFAULT' },
             coverage: { status: 'COMPLETE', issues: [] },
@@ -89,6 +90,7 @@ describe('Ad-group and Ad Search operations', () => {
                 'metrics.cpc': 1,
                 'metrics.ctr': 10,
                 'metrics.roas': 3.33,
+                'metrics.cvr': 20,
             },
         ]);
     });
@@ -138,6 +140,7 @@ describe('Ad-group and Ad Search operations', () => {
             'metrics.cpc',
             'metrics.ctr',
             'metrics.roas',
+            'metrics.cvr',
         ]);
         expect(defaultResult.rows.map(row => row['ad.id'])).toEqual(['search-ad-resources-ad-1', 'search-ad-resources-ad-2']);
 

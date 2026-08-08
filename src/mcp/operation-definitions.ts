@@ -47,7 +47,7 @@ export const MCP_SERVER_INFO = {
 export const MCP_SERVER_INSTRUCTIONS = [
     'Discover the BidBeacon Advertiser Account UUID with list_advertiser_accounts before any scoped call.',
     'Pass accountId explicitly on every scoped call; never rely on selected-account state.',
-    'Search returns current settings and the last seven account-local performance days by default; request fields and dates explicitly for another shape.',
+    'Omit fields for ordinary Search reads: defaults return legible settings and the last seven account-local performance days. Supplying fields replaces those defaults; use it only for a narrower or segmented shape.',
     'Inspect current settings and relevant performance before consequential updates; prefer composite campaign creation for ordinary launches and primitives only for bespoke or recovery work.',
     'Treat coverage issues as archive uncertainty, not zero performance.',
 ].join('\n');
@@ -97,7 +97,7 @@ export const MCP_OPERATION_DEFINITIONS: readonly McpOperationDefinition[] = [
         name: 'search',
         title: 'Search BidBeacon',
         description:
-            'Preferred read tool for campaign, ad group, ad, target, performance, and change-history data. Requires an explicit BidBeacon Advertiser Account UUID. Returns rows with query and coverage context; failures return a stable BidBeacon tool error.',
+            'Preferred read tool for campaign, ad group, ad, target, performance, and change-history data. Requires an explicit BidBeacon Advertiser Account UUID. Omit fields for ordinary legible reads; supplying fields replaces the defaults. Returns rows with query and coverage context; failures return a stable BidBeacon tool error.',
         inputSchema: searchInputSchema,
         outputSchema: searchOutputSchema,
         annotations: readOnlyAnnotations,

@@ -1,6 +1,6 @@
 import { addDays } from 'date-fns';
 import { and, asc, eq, gt, gte, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
-import { ad, adGroup, campaign, performanceDaily, performanceHourly, target } from '@/db/schema';
+import { ad, adGroup, campaign, performanceDaily, performanceHourly, productMetadata, target } from '@/db/schema';
 import { queryChangeEventSearchRows } from './change-event-search-query';
 import type { OperationContext } from './operation-context';
 import { serializeSearchValue } from './search-cursor';
@@ -132,8 +132,9 @@ const queryProductSearchRows = async (context: OperationContext, account: { adsA
 
 const queryProductSettingsRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }): Promise<ProductSearchSettings[]> => {
     const rows = await context.db
-        .select({ productAsin: ad.productAsin, productTitle: ad.productTitle, adId: ad.adId })
+        .select({ productAsin: ad.productAsin, productTitle: sql<string | null>`coalesce(${productMetadata.title}, ${ad.productTitle})`, adId: ad.adId })
         .from(ad)
+        .leftJoin(productMetadata, and(eq(productMetadata.countryCode, account.countryCode), eq(productMetadata.asin, ad.productAsin)))
         .innerJoin(adGroup, eq(adGroup.adGroupId, ad.adGroupId))
         .innerJoin(
             campaign,
@@ -361,7 +362,7 @@ const queryAdSettingsRows = async (context: OperationContext, account: { adsAcco
             adState: ad.state,
             adDeliveryStatus: ad.deliveryStatus,
             adAsin: ad.productAsin,
-            adProductTitle: ad.productTitle,
+            adProductTitle: sql<string | null>`coalesce(${productMetadata.title}, ${ad.productTitle})`,
             adType: ad.adType,
             adGroupId: adGroup.adGroupId,
             adGroupName: adGroup.name,
@@ -386,6 +387,7 @@ const queryAdSettingsRows = async (context: OperationContext, account: { adsAcco
             sales: sql<number>`0`.as('sales'),
         })
         .from(ad)
+        .leftJoin(productMetadata, and(eq(productMetadata.countryCode, account.countryCode), eq(productMetadata.asin, ad.productAsin)))
         .innerJoin(adGroup, eq(adGroup.adGroupId, ad.adGroupId))
         .innerJoin(
             campaign,
@@ -573,7 +575,7 @@ const queryAdPerformanceRows = async (
                 adState: ad.state,
                 adDeliveryStatus: ad.deliveryStatus,
                 adAsin: ad.productAsin,
-                adProductTitle: ad.productTitle,
+                adProductTitle: sql<string | null>`coalesce(${productMetadata.title}, ${ad.productTitle})`,
                 adType: ad.adType,
                 adGroupId: adGroup.adGroupId,
                 adGroupName: adGroup.name,
@@ -598,6 +600,7 @@ const queryAdPerformanceRows = async (
                 sales: metrics.sales,
             })
             .from(ad)
+            .leftJoin(productMetadata, and(eq(productMetadata.countryCode, account.countryCode), eq(productMetadata.asin, ad.productAsin)))
             .innerJoin(adGroup, eq(adGroup.adGroupId, ad.adGroupId))
             .innerJoin(
                 campaign,
@@ -610,6 +613,7 @@ const queryAdPerformanceRows = async (
                 ad.state,
                 ad.deliveryStatus,
                 ad.productAsin,
+                productMetadata.title,
                 ad.productTitle,
                 ad.adType,
                 adGroup.adGroupId,
@@ -658,7 +662,7 @@ const queryAdPerformanceRows = async (
             adState: ad.state,
             adDeliveryStatus: ad.deliveryStatus,
             adAsin: ad.productAsin,
-            adProductTitle: ad.productTitle,
+            adProductTitle: sql<string | null>`coalesce(${productMetadata.title}, ${ad.productTitle})`,
             adType: ad.adType,
             adGroupId: adGroup.adGroupId,
             adGroupName: adGroup.name,
@@ -683,6 +687,7 @@ const queryAdPerformanceRows = async (
             sales: metrics.sales,
         })
         .from(ad)
+        .leftJoin(productMetadata, and(eq(productMetadata.countryCode, account.countryCode), eq(productMetadata.asin, ad.productAsin)))
         .innerJoin(adGroup, eq(adGroup.adGroupId, ad.adGroupId))
         .innerJoin(
             campaign,
@@ -695,6 +700,7 @@ const queryAdPerformanceRows = async (
             ad.state,
             ad.deliveryStatus,
             ad.productAsin,
+            productMetadata.title,
             ad.productTitle,
             ad.adType,
             adGroup.adGroupId,

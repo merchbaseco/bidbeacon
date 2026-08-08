@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { ad, adGroup, advertiserAccount, campaign, performanceDaily, performanceHourly, reportDatasetMetadata } from '@/db/schema';
+import { ad, adGroup, advertiserAccount, campaign, performanceDaily, performanceHourly, productMetadata, reportDatasetMetadata } from '@/db/schema';
 import { createFakeAmazonAdsGateway } from './amazon-ads-gateway';
 import { createOperationContext, type OperationContext } from './operation-context';
 import { search } from './search';
@@ -115,6 +115,7 @@ describe('Product Search operation', () => {
                 'metrics.cpc',
                 'metrics.ctr',
                 'metrics.roas',
+                'metrics.cvr',
             ],
             dateRange: { startDate: '2026-08-06', endDate: '2026-08-06', source: 'EXPLICIT' },
             orderBy: [
@@ -136,6 +137,7 @@ describe('Product Search operation', () => {
             'metrics.cpc': 1,
             'metrics.ctr': 10,
             'metrics.roas': 2.95,
+            'metrics.cvr': 23.81,
         });
         expect(result.rows).toContainEqual({
             'product.asin': 'B0PRODUCT002',
@@ -149,6 +151,7 @@ describe('Product Search operation', () => {
             'metrics.cpc': 0,
             'metrics.ctr': 0,
             'metrics.roas': 0,
+            'metrics.cvr': 0,
         });
         expect(result.rows.every(row => Object.keys(row).every(field => !(field.startsWith('ad.') || field.startsWith('adGroup.') || field.startsWith('campaign.'))))).toBe(true);
 
@@ -175,12 +178,13 @@ describe('Product Search operation', () => {
                 buildSearchProductAd({ productAsin: 'B0PRODUCT001', productTitle: 'Zulu product' }),
                 buildSearchProductAd({ id: 'search-products-ad-row-2', adId: 'search-products-ad-2', productAsin: 'B0PRODUCT002', productTitle: 'Alpha product' }),
             ]);
+        await database.db.insert(productMetadata).values({ countryCode: 'US', asin: 'B0PRODUCT002', title: 'Projected product title', lastSyncedAt: new Date('2026-08-08T00:00:00Z') });
 
         const titleResult = await search(createSearchContext(database), {
             accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
             resource: 'product',
             fields: ['product.asin', 'product.title'],
-            filters: [{ field: 'product.title', operator: 'contains', value: 'ALPHA' }],
+            filters: [{ field: 'product.title', operator: 'contains', value: 'PROJECTED' }],
             orderBy: [{ field: 'product.title', direction: 'asc' }],
         });
 
@@ -193,7 +197,7 @@ describe('Product Search operation', () => {
                 { field: 'product.asin', direction: 'asc' },
             ],
         });
-        expect(titleResult.rows).toEqual([{ 'product.asin': 'B0PRODUCT002', 'product.title': 'Alpha product' }]);
+        expect(titleResult.rows).toEqual([{ 'product.asin': 'B0PRODUCT002', 'product.title': 'Projected product title' }]);
 
         const asinResult = await search(createSearchContext(database), {
             accountId: SEARCH_PRODUCTS_ACCOUNT_ID,

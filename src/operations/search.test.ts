@@ -78,6 +78,7 @@ describe('Campaign Search operation', () => {
                 'metrics.cpc',
                 'metrics.ctr',
                 'metrics.roas',
+                'metrics.cvr',
             ],
             dateRange: { startDate: '2026-08-01', endDate: '2026-08-07', source: 'DEFAULT' },
             orderBy: [
@@ -102,6 +103,7 @@ describe('Campaign Search operation', () => {
                 'metrics.cpc': 1,
                 'metrics.ctr': 10,
                 'metrics.roas': 3.33,
+                'metrics.cvr': 20,
             },
             {
                 'campaign.id': 'campaign-search-2',
@@ -118,6 +120,7 @@ describe('Campaign Search operation', () => {
                 'metrics.cpc': 0,
                 'metrics.ctr': 0,
                 'metrics.roas': 0,
+                'metrics.cvr': 0,
             },
         ]);
     });
