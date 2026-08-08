@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { spRequest } from './sp-api';
 import { getProductMetadata } from './get-product-metadata';
+import { spRequest } from './sp-api';
 
 vi.mock('./sp-api', () => ({ spRequest: vi.fn() }));
 
@@ -24,7 +24,7 @@ describe('getProductMetadata', () => {
         );
     });
 
-    it('rejects requests above Amazon\'s 300-ASIN limit', async () => {
+    it("rejects requests above Amazon's 300-ASIN limit", async () => {
         await expect(getProductMetadata({ profileId: 123, region: 'na', asins: Array.from({ length: 301 }, (_, index) => `B${index}`) })).rejects.toThrow('between 1 and 300');
         expect(spRequest).not.toHaveBeenCalled();
     });

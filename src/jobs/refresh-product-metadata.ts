@@ -19,7 +19,6 @@ export const refreshProductMetadataJob = boss
                 'accountId, countryCode, and refreshStartedAt must be provided together'
             )
     )
-    .schedule({ cron: '0 4 * * 0' })
     .retry({ limit: 3, delay: 60, backoff: true })
     .work(async jobs => {
         for (const job of jobs) {
@@ -32,7 +31,7 @@ export const refreshProductMetadataJob = boss
                     countryCode: job.data.countryCode,
                 },
                 async recorder => {
-                    if (!job.data.accountId || !job.data.countryCode || !job.data.refreshStartedAt) {
+                    if (!(job.data.accountId && job.data.countryCode && job.data.refreshStartedAt)) {
                         const accounts = await db
                             .select({ adsAccountId: advertiserAccount.adsAccountId, countryCode: advertiserAccount.countryCode })
                             .from(advertiserAccount)
@@ -42,13 +41,17 @@ export const refreshProductMetadataJob = boss
                         recorder.addEvent({ message: `Queued product metadata refresh for ${accounts.length} accounts.`, payload: { accountCount: accounts.length, trigger: 'weekly_refresh' } });
                         return;
                     }
-                    if (!(await gateAccountWork({ accountId: job.data.accountId, countryCode: job.data.countryCode, recorder }))) return;
+                    if (!(await gateAccountWork({ accountId: job.data.accountId, countryCode: job.data.countryCode, recorder }))) {
+                        return;
+                    }
 
                     const account = await db.query.advertiserAccount.findFirst({
                         where: and(eq(advertiserAccount.adsAccountId, job.data.accountId), eq(advertiserAccount.countryCode, job.data.countryCode)),
                         columns: { adsAccountId: true, countryCode: true, profileId: true },
                     });
-                    if (!account?.profileId) throw new Error(`Profile ID not found for account: ${job.data.accountId}`);
+                    if (!account?.profileId) {
+                        throw new Error(`Profile ID not found for account: ${job.data.accountId}`);
+                    }
 
                     const rows = await db
                         .selectDistinct({ asin: ad.productAsin })

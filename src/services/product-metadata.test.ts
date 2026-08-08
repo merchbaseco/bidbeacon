@@ -37,7 +37,9 @@ describe('fetchProductMetadataBatches', () => {
                 asins: Array.from({ length: 301 }, (_, index) => `B${String(index).padStart(9, '0')}`),
                 fetchBatch: async asins => {
                     call++;
-                    if (call === 2) throw new Error('Amazon unavailable');
+                    if (call === 2) {
+                        throw new Error('Amazon unavailable');
+                    }
                     return asins.map(asin => ({ asin, title: asin }));
                 },
                 onBatch: async products => {
@@ -46,6 +48,18 @@ describe('fetchProductMetadataBatches', () => {
             })
         ).rejects.toThrow('Amazon unavailable');
         expect(persistedCount).toBe(300);
+    });
+
+    it('stops after the first empty inventory response', async () => {
+        const fetchBatch = vi.fn(async () => []);
+
+        await expect(
+            fetchProductMetadataBatches({
+                asins: Array.from({ length: 301 }, (_, index) => `B${String(index).padStart(9, '0')}`),
+                fetchBatch,
+            })
+        ).rejects.toThrow('Amazon Product Metadata returned no matching inventory for 300 advertised ASINs.');
+        expect(fetchBatch).toHaveBeenCalledTimes(1);
     });
 });
 

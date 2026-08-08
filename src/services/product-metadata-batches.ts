@@ -14,9 +14,18 @@ export const fetchProductMetadataBatches = async (input: {
         const batch = asins.slice(offset, offset + AMAZON_PRODUCT_METADATA_BATCH_SIZE);
         batchSizes.push(batch.length);
         const batchProducts = new Map<string, { asin: string; title: string | null }>();
-        for (const product of await input.fetchBatch(batch)) if (requestedAsins.has(product.asin)) batchProducts.set(product.asin, product);
+        for (const product of await input.fetchBatch(batch)) {
+            if (requestedAsins.has(product.asin)) {
+                batchProducts.set(product.asin, product);
+            }
+        }
+        if (offset === 0 && batchProducts.size === 0) {
+            throw new Error(`Amazon Product Metadata returned no matching inventory for ${batch.length} advertised ${batch.length === 1 ? 'ASIN' : 'ASINs'}.`);
+        }
         await input.onBatch?.([...batchProducts.values()]);
-        for (const product of batchProducts.values()) productsByAsin.set(product.asin, product);
+        for (const product of batchProducts.values()) {
+            productsByAsin.set(product.asin, product);
+        }
     }
 
     return { requestedAsins: asins, products: [...productsByAsin.values()], batchSizes };

@@ -65,9 +65,7 @@ const ProductCoverageRow = ({ coverage, isFetching }: { coverage: { advertisedCo
                 {isFetching ? <Spinner className="-mr-0.5 -ml-0.5 size-3" /> : <span className={`size-2 rounded-full ${complete ? 'bg-emerald-500' : 'bg-amber-500'}`} />}
                 <span className="text-sm">Products</span>
             </div>
-            <span className="text-muted-foreground text-sm tabular-nums">
-                {coverage ? `${coverage.hydratedCount.toLocaleString()} / ${coverage.advertisedCount.toLocaleString()}` : '—'}
-            </span>
+            <span className="text-muted-foreground text-sm tabular-nums">{coverage ? `${coverage.hydratedCount.toLocaleString()} / ${coverage.advertisedCount.toLocaleString()}` : '—'}</span>
         </div>
     );
 };

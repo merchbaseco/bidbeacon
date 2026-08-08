@@ -120,12 +120,10 @@ export const accountsRouter = router({
             return data;
         }),
 
-    productMetadataCoverage: privateProcedure
-        .input(z.object({ accountId: z.string(), countryCode: z.string() }))
-        .query(async ({ ctx, input }) => {
-            ctx.assertAccountAccess(input.accountId);
-            return getProductMetadataCoverage(db, input);
-        }),
+    productMetadataCoverage: privateProcedure.input(z.object({ accountId: z.string(), countryCode: z.string() })).query(async ({ ctx, input }) => {
+        ctx.assertAccountAccess(input.accountId);
+        return getProductMetadataCoverage(db, input);
+    }),
 
     syncAdEntities: privateProcedure
         .input(

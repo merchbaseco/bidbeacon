@@ -30,13 +30,17 @@ export const updateProductMetadataJob = boss
                     countryCode: job.data.countryCode,
                 },
                 async recorder => {
-                    if (!(await gateAccountWork({ accountId: job.data.accountId, countryCode: job.data.countryCode, recorder }))) return;
+                    if (!(await gateAccountWork({ accountId: job.data.accountId, countryCode: job.data.countryCode, recorder }))) {
+                        return;
+                    }
 
                     const account = await db.query.advertiserAccount.findFirst({
                         where: and(eq(advertiserAccount.adsAccountId, job.data.accountId), eq(advertiserAccount.countryCode, job.data.countryCode)),
                         columns: { profileId: true },
                     });
-                    if (!account?.profileId) throw new Error(`Profile ID not found for account: ${job.data.accountId}`);
+                    if (!account?.profileId) {
+                        throw new Error(`Profile ID not found for account: ${job.data.accountId}`);
+                    }
 
                     let result: Awaited<ReturnType<typeof updateProductMetadata>>;
                     try {
