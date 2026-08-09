@@ -166,12 +166,15 @@ async function registerRoutes(fastify: FastifyInstance) {
     registerWebSocketRoute(fastify, { access, ticketStore });
     await registerBidBeaconMcpRoutes(fastify, {
         auth: createBidBeaconMcpAuth(access),
-        createContext: ({ accessibleAccountIds, merchbaseUserId }) =>
-            createProductionOperationContext({
-                accessibleAccountIds,
-                credentialKind: 'oauth',
-                merchbaseUserId,
-            }),
+        createContext: ({ accessibleAccountIds, credential, merchbaseUserId }) =>
+            createProductionOperationContext(
+                {
+                    accessibleAccountIds,
+                    credentialKind: 'oauth',
+                    merchbaseUserId,
+                },
+                credential
+            ),
         publishableKey: requireEnvironment('CLERK_PUBLISHABLE_KEY'),
         resourceUrl: getMcpResourceUrl(),
     });

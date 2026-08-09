@@ -10,6 +10,7 @@ export type AuthType = 'access' | 'none';
 export type CredentialKind = 'api_key' | 'oauth' | 'session';
 
 export type Context = {
+    accessCredential: string | null;
     accessError: 'access_denied' | 'access_unavailable' | null;
     accessibleAccountIds: string[];
     accessibleAdvertiserAccountIds: string[];
@@ -33,6 +34,7 @@ export const createContext = async ({ req }: CreateFastifyContextOptions): Promi
         const resolved = await authorizeBidBeaconCredential(access, credential);
 
         return {
+            accessCredential: credential,
             accessError: null,
             accessibleAccountIds: resolved.principal.legacyAdsAccountIds,
             accessibleAdvertiserAccountIds: resolved.principal.accessibleAccountIds,
@@ -54,6 +56,7 @@ export const createContext = async ({ req }: CreateFastifyContextOptions): Promi
 };
 
 const createUnauthenticatedContext = (request: unknown): Context => ({
+    accessCredential: null,
     accessError: null,
     accessibleAccountIds: [],
     accessibleAdvertiserAccountIds: [],

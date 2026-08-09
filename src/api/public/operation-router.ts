@@ -104,11 +104,14 @@ const getPublicOperationContext = async (context: Context): Promise<OperationCon
     }
 
     const { createProductionOperationContext } = await import('@/operations/production-operation-context');
-    return createProductionOperationContext({
-        accessibleAccountIds: context.accessibleAdvertiserAccountIds,
-        credentialKind: context.credentialKind,
-        merchbaseUserId: context.user.merchbaseUserId,
-    });
+    return createProductionOperationContext(
+        {
+            accessibleAccountIds: context.accessibleAdvertiserAccountIds,
+            credentialKind: context.credentialKind,
+            merchbaseUserId: context.user.merchbaseUserId,
+        },
+        context.accessCredential
+    );
 };
 
 const toTrpcErrorCode = (code: OperationErrorCode): TRPC_ERROR_CODE_KEY => {

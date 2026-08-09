@@ -64,6 +64,7 @@ services:
       CLERK_WEBHOOK_SIGNING_SECRET: ${CLERK_WEBHOOK_SIGNING_SECRET}
       DISABLE_SERVER_JOB_RUNNER: ${DISABLE_SERVER_JOB_RUNNER:-false}
       MCP_RESOURCE_URL: ${MCP_RESOURCE_URL:-https://bidbeacon.merchbase.co/mcp}
+      RANKWRANGLER_BASE_URL: ${RANKWRANGLER_BASE_URL:-https://rankwrangler.merchbase.co}
     depends_on:
       postgres:
         condition: service_healthy

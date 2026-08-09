@@ -95,8 +95,16 @@ describe('BidBeacon MCP HTTP routes', () => {
         expect(first.statusCode).toBe(200);
         expect(second.statusCode).toBe(200);
         expect(createContext).toHaveBeenCalledTimes(2);
-        expect(createContext).toHaveBeenNthCalledWith(1, { accessibleAccountIds: ['00000000-0000-4000-8000-000000000001'], merchbaseUserId: 'mbu_http_test' });
-        expect(createContext).toHaveBeenNthCalledWith(2, { accessibleAccountIds: ['00000000-0000-4000-8000-000000000001'], merchbaseUserId: 'mbu_http_test' });
+        expect(createContext).toHaveBeenNthCalledWith(1, {
+            accessibleAccountIds: ['00000000-0000-4000-8000-000000000001'],
+            credential: 'oat_first',
+            merchbaseUserId: 'mbu_http_test',
+        });
+        expect(createContext).toHaveBeenNthCalledWith(2, {
+            accessibleAccountIds: ['00000000-0000-4000-8000-000000000001'],
+            credential: 'oat_second',
+            merchbaseUserId: 'mbu_http_test',
+        });
     });
 
     it('closes each per-request SDK server and transport when the response completes', async () => {

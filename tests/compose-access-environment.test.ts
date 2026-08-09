@@ -15,7 +15,9 @@ describe('compose access runtime environment', () => {
         }
 
         expect(server).toContain(['      DISABLE_SERVER_JOB_RUNNER: $', '{DISABLE_SERVER_JOB_RUNNER:-false}'].join(''));
+        expect(server).toContain('      RANKWRANGLER_BASE_URL:');
         expect(worker).not.toContain('CLERK_WEBHOOK_SIGNING_SECRET');
+        expect(worker).not.toContain('RANKWRANGLER_BASE_URL');
     });
 });
 

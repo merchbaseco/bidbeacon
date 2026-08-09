@@ -73,17 +73,17 @@ const enrichProductTitles = async (context: OperationContext, marketplaceId: str
         return rows;
     }
 
-    const asins = [...new Set(rows.flatMap(row => (typeof row.values[asinField] === 'string' ? [row.values[asinField] as string] : [])))];
+    const asins = [...new Set(rows.flatMap(row => (typeof row.values[asinField] === 'string' ? [(row.values[asinField] as string).toUpperCase()] : [])))];
     if (asins.length === 0) {
         return rows;
     }
 
     try {
         const resolved = await context.products.resolveProducts({ marketplaceId, asins });
-        const titles = new Map(resolved.map(product => [product.asin, product.title]));
+        const titles = new Map(resolved.map(product => [product.asin.toUpperCase(), product.title]));
         return rows.map(row => {
             const asin = row.values[asinField];
-            const title = typeof asin === 'string' ? titles.get(asin) : undefined;
+            const title = typeof asin === 'string' ? titles.get(asin.toUpperCase()) : undefined;
             return title === undefined ? row : { values: { ...row.values, [titleField]: title } };
         });
     } catch {

@@ -1,10 +1,16 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { advertiserAccount, campaign } from '@/db/schema';
 import { createFakeAmazonAdsGateway } from '@/operations/amazon-ads-gateway';
 import { createOperationContext, type OperationContext } from '@/operations/operation-context';
 import { createTestDatabase, type TestDatabase } from '@/operations/testing/create-test-database';
 import { buildAdvertiserAccount, buildCampaign } from '@/operations/testing/fixtures';
 import { publicAppRouter } from './router-public';
+
+const productionContextMocks = vi.hoisted(() => ({
+    createProductionOperationContext: vi.fn(),
+}));
+
+vi.mock('@/operations/production-operation-context', () => productionContextMocks);
 
 const accountId = '00000000-0000-4000-8000-000000000001';
 
@@ -69,15 +75,39 @@ describe('public operation router', () => {
             cause: { code: 'ACCOUNT_ACCESS_DENIED', details: {} },
         });
     });
+
+    it('forwards the authenticated Merchbase credential into the production operation context', async () => {
+        database = await createTestDatabase();
+        await database.db.insert(advertiserAccount).values(buildAdvertiserAccount({ id: accountId }));
+        productionContextMocks.createProductionOperationContext.mockReturnValue(
+            createOperationContext({
+                amazonAds: createFakeAmazonAdsGateway(),
+                db: database.db as never,
+                principal: { accessibleAccountIds: [accountId], credentialKind: 'api_key', merchbaseUserId: 'mbu_public_router_test' },
+            })
+        );
+        const caller = publicAppRouter.createCaller(createTestContext(undefined, 'ak_suite-key'));
+
+        await expect(caller.search({ accountId, resource: 'campaign', fields: ['campaign.id'] })).resolves.toMatchObject({ rows: [] });
+        expect(productionContextMocks.createProductionOperationContext).toHaveBeenCalledWith(
+            {
+                accessibleAccountIds: [accountId],
+                credentialKind: 'api_key',
+                merchbaseUserId: 'mbu_public_router_test',
+            },
+            'ak_suite-key'
+        );
+    });
 });
 
-const createTestContext = (operationContext: OperationContext) => ({
+const createTestContext = (operationContext?: OperationContext, accessCredential = 'ak_test') => ({
+    accessCredential,
     accessError: null,
     accessibleAccountIds: [],
     accessibleAdvertiserAccountIds: [accountId],
     authType: 'access' as const,
     credentialKind: 'api_key' as const,
-    operationContext,
+    ...(operationContext ? { operationContext } : {}),
     request: null,
     user: { merchbaseUserId: 'mbu_public_router_test' },
 });

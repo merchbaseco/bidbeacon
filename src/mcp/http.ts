@@ -25,7 +25,7 @@ const MCP_METADATA_CORS = {
 
 export type RegisterBidBeaconMcpRoutesOptions = {
     auth: McpAuthDependencies;
-    createContext: (input: { accessibleAccountIds: readonly string[]; merchbaseUserId: string }) => OperationContext | Promise<OperationContext>;
+    createContext: (input: { accessibleAccountIds: readonly string[]; credential: string; merchbaseUserId: string }) => OperationContext | Promise<OperationContext>;
     publishableKey: string;
     resourceUrl: string;
 };
@@ -76,6 +76,7 @@ const handleMcpRequest = async (request: FastifyRequest, reply: FastifyReply, op
 
     const context = await options.createContext({
         accessibleAccountIds: authentication.accessibleAccountIds,
+        credential: authentication.authInfo.token,
         merchbaseUserId: authentication.merchbaseUserId,
     });
     const server = createBidBeaconMcpServer(context);
