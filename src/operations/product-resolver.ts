@@ -27,7 +27,7 @@ export const createRankWranglerProductResolver = ({
     return {
         resolveProducts: async ({ marketplaceId, asins }) => {
             const products = await client.product.getMany.mutate({ products: asins.map(asin => ({ marketplaceId, asin })) });
-            return products.flatMap(product => (product.status === 'available' && product.title ? [{ asin: product.asin, title: product.title }] : []));
+            return products.flatMap(product => (product.title ? [{ asin: product.asin, title: product.title }] : []));
         },
     };
 };

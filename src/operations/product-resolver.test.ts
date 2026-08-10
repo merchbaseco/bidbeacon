@@ -8,18 +8,24 @@ describe('RankWrangler Product resolver', () => {
             {
                 marketplaceId: 'ATVPDKIKX0DER',
                 asin: 'B000000001',
-                status: 'available',
+                amazonListingStatus: 'active',
                 title: 'First shirt',
                 thumbnail: { status: 'unavailable' },
             },
             {
                 marketplaceId: 'ATVPDKIKX0DER',
                 asin: 'B000000002',
-                status: 'available',
+                amazonListingStatus: 'active',
                 title: null,
                 thumbnail: { status: 'unavailable' },
             },
-            { marketplaceId: 'ATVPDKIKX0DER', asin: 'B000000003', status: 'unavailable' },
+            {
+                marketplaceId: 'ATVPDKIKX0DER',
+                asin: 'B000000003',
+                amazonListingStatus: 'deleted',
+                title: 'Archived shirt',
+                thumbnail: { status: 'unavailable' },
+            },
         ]);
         const createClient = vi.fn(
             () =>
@@ -34,7 +40,10 @@ describe('RankWrangler Product resolver', () => {
                 marketplaceId: 'ATVPDKIKX0DER',
                 asins: ['B000000001', 'B000000002', 'B000000003'],
             })
-        ).resolves.toEqual([{ asin: 'B000000001', title: 'First shirt' }]);
+        ).resolves.toEqual([
+            { asin: 'B000000001', title: 'First shirt' },
+            { asin: 'B000000003', title: 'Archived shirt' },
+        ]);
         expect(createClient).toHaveBeenCalledWith({
             baseUrl: 'https://rankwrangler.test',
             batch: false,

@@ -7,7 +7,7 @@
       "dependencies": {
         "@aws-sdk/client-cloudwatch": "3.971.0",
         "@aws-sdk/client-sqs": "3.971.0",
-        "@bidbeacon/http-client": "2.0.0",
+        "@bidbeacon/http-client": "2.0.1",
         "@clerk/backend": "2.33.3",
         "@clerk/clerk-react": "5.61.6",
         "@clerk/mcp-tools": "0.6.0",
@@ -16,7 +16,7 @@
         "@fastify/websocket": "11.2.0",
         "@merchbaseco/access": "0.3.0",
         "@modelcontextprotocol/sdk": "1.30.0",
-        "@rankwrangler/http-client": "0.8.0",
+        "@rankwrangler/http-client": "0.9.0",
         "@trpc/client": "11.8.1",
         "@trpc/react-query": "11.8.1",
         "@trpc/server": "11.8.1",
@@ -203,7 +203,7 @@
 
     "@base-ui-components/utils": ["@base-ui-components/utils@0.2.2", "", { "dependencies": { "@babel/runtime": "^7.28.4", "@floating-ui/utils": "^0.2.10", "reselect": "^5.1.1", "use-sync-external-store": "^1.6.0" }, "peerDependencies": { "@types/react": "^17 || ^18 || ^19", "react": "^17 || ^18 || ^19", "react-dom": "^17 || ^18 || ^19" }, "optionalPeers": ["@types/react"] }, "sha512-rNJCD6TFy3OSRDKVHJDzLpxO3esTV1/drRtWNUpe7rCpPN9HZVHUCuP+6rdDYDGWfXnQHbqi05xOyRP2iZAlkw=="],
 
-    "@bidbeacon/http-client": ["@bidbeacon/http-client@2.0.0", "", { "dependencies": { "@trpc/client": "11.8.1", "@trpc/server": "11.8.1" } }, "sha512-6YxRcudLJcS4sPnkyjfR24w1RSZufHuTFg0QKC5ouwZV5iy6HikfGz/VxtYYpSmr1iwJcjXfh4Pc1xsW0cQzYg=="],
+    "@bidbeacon/http-client": ["@bidbeacon/http-client@2.0.1", "", { "dependencies": { "@trpc/client": "11.8.1", "@trpc/server": "11.8.1" } }, "sha512-MORNO/lHMSMvXBiGDqWmtDJBhY1N5rVg/SyuWpnUYjo0ncLXQHtrgKAP1UAaGU5Z7vlMHzupHVoDQ/qwifwS4w=="],
 
     "@biomejs/biome": ["@biomejs/biome@2.3.13", "", { "optionalDependencies": { "@biomejs/cli-darwin-arm64": "2.3.13", "@biomejs/cli-darwin-x64": "2.3.13", "@biomejs/cli-linux-arm64": "2.3.13", "@biomejs/cli-linux-arm64-musl": "2.3.13", "@biomejs/cli-linux-x64": "2.3.13", "@biomejs/cli-linux-x64-musl": "2.3.13", "@biomejs/cli-win32-arm64": "2.3.13", "@biomejs/cli-win32-x64": "2.3.13" }, "bin": { "biome": "bin/biome" } }, "sha512-Fw7UsV0UAtWIBIm0M7g5CRerpu1eKyKAXIazzxhbXYUyMkwNrkX/KLkGI7b+uVDQ5cLUMfOC9vR60q9IDYDstA=="],
 
@@ -361,7 +361,7 @@
 
     "@popperjs/core": ["@popperjs/core@2.11.8", "", {}, "sha512-P1st0aksCrn9sGZhp8GMYwBnQsbvAWsZAX44oXNNvLHGqAOcoVxmjZiohstwQ7SqKnbR47akdNi+uleWD8+g6A=="],
 
-    "@rankwrangler/http-client": ["@rankwrangler/http-client@0.8.0", "", { "dependencies": { "@trpc/client": "11.10.0", "@trpc/server": "11.10.0" } }, "sha512-XrUdrvvKYzJ9rE1O1ZMHOshhlNw9hxl5AjmBfH5ovV6KhA7y3PlpfVfxM6xIVVQt6ghCzJ1gx+9nvMf2IEQFKw=="],
+    "@rankwrangler/http-client": ["@rankwrangler/http-client@0.9.0", "", { "dependencies": { "@trpc/client": "11.10.0", "@trpc/server": "11.10.0" } }, "sha512-jm7vUnHGZPl+GKcnJwysWYrtFDTmM0Dv2Cft5FIPIwiLQeUAAJbP4KS/ZVjM4xsSWgwiDSkjFscuxDSZA1Rqhg=="],
 
     "@reduxjs/toolkit": ["@reduxjs/toolkit@2.11.2", "", { "dependencies": { "@standard-schema/spec": "^1.0.0", "@standard-schema/utils": "^0.3.0", "immer": "^11.0.0", "redux": "^5.0.1", "redux-thunk": "^3.1.0", "reselect": "^5.1.0" }, "peerDependencies": { "react": "^16.9.0 || ^17.0.0 || ^18 || ^19", "react-redux": "^7.2.1 || ^8.1.3 || ^9.0.0" }, "optionalPeers": ["react", "react-redux"] }, "sha512-Kd6kAHTA6/nUpp8mySPqj3en3dm0tdMIgbttnQ1xFMVpufoj+ADi8pXLBsd4xzTRHQa7t/Jv8W5UnCuW4kuWMQ=="],
 
