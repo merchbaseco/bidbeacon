@@ -16,7 +16,7 @@ export type Context = {
 	request: unknown;
 	user: AuthenticatedUser | null;
 };
-export type OperationErrorCode = "ACCOUNT_ACCESS_DENIED" | "AMAZON_REJECTED" | "AMAZON_UNAVAILABLE" | "AUTHENTICATION_REQUIRED" | "COMPOSITE_PARTIAL_FAILURE" | "CURSOR_INVALID" | "INTERNAL_ERROR" | "INVALID_INPUT" | "RESOURCE_NOT_FOUND";
+export type OperationErrorCode = "ACCOUNT_ACCESS_DENIED" | "AMAZON_REJECTED" | "AMAZON_UNAVAILABLE" | "AUTHENTICATION_REQUIRED" | "COMPOSITE_PARTIAL_FAILURE" | "CURSOR_INVALID" | "EXECUTION_TIMEOUT" | "INTERNAL_ERROR" | "INVALID_INPUT" | "RESPONSE_TOO_LARGE" | "RESULT_TOO_LARGE" | "RESOURCE_NOT_FOUND";
 export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 	ctx: Context;
 	meta: object;
@@ -69,20 +69,20 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 			accountId: string;
 			resource: "campaign" | "ad_group" | "ad" | "target" | "product" | "change_event";
 			orderBy?: {
-				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.hour";
+				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr";
 				direction: "asc" | "desc";
 			}[] | undefined;
 			limit?: number | undefined;
-			fields?: ("campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.hour")[] | undefined;
-			filters?: {
-				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.hour";
-				operator: "eq" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
-				value?: unknown;
-			}[] | undefined;
+			fields?: ("campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr")[] | undefined;
 			dateRange?: {
 				startDate: string;
 				endDate: string;
 			} | undefined;
+			filters?: {
+				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr";
+				operator: "eq" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
+				value?: unknown;
+			}[] | undefined;
 			cursor?: string | undefined;
 		};
 		output: {
@@ -129,6 +129,100 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				"metrics.cvr": number | null;
 			} | undefined;
 			nextCursor?: string | undefined;
+		};
+		meta: object;
+	}>;
+	readonly performance: import("@trpc/server").TRPCQueryProcedure<{
+		input: {
+			accountId: string;
+			dimension: "product" | "account";
+			interval: "month" | "day" | "hour";
+			dateRange: {
+				startDate: string;
+				endDate: string;
+			};
+			metrics: ("impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr")[];
+			entityIds?: string[] | undefined;
+		};
+		output: {
+			context: {
+				account: {
+					id: string;
+					currency: string;
+					timezone: string;
+				};
+				dimension: "account";
+				interval: "month" | "day" | "hour";
+				dateRange: {
+					startDate: string;
+					endDate: string;
+				};
+				metrics: ("impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr")[];
+				coverage: {
+					status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+					issues: ({
+						date: string;
+						status: "PENDING" | "FAILED" | "UNKNOWN";
+					} | {
+						date: string;
+						status: "PARSE_ERRORS";
+						errorCount: number;
+					})[];
+				};
+			};
+			totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			points: ({
+				end: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				start: string;
+			} | {
+				date: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			} | {
+				month: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			})[];
+		} | {
+			context: {
+				account: {
+					id: string;
+					currency: string;
+					timezone: string;
+				};
+				dimension: "product";
+				interval: "month" | "day" | "hour";
+				dateRange: {
+					startDate: string;
+					endDate: string;
+				};
+				metrics: ("impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr")[];
+				coverage: {
+					status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+					issues: ({
+						date: string;
+						status: "PENDING" | "FAILED" | "UNKNOWN";
+					} | {
+						date: string;
+						status: "PARSE_ERRORS";
+						errorCount: number;
+					})[];
+				};
+			};
+			series: {
+				entityId: string;
+				totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				points: ({
+					end: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					start: string;
+				} | {
+					date: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				} | {
+					month: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				})[];
+			}[];
 		};
 		meta: object;
 	}>;
@@ -551,20 +645,20 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 			accountId: string;
 			resource: "campaign" | "ad_group" | "ad" | "target" | "product" | "change_event";
 			orderBy?: {
-				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.hour";
+				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr";
 				direction: "asc" | "desc";
 			}[] | undefined;
 			limit?: number | undefined;
-			fields?: ("campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.hour")[] | undefined;
-			filters?: {
-				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr" | "segments.date" | "segments.hour";
-				operator: "eq" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
-				value?: unknown;
-			}[] | undefined;
+			fields?: ("campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr")[] | undefined;
 			dateRange?: {
 				startDate: string;
 				endDate: string;
 			} | undefined;
+			filters?: {
+				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr";
+				operator: "eq" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
+				value?: unknown;
+			}[] | undefined;
 			cursor?: string | undefined;
 		};
 		output: {
@@ -611,6 +705,100 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				"metrics.cvr": number | null;
 			} | undefined;
 			nextCursor?: string | undefined;
+		};
+		meta: object;
+	}>;
+	readonly performance: import("@trpc/server").TRPCQueryProcedure<{
+		input: {
+			accountId: string;
+			dimension: "product" | "account";
+			interval: "month" | "day" | "hour";
+			dateRange: {
+				startDate: string;
+				endDate: string;
+			};
+			metrics: ("impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr")[];
+			entityIds?: string[] | undefined;
+		};
+		output: {
+			context: {
+				account: {
+					id: string;
+					currency: string;
+					timezone: string;
+				};
+				dimension: "account";
+				interval: "month" | "day" | "hour";
+				dateRange: {
+					startDate: string;
+					endDate: string;
+				};
+				metrics: ("impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr")[];
+				coverage: {
+					status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+					issues: ({
+						date: string;
+						status: "PENDING" | "FAILED" | "UNKNOWN";
+					} | {
+						date: string;
+						status: "PARSE_ERRORS";
+						errorCount: number;
+					})[];
+				};
+			};
+			totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			points: ({
+				end: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				start: string;
+			} | {
+				date: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			} | {
+				month: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			})[];
+		} | {
+			context: {
+				account: {
+					id: string;
+					currency: string;
+					timezone: string;
+				};
+				dimension: "product";
+				interval: "month" | "day" | "hour";
+				dateRange: {
+					startDate: string;
+					endDate: string;
+				};
+				metrics: ("impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr")[];
+				coverage: {
+					status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+					issues: ({
+						date: string;
+						status: "PENDING" | "FAILED" | "UNKNOWN";
+					} | {
+						date: string;
+						status: "PARSE_ERRORS";
+						errorCount: number;
+					})[];
+				};
+			};
+			series: {
+				entityId: string;
+				totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				points: ({
+					end: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					start: string;
+				} | {
+					date: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				} | {
+					month: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				})[];
+			}[];
 		};
 		meta: object;
 	}>;

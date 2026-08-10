@@ -62,16 +62,18 @@ const PERFORMANCE_FIELDS = [
     'metrics.cvr',
 ] as const;
 
-export const CAMPAIGN_SEARCH_FIELDS = [...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date'] as const;
-export const AD_GROUP_SEARCH_FIELDS = [...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.hour'] as const;
-export const AD_SEARCH_FIELDS = [...AD_RESOURCE_FIELDS, ...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.hour'] as const;
-export const TARGET_SEARCH_FIELDS = [...TARGET_RESOURCE_FIELDS, ...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date'] as const;
-export const PRODUCT_SEARCH_FIELDS = [...PRODUCT_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS, 'segments.date', 'segments.hour'] as const;
+export const CAMPAIGN_SEARCH_FIELDS = [...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS] as const;
+export const AD_GROUP_SEARCH_FIELDS = [...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS] as const;
+export const AD_SEARCH_FIELDS = [...AD_RESOURCE_FIELDS, ...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS] as const;
+export const TARGET_SEARCH_FIELDS = [...TARGET_RESOURCE_FIELDS, ...AD_GROUP_RESOURCE_FIELDS, ...CAMPAIGN_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS] as const;
+export const PRODUCT_SEARCH_FIELDS = [...PRODUCT_RESOURCE_FIELDS, ...PERFORMANCE_FIELDS] as const;
 export const CHANGE_EVENT_SEARCH_FIELDS = [...CHANGE_EVENT_RESOURCE_FIELDS] as const;
 
 export const SEARCH_FIELDS = [...AD_SEARCH_FIELDS, ...TARGET_RESOURCE_FIELDS, ...PRODUCT_RESOURCE_FIELDS, ...CHANGE_EVENT_RESOURCE_FIELDS] as const;
 
-export type SearchField = (typeof SEARCH_FIELDS)[number];
+const INTERNAL_SEARCH_FIELDS = [...SEARCH_FIELDS, 'segments.date', 'segments.hour'] as const;
+
+export type SearchField = (typeof INTERNAL_SEARCH_FIELDS)[number];
 export type CampaignSearchField = (typeof CAMPAIGN_SEARCH_FIELDS)[number];
 export type AdGroupSearchField = (typeof AD_GROUP_SEARCH_FIELDS)[number];
 export type AdSearchField = (typeof AD_SEARCH_FIELDS)[number];
@@ -209,8 +211,6 @@ export const isSearchFieldCompatible = (resource: SearchResource, field: string)
 export const isSearchPerformanceField = (field: string) => getSearchField(field)?.performance ?? false;
 
 export const isSearchSegmentField = (field: string) => getSearchField(field)?.segment ?? false;
-
-export const isSearchHourSegmentField = (field: string) => field === 'segments.hour';
 
 export const campaignSearchFieldRegistry = Object.fromEntries(CAMPAIGN_SEARCH_FIELDS.map(field => [field, searchFieldRegistry[field]])) as Readonly<Record<CampaignSearchField, SearchFieldDefinition>>;
 

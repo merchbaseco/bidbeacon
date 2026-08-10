@@ -41,6 +41,15 @@ describe('public operation router', () => {
         await expect(caller.search({ accountId, resource: 'campaign', fields: ['campaign.id'] })).resolves.toMatchObject({
             rows: [{ 'campaign.id': 'campaign-1' }],
         });
+        await expect(
+            caller.performance({
+                accountId,
+                dimension: 'account',
+                interval: 'day',
+                dateRange: { startDate: '2026-08-10', endDate: '2026-08-10' },
+                metrics: ['spend'],
+            })
+        ).resolves.toMatchObject({ totals: { spend: 0 }, points: [{ date: '2026-08-10', metrics: { spend: 0 } }] });
         expect(Object.keys(publicAppRouter._def.procedures).sort()).toEqual([
             'create_ad',
             'create_ad_group',
@@ -51,6 +60,7 @@ describe('public operation router', () => {
             'create_product_target',
             'create_sponsored_products_campaign',
             'list_advertiser_accounts',
+            'performance',
             'search',
             'update_ad',
             'update_ad_group',

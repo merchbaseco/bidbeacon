@@ -5,8 +5,11 @@ export type OperationErrorCode =
     | 'AUTHENTICATION_REQUIRED'
     | 'COMPOSITE_PARTIAL_FAILURE'
     | 'CURSOR_INVALID'
+    | 'EXECUTION_TIMEOUT'
     | 'INTERNAL_ERROR'
     | 'INVALID_INPUT'
+    | 'RESPONSE_TOO_LARGE'
+    | 'RESULT_TOO_LARGE'
     | 'RESOURCE_NOT_FOUND';
 
 export class OperationError extends Error {

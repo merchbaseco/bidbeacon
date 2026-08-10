@@ -1,12 +1,12 @@
 ---
-summary: Records why BidBeacon owns a compact public Field and control vocabulary.
+summary: Records why BidBeacon owns compact public Field, metric, and control vocabularies.
 read_when:
-  - adding or renaming Search fields, metrics, segments, budgets, or bid strategies
+  - adding or renaming Search fields, Performance metrics, budgets, or bid strategies
 ---
 
 # Own a stable Field vocabulary
 
-BidBeacon owns a deliberately small public vocabulary of Search fields, metrics, and segments while mapping Amazon report-version-specific columns internally. The complete v1 catalog is exposed directly in the Search tool schema and CLI documentation; a separate field-metadata operation is not provided. Resource validation errors identify the allowed fields when a caller selects an incompatible field.
+BidBeacon owns deliberately small public vocabularies for Search fields and Performance metrics while mapping Amazon report-version-specific columns internally. The complete catalog is exposed directly in the tool schemas and CLI documentation; a separate field-metadata operation is not provided. Resource validation errors identify the allowed fields when a caller selects an incompatible field.
 
 Public bidding strategies use Amazon's advertiser-facing dashboard language: `FIXED`, `DYNAMIC_DOWN_ONLY`, and `DYNAMIC_UP_AND_DOWN`. BidBeacon maps these to Amazon API transport values internally. API terms such as `MANUAL` and `SALES_DOWN_ONLY` are not public because `MANUAL` conflicts with manual targeting and neither form matches the language agents and advertisers ordinarily encounter.
 

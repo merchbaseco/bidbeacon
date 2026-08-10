@@ -323,7 +323,7 @@ describe('Target Search operation', () => {
         expect(result.rows).toEqual([{ 'target.id': 'search-target-keyword-1', 'campaign.id': 'search-target-campaign-1' }]);
     });
 
-    it('uses target defaults, account-local seven-day dates, zero-filled date segments, and keyset cursors', async () => {
+    it('uses target defaults and account-local seven-day aggregate metrics while rejecting temporal fields', async () => {
         vi.useFakeTimers();
         vi.setSystemTime(new Date('2026-08-07T12:00:00.000Z'));
         database = await createTestDatabase();
@@ -385,26 +385,13 @@ describe('Target Search operation', () => {
         expect(defaultResult.context.coverage).toEqual({ status: 'COMPLETE', issues: [] });
         expect(defaultResult.rows[0]).toMatchObject({ 'target.id': 'search-target-keyword-1', 'metrics.spend': 7 });
 
-        const input = {
-            accountId: SEARCH_TARGET_ACCOUNT_ID,
-            resource: 'target' as const,
-            fields: ['target.id', 'segments.date', 'metrics.spend'],
-            dateRange: { startDate: '2026-08-05', endDate: '2026-08-06' },
-            limit: 2,
-        };
-        const firstPage = await search(createSearchContext(database), input);
-        expect(firstPage.rows).toEqual([
-            { 'target.id': 'search-target-keyword-1', 'segments.date': '2026-08-05', 'metrics.spend': 3 },
-            { 'target.id': 'search-target-product-1', 'segments.date': '2026-08-05', 'metrics.spend': 0 },
-        ]);
-        expect(firstPage.nextCursor).toEqual(expect.any(String));
-
-        const secondPage = await search(createSearchContext(database), { ...input, cursor: firstPage.nextCursor });
-        expect(secondPage.rows).toEqual([
-            { 'target.id': 'search-target-keyword-1', 'segments.date': '2026-08-06', 'metrics.spend': 4 },
-            { 'target.id': 'search-target-product-1', 'segments.date': '2026-08-06', 'metrics.spend': 5 },
-        ]);
-        expect(secondPage.nextCursor).toBeUndefined();
+        await expect(
+            search(createSearchContext(database), {
+                accountId: SEARCH_TARGET_ACCOUNT_ID,
+                resource: 'target',
+                fields: ['target.id', 'segments.date', 'metrics.spend'],
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 });
 

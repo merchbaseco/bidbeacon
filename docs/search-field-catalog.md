@@ -1,7 +1,7 @@
 ---
-summary: Defines the stable resource, metric, and segment fields accepted by Search.
+summary: Defines the stable resource and metric fields accepted by Search.
 read_when:
-  - changing Search inputs, outputs, defaults, filters, sorting, metrics, segments, or public resource names
+  - changing Search inputs, outputs, defaults, filters, sorting, metrics, or public resource names
 ---
 
 # Search field catalog
@@ -10,9 +10,9 @@ BidBeacon exposes a deliberately small, stable field vocabulary. The catalog is 
 
 ## Search implementation status
 
-The shared Search operation implements `resource: campaign`, `resource: ad_group`, `resource: ad`, `resource: target`, `resource: product`, and `resource: change_event`. Each resource accepts its own fields, compatible ancestry where applicable, the standard performance metrics where applicable, and the account-local segments documented below. Omitting `fields` returns the selected resource's Default fields plus the standard metrics; supplying `fields` replaces that set. Descendant or unrelated fields are rejected with the compatible Field list in the validation details.
+The shared Search operation implements `resource: campaign`, `resource: ad_group`, `resource: ad`, `resource: target`, `resource: product`, and `resource: change_event`. Each resource accepts its own fields, compatible ancestry where applicable, and the standard performance metrics where applicable. Omitting `fields` returns the selected resource's Default fields plus the standard metrics; supplying `fields` replaces that set. Descendant or unrelated fields are rejected with the compatible Field list in the validation details.
 
-Every performance-bearing resource reads the canonical Target-grain archive (`entity_type = target`). Campaign, Ad-group, Ad, and Target group those observations by their stored topology identifiers. Product joins each observation's Ad to its advertised ASIN and groups by that ASIN across Ads and Campaigns. Aggregate and date-segmented searches use `performance_daily`; hour-segmented searches for Ad groups, Ads, and Products use `performance_hourly`. Rows are aggregated once at the selected resource grain, so topology joins never multiply metrics. Segmented rows are account-local and zero-filled across the requested range. Completed Target report metadata with zero records is complete while missing metadata remains unknown.
+Every performance-bearing resource reads the canonical Target-grain daily archive (`entity_type = target`). Campaign, Ad-group, Ad, and Target group those observations by their stored topology identifiers. Product joins each observation's Ad to its advertised ASIN and groups by that ASIN across Ads and Campaigns. Rows are aggregated once at the selected resource grain, so topology joins never multiply metrics. Complete temporal reads and zero-filled points belong to [Performance](performance-api.md). Completed Target report metadata with zero records is complete while missing metadata remains unknown.
 
 `product.title` and `ad.productTitle` are resolved in one bounded RankWrangler call for the final Search page. BidBeacon stores no product titles. Missing products or resolver failures return `null` without failing Search. These display-only fields cannot filter or order Search because enrichment occurs after pagination.
 
@@ -62,25 +62,19 @@ ACOS, CTR, and CVR are numeric percentage points. ROAS is a numeric multiplier. 
 
 A ratio is `null` when its denominator is zero: ACOS without sales, CPC and CVR without clicks, CTR without impressions, and ROAS without spend. A zero numerator with a nonzero denominator remains numeric, so spend with zero sales has `metrics.roas: 0` and clicks with zero orders has `metrics.cvr: 0`. Null ratios sort after numeric values in either direction.
 
-Every Performance Search response includes a `summary` with all ten standard metrics for the complete filtered result before pagination. Additive metrics are summed; ACOS, CPC, CTR, ROAS, and CVR are recomputed from the aggregate totals. Settings-only and Change-event searches omit the summary.
-
-## Segments
-
-- `segments.date`: account-local `YYYY-MM-DD`
-- `segments.hour`: account-local hour from `0` through `23`; available for Ad-group, Ad, and Product Search and requires `segments.date`. Target Search uses the daily target archive in this slice.
-Selecting `segments.hour` also requires `segments.date`, preventing the same clock hour from being aggregated across multiple dates.
+Every Metric Search response includes a `summary` with all ten standard metrics for the complete filtered result before pagination. Additive metrics are summed; ACOS, CPC, CTR, ROAS, and CVR are recomputed from the aggregate totals. Settings-only and Change-event searches omit the summary.
 
 ## Compatibility
 
-- `campaign`: Campaign fields, metrics, and `segments.date`
-- `ad_group`: Ad-group and Campaign ancestor fields, metrics, `segments.date`, and `segments.hour`
-- `ad`: Ad, Ad-group, and Campaign ancestor fields, metrics, `segments.date`, and `segments.hour`
-- `product`: Product fields, metrics, `segments.date`, and `segments.hour`
-- `target`: Target fields, compatible Ad-group/Campaign ancestry, metrics, and `segments.date`
-- `change_event`: Change-event fields only; it has no performance fields, metrics, segments, or coverage
+- `campaign`: Campaign fields and metrics
+- `ad_group`: Ad-group and Campaign ancestor fields plus metrics
+- `ad`: Ad, Ad-group, and Campaign ancestor fields plus metrics
+- `product`: Product fields and metrics
+- `target`: Target fields, compatible Ad-group/Campaign ancestry, and metrics
+- `change_event`: Change-event fields only; it has no performance fields, metrics, or coverage
 
 Filters and ordering may use any compatible Field even when that Field is not selected for output.
 
 ## Default expansion
 
-Omitting `fields` selects the resource's Default fields plus the nine Default performance metrics for every performance-bearing resource. `change_event` defaults to its resource fields without metrics. Its inclusive date range filters `entity_change_history.local_date` in the account's marketplace timezone and reports no performance coverage. Supplying `fields` replaces that expansion. Resource compatibility is validated by Search; validation errors identify the allowed fields for the selected resource.
+Omitting `fields` selects the resource's Default fields plus the ten Default performance metrics for every performance-bearing resource. `change_event` defaults to its resource fields without metrics. Its inclusive date range filters `entity_change_history.local_date` in the account's marketplace timezone and reports no performance coverage. Supplying `fields` replaces that expansion. Resource compatibility is validated by Search; validation errors identify the allowed fields for the selected resource.

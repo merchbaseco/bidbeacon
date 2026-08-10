@@ -193,7 +193,7 @@ describe('Ad-group and Ad Search operations', () => {
         ]);
     });
 
-    it('uses account-local date rows from the canonical Target archive at both child grains', async () => {
+    it('rejects temporal child-resource fields now owned by Performance', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchAdResourcesAdvertiserAccount());
         await database.db
@@ -249,47 +249,16 @@ describe('Ad-group and Ad Search operations', () => {
             }),
         ]);
 
-        const dateResult = await search(createSearchContext(database), {
-            accountId: SEARCH_AD_RESOURCES_ACCOUNT_ID,
-            resource: 'ad_group',
-            fields: ['adGroup.id', 'segments.date', 'metrics.spend'],
-            dateRange: { startDate: '2026-08-05', endDate: '2026-08-06' },
-        });
-        expect(dateResult.rows).toEqual([
-            { 'adGroup.id': 'search-ad-resources-ad-group-1', 'segments.date': '2026-08-05', 'metrics.spend': 3 },
-            { 'adGroup.id': 'search-ad-resources-ad-group-2', 'segments.date': '2026-08-05', 'metrics.spend': 0 },
-            { 'adGroup.id': 'search-ad-resources-ad-group-1', 'segments.date': '2026-08-06', 'metrics.spend': 4 },
-            { 'adGroup.id': 'search-ad-resources-ad-group-2', 'segments.date': '2026-08-06', 'metrics.spend': 5 },
-        ]);
-
-        const hourlyInputs = [
-            { resource: 'ad_group' as const, idField: 'adGroup.id' as const },
-            { resource: 'ad' as const, idField: 'ad.id' as const },
-        ];
-        for (const { resource, idField } of hourlyInputs) {
-            const hourlyResult = await search(createSearchContext(database), {
+        await expect(
+            search(createSearchContext(database), {
                 accountId: SEARCH_AD_RESOURCES_ACCOUNT_ID,
-                resource,
-                fields: [idField, 'segments.date', 'segments.hour', 'metrics.spend'],
-                filters: [{ field: 'segments.hour', operator: 'eq', value: 3 }],
-                dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
-            });
-
-            expect(hourlyResult.rows).toEqual(
-                resource === 'ad_group'
-                    ? [
-                          { 'adGroup.id': 'search-ad-resources-ad-group-1', 'segments.date': '2026-08-06', 'segments.hour': 3, 'metrics.spend': 7 },
-                          { 'adGroup.id': 'search-ad-resources-ad-group-2', 'segments.date': '2026-08-06', 'segments.hour': 3, 'metrics.spend': 1 },
-                      ]
-                    : [
-                          { 'ad.id': 'search-ad-resources-ad-1', 'segments.date': '2026-08-06', 'segments.hour': 3, 'metrics.spend': 7 },
-                          { 'ad.id': 'search-ad-resources-ad-2', 'segments.date': '2026-08-06', 'segments.hour': 3, 'metrics.spend': 1 },
-                      ]
-            );
-        }
+                resource: 'ad_group',
+                fields: ['adGroup.id', 'segments.date', 'metrics.spend'],
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 
-    it('keeps unselected hour filters aggregated at the selected date grain', async () => {
+    it('rejects temporal filters now owned by Performance', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchAdResourcesAdvertiserAccount());
         await database.db.insert(campaign).values(buildSearchAdResourcesCampaign());
@@ -304,47 +273,34 @@ describe('Ad-group and Ad Search operations', () => {
             }),
         ]);
 
-        const result = await search(createSearchContext(database), {
-            accountId: SEARCH_AD_RESOURCES_ACCOUNT_ID,
-            resource: 'ad',
-            fields: ['ad.id', 'segments.date', 'metrics.spend'],
-            filters: [{ field: 'segments.hour', operator: 'in', value: [3, 4] }],
-            dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
-        });
-
-        expect(result.rows).toEqual([{ 'ad.id': 'search-ad-resources-ad-1', 'segments.date': '2026-08-06', 'metrics.spend': 7 }]);
+        await expect(
+            search(createSearchContext(database), {
+                accountId: SEARCH_AD_RESOURCES_ACCOUNT_ID,
+                resource: 'ad',
+                fields: ['ad.id', 'metrics.spend'],
+                filters: [{ field: 'segments.hour', operator: 'in', value: [3, 4] }],
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 
-    it('keeps selected segments in custom-order cursor boundaries for both child resources', async () => {
+    it('rejects temporal cursor ordering fields now owned by Performance', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchAdResourcesAdvertiserAccount());
         await database.db.insert(campaign).values(buildSearchAdResourcesCampaign());
         await database.db.insert(adGroup).values(buildSearchAdResourcesAdGroup());
         await database.db.insert(ad).values(buildSearchAdResourcesAd());
 
-        const inputs = [
-            { resource: 'ad_group' as const, idField: 'adGroup.id' as const },
-            { resource: 'ad' as const, idField: 'ad.id' as const },
-        ];
-        for (const { resource, idField } of inputs) {
-            const input = {
+        await expect(
+            search(createSearchContext(database), {
                 accountId: SEARCH_AD_RESOURCES_ACCOUNT_ID,
-                resource,
-                fields: [idField, 'segments.date', 'metrics.spend'],
-                dateRange: { startDate: '2026-08-05', endDate: '2026-08-06' },
-                orderBy: [{ field: 'metrics.spend', direction: 'asc' as const }],
-                limit: 1,
-            };
-            const firstPage = await search(createSearchContext(database), input);
-            const secondPage = await search(createSearchContext(database), { ...input, cursor: firstPage.nextCursor });
-
-            expect(firstPage.rows).toEqual([{ [idField]: `search-ad-resources-${resource === 'ad' ? 'ad' : 'ad-group'}-1`, 'segments.date': '2026-08-05', 'metrics.spend': 0 }]);
-            expect(secondPage.rows).toEqual([{ [idField]: `search-ad-resources-${resource === 'ad' ? 'ad' : 'ad-group'}-1`, 'segments.date': '2026-08-06', 'metrics.spend': 0 }]);
-            expect(secondPage.nextCursor).toBeUndefined();
-        }
+                resource: 'ad',
+                fields: ['ad.id', 'metrics.spend'],
+                orderBy: [{ field: 'segments.date', direction: 'asc' }],
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 
-    it('rejects child fields and ambiguous hour grains with compatible-field details', async () => {
+    it('rejects child fields and retired temporal fields', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchAdResourcesAdvertiserAccount());
 
@@ -375,18 +331,7 @@ describe('Ad-group and Ad Search operations', () => {
                 fields: ['ad.id', 'segments.hour', 'metrics.spend'],
                 dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
             })
-        ).rejects.toMatchObject({ code: 'INVALID_INPUT', details: { field: 'segments.hour' } });
-        for (const value of [-1, 3.5, 24]) {
-            await expect(
-                search(createSearchContext(database), {
-                    accountId: SEARCH_AD_RESOURCES_ACCOUNT_ID,
-                    resource: 'ad',
-                    fields: ['ad.id', 'segments.date', 'segments.hour'],
-                    filters: [{ field: 'segments.hour', operator: 'eq', value }],
-                    dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
-                })
-            ).rejects.toMatchObject({ code: 'INVALID_INPUT', details: { field: 'segments.hour' } });
-        }
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 
     it('keeps child searches isolated by explicit Account ID and paginates each resource with query-bound cursors', async () => {

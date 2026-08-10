@@ -188,18 +188,6 @@ describe('Campaign Search operation', () => {
             ],
         });
         expect(conjunctiveResult.rows).toEqual([{ 'campaign.id': 'campaign-search-2' }]);
-
-        const unselectedDateFilterResult = await search(createSearchContext(database), {
-            accountId: SEARCH_ACCOUNT_ID,
-            resource: 'campaign',
-            fields: ['campaign.id', 'metrics.spend'],
-            filters: [{ field: 'segments.date', operator: 'eq', value: '2026-08-06' }],
-            dateRange: { startDate: '2026-08-05', endDate: '2026-08-06' },
-        });
-        expect(unselectedDateFilterResult.rows).toEqual([
-            { 'campaign.id': 'campaign-search-1', 'metrics.spend': 15 },
-            { 'campaign.id': 'campaign-search-2', 'metrics.spend': 0 },
-        ]);
     });
 
     it('resolves default dates at the account-local UTC boundary and omits performance context for settings-only fields', async () => {
@@ -276,44 +264,25 @@ describe('Campaign Search operation', () => {
         ]);
     });
 
-    it('fills date segments, keeps deterministic ordering, and continues with an integrity-protected keyset cursor', async () => {
+    it('rejects temporal fields and filters now owned by Performance', async () => {
         database = await createTestDatabase();
         await seedTwoCampaigns(database);
 
-        const input = {
-            accountId: SEARCH_ACCOUNT_ID,
-            resource: 'campaign' as const,
-            fields: ['campaign.id', 'segments.date', 'metrics.spend'],
-            dateRange: { startDate: '2026-08-05', endDate: '2026-08-06' },
-            limit: 2,
-        };
-        const firstPage = await search(createSearchContext(database), input);
-
-        expect(firstPage.rows).toEqual([
-            { 'campaign.id': 'campaign-search-1', 'segments.date': '2026-08-05', 'metrics.spend': 0 },
-            { 'campaign.id': 'campaign-search-2', 'segments.date': '2026-08-05', 'metrics.spend': 0 },
-        ]);
-        expect(firstPage.nextCursor).toEqual(expect.any(String));
-        expect(firstPage.context.orderBy).toEqual([
-            { field: 'segments.date', direction: 'asc' },
-            { field: 'campaign.id', direction: 'asc' },
-        ]);
-
-        const secondPage = await search(createSearchContext(database), { ...input, cursor: firstPage.nextCursor });
-        expect(secondPage.rows).toEqual([
-            { 'campaign.id': 'campaign-search-1', 'segments.date': '2026-08-06', 'metrics.spend': 15 },
-            { 'campaign.id': 'campaign-search-2', 'segments.date': '2026-08-06', 'metrics.spend': 0 },
-        ]);
-        expect(secondPage.nextCursor).toBeUndefined();
-        expect(secondPage.summary).toEqual(firstPage.summary);
-
         await expect(
-            search(createSearchContext(database), { ...input, fields: ['campaign.id', 'segments.date', 'metrics.spend', 'metrics.clicks'], cursor: firstPage.nextCursor })
-        ).rejects.toMatchObject({ code: 'CURSOR_INVALID' });
-        const [cursorPayload, cursorSignature] = firstPage.nextCursor!.split('.');
-        const tamperedCursor = `${cursorPayload}.${cursorSignature.startsWith('x') ? 'y' : 'x'}${cursorSignature.slice(1)}`;
-        await expect(search(createSearchContext(database), { ...input, cursor: tamperedCursor })).rejects.toMatchObject({ code: 'CURSOR_INVALID' });
-        await expect(search(createSearchContext(database), { ...input, limit: 201 })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+            search(createSearchContext(database), {
+                accountId: SEARCH_ACCOUNT_ID,
+                resource: 'campaign',
+                fields: ['campaign.id', 'segments.date'],
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+        await expect(
+            search(createSearchContext(database), {
+                accountId: SEARCH_ACCOUNT_ID,
+                resource: 'campaign',
+                fields: ['campaign.id', 'metrics.spend'],
+                filters: [{ field: 'segments.date', operator: 'eq', value: '2026-08-06' }],
+            })
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 
     it('keeps undefined ratios last and summarizes the complete filtered result before pagination', async () => {
@@ -371,41 +340,18 @@ describe('Campaign Search operation', () => {
         expect(enabledOnly.summary?.['metrics.acos']).toBe(30);
     });
 
-    it('uses an unselected date segment as the internal row grain for ordering', async () => {
+    it('rejects temporal ordering now owned by Performance', async () => {
         database = await createTestDatabase();
         await seedTwoCampaigns(database);
-        await database.db.insert(performanceDaily).values(
-            buildSearchPerformanceDaily({
-                accountId: 'search-ads-account-1',
-                bucketStart: new Date('2026-08-05T07:00:00.000Z'),
-                bucketDate: '2026-08-05',
-                campaignId: 'campaign-search-2',
-                adGroupId: 'search-ad-group-2',
-                adId: 'search-ad-3',
-                entityId: 'B0SEARCH003',
-                spend: '20.00',
-                sales: '20.00',
+        await expect(
+            search(createSearchContext(database), {
+                accountId: SEARCH_ACCOUNT_ID,
+                resource: 'campaign',
+                fields: ['campaign.id', 'metrics.spend'],
+                dateRange: { startDate: '2026-08-05', endDate: '2026-08-06' },
+                orderBy: [{ field: 'segments.date', direction: 'desc' }],
             })
-        );
-
-        const result = await search(createSearchContext(database), {
-            accountId: SEARCH_ACCOUNT_ID,
-            resource: 'campaign',
-            fields: ['campaign.id', 'metrics.spend'],
-            dateRange: { startDate: '2026-08-05', endDate: '2026-08-06' },
-            orderBy: [{ field: 'segments.date', direction: 'desc' }],
-            limit: 2,
-        });
-
-        expect(result.context.orderBy).toEqual([
-            { field: 'segments.date', direction: 'desc' },
-            { field: 'campaign.id', direction: 'asc' },
-        ]);
-        expect(result.rows).toEqual([
-            { 'campaign.id': 'campaign-search-1', 'metrics.spend': 15 },
-            { 'campaign.id': 'campaign-search-2', 'metrics.spend': 0 },
-        ]);
-        expect(result.nextCursor).toEqual(expect.any(String));
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 
     it('reports pending, failed, parse-error, and unknown archive dates without treating them as zero coverage', async () => {

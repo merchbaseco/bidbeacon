@@ -30,10 +30,11 @@ describe('BidBeacon MCP server', () => {
         try {
             const listed = await client.listTools();
             expect(listed.tools.map(tool => tool.name)).toEqual(MCP_TOOL_NAMES);
-            expect(listed.tools).toHaveLength(14);
+            expect(listed.tools).toHaveLength(15);
 
             const listTool = listed.tools.find(tool => tool.name === 'list_advertiser_accounts');
             const searchTool = listed.tools.find(tool => tool.name === 'search');
+            const performanceTool = listed.tools.find(tool => tool.name === 'performance');
             const createCampaignTool = listed.tools.find(tool => tool.name === 'create_campaign');
             const updateTool = listed.tools.find(tool => tool.name === 'update_campaign');
             expect(listTool?.inputSchema.properties).toEqual({});
@@ -41,6 +42,10 @@ describe('BidBeacon MCP server', () => {
             expect(searchTool?.inputSchema.properties?.resource).toMatchObject({ enum: SEARCH_RESOURCES });
             expect(searchTool?.inputSchema.properties?.fields).toMatchObject({ items: { enum: SEARCH_FIELDS } });
             expect(searchTool?.inputSchema.properties?.filters).toMatchObject({ items: { properties: { field: { enum: SEARCH_FIELDS } } } });
+            expect(performanceTool?.inputSchema.required).toEqual(['accountId', 'interval', 'dateRange', 'metrics', 'dimension']);
+            expect(performanceTool?.inputSchema.properties?.dimension).toMatchObject({ enum: ['account', 'product'] });
+            expect(performanceTool?.outputSchema?.properties).toMatchObject({ context: expect.any(Object), totals: expect.any(Object), points: expect.any(Object), series: expect.any(Object) });
+            expect(performanceTool?.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
             expect(createCampaignTool?.inputSchema.required).toEqual(['accountId', 'name', 'state', 'dailyBudget', 'bidStrategy', 'targetingMode', 'startDate']);
             expect(updateTool?.inputSchema.required).toEqual(['accountId', 'campaignId', 'changes']);
             expect(updateTool?.outputSchema?.required).toEqual(['id', 'name', 'state', 'deliveryStatus', 'dailyBudget', 'bidStrategy', 'targetingMode', 'startDate', 'endDate']);
@@ -83,6 +88,19 @@ describe('BidBeacon MCP server', () => {
             const readResult = await client.callTool({ name: 'list_advertiser_accounts', arguments: {} });
             expect(readResult.isError).not.toBe(true);
             expect(parseText(readResult)).toEqual(readResult.structuredContent);
+
+            const performanceResult = await client.callTool({
+                name: 'performance',
+                arguments: {
+                    accountId,
+                    dimension: 'account',
+                    interval: 'day',
+                    dateRange: { startDate: '2026-08-05', endDate: '2026-08-05' },
+                    metrics: ['spend'],
+                },
+            });
+            expect(performanceResult.isError).not.toBe(true);
+            expect(parseText(performanceResult)).toEqual(performanceResult.structuredContent);
 
             const writeResult = await client.callTool({
                 name: 'update_campaign',

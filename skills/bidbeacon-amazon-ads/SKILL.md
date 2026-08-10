@@ -10,7 +10,7 @@ Use one recipe. Tool schemas own validation; this skill owns judgment.
 ## Invariants
 
 1. Resolve the marketplace-specific Advertiser Account UUID when unknown or ambiguous. Pass it on every scoped call.
-2. Use account-local dates and currency, comparable ranges, and Search coverage.
+2. Use account-local dates, currency, comparable ranges, and coverage. Search resources; use Performance for temporal measurements.
 3. Inspect before writing. Show the exact proposed outcome, obtain approval at the consequential call, await it, and verify accepted state; read back when delivery or multiple writes matter.
 4. Treat the Campaign as the spend gate. Create paused unless enabled delivery is explicit.
 5. Join evidence by marketplace and ASIN: BidBeacon owns ad attribution, MerchBase actual sales and royalties, and RankWrangler external demand.

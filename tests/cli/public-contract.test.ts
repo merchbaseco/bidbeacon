@@ -61,6 +61,60 @@ describe('canonical bb public contract', () => {
         }
     });
 
+    it('serializes one atomic Performance request without pagination controls', async () => {
+        const requests: RecordedRequest[] = [];
+        const response = {
+            context: {
+                account: { id: accountId, timezone: 'America/Los_Angeles', currency: 'USD' },
+                dimension: 'product',
+                interval: 'day',
+                metrics: ['spend'],
+                dateRange: { startDate: '2026-08-01', endDate: '2026-08-02' },
+                coverage: { status: 'COMPLETE', issues: [] },
+            },
+            series: [],
+        };
+        const server = await startFixtureServer(requests, request => (request.path === '/api/performance' ? { payload: { result: { data: response } } } : undefined));
+        try {
+            const result = await runCli(server, [
+                'performance',
+                '--account',
+                accountId,
+                '--dimension',
+                'product',
+                '--entity-ids',
+                'B0ABC12345,B0DEF67890',
+                '--interval',
+                'day',
+                '--start-date',
+                '2026-08-01',
+                '--end-date',
+                '2026-08-02',
+                '--metrics',
+                'spend',
+            ]);
+
+            expect(result.code).toBe(0);
+            expect(result.stderr).toBe('');
+            expect(JSON.parse(result.stdout)).toEqual(response);
+            expect(requests).toEqual([
+                {
+                    path: '/api/performance',
+                    input: {
+                        accountId,
+                        dimension: 'product',
+                        entityIds: ['B0ABC12345', 'B0DEF67890'],
+                        interval: 'day',
+                        dateRange: { startDate: '2026-08-01', endDate: '2026-08-02' },
+                        metrics: ['spend'],
+                    },
+                },
+            ]);
+        } finally {
+            await closeFixtureServer(server);
+        }
+    });
+
     it('rejects scoped commands without --account and leaves stdout empty', async () => {
         const result = await runCli(null, ['search', 'campaign']);
 
@@ -287,6 +341,7 @@ describe('canonical bb public contract', () => {
         expect(result.code).toBe(0);
         expect(result.stdout).toContain('advertiser-accounts list');
         expect(result.stdout).toContain('search <resource>');
+        expect(result.stdout).toContain('performance');
         expect(createHelp.stdout).toContain('sponsored-products-campaign');
         expect(result.stdout).not.toContain('campaigns list');
         expect(result.stdout).not.toContain('metrics');

@@ -6,6 +6,7 @@ describe('bb help topics', () => {
         expect(resolveHelpTopicKey([])).toBe('global');
         expect(resolveHelpTopicKey(['advertiser-accounts', 'list'])).toBe('advertiser-accounts');
         expect(resolveHelpTopicKey(['search'])).toBe('search');
+        expect(resolveHelpTopicKey(['performance'])).toBe('performance');
         expect(resolveHelpTopicKey(['create'])).toBe('create');
         expect(resolveHelpTopicKey(['update'])).toBe('update');
         expect(resolveHelpTopicKey(['auth'])).toBe('auth');
@@ -19,6 +20,7 @@ describe('bb help topics', () => {
         expect(output).toContain('BidBeacon CLI 0.0.0-abc123');
         expect(output).toContain('advertiser-accounts list');
         expect(output).toContain('search <resource>');
+        expect(output).toContain('performance');
         expect(output).toContain('create <operation>');
         expect(output).toContain('requires `--account <');
         expect(output).not.toContain('campaigns');
@@ -36,6 +38,10 @@ describe('bb help topics', () => {
         expect(searchOutput).toContain('--where <expression>');
         expect(searchOutput).toContain('metrics.orders');
         expect(searchOutput).toContain('--all');
+
+        const performanceOutput = renderHelp('performance', { version: '0.0.0' });
+        expect(performanceOutput).toContain('--dimension <value>');
+        expect(performanceOutput).toContain('--entity-ids <asin,...>');
     });
 
     it('renders auth, config, and changelog guidance', () => {

@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## v3.0.0 - 2026-08-10
+
+### Added
+
+- Added the complete, bounded public `performance` operation for account and explicit Product time series at hourly, daily, or monthly intervals.
+- Added zero-filled points, selected metric totals, account-local timezone context, archive coverage, and structured point, response-size, and execution limits.
+- Added matching typed HTTP-client, CLI, MCP, and agent-skill projections for Performance.
+
+### Changed
+
+- Changed Search to return only independently useful resource snapshots with range-aggregated metrics and a complete filtered-result summary.
+- Superseded the sole-public-read decision with separate deep Search and Performance completeness contracts.
+
+### Removed
+
+- Removed `segments.date` and `segments.hour` from Search; temporal consumers must use Performance without exhaustive cursor traversal or compatibility fallbacks.
+
 ## v2.0.1 - 2026-08-10
 
 ### Fixed

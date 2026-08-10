@@ -32,9 +32,9 @@ const usePerformanceTable = ({
         [accountId, range, dimension, filters]
     );
 
-    const query = api.performance.table.useQuery(queryInput, {
+    const query = api.performanceTable.table.useQuery(queryInput, {
         enabled: enabled ?? Boolean(accountId),
-        keepPreviousData: true,
+        placeholderData: previous => previous,
     });
 
     return {

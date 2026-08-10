@@ -5,16 +5,32 @@ BidBeacon is a durable archive and automation layer for Amazon advertising, with
 ## Language
 
 **Search**:
-The sole public read operation for advertising resources, including current state, performance, and change history.
-_Avoid_: Get operation, list operation, metrics table, metrics series
+The public read operation for independently useful, cursor-paginated advertising resource snapshots, including current state, range-aggregated performance, and change history. Search never returns temporal segments.
+_Avoid_: Get operation, list operation, metrics table, temporal series
 
 **Search resource**:
 A public advertising resource or reporting view that determines the primary grain of each Search row. A Search may select fields from that resource and its ancestors, but never from its children.
 _Avoid_: Group by, root entity
 
-**Performance search**:
-A Search that selects a metric or segment. It uses the requested date range or BidBeacon's deterministic default, and always reports the exact resolved range and its source.
-_Avoid_: Unstated reporting window
+**Metric Search**:
+A Search whose resource rows include metrics aggregated over a requested or deterministic default account-local date range. It always reports the exact resolved range and its source.
+_Avoid_: Performance Search, segmented Search, unstated reporting window
+
+**Performance**:
+The public read operation for one complete, bounded temporal measurement of an Advertiser account or an explicit small set of Products. It returns selected metric totals and ordered zero-filled points without a cursor, or rejects the request with a structured size or execution error.
+_Avoid_: Chart operation, report job, generic analytics query
+
+**Performance dimension**:
+The subject measured by Performance: the whole Advertiser account or an explicitly identified Product. Dimension is distinct from interval; together they determine point cardinality.
+_Avoid_: Search resource, grain
+
+**Performance interval**:
+The account-local time bucket of each Performance point: hour, day, or month. Hourly point boundaries are instants so repeated or missing local hours remain unambiguous across daylight-saving transitions.
+_Avoid_: Browser-local interval, display grouping
+
+**Performance series**:
+The totals and ordered zero-filled points returned atomically by Performance. Atomic response completeness is distinct from Performance coverage, which describes the underlying archive evidence.
+_Avoid_: Search page, cursor traversal, `complete` flag
 
 **Performance coverage**:
 A conservative account-local date assessment derived from report dataset metadata. A date is complete only when its daily report completed without parse errors; pending, failed, or partially parsed dates are reported as issues, and dates without retained metadata are unknown rather than assumed missing or complete. Completed daily metadata is retained beyond Amazon's report retrieval window as durable coverage evidence.
@@ -33,18 +49,18 @@ The stable, documented resource, ancestor identity, and standard performance fie
 _Avoid_: All fields
 
 **Default date range**:
-The last seven account-local dates, including the current date, used by a Performance search when no date range is requested. Search responses identify both the resolved dates and that the range was defaulted.
+The last seven account-local dates, including the current date, used by a Metric Search when no date range is requested. Search responses identify both the resolved dates and that the range was defaulted.
 _Avoid_: Selected date range, implicit date range
 
 **Standard performance metrics**:
-Impressions, clicks, spend, orders, sales, ACOS, CPC, CTR, and ROAS. These metrics form the performance portion of each performance-bearing resource's Default field set.
+Impressions, clicks, spend, orders, sales, ACOS, CPC, CTR, ROAS, and CVR. These metrics form the performance portion of each performance-bearing resource's Default field set and the selectable metric vocabulary for Performance.
 
 **Order**:
 An attributed customer order reported by Amazon Ads. The public Field is `metrics.orders`; Amazon source fields and internal storage may call the same measure a purchase.
 _Avoid_: Purchase
 
 **CVR**:
-Orders divided by clicks. The selectable public Field is `metrics.cvr`; it is not part of the Default field set.
+Orders divided by clicks. The public Field is `metrics.cvr`, and it is part of the Default field set.
 _Avoid_: Conversion rate, `metrics.conversionRate`
 
 **Performance metric units**:
@@ -104,7 +120,7 @@ One explicit low-level operation for each constructible resource or target kind:
 _Avoid_: Hidden creation-state defaults, hiding underlying construction capabilities, generic create operation
 
 **Field**:
-A stable BidBeacon-owned attribute, metric, or segment that can be selected, filtered, or sorted by Search. BidBeacon exposes a deliberately small field catalog directly in the Search schema; Amazon report names and versions are source mappings rather than public Field names.
+A stable BidBeacon-owned attribute or metric that can be selected, filtered, or sorted by Search. BidBeacon exposes a deliberately small field catalog directly in the Search schema; Amazon report names and versions are source mappings rather than public Field names.
 _Avoid_: Amazon report column
 
 **Search row**:
@@ -120,7 +136,7 @@ A bounded Search response containing at most the requested `limit` of rows and a
 _Avoid_: Unbounded result, implicit full export
 
 **Search ordering**:
-The ordered Fields and directions that determine Search row order and cursor position. Aggregate performance defaults to spend descending, segmented performance to chronological order, and state-only results to name ascending; resource ID is always the final tie-breaker.
+The ordered Fields and directions that determine Search row order and cursor position. Metric Search defaults to spend descending and state-only results to name ascending; resource ID is always the final tie-breaker.
 _Avoid_: Database order
 
 **Advertising resource**:

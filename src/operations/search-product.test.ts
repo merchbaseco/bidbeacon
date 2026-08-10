@@ -242,7 +242,7 @@ describe('Product Search operation', () => {
         expect(result.rows).toEqual([{ 'product.asin': 'B0PRODUCT001', 'product.title': null }]);
     });
 
-    it('zero-fills account-local date and hour segments from the canonical Target archive', async () => {
+    it('rejects temporal Product fields now owned by Performance', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildSearchProductAdvertiserAccount());
         await database.db
@@ -314,38 +314,13 @@ describe('Product Search operation', () => {
         ]);
         await database.db.insert(reportDatasetMetadata).values([buildSearchProductReportMetadata('2026-08-05'), buildSearchProductReportMetadata('2026-08-06')]);
 
-        const dateResult = await search(createSearchContext(database), {
-            accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
-            resource: 'product',
-            fields: ['product.asin', 'segments.date', 'metrics.spend'],
-            dateRange: { startDate: '2026-08-05', endDate: '2026-08-06' },
-        });
-        expect(dateResult.rows).toEqual([
-            { 'product.asin': 'B0PRODUCT001', 'segments.date': '2026-08-05', 'metrics.spend': 3 },
-            { 'product.asin': 'B0PRODUCT002', 'segments.date': '2026-08-05', 'metrics.spend': 0 },
-            { 'product.asin': 'B0PRODUCT001', 'segments.date': '2026-08-06', 'metrics.spend': 4 },
-            { 'product.asin': 'B0PRODUCT002', 'segments.date': '2026-08-06', 'metrics.spend': 5 },
-        ]);
-
-        const hourlyResult = await search(createSearchContext(database), {
-            accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
-            resource: 'product',
-            fields: ['product.asin', 'segments.date', 'segments.hour', 'metrics.spend'],
-            filters: [{ field: 'segments.hour', operator: 'eq', value: 3 }],
-            dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
-        });
-        expect(hourlyResult.rows).toEqual([
-            { 'product.asin': 'B0PRODUCT001', 'segments.date': '2026-08-06', 'segments.hour': 3, 'metrics.spend': 7 },
-            { 'product.asin': 'B0PRODUCT002', 'segments.date': '2026-08-06', 'segments.hour': 3, 'metrics.spend': 1 },
-        ]);
         await expect(
             search(createSearchContext(database), {
                 accountId: SEARCH_PRODUCTS_ACCOUNT_ID,
                 resource: 'product',
-                fields: ['product.asin', 'segments.hour', 'metrics.spend'],
-                dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
+                fields: ['product.asin', 'segments.date', 'metrics.spend'],
             })
-        ).rejects.toMatchObject({ code: 'INVALID_INPUT', details: { field: 'segments.hour' } });
+        ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
 
     it('continues Product pages with query-bound cursors and proves Product-to-Ad traversal in the explicit account', async () => {

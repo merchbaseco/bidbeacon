@@ -76,8 +76,6 @@ const SEARCH_FIELD_NAMES = new Set([
     'metrics.ctr',
     'metrics.roas',
     'metrics.cvr',
-    'segments.date',
-    'segments.hour',
 ]);
 
 const main = async () => {
@@ -107,6 +105,9 @@ const main = async () => {
             return;
         case 'search':
             await handleSearchCommand(subcommand, parsed.flags);
+            return;
+        case 'performance':
+            await handlePerformanceCommand(subcommand, rest, parsed.flags);
             return;
         case 'create':
             await handleCreateCommand(subcommand, parsed.flags);
@@ -186,6 +187,42 @@ const handleSearchCommand = async (resource: string | undefined, flags: FlagMap)
     const client = await createApiClient();
     const result = flags.has('all') ? await fetchAllSearchPages(client, input) : await client.search.query(input);
     printOutput(result);
+};
+
+const handlePerformanceCommand = async (subcommand: string | undefined, rest: string[], flags: FlagMap) => {
+    if (subcommand || rest.length > 0) {
+        throw invalidInput('Use `bb performance` without a subcommand.', {});
+    }
+    assertNoUnexpectedFlags(flags, ['account', 'dimension', 'entity-ids', 'interval', 'metrics', 'start-date', 'end-date', 'json', 'help']);
+    const accountId = requireAccount(flags);
+    const json = await readJsonFlag(flags);
+    const flagInput: Record<string, unknown> = { accountId };
+    for (const key of ['dimension', 'interval'] as const) {
+        const value = readOptionalFlag(flags, key);
+        if (value !== undefined) {
+            flagInput[key] = value.replaceAll('-', '_');
+        }
+    }
+    for (const [flag, property] of [
+        ['metrics', 'metrics'],
+        ['entity-ids', 'entityIds'],
+    ] as const) {
+        const value = readOptionalFlag(flags, flag);
+        if (value !== undefined) {
+            flagInput[property] = splitList(value, flag);
+        }
+    }
+    const startDate = readOptionalFlag(flags, 'start-date');
+    const endDate = readOptionalFlag(flags, 'end-date');
+    if ((startDate && !endDate) || (!startDate && endDate)) {
+        throw invalidInput('`--start-date` and `--end-date` must be supplied together.', {});
+    }
+    if (startDate && endDate) {
+        flagInput.dateRange = { startDate, endDate };
+    }
+    const input = mergeTopLevelInput(json ?? {}, flagInput, 'performance');
+    const client = (await createApiClient()) as BidBeaconClient & { performance: { query: (value: unknown) => Promise<unknown> } };
+    printOutput(await client.performance.query(input));
 };
 
 const handleCreateCommand = async (operation: string | undefined, flags: FlagMap) => {

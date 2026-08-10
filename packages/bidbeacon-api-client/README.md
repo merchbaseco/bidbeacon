@@ -23,6 +23,13 @@ const page = await client.search.query({
   fields: ['campaign.id', 'metrics.orders'],
 });
 console.log(page.summary?.['metrics.orders']);
+const performance = await client.performance.query({
+  accountId: '00000000-0000-4000-8000-000000000001',
+  dimension: 'account',
+  interval: 'day',
+  dateRange: { startDate: '2026-08-01', endDate: '2026-08-06' },
+  metrics: ['spend', 'sales', 'orders'],
+});
 const target = await client.update_target.mutate({
   accountId: '00000000-0000-4000-8000-000000000001',
   targetId: 'target-1',
@@ -32,7 +39,7 @@ const target = await client.update_target.mutate({
 
 The operation names are verbatim and match the CLI/MCP contract:
 
-`list_advertiser_accounts`, `search`, `create_sponsored_products_campaign`, `create_campaign`, `create_ad_group`, `create_ad`, `create_keyword_target`, `create_product_target`, `create_negative_keyword`, `create_negative_product_target`, `update_campaign`, `update_ad_group`, `update_ad`, and `update_target`.
+`list_advertiser_accounts`, `search`, `performance`, `create_sponsored_products_campaign`, `create_campaign`, `create_ad_group`, `create_ad`, `create_keyword_target`, `create_product_target`, `create_negative_keyword`, `create_negative_product_target`, `update_campaign`, `update_ad_group`, `update_ad`, and `update_target`.
 
 `list_advertiser_accounts` is the only unscoped operation. Every other operation requires an explicit advertiser account UUID. The client exports `CliRouterInputs` and `CliRouterOutputs`, inferred directly from the server router:
 
@@ -43,7 +50,7 @@ type SearchInput = CliRouterInputs['search'];
 type SearchOutput = CliRouterOutputs['search'];
 ```
 
-Performance Search returns `summary` totals for the complete filtered result before pagination. Ratio fields are `null` when their denominator is zero.
+Search returns `summary` totals for the complete filtered resource result before pagination. Performance returns complete bounded Account or Product temporal points without a cursor. Ratio fields are `null` when their denominator is zero.
 
 Batching is enabled by default. Configure it with `batch`, `batchMaxItems`, and `batchMaxURLLength`, or set `batch: false` for one HTTP request per operation.
 

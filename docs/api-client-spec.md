@@ -24,6 +24,7 @@ The client exposes these exact operation names as tRPC query/mutation keys:
 ```text
 list_advertiser_accounts
 search
+performance
 create_sponsored_products_campaign
 create_campaign
 create_ad_group
@@ -40,7 +41,7 @@ update_target
 
 Queries use `.query(...)`; creates and updates use `.mutate(...)`. `list_advertiser_accounts` is the only unscoped operation. All other inputs require an opaque Advertiser Account UUID. Search uses the curated Field/metric catalog, account-local date ranges, structured filters, ordering, and keyset cursors described in [cli-spec.md](cli-spec.md).
 
-Performance Search responses include a typed `summary` of all standard metrics over the complete filtered result before pagination. This is the authoritative dashboard or account total on every cursor page; ratio fields are nullable when their denominator is zero.
+Metric Search responses include a typed `summary` of all standard metrics over the complete filtered resource result before pagination. Performance returns one complete bounded temporal result without a cursor; ratio fields are nullable when their denominator is zero.
 
 ```ts
 const client = createBidBeaconClient({ baseUrl, credential });
@@ -54,6 +55,14 @@ const rows = await client.search.query({
   dateRange: { startDate: '2026-08-01', endDate: '2026-08-06' },
   orderBy: [{ field: 'metrics.orders', direction: 'desc' }],
   limit: 50,
+});
+
+const series = await client.performance.query({
+  accountId,
+  dimension: 'account',
+  interval: 'day',
+  dateRange: { startDate: '2026-08-01', endDate: '2026-08-06' },
+  metrics: ['spend', 'sales', 'orders'],
 });
 
 const updated = await client.update_campaign.mutate({

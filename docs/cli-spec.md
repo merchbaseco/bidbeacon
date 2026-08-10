@@ -25,7 +25,8 @@ Sponsored Products is the only writable ad product in this version.
 
 - Every account-scoped call requires an explicit BidBeacon Advertiser account ID.
 - The MCP and advertising operations are stateless. The CLI does not infer an account from dashboard state or local configuration.
-- `search` is the sole read operation for advertising resources, performance, and change history.
+- `search` reads paginated resource snapshots, range-aggregated resource metrics, and change history.
+- `performance` reads one complete bounded temporal result for an Account or explicit Products.
 - Public schemas use a small BidBeacon-owned vocabulary rather than Amazon report or API records.
 - Ordinary campaign construction uses one synchronous composite operation. Primitive creation operations remain available for bespoke topology and recovery.
 - Mutations use absolute desired values. There are no relative bid changes or dedicated pause, resume, and delete operations.
@@ -37,6 +38,7 @@ Sponsored Products is the only writable ad product in this version.
 | --- | --- | --- |
 | `list_advertiser_accounts` | `bb advertiser-accounts list` | Discover accessible Account IDs and account metadata |
 | `search` | `bb search <resource>` | Read current settings, performance, products, or change history |
+| `performance` | `bb performance` | Read complete bounded Account or Product temporal performance |
 | `create_sponsored_products_campaign` | `bb create sponsored-products-campaign` | Create one complete ordinary Sponsored Products campaign |
 | `create_campaign` | `bb create campaign` | Create a campaign without children |
 | `create_ad_group` | `bb create ad-group` | Add an ad group to an existing campaign |
@@ -71,7 +73,7 @@ Date inputs are inclusive account-local dates in `YYYY-MM-DD` format:
 }
 ```
 
-The response identifies the account timezone and the resolved range. Hour segments are also account-local. See [timezones.md](timezones.md).
+The response identifies the account timezone and the resolved range. See [timezones.md](timezones.md).
 
 ### Money, bids, and percentages
 
@@ -180,7 +182,7 @@ campaign | ad_group | ad | target | product | change_event
 
 The resource determines row grain. A row may select fields from that resource and its ancestors, never its children. `product` is a read-only ASIN-grain view aggregated across matching ads.
 
-The delivered Search slice supports `resource: campaign`, `resource: ad_group`, `resource: ad`, `resource: target`, `resource: product`, and `resource: change_event`. Each resource accepts its own fields, compatible ancestry where applicable, standard metrics where applicable, and the segments supported by its archive projection. Ad-group, Ad, and Product Search accept `segments.hour`, which requires `segments.date`. Campaign and Target Search accept `segments.date`; Change-event Search is settings/history-only and accepts no performance fields or segments.
+The delivered Search slice supports `resource: campaign`, `resource: ad_group`, `resource: ad`, `resource: target`, `resource: product`, and `resource: change_event`. Each resource accepts its own fields, compatible ancestry where applicable, and standard metrics where applicable. Search metrics aggregate over the resolved date range; temporal buckets belong to Performance. Change-event Search is settings/history-only and accepts no performance fields.
 
 ### Filters
 
@@ -208,19 +210,17 @@ The complete field vocabulary lives in [search-field-catalog.md](search-field-ca
 
 - Omitting `fields` selects the resource's documented Default fields.
 - Supplying `fields` replaces the Default fields.
-- Selecting a metric or segment makes the request a Performance search.
-- Campaign Search accepts `segments.date`.
-- Ad-group, Ad, and Product Search accept account-local `segments.hour`, which requires `segments.date`.
+- Selecting a metric makes the request a Metric Search.
 - `product.title` and `ad.productTitle` are resolved through RankWrangler for only the final page; missing resolution returns `null` without failing Search.
 - A validation error names incompatible fields and the fields permitted for that resource.
 
-Every performance-bearing Search resource reads the canonical Target-grain archive (`entity_type = target`). Campaign, Ad-group, Ad, and Target group those observations by their topology identifiers. Product joins each observation's Ad to its advertised ASIN and groups by that ASIN across Ads and Campaigns. Aggregate and date-segmented searches use the daily archive; hour-segmented Ad-group, Ad, and Product searches use the hourly archive. Rows are aggregated once at the selected resource grain, and segmented rows are account-local and zero-filled across the requested range. Coverage uses Target report metadata, including valid completed zero-record reports. Change-event Search reads account- and marketplace-scoped entity history and does not report performance coverage.
+Every performance-bearing Search resource reads the canonical Target-grain daily archive (`entity_type = target`). Campaign, Ad-group, Ad, and Target group those observations by their topology identifiers. Product joins each observation's Ad to its advertised ASIN and groups by that ASIN across Ads and Campaigns. Rows are aggregated once at the selected resource grain. Coverage uses Target report metadata, including valid completed zero-record reports. Change-event Search reads account- and marketplace-scoped entity history and does not report performance coverage.
 
 The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` include the ten Standard performance metrics, including CVR. A default campaign Search therefore behaves like the campaign table in the Amazon Ads dashboard: it returns campaign settings and recent performance together.
 
 ### Date defaults
 
-- A Performance search without `dateRange` uses the last seven account-local dates, including the current date.
+- A Metric Search without `dateRange` uses the last seven account-local dates, including the current date.
 - A `change_event` Search without `dateRange` uses the same seven-date default.
 - Change-event date ranges are inclusive account-local dates applied to the history row's `local_date`, not UTC timestamp truncation.
 - A settings-only Search does not resolve or report a date range.
@@ -230,8 +230,7 @@ The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` inc
 
 `orderBy` is an ordered array of Fields and `asc` or `desc` directions. When omitted:
 
-- aggregate Performance searches order by `metrics.spend desc`;
-- segmented Performance searches order by the selected segments ascending;
+- Metric Search orders by `metrics.spend desc`;
 - settings-only Campaign and Ad-group searches order by name ascending;
 - settings-only Ad and Target searches order by ID ascending;
 - settings-only Product searches order by ASIN ascending;
@@ -335,6 +334,22 @@ Coverage issues are compact:
 
 Issue status is `PENDING`, `FAILED`, `PARSE_ERRORS`, or `UNKNOWN`. `PARSE_ERRORS` also includes `errorCount`. Missing performance rows do not determine coverage; a valid zero-activity report is complete.
 
+## Performance
+
+`performance` returns one complete bounded temporal result without a cursor. It supports `dimension: account | product`, `interval: hour | day | month`, an explicit inclusive account-local date range, and a selected subset of the ten canonical performance metrics. Product requests require one through 25 explicit ASIN `entityIds`; Performance accepts no general filter or sorting language.
+
+```bash
+bb performance \
+  --account 6d997c64-3e64-4d50-b732-ec79d47f87f1 \
+  --dimension account \
+  --interval day \
+  --start-date 2026-07-01 \
+  --end-date 2026-07-30 \
+  --metrics impressions,spend,sales,orders
+```
+
+Account results contain totals and points. Product results contain one ordered series per requested ASIN. Points are zero-filled; hourly points use unambiguous ISO start/end instants. Coverage remains separate from atomic response delivery. Exact limits and errors are defined in [performance-api.md](performance-api.md).
+
 ## Search field behavior
 
 ### Product-to-Ad traversal
@@ -373,14 +388,13 @@ The agent uses the returned `product.asin` to retrieve controllable topology:
 
 Default Ad fields return each Ad ID plus its Ad group and Campaign identities.
 
-### Aggregate and segmented performance
+### Aggregate performance
 
-Metrics aggregate at the selected resource grain unless the caller selects a segment. Each selected segment becomes part of the row grain.
+Metrics aggregate at the selected resource grain over the resolved date range.
 
 Examples:
 
 - Campaign plus metrics: one row per campaign for the range.
-- Campaign plus `segments.date`: one row per campaign and date.
 - Product plus metrics: one row per advertised ASIN across all matching ads.
 
 ## CLI projection
@@ -934,6 +948,9 @@ Stable error codes:
 | `INVALID_INPUT` | The operation input fails schema or cross-field validation |
 | `RESOURCE_NOT_FOUND` | The requested resource is not present in the explicit account |
 | `CURSOR_INVALID` | The Search cursor is malformed, expired, or bound to another query |
+| `RESULT_TOO_LARGE` | Performance point cardinality exceeds a public limit before the performance query |
+| `RESPONSE_TOO_LARGE` | A completed Performance result exceeds the serialized response limit |
+| `EXECUTION_TIMEOUT` | Performance exceeded its bounded server execution time |
 | `AMAZON_REJECTED` | Amazon rejected the requested operation |
 | `AMAZON_UNAVAILABLE` | Amazon remains unavailable after the documented retry policy |
 | `COMPOSITE_PARTIAL_FAILURE` | Composite creation created some resources before a later failure |
@@ -960,7 +977,7 @@ Descriptions do not repeat the field catalog, canonical resource shapes, or work
 
 | Tools | `readOnlyHint` | `destructiveHint` | `idempotentHint` | `openWorldHint` |
 | --- | --- | --- | --- | --- |
-| `list_advertiser_accounts`, `search` | `true` | `false` | `true` | `false` |
+| `list_advertiser_accounts`, `search`, `performance` | `true` | `false` | `true` | `false` |
 | Creation tools | `false` | `false` | `false` | `true` |
 | Update tools | `false` | `true` | `true` | `true` |
 
@@ -971,7 +988,7 @@ Creation is additive but can begin spend when `state` is `ENABLED`. Tool annotat
 MCP server instructions contain only universal invariants:
 
 1. Discover the BidBeacon Account ID, then include it explicitly in every account-scoped call.
-2. Search defaults to legible settings plus the last seven account-local dates of performance. Omit `fields` for ordinary reads; supplying it replaces the defaults and is intended for narrower or segmented shapes.
+2. Search defaults to legible settings plus the last seven account-local dates of range-aggregated performance. Omit `fields` for ordinary reads; supplying it replaces the defaults and is intended for narrower resource shapes.
 3. Inspect current settings and relevant performance before consequential updates.
 4. Prefer `create_sponsored_products_campaign` for ordinary launches and primitive creation only for bespoke topology or recovery.
 5. Treat coverage issues as uncertainty in the archive, not zero performance.
@@ -1001,7 +1018,8 @@ This contract cleanly replaces the prior public shape:
 | Replaced behavior | Canonical behavior |
 | --- | --- |
 | Dashboard-selected or configured account fallback | Explicit `--account` on every account-scoped command |
-| `campaigns list/get`, `metrics table/series`, `history`, `asins tree/overview` | `bb search <resource>` |
+| `campaigns list/get`, `metrics table`, `history`, `asins tree/overview` | `bb search <resource>` |
+| `metrics series` | `bb performance` |
 | Offset pagination | Opaque keyset cursor; `--all` follows cursors |
 | Default `ENABLED` state filter | No implicit state filter |
 | `purchases` | `orders` |

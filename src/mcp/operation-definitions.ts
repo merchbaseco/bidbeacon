@@ -8,6 +8,8 @@ import { campaignCreateInputSchema, campaignUpdateInputSchema, canonicalCampaign
 import { compositeCampaignCreateInputSchema, compositeCampaignCreationResultSchema } from '@/operations/composite-campaign-schemas';
 import type { OperationContext } from '@/operations/operation-context';
 import { listAdvertiserAccountsInputSchema, listAdvertiserAccountsOutputSchema } from '@/operations/operation-schema';
+import { performance } from '@/operations/performance';
+import { performanceInputSchema, performanceMcpOutputSchema } from '@/operations/performance-schemas';
 import { search } from '@/operations/search';
 import { searchInputSchema, searchOutputSchema } from '@/operations/search-planner';
 import { createKeywordTarget, createNegativeKeyword, createNegativeProductTarget, createProductTarget, updateTarget } from '@/operations/target-mutations';
@@ -24,6 +26,7 @@ import packageJson from '../../package.json';
 export const MCP_TOOL_NAMES = [
     'list_advertiser_accounts',
     'search',
+    'performance',
     'create_sponsored_products_campaign',
     'create_campaign',
     'create_ad_group',
@@ -47,7 +50,8 @@ export const MCP_SERVER_INFO = {
 export const MCP_SERVER_INSTRUCTIONS = [
     'Discover the BidBeacon Advertiser Account UUID with list_advertiser_accounts before any scoped call.',
     'Pass accountId explicitly on every scoped call; never rely on selected-account state.',
-    'Omit fields for ordinary Search reads: defaults return legible settings and the last seven account-local performance days. Supplying fields replaces those defaults; use it only for a narrower or segmented shape.',
+    'Omit fields for ordinary Search reads: defaults return legible settings and the last seven account-local performance days aggregated at the resource grain. Supplying fields replaces those defaults; use it only for a narrower resource shape.',
+    'Use Performance for complete hourly, daily, or monthly Account and bounded Product time series; never exhaust Search cursors to build a chart.',
     'Inspect current settings and relevant performance before consequential updates; prefer composite campaign creation for ordinary launches and primitives only for bespoke or recovery work.',
     'Treat coverage issues as archive uncertainty, not zero performance.',
 ].join('\n');
@@ -102,6 +106,16 @@ export const MCP_OPERATION_DEFINITIONS: readonly McpOperationDefinition[] = [
         outputSchema: searchOutputSchema,
         annotations: readOnlyAnnotations,
         execute: search,
+    },
+    {
+        name: 'performance',
+        title: 'Read Performance',
+        description:
+            'Read one complete bounded temporal performance result for an explicit BidBeacon Advertiser Account UUID. Supports Account or explicit Product dimensions, hourly, daily, or monthly intervals, selected canonical metrics, zero-filled points, totals, timezone, and archive coverage. Returns no cursor; failures return a stable BidBeacon tool error with actionable structured limits.',
+        inputSchema: performanceInputSchema,
+        outputSchema: performanceMcpOutputSchema,
+        annotations: readOnlyAnnotations,
+        execute: performance,
     },
     {
         name: 'create_sponsored_products_campaign',

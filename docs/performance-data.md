@@ -8,7 +8,7 @@ Marketing Stream data is rolled into `performance_hourly` every five minutes ove
 
 Amazon hourly-grain reports reconcile Stream data after an account-local date closes. Each metadata row and API request covers one local date (the report still returns `hour.value` rows). Metadata retains exactly 14 account-local dates, including the current date, matching Amazon's hourly history window. Reconciliation runs every three hours during the first post-close day, then at 3 days, 7 days, and 13 days 21 hours. This keeps Stream as the low-latency source while using reports to catch late or corrected data without requesting the same full-day report once per hour.
 
-Search treats rows with `entity_type = target` as the canonical performance grain. Campaign, Ad-group, Ad, and Target regroup them by stored topology identifiers. Product joins `performance.ad_id` to the Ad's advertised ASIN; it does not use the target ASIN, which describes a targeting condition. Target Search uses the daily projection and does not expose `segments.hour`.
+Search and Performance treat rows with `entity_type = target` as the canonical performance grain. Search regroups Campaign, Ad-group, Ad, Target, and Product resource totals from the daily projection. Performance uses the hourly projection for hourly points and the daily projection for daily and monthly points. Product joins `performance.ad_id` to the Ad's advertised ASIN; it does not use the target ASIN, which describes a targeting condition.
 
 These datasets **do not always reconcile** 1:1. Amazon’s hourly and daily reports are generated from different pipelines and can differ because of:
 

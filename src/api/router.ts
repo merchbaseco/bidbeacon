@@ -18,7 +18,7 @@ export const appRouter = router({
     entityHistory: createEntityHistoryRouter(db),
     api: publicApiRouter,
     metrics: metricsRouter,
-    performance: performanceRouter,
+    performanceTable: performanceRouter,
     users: usersRouter,
     worker: workerRouter,
     ...publicOperationProcedures,

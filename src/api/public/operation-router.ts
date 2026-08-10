@@ -10,6 +10,8 @@ import { compositeCampaignCreateInputSchema, compositeCampaignCreationResultSche
 import type { OperationContext } from '@/operations/operation-context';
 import { OperationError, type OperationErrorCode } from '@/operations/operation-errors';
 import { listAdvertiserAccountsInputSchema, listAdvertiserAccountsOutputSchema } from '@/operations/operation-schema';
+import { performance } from '@/operations/performance';
+import { performanceInputSchema, performanceOutputSchema } from '@/operations/performance-schemas';
 import { search } from '@/operations/search';
 import { searchInputSchema, searchOutputSchema } from '@/operations/search-planner';
 import { createKeywordTarget, createNegativeKeyword, createNegativeProductTarget, createProductTarget, updateTarget } from '@/operations/target-mutations';
@@ -31,6 +33,10 @@ export const publicOperationProcedures = {
         .input(searchInputSchema)
         .output(searchOutputSchema)
         .query(({ ctx, input }) => runOperation(ctx, search, input)),
+    performance: apiProcedure
+        .input(performanceInputSchema)
+        .output(performanceOutputSchema)
+        .query(({ ctx, input }) => runOperation(ctx, performance, input)),
     create_sponsored_products_campaign: apiProcedure
         .input(compositeCampaignCreateInputSchema)
         .output(compositeCampaignCreationResultSchema)
@@ -122,6 +128,8 @@ const toTrpcErrorCode = (code: OperationErrorCode): TRPC_ERROR_CODE_KEY => {
             return 'FORBIDDEN';
         case 'INVALID_INPUT':
         case 'CURSOR_INVALID':
+        case 'RESULT_TOO_LARGE':
+        case 'RESPONSE_TOO_LARGE':
             return 'BAD_REQUEST';
         case 'RESOURCE_NOT_FOUND':
             return 'NOT_FOUND';
@@ -129,6 +137,7 @@ const toTrpcErrorCode = (code: OperationErrorCode): TRPC_ERROR_CODE_KEY => {
             return 'CONFLICT';
         case 'AMAZON_REJECTED':
         case 'AMAZON_UNAVAILABLE':
+        case 'EXECUTION_TIMEOUT':
             return 'TIMEOUT';
         case 'INTERNAL_ERROR':
             return 'INTERNAL_SERVER_ERROR';

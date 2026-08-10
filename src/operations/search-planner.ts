@@ -8,9 +8,7 @@ import {
     getSearchDefaultFields,
     getSearchField,
     isSearchFieldCompatible,
-    isSearchHourSegmentField,
     isSearchPerformanceField,
-    isSearchSegmentField,
     SEARCH_FIELDS,
     SEARCH_OPERATORS,
     SEARCH_RESOURCES,
@@ -152,21 +150,9 @@ export const planSearch = (input: unknown, options: { timezone: string; now?: Da
     const requestedOrder = resolveOrder(resource, parsedInput.data.orderBy ?? []);
     const usedFields = [...fields, ...filters.map(filter => filter.field), ...requestedOrder.map(order => order.field)];
     const performance = usedFields.some(isSearchPerformanceField);
-    const segmentFields = [...new Set([...fields, ...requestedOrder.map(order => order.field)].filter(isSearchSegmentField))];
-    const segmented = segmentFields.length > 0;
-    const hourly = usedFields.some(isSearchHourSegmentField);
-    if (hourly && !usedFields.includes('segments.date')) {
-        throw invalidInput('segments.hour requires the compatible segments.date Field.', {
-            field: 'segments.hour',
-            compatibleFields: fieldsForResource(resource).filter(field => field === 'segments.date' || field === 'segments.hour'),
-        });
-    }
-    if (segmentFields.includes('segments.hour') && !segmentFields.includes('segments.date')) {
-        throw invalidInput('segments.hour requires segments.date at the selected row grain.', {
-            field: 'segments.hour',
-            compatibleFields: fieldsForResource(resource).filter(field => field === 'segments.date' || field === 'segments.hour'),
-        });
-    }
+    const segmentFields: SearchField[] = [];
+    const segmented = false;
+    const hourly = false;
     if (!performance && resource !== 'change_event' && parsedInput.data.dateRange) {
         throw invalidInput('dateRange requires a metric or segment Field.');
     }
@@ -270,7 +256,7 @@ const resolveOrder = (resource: SearchResource, orderBy: readonly z.infer<typeof
 
 const validateFilterValue = (field: SearchFieldDefinition, operator: SearchOperator, value: unknown): SearchFilter['value'] => {
     if (operator === 'in') {
-        if (!Array.isArray(value) || value.length === 0 || value.some(item => !(isFieldValue(field, item) && isValidFieldValue(field, item)))) {
+        if (!Array.isArray(value) || value.length === 0 || value.some(item => !isFieldValue(field, item))) {
             throw invalidInput('The in operator requires a non-empty array of values matching the Field type.', { field: field.field });
         }
         return value.map(item => normalizeFilterValue(field, item as SearchFilterValue));
@@ -283,7 +269,7 @@ const validateFilterValue = (field: SearchFieldDefinition, operator: SearchOpera
         return value;
     }
 
-    if (!(isFieldValue(field, value) && isValidFieldValue(field, value))) {
+    if (!isFieldValue(field, value)) {
         throw invalidInput('Search filter value does not match the Field type.', { field: field.field });
     }
     return normalizeFilterValue(field, value);
@@ -310,9 +296,6 @@ const isFieldValue = (field: SearchFieldDefinition, value: unknown): value is Se
     }
     return true;
 };
-
-const isValidFieldValue = (field: SearchFieldDefinition, value: SearchFilterValue) =>
-    field.field !== 'segments.hour' || (typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= 23);
 
 const normalizeFilterValue = (field: SearchFieldDefinition, value: SearchFilterValue): SearchFilterValue => (field.kind === 'datetime' ? new Date(value as string).toISOString() : value);
 
