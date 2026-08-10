@@ -2,6 +2,7 @@ import { addDays } from 'date-fns';
 import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { adGroup, campaign, performanceDaily, target } from '@/db/schema';
 import type { OperationContext } from './operation-context';
+import { buildSearchMetricValues, emptySearchMetrics, type SearchMetricTotals } from './search-metrics';
 import type { SearchFilter, SearchPlan } from './search-planner';
 import type { SearchRow } from './search-query';
 
@@ -41,18 +42,10 @@ type TargetSearchDatabaseRow = TargetSearchSettings & {
     sales: number | string | null;
 };
 
-type TargetMetricTotals = {
-    impressions: number;
-    clicks: number;
-    spend: number;
-    orders: number;
-    sales: number;
-};
-
 export const queryTargetSearchRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, plan: SearchPlan): Promise<SearchRow[]> => {
     const rows = plan.performance ? await queryTargetPerformanceRows(context, account, plan) : await queryTargetSettingsRows(context, account);
     if (!plan.segmented) {
-        return rows.map(row => buildTargetSearchRow(row, plan.performance ? toTargetMetricTotals(row) : emptyTargetMetrics(), null));
+        return rows.map(row => buildTargetSearchRow(row, plan.performance ? toTargetMetricTotals(row) : emptySearchMetrics(), null));
     }
 
     const dates = getDateSequence(plan.dateRange?.startDate ?? '', plan.dateRange?.endDate ?? '');
@@ -67,7 +60,7 @@ export const queryTargetSearchRows = async (context: OperationContext, account: 
     return [...rowsByTarget.values()].flatMap(row =>
         dates.map(date => {
             const segmentedRow = rowsByTargetAndDate.get(`${row.targetId}\u0000${date}`);
-            return buildTargetSearchRow(segmentedRow ?? row, segmentedRow ? toTargetMetricTotals(segmentedRow) : emptyTargetMetrics(), date);
+            return buildTargetSearchRow(segmentedRow ?? row, segmentedRow ? toTargetMetricTotals(segmentedRow) : emptySearchMetrics(), date);
         })
     );
 };
@@ -206,9 +199,9 @@ const queryTargetPerformanceRows = async (context: OperationContext, account: { 
     return rows;
 };
 
-const buildTargetSearchRow = (row: TargetSearchDatabaseRow, totals: TargetMetricTotals, date: string | null): SearchRow => {
+const buildTargetSearchRow = (row: TargetSearchDatabaseRow, totals: SearchMetricTotals, date: string | null): SearchRow => {
     const type = normalizeTargetType(row.targetType, row.targetKeyword, row.targetAsin);
-    const metrics = buildTargetMetricValues(totals);
+    const metrics = buildSearchMetricValues(totals);
     return {
         values: {
             'target.id': row.targetId,
@@ -247,6 +240,7 @@ const buildTargetSearchRow = (row: TargetSearchDatabaseRow, totals: TargetMetric
             'metrics.cvr': metrics.cvr,
             'segments.date': date,
         },
+        metricTotals: totals,
     };
 };
 
@@ -269,28 +263,13 @@ const buildTargetDateCondition = (filter: SearchFilter) => {
     }
 };
 
-const toTargetMetricTotals = (row: Pick<TargetSearchDatabaseRow, 'impressions' | 'clicks' | 'spend' | 'orders' | 'sales'>): TargetMetricTotals => ({
+const toTargetMetricTotals = (row: Pick<TargetSearchDatabaseRow, 'impressions' | 'clicks' | 'spend' | 'orders' | 'sales'>): SearchMetricTotals => ({
     impressions: toNumber(row.impressions),
     clicks: toNumber(row.clicks),
     spend: toNumber(row.spend),
     orders: toNumber(row.orders),
     sales: toNumber(row.sales),
 });
-
-const buildTargetMetricValues = (totals: TargetMetricTotals) => ({
-    impressions: totals.impressions,
-    clicks: totals.clicks,
-    spend: roundMetric(totals.spend),
-    orders: totals.orders,
-    sales: roundMetric(totals.sales),
-    acos: ratioAsPercentage(totals.spend, totals.sales),
-    cpc: ratio(totals.spend, totals.clicks),
-    ctr: ratioAsPercentage(totals.clicks, totals.impressions),
-    roas: ratio(totals.sales, totals.spend),
-    cvr: ratioAsPercentage(totals.orders, totals.clicks),
-});
-
-const emptyTargetMetrics = (): TargetMetricTotals => ({ impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 });
 
 const normalizeTargetType = (value: string, keyword: string | null, asin: string | null) => {
     const upper = value.toUpperCase();
@@ -337,12 +316,6 @@ const normalizeBidStrategy = (value: string | null) => {
             return null;
     }
 };
-
-const ratio = (numerator: number, denominator: number) => (denominator === 0 ? 0 : roundMetric(numerator / denominator));
-
-const ratioAsPercentage = (numerator: number, denominator: number) => (denominator === 0 ? 0 : roundMetric((numerator / denominator) * 100));
-
-const roundMetric = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 const toNumber = (value: number | string | null) => (value === null ? 0 : Number(value));
 

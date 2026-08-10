@@ -6,6 +6,7 @@ export type AuthenticatedUser = {
 export type AuthType = "access" | "none";
 export type CredentialKind = "api_key" | "oauth" | "session";
 export type Context = {
+	accessCredential: string | null;
 	accessError: "access_denied" | "access_unavailable" | null;
 	accessibleAccountIds: string[];
 	accessibleAdvertiserAccountIds: string[];
@@ -115,6 +116,18 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				} | undefined;
 			};
 			rows: Record<string, unknown>[];
+			summary?: {
+				"metrics.impressions": number;
+				"metrics.clicks": number;
+				"metrics.spend": number;
+				"metrics.orders": number;
+				"metrics.sales": number;
+				"metrics.acos": number | null;
+				"metrics.cpc": number | null;
+				"metrics.ctr": number | null;
+				"metrics.roas": number | null;
+				"metrics.cvr": number | null;
+			} | undefined;
 			nextCursor?: string | undefined;
 		};
 		meta: object;
@@ -585,6 +598,18 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 				} | undefined;
 			};
 			rows: Record<string, unknown>[];
+			summary?: {
+				"metrics.impressions": number;
+				"metrics.clicks": number;
+				"metrics.spend": number;
+				"metrics.orders": number;
+				"metrics.sales": number;
+				"metrics.acos": number | null;
+				"metrics.cpc": number | null;
+				"metrics.ctr": number | null;
+				"metrics.roas": number | null;
+				"metrics.cvr": number | null;
+			} | undefined;
 			nextCursor?: string | undefined;
 		};
 		meta: object;

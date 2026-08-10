@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## v2.0.0 - 2026-08-10
+
+### Added
+
+- Added a distributable Amazon Ads account-management skill with compact recipes for account reviews, ASIN investigations, optimization, launches, lifecycle changes, and partial-failure recovery.
+- Added request-time advertised-product title resolution through RankWrangler using shared Merchbase authentication.
+- Added full filtered-result performance summaries to Search for authoritative agent and HTTP dashboard totals on every cursor page.
+
+### Changed
+
+- Changed Search performance to derive Campaign, Ad-group, Ad, Target, and Product views from the canonical Target-grain archive.
+- Changed zero-denominator ratios to return `null`, retained valid zero numerators, and sorted undefined ratios after numeric values.
+- Clarified that Product Search summarizes one advertised ASIN across the advertiser account while Ad Search resolves its Campaign and Ad-group topology.
+
+### Removed
+
+- Removed placement reporting and the unsupported Amazon Ads product-metadata ingestion, refresh, storage, and dashboard paths.
+
 ## v1.0.0 - 2026-08-07
 
 ### Added

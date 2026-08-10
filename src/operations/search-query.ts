@@ -5,22 +5,16 @@ import { queryChangeEventSearchRows } from './change-event-search-query';
 import type { OperationContext } from './operation-context';
 import { serializeSearchValue } from './search-cursor';
 import { isSearchSegmentField } from './search-field-registry';
+import { buildSearchMetricValues, emptySearchMetrics, type SearchMetricTotals } from './search-metrics';
 import type { CampaignSearchPlan, SearchFilter, SearchOrder, SearchPlan } from './search-planner';
 import { queryTargetSearchRows } from './target-search-query';
 
 type CampaignRow = typeof campaign.$inferSelect;
 type CampaignSettings = Pick<CampaignRow, 'campaignId' | 'name' | 'state' | 'deliveryStatus' | 'budgetAmount' | 'targetingSettings' | 'bidStrategy' | 'startDate' | 'endDate'>;
 
-type MetricTotals = {
-    impressions: number;
-    clicks: number;
-    spend: number;
-    orders: number;
-    sales: number;
-};
-
 export type SearchRow = {
     values: Record<string, unknown>;
+    metricTotals?: SearchMetricTotals;
 };
 
 export type CampaignSearchRow = SearchRow;
@@ -102,7 +96,7 @@ type SearchPerformanceDatabaseRow<TSettings> = TSettings & {
 const queryProductSearchRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, plan: SearchPlan): Promise<SearchRow[]> => {
     const settingsRows = await queryProductSettingsRows(context, account);
     if (!plan.performance) {
-        return settingsRows.map(row => buildProductSearchRow(row, emptyMetrics(), null, null));
+        return settingsRows.map(row => buildProductSearchRow(row, emptySearchMetrics(), null, null));
     }
 
     const performanceRows = await queryProductPerformanceRows(context, account, plan);
@@ -110,7 +104,7 @@ const queryProductSearchRows = async (context: OperationContext, account: { adsA
     const totalsByProduct = new Map(performanceRows.map(row => [row.productAsin, toMetricTotals(row)]));
 
     if (!plan.segmented) {
-        return settingsRows.map(row => buildProductSearchRow(row, totalsByProduct.get(row.productAsin) ?? emptyMetrics(), null, null));
+        return settingsRows.map(row => buildProductSearchRow(row, totalsByProduct.get(row.productAsin) ?? emptySearchMetrics(), null, null));
     }
 
     const dates = getDateSequence(plan.dateRange?.startDate ?? '', plan.dateRange?.endDate ?? '');
@@ -119,13 +113,13 @@ const queryProductSearchRows = async (context: OperationContext, account: { adsA
             return dates.flatMap(date =>
                 Array.from({ length: 24 }, (_, hour) => {
                     const segment = rowsBySegment.get(`${row.productAsin}\u0000${date}\u0000${hour}`);
-                    return buildProductSearchRow(row, segment ? toMetricTotals(segment) : emptyMetrics(), date, hour);
+                    return buildProductSearchRow(row, segment ? toMetricTotals(segment) : emptySearchMetrics(), date, hour);
                 })
             );
         }
         return dates.map(date => {
             const segment = rowsBySegment.get(`${row.productAsin}\u0000${date}\u0000null`);
-            return buildProductSearchRow(row, segment ? toMetricTotals(segment) : emptyMetrics(), date, null);
+            return buildProductSearchRow(row, segment ? toMetricTotals(segment) : emptySearchMetrics(), date, null);
         });
     });
 };
@@ -259,7 +253,7 @@ const queryAdGroupSearchRows = async (context: OperationContext, account: { adsA
     const rows = plan.performance ? await queryAdGroupPerformanceRows(context, account, plan) : await queryAdGroupSettingsRows(context, account);
     const targetingModes = await queryManualTargetingModes(context, rows, plan);
     if (!plan.segmented) {
-        return rows.map(row => buildAdGroupSearchRow(row, plan.performance ? toMetricTotals(row) : emptyMetrics(), null, null, targetingModes.get(row.campaignId)));
+        return rows.map(row => buildAdGroupSearchRow(row, plan.performance ? toMetricTotals(row) : emptySearchMetrics(), null, null, targetingModes.get(row.campaignId)));
     }
 
     const dates = getDateSequence(plan.dateRange?.startDate ?? '', plan.dateRange?.endDate ?? '');
@@ -276,13 +270,13 @@ const queryAdGroupSearchRows = async (context: OperationContext, account: { adsA
             return dates.flatMap(date =>
                 Array.from({ length: 24 }, (_, hour) => {
                     const segment = rowsBySegment.get(`${row.adGroupId}\u0000${date}\u0000${hour}`);
-                    return buildAdGroupSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptyMetrics(), date, hour, targetingModes.get(row.campaignId));
+                    return buildAdGroupSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptySearchMetrics(), date, hour, targetingModes.get(row.campaignId));
                 })
             );
         }
         return dates.map(date => {
             const segment = rowsBySegment.get(`${row.adGroupId}\u0000${date}\u0000null`);
-            return buildAdGroupSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptyMetrics(), date, null, targetingModes.get(row.campaignId));
+            return buildAdGroupSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptySearchMetrics(), date, null, targetingModes.get(row.campaignId));
         });
     });
 };
@@ -291,7 +285,7 @@ const queryAdSearchRows = async (context: OperationContext, account: { adsAccoun
     const rows = plan.performance ? await queryAdPerformanceRows(context, account, plan) : await queryAdSettingsRows(context, account);
     const targetingModes = await queryManualTargetingModes(context, rows, plan);
     if (!plan.segmented) {
-        return rows.map(row => buildAdSearchRow(row, plan.performance ? toMetricTotals(row) : emptyMetrics(), null, null, targetingModes.get(row.campaignId)));
+        return rows.map(row => buildAdSearchRow(row, plan.performance ? toMetricTotals(row) : emptySearchMetrics(), null, null, targetingModes.get(row.campaignId)));
     }
 
     const dates = getDateSequence(plan.dateRange?.startDate ?? '', plan.dateRange?.endDate ?? '');
@@ -308,13 +302,13 @@ const queryAdSearchRows = async (context: OperationContext, account: { adsAccoun
             return dates.flatMap(date =>
                 Array.from({ length: 24 }, (_, hour) => {
                     const segment = rowsBySegment.get(`${row.adId}\u0000${date}\u0000${hour}`);
-                    return buildAdSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptyMetrics(), date, hour, targetingModes.get(row.campaignId));
+                    return buildAdSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptySearchMetrics(), date, hour, targetingModes.get(row.campaignId));
                 })
             );
         }
         return dates.map(date => {
             const segment = rowsBySegment.get(`${row.adId}\u0000${date}\u0000null`);
-            return buildAdSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptyMetrics(), date, null, targetingModes.get(row.campaignId));
+            return buildAdSearchRow(segment ?? row, segment ? toMetricTotals(segment) : emptySearchMetrics(), date, null, targetingModes.get(row.campaignId));
         });
     });
 };
@@ -717,12 +711,12 @@ const queryAdPerformanceRows = async (
 
 const buildAdGroupSearchRow = (
     row: SearchPerformanceDatabaseRow<AdGroupSearchSettings>,
-    totals: MetricTotals,
+    totals: SearchMetricTotals,
     date: string | null,
     hour: number | null,
     inferredTargetingMode?: 'MANUAL_KEYWORD' | 'MANUAL_PRODUCT'
 ): SearchRow => {
-    const metrics = buildMetricValues(totals);
+    const metrics = buildSearchMetricValues(totals);
     return {
         values: {
             'adGroup.id': row.adGroupId,
@@ -752,17 +746,18 @@ const buildAdGroupSearchRow = (
             'segments.date': date,
             'segments.hour': hour,
         },
+        metricTotals: totals,
     };
 };
 
 const buildAdSearchRow = (
     row: SearchPerformanceDatabaseRow<AdSearchSettings>,
-    totals: MetricTotals,
+    totals: SearchMetricTotals,
     date: string | null,
     hour: number | null,
     inferredTargetingMode?: 'MANUAL_KEYWORD' | 'MANUAL_PRODUCT'
 ): SearchRow => {
-    const metrics = buildMetricValues(totals);
+    const metrics = buildSearchMetricValues(totals);
     return {
         values: {
             'ad.id': row.adId,
@@ -798,11 +793,12 @@ const buildAdSearchRow = (
             'segments.date': date,
             'segments.hour': hour,
         },
+        metricTotals: totals,
     };
 };
 
-const buildProductSearchRow = (row: ProductSearchSettings, totals: MetricTotals, date: string | null, hour: number | null): SearchRow => {
-    const metrics = buildMetricValues(totals);
+const buildProductSearchRow = (row: ProductSearchSettings, totals: SearchMetricTotals, date: string | null, hour: number | null): SearchRow => {
+    const metrics = buildSearchMetricValues(totals);
     return {
         values: {
             'product.asin': row.productAsin,
@@ -820,6 +816,7 @@ const buildProductSearchRow = (row: ProductSearchSettings, totals: MetricTotals,
             'segments.date': date,
             'segments.hour': hour,
         },
+        metricTotals: totals,
     };
 };
 
@@ -893,7 +890,7 @@ export const queryCampaignSearchRows = async (context: OperationContext, account
             .where(and(eq(campaign.accountId, account.adsAccountId), eq(campaign.countryCode, account.countryCode), eq(campaign.adProduct, 'SPONSORED_PRODUCTS')))
             .orderBy(asc(campaign.campaignId));
         const targetingModes = await queryManualTargetingModes(context, campaignRows, plan);
-        return campaignRows.map(row => buildSearchRow(row, emptyMetrics(), null, targetingModes.get(row.campaignId)));
+        return campaignRows.map(row => buildSearchRow(row, emptySearchMetrics(), null, targetingModes.get(row.campaignId)));
     }
 
     const metrics = {
@@ -974,7 +971,7 @@ export const queryCampaignSearchRows = async (context: OperationContext, account
     return [...campaignRowsById.values()].flatMap(row =>
         dates.map(date => {
             const segmentedRow = rowsByCampaignAndDate.get(`${row.campaignId}\u0000${date}`);
-            return buildSearchRow(segmentedRow ?? row, segmentedRow ? toMetricTotals(segmentedRow) : emptyMetrics(), date, targetingModes.get(row.campaignId));
+            return buildSearchRow(segmentedRow ?? row, segmentedRow ? toMetricTotals(segmentedRow) : emptySearchMetrics(), date, targetingModes.get(row.campaignId));
         })
     );
 };
@@ -990,9 +987,9 @@ export const sortCampaignSearchRows = (rows: readonly CampaignSearchRow[], order
 
 export const compareSearchRows = (left: SearchRow, right: SearchRow, orderBy: readonly SearchOrder[]) => {
     for (const order of orderBy) {
-        const comparison = compareValues(left.values[order.field], right.values[order.field]);
+        const comparison = compareOrderedValues(left.values[order.field], right.values[order.field], order.direction);
         if (comparison !== 0) {
-            return order.direction === 'asc' ? comparison : -comparison;
+            return comparison;
         }
     }
     return 0;
@@ -1000,9 +997,9 @@ export const compareSearchRows = (left: SearchRow, right: SearchRow, orderBy: re
 
 export const compareSearchRowToBoundary = (row: SearchRow, boundary: readonly unknown[], orderBy: readonly SearchOrder[]) => {
     for (const [index, order] of orderBy.entries()) {
-        const comparison = compareValues(row.values[order.field], boundary[index]);
+        const comparison = compareOrderedValues(row.values[order.field], boundary[index], order.direction);
         if (comparison !== 0) {
-            return order.direction === 'asc' ? comparison : -comparison;
+            return comparison;
         }
     }
     return 0;
@@ -1014,7 +1011,7 @@ const toMetricTotals = (row: {
     spend: number | string | null;
     orders: number | string | null;
     sales: number | string | null;
-}): MetricTotals => ({
+}): SearchMetricTotals => ({
     impressions: toNumber(row.impressions),
     clicks: toNumber(row.clicks),
     spend: toNumber(row.spend),
@@ -1044,8 +1041,8 @@ const buildSegmentDateCondition = (filter: SearchFilter) => {
     }
 };
 
-const buildSearchRow = (row: CampaignSettings, totals: MetricTotals, date: string | null, inferredTargetingMode?: 'MANUAL_KEYWORD' | 'MANUAL_PRODUCT'): CampaignSearchRow => {
-    const metrics = buildMetricValues(totals);
+const buildSearchRow = (row: CampaignSettings, totals: SearchMetricTotals, date: string | null, inferredTargetingMode?: 'MANUAL_KEYWORD' | 'MANUAL_PRODUCT'): CampaignSearchRow => {
+    const metrics = buildSearchMetricValues(totals);
     return {
         values: {
             'campaign.id': row.campaignId,
@@ -1069,21 +1066,9 @@ const buildSearchRow = (row: CampaignSettings, totals: MetricTotals, date: strin
             'metrics.cvr': metrics.cvr,
             'segments.date': date,
         },
+        metricTotals: totals,
     };
 };
-
-const buildMetricValues = (totals: MetricTotals) => ({
-    impressions: totals.impressions,
-    clicks: totals.clicks,
-    spend: roundMetric(totals.spend),
-    orders: totals.orders,
-    sales: roundMetric(totals.sales),
-    acos: ratioAsPercentage(totals.spend, totals.sales),
-    cpc: ratio(totals.spend, totals.clicks),
-    ctr: ratioAsPercentage(totals.clicks, totals.impressions),
-    roas: ratio(totals.sales, totals.spend),
-    cvr: ratioAsPercentage(totals.orders, totals.clicks),
-});
 
 const matchesFilter = (actual: unknown, filter: SearchFilter) => {
     if (actual === undefined) {
@@ -1137,6 +1122,16 @@ const compareValues = (left: unknown, right: unknown) => {
     return serializedLeft < serializedRight ? -1 : 1;
 };
 
+const compareOrderedValues = (left: unknown, right: unknown, direction: 'asc' | 'desc') => {
+    const leftMissing = left === null || left === undefined;
+    const rightMissing = right === null || right === undefined;
+    if (leftMissing || rightMissing) {
+        return leftMissing === rightMissing ? 0 : leftMissing ? 1 : -1;
+    }
+    const comparison = compareValues(left, right);
+    return direction === 'asc' ? comparison : -comparison;
+};
+
 const getDateSequence = (startDate: string, endDate: string) => {
     const dates: string[] = [];
     let current = new Date(`${startDate}T00:00:00.000Z`);
@@ -1147,8 +1142,6 @@ const getDateSequence = (startDate: string, endDate: string) => {
     }
     return dates;
 };
-
-const emptyMetrics = (): MetricTotals => ({ impressions: 0, clicks: 0, spend: 0, orders: 0, sales: 0 });
 
 const queryManualTargetingModes = async (
     context: OperationContext,
@@ -1229,12 +1222,6 @@ const normalizeBidStrategy = (value: string | null) => {
             return null;
     }
 };
-
-const ratio = (numerator: number, denominator: number) => (denominator === 0 ? 0 : roundMetric(numerator / denominator));
-
-const ratioAsPercentage = (numerator: number, denominator: number) => (denominator === 0 ? 0 : roundMetric((numerator / denominator) * 100));
-
-const roundMetric = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
 const toNumber = (value: number | string | null) => (value === null ? 0 : Number(value));
 

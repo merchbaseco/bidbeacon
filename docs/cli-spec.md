@@ -78,6 +78,7 @@ The response identifies the account timezone and the resolved range. Hour segmen
 - Money and bids are JSON numbers in the Advertiser account's currency.
 - `metrics.acos`, `metrics.ctr`, and `metrics.cvr` are percentage points: `24.45` means 24.45%.
 - `metrics.roas` is a multiplier: `4.09` means 4.09x.
+- A ratio is `null` when its denominator is zero. A zero numerator with a nonzero denominator remains numeric.
 - Placement bid adjustments are percentage-point increases: `50` means a 50% increase.
 - Outputs do not contain formatted currency or percentage strings.
 
@@ -238,6 +239,8 @@ The Default fields for `campaign`, `ad_group`, `ad`, `target`, and `product` inc
 
 BidBeacon preserves requested ordering and ensures the selected segment Fields plus Campaign ID, Ad-group ID, Ad ID, Target ID, Product ASIN, or Change-event ID are present as deterministic continuation keys.
 
+Null ratio values sort after numeric values for both ascending and descending ordering, so undefined ACOS never appears as the best or worst finite performer.
+
 ### Pagination
 
 - `limit` defaults to `20`.
@@ -285,6 +288,18 @@ Search has no offset or page-number input. The CLI's `--all` option follows serv
       "issues": []
     }
   },
+  "summary": {
+    "metrics.impressions": 1200,
+    "metrics.clicks": 80,
+    "metrics.spend": 142.31,
+    "metrics.orders": 14,
+    "metrics.sales": 510.25,
+    "metrics.acos": 27.89,
+    "metrics.cpc": 1.78,
+    "metrics.ctr": 6.67,
+    "metrics.roas": 3.59,
+    "metrics.cvr": 17.5
+  },
   "rows": [
     {
       "campaign.id": "123",
@@ -299,7 +314,7 @@ Search has no offset or page-number input. The CLI's `--all` option follows serv
 
 Each row is a flat mapping whose keys exactly match the resolved `fields`.
 
-`dateRange` and `coverage` are omitted for settings-only searches. `coverage` is omitted for `change_event`.
+`summary` contains all ten standard metrics for the complete filtered result before pagination and is repeated unchanged on every cursor page. Additive metrics are summed; ratios are recomputed from aggregate numerators and denominators rather than summing or averaging row ratios. `summary`, `dateRange`, and `coverage` are omitted for settings-only searches. `coverage` is omitted for `change_event`.
 
 Coverage status is:
 

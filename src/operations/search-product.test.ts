@@ -145,11 +145,11 @@ describe('Product Search operation', () => {
             'metrics.spend': 0,
             'metrics.orders': 0,
             'metrics.sales': 0,
-            'metrics.acos': 0,
-            'metrics.cpc': 0,
-            'metrics.ctr': 0,
-            'metrics.roas': 0,
-            'metrics.cvr': 0,
+            'metrics.acos': null,
+            'metrics.cpc': null,
+            'metrics.ctr': null,
+            'metrics.roas': null,
+            'metrics.cvr': null,
         });
         expect(result.rows.every(row => Object.keys(row).every(field => !(field.startsWith('ad.') || field.startsWith('adGroup.') || field.startsWith('campaign.'))))).toBe(true);
 
@@ -161,7 +161,7 @@ describe('Product Search operation', () => {
         });
         expect(cvrResult.rows).toEqual([
             { 'product.asin': 'B0PRODUCT001', 'metrics.cvr': 23.81 },
-            { 'product.asin': 'B0PRODUCT002', 'metrics.cvr': 0 },
+            { 'product.asin': 'B0PRODUCT002', 'metrics.cvr': null },
         ]);
     });
 

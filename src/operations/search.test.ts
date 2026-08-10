@@ -116,13 +116,25 @@ describe('Campaign Search operation', () => {
                 'metrics.spend': 0,
                 'metrics.orders': 0,
                 'metrics.sales': 0,
-                'metrics.acos': 0,
-                'metrics.cpc': 0,
-                'metrics.ctr': 0,
-                'metrics.roas': 0,
-                'metrics.cvr': 0,
+                'metrics.acos': null,
+                'metrics.cpc': null,
+                'metrics.ctr': null,
+                'metrics.roas': null,
+                'metrics.cvr': null,
             },
         ]);
+        expect(result.summary).toEqual({
+            'metrics.impressions': 150,
+            'metrics.clicks': 15,
+            'metrics.spend': 15,
+            'metrics.orders': 3,
+            'metrics.sales': 50,
+            'metrics.acos': 30,
+            'metrics.cpc': 1,
+            'metrics.ctr': 10,
+            'metrics.roas': 3.33,
+            'metrics.cvr': 20,
+        });
     });
 
     it('rejects the retired placement reporting segment', async () => {
@@ -293,6 +305,7 @@ describe('Campaign Search operation', () => {
             { 'campaign.id': 'campaign-search-2', 'segments.date': '2026-08-06', 'metrics.spend': 0 },
         ]);
         expect(secondPage.nextCursor).toBeUndefined();
+        expect(secondPage.summary).toEqual(firstPage.summary);
 
         await expect(
             search(createSearchContext(database), { ...input, fields: ['campaign.id', 'segments.date', 'metrics.spend', 'metrics.clicks'], cursor: firstPage.nextCursor })
@@ -301,6 +314,61 @@ describe('Campaign Search operation', () => {
         const tamperedCursor = `${cursorPayload}.${cursorSignature.startsWith('x') ? 'y' : 'x'}${cursorSignature.slice(1)}`;
         await expect(search(createSearchContext(database), { ...input, cursor: tamperedCursor })).rejects.toMatchObject({ code: 'CURSOR_INVALID' });
         await expect(search(createSearchContext(database), { ...input, limit: 201 })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    });
+
+    it('keeps undefined ratios last and summarizes the complete filtered result before pagination', async () => {
+        database = await createTestDatabase();
+        await seedTwoCampaigns(database);
+        await database.db.insert(performanceDaily).values(
+            buildSearchPerformanceDaily({
+                campaignId: 'campaign-search-2',
+                adGroupId: 'search-ad-group-2',
+                adId: 'search-ad-3',
+                entityId: 'B0SEARCH003',
+                impressions: 60,
+                clicks: 6,
+                spend: '12.00',
+                sales: '0.00',
+                purchases: 0,
+            })
+        );
+
+        const input = {
+            accountId: SEARCH_ACCOUNT_ID,
+            resource: 'campaign' as const,
+            fields: ['campaign.id', 'metrics.acos', 'metrics.roas', 'metrics.cvr'],
+            dateRange: { startDate: '2026-08-06', endDate: '2026-08-06' },
+            orderBy: [{ field: 'metrics.acos' as const, direction: 'asc' as const }],
+            limit: 1,
+        };
+        const firstPage = await search(createSearchContext(database), input);
+
+        expect(firstPage.rows).toEqual([{ 'campaign.id': 'campaign-search-1', 'metrics.acos': 30, 'metrics.roas': 3.33, 'metrics.cvr': 20 }]);
+        expect(firstPage.nextCursor).toEqual(expect.any(String));
+        expect(firstPage.summary).toEqual({
+            'metrics.impressions': 210,
+            'metrics.clicks': 21,
+            'metrics.spend': 27,
+            'metrics.orders': 3,
+            'metrics.sales': 50,
+            'metrics.acos': 54,
+            'metrics.cpc': 1.29,
+            'metrics.ctr': 10,
+            'metrics.roas': 1.85,
+            'metrics.cvr': 14.29,
+        });
+
+        const secondPage = await search(createSearchContext(database), { ...input, cursor: firstPage.nextCursor! });
+        expect(secondPage.rows).toEqual([{ 'campaign.id': 'campaign-search-2', 'metrics.acos': null, 'metrics.roas': 0, 'metrics.cvr': 0 }]);
+        expect(secondPage.summary).toEqual(firstPage.summary);
+
+        const enabledOnly = await search(createSearchContext(database), {
+            ...input,
+            filters: [{ field: 'campaign.state', operator: 'eq', value: 'ENABLED' }],
+            limit: 20,
+        });
+        expect(enabledOnly.summary?.['metrics.spend']).toBe(15);
+        expect(enabledOnly.summary?.['metrics.acos']).toBe(30);
     });
 
     it('uses an unselected date segment as the internal row grain for ordering', async () => {

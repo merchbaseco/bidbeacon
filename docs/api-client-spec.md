@@ -40,6 +40,8 @@ update_target
 
 Queries use `.query(...)`; creates and updates use `.mutate(...)`. `list_advertiser_accounts` is the only unscoped operation. All other inputs require an opaque Advertiser Account UUID. Search uses the curated Field/metric catalog, account-local date ranges, structured filters, ordering, and keyset cursors described in [cli-spec.md](cli-spec.md).
 
+Performance Search responses include a typed `summary` of all standard metrics over the complete filtered result before pagination. This is the authoritative dashboard or account total on every cursor page; ratio fields are nullable when their denominator is zero.
+
 ```ts
 const client = createBidBeaconClient({ baseUrl, credential });
 

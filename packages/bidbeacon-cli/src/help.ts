@@ -85,6 +85,8 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             'The Field catalog is intentionally small; use `bb search --help` with the public contract docs for the exact vocabulary.',
             'Repeated `--where` clauses are ANDed. Use `in ["a", "b"]` for alternatives.',
             'Search metrics use canonical names such as `metrics.orders` and `metrics.cvr`.',
+            'Performance responses include a full filtered-result summary before pagination.',
+            'Product summarizes an ASIN across the account; use Ad for its campaign and ad-group topology.',
         ],
     },
     create: {

@@ -4,6 +4,7 @@ import type { OperationContext } from './operation-context';
 import { OperationError } from './operation-errors';
 import { queryCampaignSearchCoverage, queryTargetSearchCoverage } from './search-coverage';
 import { decodeSearchCursor, encodeSearchCursor } from './search-cursor';
+import { summarizeSearchMetrics } from './search-metrics';
 import { planSearch, searchOutputSchema } from './search-planner';
 import { compareSearchRowToBoundary, filterSearchRows, querySearchRows, type SearchRow, sortSearchRows } from './search-query';
 
@@ -45,6 +46,7 @@ export const search = async (context: OperationContext, input: unknown, options:
     const enrichedRows = await enrichProductTitles(context, metadata.marketplaceId, plan.resource, plan.fields, pageRows);
     const result: {
         context: Record<string, unknown>;
+        summary?: Record<string, number | null>;
         rows: Record<string, unknown>[];
         nextCursor?: string;
     } = {
@@ -56,6 +58,7 @@ export const search = async (context: OperationContext, input: unknown, options:
             orderBy: [...plan.orderBy],
             ...(coverage ? { coverage } : {}),
         },
+        ...(plan.performance ? { summary: summarizeSearchMetrics(filteredRows) } : {}),
         rows: enrichedRows.map(row => Object.fromEntries(plan.fields.map(field => [field, row.values[field]]))),
     };
 

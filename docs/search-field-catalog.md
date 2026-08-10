@@ -60,6 +60,10 @@ Cost per order is not a v1 Field.
 
 ACOS, CTR, and CVR are numeric percentage points. ROAS is a numeric multiplier. Spend, sales, and CPC use the Advertiser account's currency. Impressions, clicks, and orders are integer counts.
 
+A ratio is `null` when its denominator is zero: ACOS without sales, CPC and CVR without clicks, CTR without impressions, and ROAS without spend. A zero numerator with a nonzero denominator remains numeric, so spend with zero sales has `metrics.roas: 0` and clicks with zero orders has `metrics.cvr: 0`. Null ratios sort after numeric values in either direction.
+
+Every Performance Search response includes a `summary` with all ten standard metrics for the complete filtered result before pagination. Additive metrics are summed; ACOS, CPC, CTR, ROAS, and CVR are recomputed from the aggregate totals. Settings-only and Change-event searches omit the summary.
+
 ## Segments
 
 - `segments.date`: account-local `YYYY-MM-DD`

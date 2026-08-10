@@ -62,6 +62,21 @@ const searchCoverageIssueSchema = z.union([
     z.object({ date: z.string(), status: z.literal('PARSE_ERRORS'), errorCount: z.number().int().nonnegative() }).strict(),
 ]);
 
+const searchSummarySchema = z
+    .object({
+        'metrics.impressions': z.number(),
+        'metrics.clicks': z.number(),
+        'metrics.spend': z.number(),
+        'metrics.orders': z.number(),
+        'metrics.sales': z.number(),
+        'metrics.acos': z.number().nullable(),
+        'metrics.cpc': z.number().nullable(),
+        'metrics.ctr': z.number().nullable(),
+        'metrics.roas': z.number().nullable(),
+        'metrics.cvr': z.number().nullable(),
+    })
+    .strict();
+
 export const searchOutputSchema = z
     .object({
         context: z
@@ -80,6 +95,7 @@ export const searchOutputSchema = z
                     .optional(),
             })
             .strict(),
+        summary: searchSummarySchema.optional(),
         rows: z.array(z.record(z.unknown())),
         nextCursor: z.string().optional(),
     })

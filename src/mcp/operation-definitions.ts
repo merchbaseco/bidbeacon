@@ -97,7 +97,7 @@ export const MCP_OPERATION_DEFINITIONS: readonly McpOperationDefinition[] = [
         name: 'search',
         title: 'Search BidBeacon',
         description:
-            'Preferred read tool for campaign, ad group, ad, target, performance, and change-history data. Requires an explicit BidBeacon Advertiser Account UUID. Omit fields for ordinary legible reads; supplying fields replaces the defaults. Product title fields are display-only. Returns rows with query and coverage context; failures return a stable BidBeacon tool error.',
+            'Preferred read tool for campaign, ad group, ad, target, performance, and change-history data. Requires an explicit BidBeacon Advertiser Account UUID. Omit fields for ordinary legible reads; supplying fields replaces the defaults. Product summarizes one advertised ASIN across the account; use Ad to resolve its campaign and ad-group topology. Product title fields are display-only. Performance results include a full filtered-result summary before pagination. Returns rows with query and coverage context; failures return a stable BidBeacon tool error.',
         inputSchema: searchInputSchema,
         outputSchema: searchOutputSchema,
         annotations: readOnlyAnnotations,

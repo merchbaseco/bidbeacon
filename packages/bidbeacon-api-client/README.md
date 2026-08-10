@@ -22,6 +22,7 @@ const page = await client.search.query({
   resource: 'campaign',
   fields: ['campaign.id', 'metrics.orders'],
 });
+console.log(page.summary?.['metrics.orders']);
 const target = await client.update_target.mutate({
   accountId: '00000000-0000-4000-8000-000000000001',
   targetId: 'target-1',
@@ -41,6 +42,8 @@ import type { CliRouterInputs, CliRouterOutputs } from '@bidbeacon/http-client';
 type SearchInput = CliRouterInputs['search'];
 type SearchOutput = CliRouterOutputs['search'];
 ```
+
+Performance Search returns `summary` totals for the complete filtered result before pagination. Ratio fields are `null` when their denominator is zero.
 
 Batching is enabled by default. Configure it with `batch`, `batchMaxItems`, and `batchMaxURLLength`, or set `batch: false` for one HTTP request per operation.
 
