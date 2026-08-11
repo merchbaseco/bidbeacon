@@ -10,7 +10,7 @@ Build the smallest evidence chain that distinguishes the cause.
    - targeting or placement
    - a prior change near the onset
 3. Treat Campaign performance as triage. Before a broad action, inspect Target or advertised-ASIN composition, especially for multi-product or historically valuable Campaigns.
-4. Keep aggregate, date, placement, Product, and Target results as distinct grains.
+4. Keep aggregate, Product, Ad, and Target results as distinct dimensions. Request bounded Ad or Target Performance only when temporal history distinguishes the cause.
 5. Stop when the evidence identifies a cause, narrows the next question, or shows insufficient data.
 6. For a selected action, use [optimization](optimize-resource.md). To evaluate an earlier action, compare before and after accounting for coverage and elapsed time; include aligned MerchBase sales when business outcome matters.
 

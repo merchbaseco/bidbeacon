@@ -30,6 +30,14 @@ const performance = await client.performance.query({
   dateRange: { startDate: '2026-08-01', endDate: '2026-08-06' },
   metrics: ['spend', 'sales', 'orders'],
 });
+const targetPerformance = await client.performance.query({
+  accountId: '00000000-0000-4000-8000-000000000001',
+  dimension: 'target',
+  entityIds: ['target-1', 'target-2'],
+  interval: 'day',
+  dateRange: { startDate: '2026-08-01', endDate: '2026-08-06' },
+  metrics: ['spend', 'sales', 'orders'],
+});
 const target = await client.update_target.mutate({
   accountId: '00000000-0000-4000-8000-000000000001',
   targetId: 'target-1',
@@ -50,7 +58,7 @@ type SearchInput = CliRouterInputs['search'];
 type SearchOutput = CliRouterOutputs['search'];
 ```
 
-Search returns `summary` totals for the complete filtered resource result before pagination. Performance returns complete bounded Account or Product temporal points without a cursor. Ratio fields are `null` when their denominator is zero.
+Search returns `summary` totals for the complete filtered resource result before pagination. Performance returns complete bounded Account or ordered Product, Ad, or Target temporal points without a cursor. Ratio fields are `null` when their denominator is zero.
 
 Batching is enabled by default. Configure it with `batch`, `batchMaxItems`, and `batchMaxURLLength`, or set `batch: false` for one HTTP request per operation.
 

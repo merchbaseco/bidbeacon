@@ -1,7 +1,7 @@
 {
   "name": "@bidbeacon/server",
   "private": true,
-  "version": "3.0.0",
+  "version": "3.1.0",
   "description": "Docker-deployable API service for BidBeacon",
   "type": "module",
   "main": "dist/index.js",
@@ -36,7 +36,7 @@
   "dependencies": {
     "@aws-sdk/client-cloudwatch": "3.971.0",
     "@aws-sdk/client-sqs": "3.971.0",
-    "@bidbeacon/http-client": "3.0.0",
+    "@bidbeacon/http-client": "3.1.0",
     "@clerk/backend": "2.33.3",
     "@clerk/clerk-react": "5.61.6",
     "@clerk/mcp-tools": "0.6.0",

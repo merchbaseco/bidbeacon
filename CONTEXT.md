@@ -17,11 +17,11 @@ A Search whose resource rows include metrics aggregated over a requested or dete
 _Avoid_: Performance Search, segmented Search, unstated reporting window
 
 **Performance**:
-The public read operation for one complete, bounded temporal measurement of an Advertiser account or an explicit small set of Products. It returns selected metric totals and ordered zero-filled points without a cursor, or rejects the request with a structured size or execution error.
+The public read operation for one complete, bounded temporal measurement of an Advertiser account or an explicit small set of Products, Ads, or Targets. It returns selected metric totals and ordered zero-filled points without a cursor, or rejects the request with a structured size or execution error.
 _Avoid_: Chart operation, report job, generic analytics query
 
 **Performance dimension**:
-The subject measured by Performance: the whole Advertiser account or an explicitly identified Product. Dimension is distinct from interval; together they determine point cardinality.
+The subject measured by Performance: the whole Advertiser account or an explicitly identified Product, Ad, or Target. Dimension is distinct from interval; it selects an archive-native identity, not a generic grouping language.
 _Avoid_: Search resource, grain
 
 **Performance interval**:

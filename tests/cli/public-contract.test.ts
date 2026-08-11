@@ -66,7 +66,7 @@ describe('canonical bb public contract', () => {
         const response = {
             context: {
                 account: { id: accountId, timezone: 'America/Los_Angeles', currency: 'USD' },
-                dimension: 'product',
+                dimension: 'target',
                 interval: 'day',
                 metrics: ['spend'],
                 dateRange: { startDate: '2026-08-01', endDate: '2026-08-02' },
@@ -81,9 +81,9 @@ describe('canonical bb public contract', () => {
                 '--account',
                 accountId,
                 '--dimension',
-                'product',
+                'target',
                 '--entity-ids',
-                'B0ABC12345,B0DEF67890',
+                'target-123,target-456',
                 '--interval',
                 'day',
                 '--start-date',
@@ -102,8 +102,8 @@ describe('canonical bb public contract', () => {
                     path: '/api/performance',
                     input: {
                         accountId,
-                        dimension: 'product',
-                        entityIds: ['B0ABC12345', 'B0DEF67890'],
+                        dimension: 'target',
+                        entityIds: ['target-123', 'target-456'],
                         interval: 'day',
                         dateRange: { startDate: '2026-08-01', endDate: '2026-08-02' },
                         metrics: ['spend'],

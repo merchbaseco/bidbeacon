@@ -43,7 +43,7 @@ describe('BidBeacon MCP server', () => {
             expect(searchTool?.inputSchema.properties?.fields).toMatchObject({ items: { enum: SEARCH_FIELDS } });
             expect(searchTool?.inputSchema.properties?.filters).toMatchObject({ items: { properties: { field: { enum: SEARCH_FIELDS } } } });
             expect(performanceTool?.inputSchema.required).toEqual(['accountId', 'interval', 'dateRange', 'metrics', 'dimension']);
-            expect(performanceTool?.inputSchema.properties?.dimension).toMatchObject({ enum: ['account', 'product'] });
+            expect(performanceTool?.inputSchema.properties?.dimension).toMatchObject({ enum: ['account', 'product', 'ad', 'target'] });
             expect(performanceTool?.outputSchema?.properties).toMatchObject({ context: expect.any(Object), totals: expect.any(Object), points: expect.any(Object), series: expect.any(Object) });
             expect(performanceTool?.annotations).toMatchObject({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
             expect(createCampaignTool?.inputSchema.required).toEqual(['accountId', 'name', 'state', 'dailyBudget', 'bidStrategy', 'targetingMode', 'startDate']);
@@ -93,7 +93,8 @@ describe('BidBeacon MCP server', () => {
                 name: 'performance',
                 arguments: {
                     accountId,
-                    dimension: 'account',
+                    dimension: 'target',
+                    entityIds: ['target-mcp'],
                     interval: 'day',
                     dateRange: { startDate: '2026-08-05', endDate: '2026-08-05' },
                     metrics: ['spend'],

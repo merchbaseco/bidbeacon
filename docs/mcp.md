@@ -29,7 +29,7 @@ The public tool inventory is deliberately limited to the shared operation layer:
 
 `list_advertiser_accounts`, `search`, `performance`, `create_sponsored_products_campaign`, `create_campaign`, `create_ad_group`, `create_ad`, `create_keyword_target`, `create_product_target`, `create_negative_keyword`, `create_negative_product_target`, `update_campaign`, `update_ad_group`, `update_ad`, and `update_target`.
 
-Search returns paginated resource snapshots and range-aggregated resource metrics. Performance returns complete bounded Account or Product time series without cursors. See [the Performance contract](performance-api.md).
+Search returns paginated resource snapshots and range-aggregated resource metrics. Performance returns complete bounded Account, Product, Ad, or Target time series without cursors. See [the Performance contract](performance-api.md).
 
 The server exposes tools only. It does not expose MCP resources, prompts, sampling, Apps, stdio transport, or selected-account/session state. Input and output JSON Schemas are generated from the operation schemas. Successful calls return the same JSON value as portable text content and `structuredContent`. Operation failures use the stable `{ error: { code, message, details } }` envelope documented in [the CLI contract](cli-spec.md).
 

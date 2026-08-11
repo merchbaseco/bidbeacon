@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## v3.1.0 - 2026-08-10
+
+### Added
+
+- Added bounded Ad and Target dimensions to the public `performance` operation, with caller-ordered multi-series responses over the canonical Target-grain archive.
+- Added matching typed HTTP-client, CLI, MCP, documentation, and regression coverage for Ad and Target temporal performance.
+
 ## v3.0.0 - 2026-08-10
 
 ### Added

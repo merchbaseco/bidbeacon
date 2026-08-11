@@ -36,7 +36,7 @@ export const performance = async (context: OperationContext, input: unknown, opt
     const account = await resolveAdvertiserAccount(context, { accountId: parsed.data.accountId });
     const metadata = getAdvertiserAccountMetadata(account.countryCode);
     const buckets = buildBuckets(parsed.data.interval, parsed.data.dateRange, metadata.timezone);
-    const entityCount = parsed.data.dimension === 'product' ? getProductEntityIds(parsed.data).length : 1;
+    const entityCount = parsed.data.dimension === 'account' ? 1 : getEntityIds(parsed.data).length;
     const estimatedPoints = entityCount * buckets.length;
     if (estimatedPoints > MAX_POINTS) {
         throw resultTooLarge(parsed.data, estimatedPoints, MAX_POINTS);
@@ -76,13 +76,13 @@ const validatePerformanceInput = (input: PerformanceInput) => {
     if (new Set(input.metrics).size !== input.metrics.length) {
         throw new OperationError('INVALID_INPUT', 'Performance metrics must be unique.');
     }
-    if (input.dimension === 'product') {
+    if (input.dimension !== 'account') {
         if (!input.entityIds) {
-            throw new OperationError('INVALID_INPUT', 'Product Performance requires entityIds.');
+            throw new OperationError('INVALID_INPUT', `${dimensionLabel(input)} Performance requires entityIds.`);
         }
-        const normalizedIds = input.entityIds.map(entityId => entityId.toUpperCase());
+        const normalizedIds = getEntityIds(input);
         if (new Set(normalizedIds).size !== normalizedIds.length) {
-            throw new OperationError('INVALID_INPUT', 'Performance Product entityIds must be unique.', { entityIds: input.entityIds });
+            throw new OperationError('INVALID_INPUT', `Performance ${dimensionLabel(input)} entityIds must be unique.`, { entityIds: input.entityIds });
         }
     } else if (input.entityIds) {
         throw new OperationError('INVALID_INPUT', 'Account Performance does not accept entityIds.');
@@ -95,7 +95,7 @@ const validatePerformanceInput = (input: PerformanceInput) => {
     const maxRange = input.interval === 'hour' ? MAX_ACCOUNT_HOURS_DAYS : input.interval === 'day' ? MAX_ACCOUNT_DAYS : MAX_ACCOUNT_MONTHS;
     const requestedRange = input.interval === 'month' ? requestedMonths : requestedDays;
     if (requestedRange > maxRange) {
-        const entityCount = input.dimension === 'product' ? getProductEntityIds(input).length : 1;
+        const entityCount = input.dimension === 'account' ? 1 : getEntityIds(input).length;
         const pointsPerRangeUnit = input.interval === 'hour' ? 24 : 1;
         throw resultTooLarge(input, requestedRange * pointsPerRangeUnit * entityCount, Math.min(maxRange * pointsPerRangeUnit * entityCount, MAX_POINTS), {
             requestedRange,
@@ -123,6 +123,15 @@ const queryPerformanceRows = async (context: OperationContext, account: { adsAcc
                 .groupBy(performanceHourly.bucketStart)
                 .orderBy(asc(performanceHourly.bucketStart)) as Promise<MetricRow[]>;
         }
+        if (input.dimension !== 'product') {
+            const entityColumn = input.dimension === 'ad' ? performanceHourly.adId : performanceHourly.entityId;
+            return context.db
+                .select({ entityId: entityColumn, bucket: performanceHourly.bucketStart, ...metricSelect(performanceHourly) })
+                .from(performanceHourly)
+                .where(and(...conditions, inArray(entityColumn, getEntityIds(input))))
+                .groupBy(entityColumn, performanceHourly.bucketStart)
+                .orderBy(asc(entityColumn), asc(performanceHourly.bucketStart)) as Promise<MetricRow[]>;
+        }
         return context.db
             .select({ entityId: sql<string>`${ad.productAsin}`.as('entity_id'), bucket: performanceHourly.bucketStart, ...metricSelect(performanceHourly) })
             .from(performanceHourly)
@@ -136,16 +145,7 @@ const queryPerformanceRows = async (context: OperationContext, account: { adsAcc
                     eq(campaign.adProduct, 'SPONSORED_PRODUCTS')
                 )
             )
-            .where(
-                and(
-                    ...conditions,
-                    isNotNull(ad.productAsin),
-                    inArray(
-                        ad.productAsin,
-                        getProductEntityIds(input).map(entityId => entityId.toUpperCase())
-                    )
-                )
-            )
+            .where(and(...conditions, isNotNull(ad.productAsin), inArray(ad.productAsin, getEntityIds(input))))
             .groupBy(ad.productAsin, performanceHourly.bucketStart)
             .orderBy(asc(ad.productAsin), asc(performanceHourly.bucketStart)) as Promise<MetricRow[]>;
     }
@@ -165,6 +165,15 @@ const queryPerformanceRows = async (context: OperationContext, account: { adsAcc
             .groupBy(bucket)
             .orderBy(asc(bucket)) as Promise<MetricRow[]>;
     }
+    if (input.dimension !== 'product') {
+        const entityColumn = input.dimension === 'ad' ? performanceDaily.adId : performanceDaily.entityId;
+        return context.db
+            .select({ entityId: entityColumn, bucket, ...metricSelect(performanceDaily) })
+            .from(performanceDaily)
+            .where(and(...conditions, inArray(entityColumn, getEntityIds(input))))
+            .groupBy(entityColumn, bucket)
+            .orderBy(asc(entityColumn), asc(bucket)) as Promise<MetricRow[]>;
+    }
     return context.db
         .select({ entityId: sql<string>`${ad.productAsin}`.as('entity_id'), bucket, ...metricSelect(performanceDaily) })
         .from(performanceDaily)
@@ -178,16 +187,7 @@ const queryPerformanceRows = async (context: OperationContext, account: { adsAcc
                 eq(campaign.adProduct, 'SPONSORED_PRODUCTS')
             )
         )
-        .where(
-            and(
-                ...conditions,
-                isNotNull(ad.productAsin),
-                inArray(
-                    ad.productAsin,
-                    getProductEntityIds(input).map(entityId => entityId.toUpperCase())
-                )
-            )
-        )
+        .where(and(...conditions, isNotNull(ad.productAsin), inArray(ad.productAsin, getEntityIds(input))))
         .groupBy(ad.productAsin, bucket)
         .orderBy(asc(ad.productAsin), asc(bucket)) as Promise<MetricRow[]>;
 };
@@ -214,7 +214,7 @@ const buildResult = (
     const rowsByEntity = groupRowsByEntity(rows);
     return {
         context,
-        series: getProductEntityIds(input).map(entityId => ({ entityId: entityId.toUpperCase(), ...buildSeriesValues(input.metrics, rowsByEntity.get(entityId.toUpperCase()) ?? [], buckets) })),
+        series: getEntityIds(input).map(entityId => ({ entityId, ...buildSeriesValues(input.metrics, rowsByEntity.get(entityId) ?? [], buckets) })),
     };
 };
 
@@ -316,18 +316,21 @@ const resultTooLarge = (input: PerformanceInput, estimatedPoints: number, maxPoi
     new OperationError('RESULT_TOO_LARGE', 'Performance request exceeds the bounded result limits.', {
         estimatedPoints,
         maxPoints,
-        dimensions: { dimension: input.dimension, interval: input.interval, entities: input.dimension === 'product' ? getProductEntityIds(input).length : 1 },
+        dimensions: { dimension: input.dimension, interval: input.interval, entities: input.dimension === 'account' ? 1 : getEntityIds(input).length },
         suggestions: cardinalityNarrowingSuggestions(input),
         ...details,
     });
 
 const responseNarrowingSuggestions = (input: PerformanceInput) => [
-    ...(input.dimension === 'product' ? ['Request fewer Products.'] : []),
+    ...(input.dimension === 'account' ? [] : [`Request fewer ${dimensionLabel(input)}s.`]),
     'Request fewer metrics.',
     'Use a coarser interval or shorter date range.',
 ];
 
-const cardinalityNarrowingSuggestions = (input: PerformanceInput) => [...(input.dimension === 'product' ? ['Request fewer Products.'] : []), 'Use a coarser interval or shorter date range.'];
+const cardinalityNarrowingSuggestions = (input: PerformanceInput) => [
+    ...(input.dimension === 'account' ? [] : [`Request fewer ${dimensionLabel(input)}s.`]),
+    'Use a coarser interval or shorter date range.',
+];
 
 const withExecutionTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
     let timeout: ReturnType<typeof setTimeout> | undefined;
@@ -362,4 +365,6 @@ const isIsoDate = (value: string) => {
     return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
 };
 
-const getProductEntityIds = (input: PerformanceInput) => input.entityIds ?? [];
+const getEntityIds = (input: PerformanceInput) => (input.entityIds ?? []).map(entityId => (input.dimension === 'product' ? entityId.toUpperCase() : entityId));
+
+const dimensionLabel = (input: PerformanceInput) => input.dimension[0]?.toUpperCase() + input.dimension.slice(1);

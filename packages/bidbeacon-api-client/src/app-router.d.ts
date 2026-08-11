@@ -135,7 +135,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 	readonly performance: import("@trpc/server").TRPCQueryProcedure<{
 		input: {
 			accountId: string;
-			dimension: "product" | "account";
+			dimension: "ad" | "target" | "product" | "account";
 			interval: "month" | "day" | "hour";
 			dateRange: {
 				startDate: string;
@@ -189,7 +189,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					currency: string;
 					timezone: string;
 				};
-				dimension: "product";
+				dimension: "ad" | "target" | "product";
 				interval: "month" | "day" | "hour";
 				dateRange: {
 					startDate: string;
@@ -711,7 +711,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 	readonly performance: import("@trpc/server").TRPCQueryProcedure<{
 		input: {
 			accountId: string;
-			dimension: "product" | "account";
+			dimension: "ad" | "target" | "product" | "account";
 			interval: "month" | "day" | "hour";
 			dateRange: {
 				startDate: string;
@@ -765,7 +765,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					currency: string;
 					timezone: string;
 				};
-				dimension: "product";
+				dimension: "ad" | "target" | "product";
 				interval: "month" | "day" | "hour";
 				dateRange: {
 					startDate: string;

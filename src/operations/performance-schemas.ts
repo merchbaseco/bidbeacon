@@ -3,6 +3,7 @@ import { accountIdSchema } from './operation-schema';
 
 export const PERFORMANCE_METRICS = ['impressions', 'clicks', 'spend', 'orders', 'sales', 'acos', 'cpc', 'ctr', 'roas', 'cvr'] as const;
 export const PERFORMANCE_INTERVALS = ['hour', 'day', 'month'] as const;
+export const PERFORMANCE_DIMENSIONS = ['account', 'product', 'ad', 'target'] as const;
 
 const dateRangeSchema = z
     .object({
@@ -21,7 +22,7 @@ const sharedInputShape = {
 export const performanceInputSchema = z
     .object({
         ...sharedInputShape,
-        dimension: z.enum(['account', 'product']),
+        dimension: z.enum(PERFORMANCE_DIMENSIONS),
         entityIds: z.array(z.string().trim().min(1)).min(1).max(25).optional(),
     })
     .strict();
@@ -36,7 +37,7 @@ const coverageIssueSchema = z.union([
 const contextSchema = z
     .object({
         account: z.object({ id: accountIdSchema, timezone: z.string(), currency: z.string() }).strict(),
-        dimension: z.enum(['account', 'product']),
+        dimension: z.enum(PERFORMANCE_DIMENSIONS),
         interval: z.enum(PERFORMANCE_INTERVALS),
         metrics: z.array(z.enum(PERFORMANCE_METRICS)),
         dateRange: dateRangeSchema,
@@ -57,9 +58,9 @@ export const accountPerformanceOutputSchema = z
     })
     .strict();
 
-export const productPerformanceOutputSchema = z
+export const entityPerformanceOutputSchema = z
     .object({
-        context: contextSchema.extend({ dimension: z.literal('product') }),
+        context: contextSchema.extend({ dimension: z.enum(['product', 'ad', 'target']) }),
         series: z.array(
             z
                 .object({
@@ -72,7 +73,7 @@ export const productPerformanceOutputSchema = z
     })
     .strict();
 
-export const performanceOutputSchema = z.union([accountPerformanceOutputSchema, productPerformanceOutputSchema]);
+export const performanceOutputSchema = z.union([accountPerformanceOutputSchema, entityPerformanceOutputSchema]);
 
 export const performanceMcpOutputSchema = z
     .object({
@@ -96,3 +97,4 @@ export const performanceMcpOutputSchema = z
 export type PerformanceInput = z.infer<typeof performanceInputSchema>;
 export type PerformanceMetric = (typeof PERFORMANCE_METRICS)[number];
 export type PerformanceInterval = (typeof PERFORMANCE_INTERVALS)[number];
+export type PerformanceDimension = (typeof PERFORMANCE_DIMENSIONS)[number];

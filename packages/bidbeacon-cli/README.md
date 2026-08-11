@@ -15,6 +15,7 @@ bb auth set --stdin
 bb advertiser-accounts list
 bb search campaign --account <advertiser-account-uuid> --fields campaign.id,metrics.orders --where 'metrics.orders>=1' --all
 bb performance --account <advertiser-account-uuid> --dimension account --interval day --start-date 2026-08-01 --end-date 2026-08-06 --metrics spend,sales,orders
+bb performance --account <advertiser-account-uuid> --dimension target --entity-ids <target-id-1,target-id-2> --interval day --start-date 2026-08-01 --end-date 2026-08-06 --metrics spend,sales,orders
 bb create campaign --account <advertiser-account-uuid> --name "Example" --state ENABLED --daily-budget 25 --bid-strategy FIXED --targeting-mode AUTO --start-date 2026-08-06
 bb create sponsored-products-campaign --account <advertiser-account-uuid> --json @campaign.json
 bb update target --account <advertiser-account-uuid> --target-id <target-id> --bid 0.75
@@ -24,7 +25,7 @@ bb changelog
 
 All account-scoped commands require an explicit advertiser account UUID. The CLI does not read or write a selected account. `bb advertiser-accounts list` is the only unscoped operation.
 
-Search supports explicit fields, account-local inclusive dates, stable ordering, keyset cursors, repeated `--where` AND filters, and `--all`. Use `in ["a", "b"]` for alternatives. Metric fields use the canonical vocabulary, including `metrics.orders` and `metrics.cvr`. Search responses include a full filtered-resource `summary`. `bb performance` returns complete bounded Account or Product temporal points without a cursor. Ratios are `null` when their denominator is zero.
+Search supports explicit fields, account-local inclusive dates, stable ordering, keyset cursors, repeated `--where` AND filters, and `--all`. Use `in ["a", "b"]` for alternatives. Metric fields use the canonical vocabulary, including `metrics.orders` and `metrics.cvr`. Search responses include a full filtered-resource `summary`. `bb performance` returns complete bounded Account or ordered Product, Ad, or Target temporal points without a cursor. Ratios are `null` when their denominator is zero.
 
 Primitive create and update operations accept camel-case operation properties as kebab-case flags. Nested input can come from a JSON literal, `@file`, or stdin:
 

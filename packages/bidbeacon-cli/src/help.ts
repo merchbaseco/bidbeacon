@@ -22,7 +22,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         commands: [
             { left: 'advertiser-accounts list', right: 'List advertiser accounts available to the credential' },
             { left: 'search <resource>', right: 'Search rows with explicit account, fields, filters, and paging' },
-            { left: 'performance', right: 'Read one complete bounded Account or Product time series' },
+            { left: 'performance', right: 'Read one complete bounded Account, Product, Ad, or Target time series' },
             { left: 'create <operation>', right: 'Create one resource or a Sponsored Products composite' },
             { left: 'update <resource>', right: 'Update one resource with explicit changes' },
             { left: 'auth', right: 'Set, clear, or inspect shared Merchbase API-key auth' },
@@ -92,12 +92,12 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
     },
     performance: {
         key: 'performance',
-        usage: 'bb performance --account <uuid> --dimension <account|product> --interval <hour|day|month> [options]',
+        usage: 'bb performance --account <uuid> --dimension <account|product|ad|target> --interval <hour|day|month> [options]',
         summary: 'Read complete bounded temporal performance without cursors.',
         options: [
             { left: '--account <uuid>', right: 'Required advertiser account UUID' },
-            { left: '--dimension <value>', right: 'Account or Product' },
-            { left: '--entity-ids <asin,...>', right: 'Required for Product; maximum 25 ASINs' },
+            { left: '--dimension <value>', right: 'Account, Product, Ad, or Target' },
+            { left: '--entity-ids <id,...>', right: 'Required outside Account; maximum 25 IDs' },
             { left: '--interval <value>', right: 'Hour, day, or month' },
             { left: '--metrics <metric,...>', right: 'Canonical performance metrics' },
             { left: '--start-date <YYYY-MM-DD>', right: 'Account-local inclusive start date' },

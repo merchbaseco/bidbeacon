@@ -86,9 +86,9 @@ describe('bidbeacon cli build', () => {
         });
 
         expect(JSON.parse(output)).toMatchObject({
-            currentVersion: '3.0.0',
-            selectedVersion: '3.0.0',
-            entry: { version: '3.0.0' },
+            currentVersion: '3.1.0',
+            selectedVersion: '3.1.0',
+            entry: { version: '3.1.0' },
         });
     });
 });

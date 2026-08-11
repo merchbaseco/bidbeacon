@@ -41,7 +41,7 @@ describe('bb help topics', () => {
 
         const performanceOutput = renderHelp('performance', { version: '0.0.0' });
         expect(performanceOutput).toContain('--dimension <value>');
-        expect(performanceOutput).toContain('--entity-ids <asin,...>');
+        expect(performanceOutput).toContain('--entity-ids <id,...>');
     });
 
     it('renders auth, config, and changelog guidance', () => {

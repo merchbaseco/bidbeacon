@@ -26,7 +26,7 @@ Sponsored Products is the only writable ad product in this version.
 - Every account-scoped call requires an explicit BidBeacon Advertiser account ID.
 - The MCP and advertising operations are stateless. The CLI does not infer an account from dashboard state or local configuration.
 - `search` reads paginated resource snapshots, range-aggregated resource metrics, and change history.
-- `performance` reads one complete bounded temporal result for an Account or explicit Products.
+- `performance` reads one complete bounded temporal result for an Account or explicit Products, Ads, or Targets.
 - Public schemas use a small BidBeacon-owned vocabulary rather than Amazon report or API records.
 - Ordinary campaign construction uses one synchronous composite operation. Primitive creation operations remain available for bespoke topology and recovery.
 - Mutations use absolute desired values. There are no relative bid changes or dedicated pause, resume, and delete operations.
@@ -38,7 +38,7 @@ Sponsored Products is the only writable ad product in this version.
 | --- | --- | --- |
 | `list_advertiser_accounts` | `bb advertiser-accounts list` | Discover accessible Account IDs and account metadata |
 | `search` | `bb search <resource>` | Read current settings, performance, products, or change history |
-| `performance` | `bb performance` | Read complete bounded Account or Product temporal performance |
+| `performance` | `bb performance` | Read complete bounded Account, Product, Ad, or Target temporal performance |
 | `create_sponsored_products_campaign` | `bb create sponsored-products-campaign` | Create one complete ordinary Sponsored Products campaign |
 | `create_campaign` | `bb create campaign` | Create a campaign without children |
 | `create_ad_group` | `bb create ad-group` | Add an ad group to an existing campaign |
@@ -336,7 +336,7 @@ Issue status is `PENDING`, `FAILED`, `PARSE_ERRORS`, or `UNKNOWN`. `PARSE_ERRORS
 
 ## Performance
 
-`performance` returns one complete bounded temporal result without a cursor. It supports `dimension: account | product`, `interval: hour | day | month`, an explicit inclusive account-local date range, and a selected subset of the ten canonical performance metrics. Product requests require one through 25 explicit ASIN `entityIds`; Performance accepts no general filter or sorting language.
+`performance` returns one complete bounded temporal result without a cursor. It supports `dimension: account | product | ad | target`, `interval: hour | day | month`, an explicit inclusive account-local date range, and a selected subset of the ten canonical performance metrics. Product, Ad, and Target requests require one through 25 explicit `entityIds`; Account forbids them. Performance accepts no general filter or sorting language.
 
 ```bash
 bb performance \
@@ -348,7 +348,7 @@ bb performance \
   --metrics impressions,spend,sales,orders
 ```
 
-Account results contain totals and points. Product results contain one ordered series per requested ASIN. Points are zero-filled; hourly points use unambiguous ISO start/end instants. Coverage remains separate from atomic response delivery. Exact limits and errors are defined in [performance-api.md](performance-api.md).
+Account results contain totals and points. Product, Ad, and Target results contain one series per requested identity in caller order. Points are zero-filled; hourly points use unambiguous ISO start/end instants. Coverage remains separate from atomic response delivery. Exact limits and errors are defined in [performance-api.md](performance-api.md).
 
 ## Search field behavior
 
@@ -1037,4 +1037,4 @@ The shape deliberately combines:
 - [Amazon Ads MCP](https://advertising.amazon.com/en-ca/library/news/amazon-ads-mcp-server-open-beta)'s composite end-to-end Sponsored Products campaign workflow;
 - BidBeacon's durable archive, explicit performance coverage, curated Field catalog, and ASIN-grain Product view.
 
-Decision rationale is recorded in [ADR 0001](adr/0001-use-search-for-advertising-resource-reads.md) through [ADR 0011](adr/0011-layer-composite-campaign-creation-over-primitives.md).
+Decision rationale is recorded in [ADR 0001](adr/0001-use-search-for-advertising-resource-reads.md) through [ADR 0014](adr/0014-separate-resource-search-from-temporal-performance.md).
