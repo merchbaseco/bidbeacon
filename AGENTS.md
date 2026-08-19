@@ -2,6 +2,14 @@
 
 > **Note:** `CLAUDE.md` is a symlink to this file.
 
+## Cursor Cloud specific instructions
+
+The Cloud Agent environment is repo-managed via `.cursor/environment.json`: `install.sh` installs `bun@1.3.5` + PostgreSQL 16 and runs `bun install`; `start.sh` starts a local Postgres and ensures the app's local role/database; the `dev` terminal runs `bun run dev` (API on `:8080`, dashboard on `:4173`). Standard commands live in the README and `package.json`.
+
+- **Install secrets:** `bun install` needs `MERCHBASE_GITHUB_NPM_TOKEN` (GitHub Packages `read:packages`, for `@merchbaseco/access`) and `HUGEICONS_LICENSE_KEY` (npm.hugeicons.com, for `@hugeicons-pro/*`); without them it returns HTTP 401. Prebuilt Environment Builds do **not** receive these secrets (install 401s in a build), so this environment installs just-in-time on the agent VM, not from a prebuilt build.
+- **Local dev must use the local Postgres, not production.** The VM injects database-connection secrets pointing at the production database (reachable only over Tailscale, so it times out here). `dotenv-cli` does not override already-set env vars, so `.cursor/dev.sh` pins the connection host/port to the local Postgres to win. Never point the dev server at production — it runs migrations and startup writes on boot.
+- **Running tests:** injected `BB_*` secrets (e.g. `BB_BASE_URL`) leak into the CLI unit tests and break their default-config assertions. Run the suite with those unset: `env -u BB_BASE_URL -u BB_ACCOUNT_ID -u BB_API_KEY -u BB_COUNTRY_CODE bun run test`. `bun run lint` is unaffected.
+
 ## Working Style
 
 - Address the user as **Zach**.

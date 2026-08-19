@@ -6,7 +6,7 @@ RUN apk add --no-cache libc6-compat
 FROM base AS deps
 COPY package.json bun.lock bunfig.toml .npmrc ./
 RUN --mount=type=secret,id=hugeicons_license_key,env=HUGEICONS_LICENSE_KEY,required=true \
-    --mount=type=secret,id=merchbase_npm_token,env=MERCHBASE_NPM_TOKEN,required=true \
+    --mount=type=secret,id=merchbase_github_npm_token,env=MERCHBASE_GITHUB_NPM_TOKEN,required=true \
     bun install --frozen-lockfile
 
 FROM deps AS build
@@ -19,7 +19,7 @@ RUN export VITE_CLERK_PUBLISHABLE_KEY="$VITE_CLERK_PUBLISHABLE" && \
 # Production dependencies only - prune dev deps from node_modules
 FROM deps AS prod-deps
 RUN --mount=type=secret,id=hugeicons_license_key,env=HUGEICONS_LICENSE_KEY,required=true \
-    --mount=type=secret,id=merchbase_npm_token,env=MERCHBASE_NPM_TOKEN,required=true \
+    --mount=type=secret,id=merchbase_github_npm_token,env=MERCHBASE_GITHUB_NPM_TOKEN,required=true \
     bun install --frozen-lockfile --production
 
 FROM node:20-alpine AS runtime

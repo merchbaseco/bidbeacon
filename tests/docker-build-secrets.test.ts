@@ -3,14 +3,14 @@ import { describe, expect, it } from 'vitest';
 
 const dockerfile = readFileSync(new URL('../Dockerfile', import.meta.url), 'utf8');
 const compose = readFileSync(new URL('../compose.yml', import.meta.url), 'utf8');
-const privateArgOrEnvRegex = /^\s*(?:ARG|ENV)\s+.*(?:HUGEICONS_LICENSE_KEY|MERCHBASE_NPM_TOKEN)/m;
-const privateEnvFileRegex = /(?:HUGEICONS_LICENSE_KEY|MERCHBASE_NPM_TOKEN).*>>\s*\.env/;
+const privateArgOrEnvRegex = /^\s*(?:ARG|ENV)\s+.*(?:HUGEICONS_LICENSE_KEY|MERCHBASE_GITHUB_NPM_TOKEN)/m;
+const privateEnvFileRegex = /(?:HUGEICONS_LICENSE_KEY|MERCHBASE_GITHUB_NPM_TOKEN).*>>\s*\.env/;
 const hugeiconsSecretMountRegex = /id=hugeicons_license_key,env=HUGEICONS_LICENSE_KEY,required=true/g;
-const merchbaseSecretMountRegex = /id=merchbase_npm_token,env=MERCHBASE_NPM_TOKEN,required=true/g;
+const merchbaseSecretMountRegex = /id=merchbase_github_npm_token,env=MERCHBASE_GITHUB_NPM_TOKEN,required=true/g;
 const hugeiconsDockerfileNameRegex = /HUGEICONS_LICENSE_KEY/g;
-const merchbaseDockerfileNameRegex = /MERCHBASE_NPM_TOKEN/g;
+const merchbaseDockerfileNameRegex = /MERCHBASE_GITHUB_NPM_TOKEN/g;
 const hugeiconsComposeSecretRegex = /HUGEICONS_LICENSE_KEY/g;
-const merchbaseComposeSecretRegex = /MERCHBASE_NPM_TOKEN/g;
+const merchbaseComposeSecretRegex = /MERCHBASE_GITHUB_NPM_TOKEN/g;
 
 describe('Docker build secret wiring', () => {
     it('uses ephemeral BuildKit secret mounts for private dependency credentials', () => {
@@ -29,14 +29,14 @@ describe('Docker build secret wiring', () => {
         expect(compose.match(hugeiconsComposeSecretRegex)).toHaveLength(1);
         expect(compose.match(merchbaseComposeSecretRegex)).toHaveLength(1);
         expect(compose).toContain('hugeicons_license_key:\n    environment: HUGEICONS_LICENSE_KEY');
-        expect(compose).toContain('merchbase_npm_token:\n    environment: MERCHBASE_NPM_TOKEN');
+        expect(compose).toContain('merchbase_github_npm_token:\n    environment: MERCHBASE_GITHUB_NPM_TOKEN');
 
         for (const service of ['server', 'caddy']) {
             const serviceBlock = getServiceBlock(service, service === 'server' ? 'worker' : 'volumes');
             const build = getBuildBlock(service);
-            expect(build).toContain('      secrets:\n        - hugeicons_license_key\n        - merchbase_npm_token');
+            expect(build).toContain('      secrets:\n        - hugeicons_license_key\n        - merchbase_github_npm_token');
             expect(build).not.toContain('HUGEICONS_LICENSE_KEY');
-            expect(build).not.toContain('MERCHBASE_NPM_TOKEN');
+            expect(build).not.toContain('MERCHBASE_GITHUB_NPM_TOKEN');
             expect(serviceBlock).not.toContain('\n    secrets:');
         }
 

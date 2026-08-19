@@ -29,7 +29,7 @@ if [ ! -s "$PGDATA/PG_VERSION" ]; then
 fi
 
 # --- JS dependencies ---
-# Requires MERCHBASE_NPM_TOKEN (GitHub Packages: @merchbaseco/access) and
+# Requires MERCHBASE_GITHUB_NPM_TOKEN (GitHub Packages: @merchbaseco/access) and
 # HUGEICONS_LICENSE_KEY (npm.hugeicons.com: @hugeicons-pro/*), injected as secrets.
 bun install --frozen-lockfile
 

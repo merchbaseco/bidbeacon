@@ -37,7 +37,7 @@ services:
         - VITE_CLERK_PUBLISHABLE=${VITE_CLERK_PUBLISHABLE_KEY}
       secrets:
         - hugeicons_license_key
-        - merchbase_npm_token
+        - merchbase_github_npm_token
     image: bidbeacon-server:local
     container_name: bidbeacon-server
     restart: unless-stopped
@@ -124,7 +124,7 @@ services:
         - VITE_CLERK_PUBLISHABLE=${VITE_CLERK_PUBLISHABLE_KEY}
       secrets:
         - hugeicons_license_key
-        - merchbase_npm_token
+        - merchbase_github_npm_token
     image: bidbeacon-caddy:local
     container_name: bidbeacon-caddy
     restart: unless-stopped
@@ -155,8 +155,8 @@ volumes:
 secrets:
   hugeicons_license_key:
     environment: HUGEICONS_LICENSE_KEY
-  merchbase_npm_token:
-    environment: MERCHBASE_NPM_TOKEN
+  merchbase_github_npm_token:
+    environment: MERCHBASE_GITHUB_NPM_TOKEN
 
 networks:
   bidbeacon:
