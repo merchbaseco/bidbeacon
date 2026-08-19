@@ -1,0 +1,16 @@
+{
+  "name": "BidBeacon",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "terminals": [
+    {
+      "name": "dev",
+      "command": "bash .cursor/dev.sh",
+      "description": "API server (:8080) + dashboard (:4173) via `bun run dev`. Dashboard proxies /api to the local API."
+    }
+  ],
+  "ports": [
+    { "name": "dashboard", "port": 4173 },
+    { "name": "api", "port": 8080 }
+  ]
+}
