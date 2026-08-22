@@ -2,7 +2,8 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 const compose = readFileSync(new URL('../compose.yml', import.meta.url), 'utf8');
-const requiredAccessEnvironment = ['CLERK_AUTHORIZED_PARTIES', 'CLERK_ISSUER', 'CLERK_JWT_KEY', 'CLERK_PUBLISHABLE_KEY', 'CLERK_SECRET_KEY'];
+const composeDefaultFallbackPattern = /\$\{[A-Z][A-Z0-9_]*:-/u;
+const requiredAccessEnvironment = ['BIDBEACON_CLERK_AUTHORIZED_PARTIES', 'MERCHBASE_CLERK_ISSUER', 'MERCHBASE_CLERK_JWT_KEY', 'MERCHBASE_CLERK_PUBLISHABLE_KEY', 'MERCHBASE_CLERK_SECRET_KEY'];
 
 describe('compose access runtime environment', () => {
     it('passes verifier credentials to every service that can run access-gated work', () => {
@@ -14,10 +15,12 @@ describe('compose access runtime environment', () => {
             expect(worker).toContain(`      ${variable}:`);
         }
 
-        expect(server).toContain(['      DISABLE_SERVER_JOB_RUNNER: $', '{DISABLE_SERVER_JOB_RUNNER:-false}'].join(''));
-        expect(server).toContain('      RANKWRANGLER_BASE_URL:');
-        expect(worker).not.toContain('CLERK_WEBHOOK_SIGNING_SECRET');
-        expect(worker).not.toContain('RANKWRANGLER_BASE_URL');
+        // No `:-default` fallbacks: .env.schema is the single owner of every default.
+        expect(server).toContain(['      BIDBEACON_DISABLE_SERVER_JOB_RUNNER: $', '{BIDBEACON_DISABLE_SERVER_JOB_RUNNER}'].join(''));
+        expect(compose).not.toMatch(composeDefaultFallbackPattern);
+        expect(server).toContain('      BIDBEACON_RANKWRANGLER_BASE_URL:');
+        expect(worker).not.toContain('BIDBEACON_CLERK_WEBHOOK_SIGNING_SECRET');
+        expect(worker).not.toContain('BIDBEACON_RANKWRANGLER_BASE_URL');
     });
 });
 

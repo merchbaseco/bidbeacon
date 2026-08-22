@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createBidBeaconClient, type RouterOutputs } from '../../packages/bidbeacon-api-client/src';
 
-const liveSmokeEnabled = process.env.RUN_LIVE_SMOKE === 'true';
+const liveSmokeEnabled = process.env.BIDBEACON_RUN_LIVE_SMOKE === 'true';
 const describeLive = liveSmokeEnabled ? describe : describe.skip;
 
 describeLive('Sponsored Products live smoke', () => {
@@ -79,7 +79,7 @@ describeLive('Sponsored Products live smoke', () => {
 const requireLiveEnv = (name: string) => {
     const value = process.env[name]?.trim();
     if (!value) {
-        throw new Error(`RUN_LIVE_SMOKE=true requires ${name}.`);
+        throw new Error(`BIDBEACON_RUN_LIVE_SMOKE=true requires ${name}.`);
     }
     return value;
 };
