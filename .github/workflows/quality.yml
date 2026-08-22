@@ -8,7 +8,6 @@ on:
 
 permissions:
   contents: read
-  packages: read
 
 concurrency:
   group: quality-${{ github.ref }}
@@ -29,14 +28,28 @@ jobs:
         with:
           bun-version: '1.3.5'
 
+      # The private @merchbaseco/* scope needs a real GitHub Packages read
+      # token: Actions' own `github.token` cannot download another repository's
+      # package unless that package grants this repository access, so it is not
+      # a substitute. The token is an @internal schema item, resolved here from
+      # the Development vault through the deploy identity. The plugin version is
+      # pinned in .env.schema, so this works before node_modules exists.
       - name: Install dependencies
         env:
-          # Private @merchbaseco/* packages install with the workflow's own
-          # repository-scoped token; no 1Password access is involved.
-          MERCHBASE_GITHUB_NPM_TOKEN: ${{ github.token }}
-        run: bun install --frozen-lockfile
+          CURSOR_CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
+        run: |
+          MERCHBASE_GITHUB_NPM_TOKEN="$(
+            BIDBEACON_RESOLVE_INSTALL_TOKENS=true \
+            bunx varlock@1.16.1 printenv MERCHBASE_GITHUB_NPM_TOKEN
+          )"
+          if [ -z "${MERCHBASE_GITHUB_NPM_TOKEN}" ]; then
+            echo "MERCHBASE_GITHUB_NPM_TOKEN did not resolve; the private @merchbaseco/* packages cannot be installed." >&2
+            exit 1
+          fi
+          export MERCHBASE_GITHUB_NPM_TOKEN
+          bun install --frozen-lockfile
 
-      # `check` pins the schema's `test` lifecycle itself, so CI needs no
-      # environment selector and no 1Password access.
+      # `check` pins the schema's `test` lifecycle itself, so the gates run
+      # fully offline with no 1Password access of their own.
       - name: Run quality gates
         run: bun run check
