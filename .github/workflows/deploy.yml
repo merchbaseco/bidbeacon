@@ -46,6 +46,11 @@ jobs:
           # Private @merchbaseco/* packages install with the workflow's own
           # repository-scoped token, so the image build never needs 1Password.
           MERCHBASE_GITHUB_NPM_TOKEN: ${{ github.token }}
+          # Licensed @hugeicons-pro registry. Platform-injected because the
+          # deploy agent is Production-vault-scoped and this install credential
+          # lives in Development: no identity available to an unattended deploy
+          # can resolve it, and the dashboard image cannot build without it.
+          MERCHBASE_HUGEICONS_LICENSE_KEY: ${{ secrets.MERCHBASE_HUGEICONS_LICENSE_KEY }}
         run: bun run deploy
 
       - name: Install the host CLI wrapper
