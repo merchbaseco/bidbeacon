@@ -51,10 +51,21 @@ SELECT format('CREATE DATABASE %I OWNER %I', :'db_name', :'db_user')
     WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = :'db_name')\gexec
 SQL
 
+# Extensions are created here, as the postgres superuser, so the application
+# role stays ordinary. Migration 0000 runs `CREATE EXTENSION IF NOT EXISTS
+# pg_stat_statements`, which an ordinary role cannot execute ("Must be
+# superuser to create this extension") — but once the extension exists the
+# statement is a no-op notice, so server startup migrations succeed.
+#
+# The extension is created but not preloaded: querying its view needs
+# `shared_preload_libraries`, which only the production compose stack sets.
+# Nothing in the application reads it — it is a manual query-cost analysis tool
+# — so a cloud agent needs the extension present, not functional.
 $SUDO -u postgres psql -p 5432 -d "$DB_NAME" -v ON_ERROR_STOP=1 -v db_user="$DB_USER" <<'SQL'
 SELECT format('ALTER SCHEMA public OWNER TO %I', :'db_user')\gexec
 SELECT format('GRANT ALL ON SCHEMA public TO %I', :'db_user')\gexec
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+CREATE EXTENSION IF NOT EXISTS pg_stat_statements;
 SQL
 
 unset DB_PASSWORD
