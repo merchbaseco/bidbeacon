@@ -24,7 +24,7 @@ const varlockBuiltins = new Set(['VARLOCK_ENV']);
 
 const schemaItemPattern = /^([A-Z][A-Z0-9_]*)=/u;
 const envReadPattern = /^.*\.env\./u;
-const composeEntryPattern = /^\s*-?\s*([A-Z][A-Z0-9_]*)[:=]/u;
+const composeEntryPattern = /^\s*(?:-\s*([A-Z][A-Z0-9_]*)(?:[:=]|\s*$)|([A-Z][A-Z0-9_]*)[:=])/u;
 const dockerfileArgPattern = /^ARG\s+([A-Z][A-Z0-9_]*)/gmu;
 const nonSpacePattern = /\S/u;
 
@@ -175,7 +175,7 @@ const readComposeBlocks = (blockHeader: string, headerIndent: number) => {
 
         const match = composeEntryPattern.exec(line);
         if (match) {
-            names.push(match[1]);
+            names.push(match[1] ?? match[2]);
         }
     }
 

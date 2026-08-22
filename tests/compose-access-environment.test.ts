@@ -11,14 +11,15 @@ describe('compose access runtime environment', () => {
         const worker = getServiceBlock('worker', 'caddy');
 
         for (const variable of requiredAccessEnvironment) {
-            expect(server).toContain(`      ${variable}:`);
-            expect(worker).toContain(`      ${variable}:`);
+            expect(server).toContain(`      - ${variable}`);
+            expect(worker).toContain(`      - ${variable}`);
         }
 
-        // No `:-default` fallbacks: .env.schema is the single owner of every default.
-        expect(server).toContain(['      BIDBEACON_DISABLE_SERVER_JOB_RUNNER: $', '{BIDBEACON_DISABLE_SERVER_JOB_RUNNER}'].join(''));
+        // Pass-through shorthand, not `${VAR}`: Compose interpolates what it
+        // substitutes, which truncates any value containing a `$`.
+        expect(server).toContain('      - BIDBEACON_DISABLE_SERVER_JOB_RUNNER');
         expect(compose).not.toMatch(composeDefaultFallbackPattern);
-        expect(server).toContain('      BIDBEACON_RANKWRANGLER_BASE_URL:');
+        expect(server).toContain('      - BIDBEACON_RANKWRANGLER_BASE_URL');
         expect(worker).not.toContain('BIDBEACON_CLERK_WEBHOOK_SIGNING_SECRET');
         expect(worker).not.toContain('BIDBEACON_RANKWRANGLER_BASE_URL');
     });
