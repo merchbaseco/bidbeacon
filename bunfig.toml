@@ -7,4 +7,4 @@ saveTextLockfile = true
 minimumReleaseAge = 259200
 
 [install.scopes]
-"@hugeicons-pro" = { token = "$HUGEICONS_LICENSE_KEY", url = "https://npm.hugeicons.com/" }
+"@hugeicons-pro" = { token = "$MERCHBASE_HUGEICONS_LICENSE_KEY", url = "https://npm.hugeicons.com/" }
