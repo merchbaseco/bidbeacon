@@ -11,7 +11,7 @@ export const createProductionOperationContext = (principal?: OperationPrincipal,
         products: accessCredential
             ? createRankWranglerProductResolver({
                   accessCredential,
-                  baseUrl: process.env.RANKWRANGLER_BASE_URL?.trim() || undefined,
+                  baseUrl: process.env.BIDBEACON_RANKWRANGLER_BASE_URL?.trim() || undefined,
               })
             : pendingRankWranglerProductResolver,
     });

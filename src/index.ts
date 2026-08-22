@@ -21,7 +21,7 @@ import { getServerRuntimeFlags } from '@/server-runtime';
 import { getBidBeaconAccess } from '@/services/access/bidbeacon-access';
 import { emitEvent } from '@/utils/events.js';
 
-const PORT = Number(process.env.PORT) || 8080;
+const PORT = Number(process.env.BIDBEACON_PORT) || 8080;
 
 // ============================================================================
 // BidBeacon Server Startup
@@ -52,7 +52,7 @@ async function main() {
     if (runtimeFlags.runServerJobRunner) {
         await startJobs();
     } else {
-        console.log('Server job runner disabled via DISABLE_SERVER_JOB_RUNNER');
+        console.log('Server job runner disabled via BIDBEACON_DISABLE_SERVER_JOB_RUNNER');
     }
 
     // Start server
@@ -157,9 +157,9 @@ async function registerRoutes(fastify: FastifyInstance) {
 
     // Auth, realtime ticket, and WebSocket endpoints are registered before tRPC.
     await registerClerkAccessWebhookRoute(fastify, {
-        issuer: requireEnvironment('CLERK_ISSUER'),
+        issuer: requireEnvironment('MERCHBASE_CLERK_ISSUER'),
         onIdentityChanged: identity => access.authenticator.invalidateApiKeys(identity),
-        signingSecret: requireEnvironment('CLERK_WEBHOOK_SIGNING_SECRET'),
+        signingSecret: requireEnvironment('BIDBEACON_CLERK_WEBHOOK_SIGNING_SECRET'),
         store: access.projections,
     });
     registerRealtimeTicketRoute(fastify, { access, ticketStore });
@@ -175,7 +175,7 @@ async function registerRoutes(fastify: FastifyInstance) {
                 },
                 credential
             ),
-        publishableKey: requireEnvironment('CLERK_PUBLISHABLE_KEY'),
+        publishableKey: requireEnvironment('MERCHBASE_CLERK_PUBLISHABLE_KEY'),
         resourceUrl: getMcpResourceUrl(),
     });
 

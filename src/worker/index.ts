@@ -210,7 +210,7 @@ process.on('uncaughtException', error => {
                 {
                     err: error,
                     message: 'AWS credentials not available',
-                    fix: 'Set AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars, configure IAM role with SQS permissions, or mount ~/.aws/credentials file',
+                    fix: 'Set BIDBEACON_AWS_ACCESS_KEY_ID and BIDBEACON_AWS_SECRET_ACCESS_KEY env vars, configure IAM role with SQS permissions, or mount ~/.aws/credentials file',
                 },
                 'AWS credentials error - Worker will not start SQS polling until credentials are configured'
             );
@@ -228,8 +228,8 @@ process.on('uncaughtException', error => {
         // Print startup status summary
         logger.info(
             {
-                queue: process.env.AMS_QUEUE_URL,
-                region: process.env.AWS_REGION || 'us-east-1',
+                queue: process.env.BIDBEACON_AMS_QUEUE_URL,
+                region: process.env.BIDBEACON_AWS_REGION,
             },
             'BidBeacon Worker Ready'
         );

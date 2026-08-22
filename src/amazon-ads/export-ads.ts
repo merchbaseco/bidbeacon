@@ -64,10 +64,10 @@ export interface ExportAdsOptions {
 export async function exportAds(options: ExportAdsOptions, region: ApiRegion = 'na'): Promise<ExportAdsResponse> {
     return withTracking({ apiName: 'exportAds', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
-        const clientId = process.env.ADS_API_CLIENT_ID;
+        const clientId = process.env.BIDBEACON_ADS_API_CLIENT_ID;
 
         if (!clientId) {
-            throw new Error('Missing ADS_API_CLIENT_ID environment variable');
+            throw new Error('Missing BIDBEACON_ADS_API_CLIENT_ID environment variable');
         }
 
         const baseUrl = getApiBaseUrl(region);

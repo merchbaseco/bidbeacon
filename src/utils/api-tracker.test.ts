@@ -39,9 +39,9 @@ describe('API tracker request metrics', () => {
     it('records zero attempts when a failure happens before the HTTP request', async () => {
         await expect(
             withTracking({ apiName: 'createReport', region: 'na' }, async () => {
-                throw new Error('Missing ADS_API_CLIENT_ID environment variable');
+                throw new Error('Missing BIDBEACON_ADS_API_CLIENT_ID environment variable');
             })
-        ).rejects.toThrow('Missing ADS_API_CLIENT_ID');
+        ).rejects.toThrow('Missing BIDBEACON_ADS_API_CLIENT_ID');
 
         expect(recordedValues).toEqual(expect.objectContaining({ attemptCount: 0, retryCount: 0, rateLimitCount: 0 }));
     });

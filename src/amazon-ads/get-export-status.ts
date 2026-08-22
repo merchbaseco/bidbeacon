@@ -56,10 +56,10 @@ export interface GetExportStatusOptions {
 export async function getExportStatus(options: GetExportStatusOptions, region: ApiRegion = 'na'): Promise<ExportStatusResponse> {
     return withTracking({ apiName: 'getExportStatus', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
-        const clientId = process.env.ADS_API_CLIENT_ID;
+        const clientId = process.env.BIDBEACON_ADS_API_CLIENT_ID;
 
         if (!clientId) {
-            throw new Error('Missing ADS_API_CLIENT_ID environment variable');
+            throw new Error('Missing BIDBEACON_ADS_API_CLIENT_ID environment variable');
         }
 
         const baseUrl = getApiBaseUrl(region);

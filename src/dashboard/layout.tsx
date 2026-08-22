@@ -20,10 +20,10 @@ import { AccountEnabledSwitch } from './routes/components/account-selector/accou
 import { AccountSelector } from './routes/components/account-selector/account-selector';
 import { useWebSocket } from './routes/hooks/use-websocket';
 
-const CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_CLERK_PUBLISHABLE_KEY;
+const MERCHBASE_CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY;
 
-if (!CLERK_PUBLISHABLE_KEY) {
-    throw new Error('Missing VITE_CLERK_PUBLISHABLE_KEY environment variable');
+if (!MERCHBASE_CLERK_PUBLISHABLE_KEY) {
+    throw new Error('Missing VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY environment variable');
 }
 
 export function RootRoute() {
@@ -80,7 +80,7 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
     <StrictMode>
-        <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY}>
+        <ClerkProvider publishableKey={MERCHBASE_CLERK_PUBLISHABLE_KEY}>
             <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
                 <SignedIn>
                     <TRPCProvider>

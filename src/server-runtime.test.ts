@@ -10,25 +10,25 @@ describe('getServerRuntimeFlags', () => {
     });
 
     it('disables the server job runner when the env toggle is true', () => {
-        expect(getServerRuntimeFlags({ DISABLE_SERVER_JOB_RUNNER: 'true' })).toEqual({
+        expect(getServerRuntimeFlags({ BIDBEACON_DISABLE_SERVER_JOB_RUNNER: 'true' })).toEqual({
             disableServerJobRunner: true,
             runServerJobRunner: false,
         });
     });
 
     it('treats false-like values as enabled', () => {
-        expect(getServerRuntimeFlags({ DISABLE_SERVER_JOB_RUNNER: 'false' })).toEqual({
+        expect(getServerRuntimeFlags({ BIDBEACON_DISABLE_SERVER_JOB_RUNNER: 'false' })).toEqual({
             disableServerJobRunner: false,
             runServerJobRunner: true,
         });
-        expect(getServerRuntimeFlags({ DISABLE_SERVER_JOB_RUNNER: '0' })).toEqual({
+        expect(getServerRuntimeFlags({ BIDBEACON_DISABLE_SERVER_JOB_RUNNER: '0' })).toEqual({
             disableServerJobRunner: false,
             runServerJobRunner: true,
         });
     });
 
     it('ignores invalid toggle values and keeps the runner enabled', () => {
-        expect(getServerRuntimeFlags({ DISABLE_SERVER_JOB_RUNNER: 'banana' })).toEqual({
+        expect(getServerRuntimeFlags({ BIDBEACON_DISABLE_SERVER_JOB_RUNNER: 'banana' })).toEqual({
             disableServerJobRunner: false,
             runServerJobRunner: true,
         });

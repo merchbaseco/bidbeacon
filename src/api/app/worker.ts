@@ -150,10 +150,10 @@ export const workerRouter = router({
             return metricsCache.data;
         }
 
-        const mainQueueUrl = process.env.AMS_QUEUE_URL;
+        const mainQueueUrl = process.env.BIDBEACON_AMS_QUEUE_URL;
 
         if (!mainQueueUrl) {
-            throw new Error('AMS_QUEUE_URL not configured');
+            throw new Error('BIDBEACON_AMS_QUEUE_URL not configured');
         }
 
         const mainQueueMetrics = await getQueueMetrics(mainQueueUrl);

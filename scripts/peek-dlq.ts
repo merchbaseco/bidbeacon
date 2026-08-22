@@ -4,50 +4,25 @@
  * Peek at DLQ messages without deleting them
  *
  * Usage:
- *   tsx scripts/peek-dlq.ts [--limit N] [--dataset DATASET_ID]
- *   or: dotenv -e .env tsx scripts/peek-dlq.ts [--limit N] [--dataset DATASET_ID]
+ *   bun run peek-dlq [--limit N] [--dataset DATASET_ID]
+ *
+ * Environment comes from the committed .env.schema through `varlock run`; this
+ * script never reads a .env file itself.
  *
  * Options:
  *   --limit N        Number of messages to peek at (default: 10)
  *   --dataset ID      Filter by dataset_id (optional)
  *
  * Environment variables:
- *   AMS_QUEUE_URL or AWS_QUEUE_URL - Main queue URL or ARN
- *   AWS_REGION - AWS region (default: us-east-1)
- *   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY - AWS credentials (or use ~/.aws/credentials)
+ *   BIDBEACON_AMS_QUEUE_URL - Main queue URL or ARN
+ *   BIDBEACON_AWS_REGION - AWS region
+ *   BIDBEACON_AWS_ACCESS_KEY_ID, BIDBEACON_AWS_SECRET_ACCESS_KEY - AWS credentials
  */
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { GetQueueAttributesCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
+import { awsClientConfig } from '@/worker/aws-client-config';
 
-// Load .env file if it exists
-try {
-    const envPath = join(process.cwd(), '.env');
-    const envContent = readFileSync(envPath, 'utf-8');
-    const envLines = envContent.split('\n');
-
-    for (const line of envLines) {
-        const trimmed = line.trim();
-        if (trimmed && !trimmed.startsWith('#')) {
-            const [key, ...valueParts] = trimmed.split('=');
-            if (key && valueParts.length > 0) {
-                const value = valueParts.join('=').trim();
-                // Remove quotes if present
-                const cleanValue = value.replace(/^["']|["']$/g, '');
-                if (!process.env[key]) {
-                    process.env[key] = cleanValue;
-                }
-            }
-        }
-    }
-} catch (error) {
-    // .env file doesn't exist or can't be read, that's okay
-}
-
-const sqsClient = new SQSClient({
-    region: process.env.AWS_REGION || 'us-east-1',
-});
+const sqsClient = new SQSClient(awsClientConfig());
 
 /**
  * Get DLQ URL from main queue's RedrivePolicy attribute
@@ -316,9 +291,9 @@ Options:
   --help, -h       Show this help message
 
 Environment variables (in .env file):
-  AMS_QUEUE_URL or AWS_QUEUE_URL - Main queue URL or ARN (required)
-  AWS_REGION - AWS region (default: us-east-1)
-  AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY - AWS credentials (or use ~/.aws/credentials)
+  BIDBEACON_AMS_QUEUE_URL - Main queue URL or ARN (required)
+  BIDBEACON_AWS_REGION - AWS region (default: us-east-1)
+  BIDBEACON_AWS_ACCESS_KEY_ID, BIDBEACON_AWS_SECRET_ACCESS_KEY - AWS credentials (or use ~/.aws/credentials)
 
 Examples:
   bun run peek-dlq
@@ -329,11 +304,11 @@ Examples:
         }
     }
 
-    // Support both AMS_QUEUE_URL and AWS_QUEUE_URL (for ARN or URL)
-    let mainQueueUrl = process.env.AMS_QUEUE_URL || process.env.AWS_QUEUE_URL;
+    // Accepts either a queue URL or an ARN.
+    let mainQueueUrl = process.env.BIDBEACON_AMS_QUEUE_URL;
 
     if (!mainQueueUrl) {
-        console.error('Error: AMS_QUEUE_URL or AWS_QUEUE_URL environment variable is required');
+        console.error('Error: BIDBEACON_AMS_QUEUE_URL environment variable is required');
         console.error('Please set it in .env file or as an environment variable');
         process.exit(1);
     }

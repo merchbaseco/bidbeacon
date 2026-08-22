@@ -78,12 +78,12 @@ let defaultAccess: BidBeaconAccess | null = null;
 export const getBidBeaconAccess = (): BidBeaconAccess => {
     if (!defaultAccess) {
         defaultAccess = createBidBeaconAccess({
-            authorizedParties: parseList(requireEnvironment('CLERK_AUTHORIZED_PARTIES')),
+            authorizedParties: parseList(requireEnvironment('BIDBEACON_CLERK_AUTHORIZED_PARTIES')),
             database: db,
-            issuer: requireEnvironment('CLERK_ISSUER'),
-            jwtKey: requireEnvironment('CLERK_JWT_KEY'),
-            publishableKey: requireEnvironment('CLERK_PUBLISHABLE_KEY'),
-            secretKey: requireEnvironment('CLERK_SECRET_KEY'),
+            issuer: requireEnvironment('MERCHBASE_CLERK_ISSUER'),
+            jwtKey: requireEnvironment('MERCHBASE_CLERK_JWT_KEY'),
+            publishableKey: requireEnvironment('MERCHBASE_CLERK_PUBLISHABLE_KEY'),
+            secretKey: requireEnvironment('MERCHBASE_CLERK_SECRET_KEY'),
         });
     }
 

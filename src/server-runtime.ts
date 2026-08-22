@@ -1,5 +1,5 @@
 export const getServerRuntimeFlags = (env: NodeJS.ProcessEnv = process.env) => {
-    const disableServerJobRunner = parseBooleanEnv(env.DISABLE_SERVER_JOB_RUNNER) ?? false;
+    const disableServerJobRunner = parseBooleanEnv(env.BIDBEACON_DISABLE_SERVER_JOB_RUNNER) ?? false;
 
     return {
         disableServerJobRunner,

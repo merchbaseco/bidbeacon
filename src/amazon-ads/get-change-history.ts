@@ -101,12 +101,12 @@ export const DEFAULT_CHANGE_HISTORY_EVENT_TYPES: z.infer<typeof historyEventType
 export const getChangeHistory = async (options: GetChangeHistoryOptions, region: ApiRegion = 'na'): Promise<GetChangeHistoryResponse> => {
     return withTracking({ apiName: 'getChangeHistory', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
-        const clientId = process.env.ADS_API_CLIENT_ID;
+        const clientId = process.env.BIDBEACON_ADS_API_CLIENT_ID;
         const baseUrl = getApiBaseUrl(region);
         const url = `${baseUrl}/history`;
 
         if (!clientId) {
-            throw new Error('Missing ADS_API_CLIENT_ID environment variable');
+            throw new Error('Missing BIDBEACON_ADS_API_CLIENT_ID environment variable');
         }
 
         const requestBody: GetChangeHistoryRequest = getChangeHistoryRequestSchema.parse({

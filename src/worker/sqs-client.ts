@@ -2,22 +2,19 @@ import { CloudWatchClient, GetMetricStatisticsCommand } from '@aws-sdk/client-cl
 import type { Message } from '@aws-sdk/client-sqs';
 import { DeleteMessageCommand, GetQueueAttributesCommand, ReceiveMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { createContextLogger } from '@/utils/logger';
+import { awsClientConfig } from './aws-client-config';
 
 const logger = createContextLogger({ component: 'sqs' });
 
 // Create SQS client singleton
-const sqsClient = new SQSClient({
-    region: process.env.AWS_REGION || 'us-east-1',
-});
+const sqsClient = new SQSClient(awsClientConfig());
 
 // Create CloudWatch client singleton
-const cloudWatchClient = new CloudWatchClient({
-    region: process.env.AWS_REGION || 'us-east-1',
-});
+const cloudWatchClient = new CloudWatchClient(awsClientConfig());
 
-const queueUrl = process.env.AMS_QUEUE_URL;
+const queueUrl = process.env.BIDBEACON_AMS_QUEUE_URL;
 if (!queueUrl) {
-    throw new Error('AMS_QUEUE_URL environment variable is required');
+    throw new Error('BIDBEACON_AMS_QUEUE_URL environment variable is required');
 }
 
 /**
@@ -35,7 +32,9 @@ export async function testAwsConnection(): Promise<void> {
     } catch (error) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         if (errorMessage.includes('Credentials') || errorMessage.includes('credentials')) {
-            throw new Error(`AWS credentials not found. Provide credentials via IAM role, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY env vars, or ~/.aws/credentials file. Error: ${errorMessage}`);
+            throw new Error(
+                `AWS credentials not found. Provide credentials via IAM role, BIDBEACON_AWS_ACCESS_KEY_ID/BIDBEACON_AWS_SECRET_ACCESS_KEY env vars, or ~/.aws/credentials file. Error: ${errorMessage}`
+            );
         }
         throw error;
     }

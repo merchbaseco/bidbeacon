@@ -14,17 +14,17 @@ const lwaTokenResponseSchema = z.object({
 
 /**
  * Refresh an Amazon Ads API access token using a refresh token
- * Reads ADS_API_CLIENT_ID, ADS_API_CLIENT_SECRET, and ADS_API_REFRESH_TOKEN from environment variables
+ * Reads BIDBEACON_ADS_API_CLIENT_ID, BIDBEACON_ADS_API_CLIENT_SECRET, and BIDBEACON_ADS_API_REFRESH_TOKEN from environment variables
  * @returns The access token
  * @throws Error if credentials are missing or token refresh fails
  */
 export async function refreshAccessToken(): Promise<string> {
-    const clientId = process.env.ADS_API_CLIENT_ID;
-    const clientSecret = process.env.ADS_API_CLIENT_SECRET;
-    const refreshToken = process.env.ADS_API_REFRESH_TOKEN;
+    const clientId = process.env.BIDBEACON_ADS_API_CLIENT_ID;
+    const clientSecret = process.env.BIDBEACON_ADS_API_CLIENT_SECRET;
+    const refreshToken = process.env.BIDBEACON_ADS_API_REFRESH_TOKEN;
 
     if (!(clientId && clientSecret && refreshToken)) {
-        throw new Error('Missing ADS_API_CLIENT_ID, ADS_API_CLIENT_SECRET, or ADS_API_REFRESH_TOKEN environment variables');
+        throw new Error('Missing BIDBEACON_ADS_API_CLIENT_ID, BIDBEACON_ADS_API_CLIENT_SECRET, or BIDBEACON_ADS_API_REFRESH_TOKEN environment variables');
     }
 
     // Build x-www-form-urlencoded body

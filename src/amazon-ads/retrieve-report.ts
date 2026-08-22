@@ -99,10 +99,10 @@ export interface RetrieveReportOptions {
 export async function retrieveReport(options: RetrieveReportOptions, region: ApiRegion = 'na'): Promise<RetrieveReportResponse> {
     return withTracking({ apiName: 'retrieveReport', region }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
-        const clientId = process.env.ADS_API_CLIENT_ID;
+        const clientId = process.env.BIDBEACON_ADS_API_CLIENT_ID;
 
         if (!clientId) {
-            throw new Error('Missing ADS_API_CLIENT_ID environment variable');
+            throw new Error('Missing BIDBEACON_ADS_API_CLIENT_ID environment variable');
         }
 
         const baseUrl = getApiBaseUrl(region);

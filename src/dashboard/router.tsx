@@ -5,7 +5,7 @@ import { IndexRoute } from './routes/index';
 const TRAILING_SLASH_REGEX = /\/$/;
 
 function resolveApiBaseUrl() {
-    const envApi = typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL : undefined;
+    const envApi = typeof import.meta !== 'undefined' && import.meta.env?.VITE_BIDBEACON_API_URL ? import.meta.env.VITE_BIDBEACON_API_URL : undefined;
 
     const baseUrl = (envApi ?? 'https://bidbeacon.merchbase.co').replace(TRAILING_SLASH_REGEX, '');
     return baseUrl;

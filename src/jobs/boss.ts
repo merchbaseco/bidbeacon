@@ -3,6 +3,7 @@
  */
 import { PgBoss } from 'pg-boss';
 import type { z } from 'zod';
+import { getDatabaseConfig } from '@/db/database-config';
 
 // ============================================================================
 // Types
@@ -232,7 +233,7 @@ class BossWrapper {
         const connectionString = buildConnectionString();
         this.instance = new PgBoss({
             connectionString,
-            schema: process.env.PG_BOSS_SCHEMA ?? 'pgboss',
+            schema: 'pgboss',
         });
 
         // Handle errors to prevent unhandled error crashes
@@ -284,24 +285,12 @@ class BossWrapper {
 // Connection String Builder
 // ============================================================================
 
+// Built from the same canonical names the server uses. The former
+// PG_BOSS_CONNECTION_STRING / DATABASE_URL escape hatches are gone: nothing set
+// them, and a second source for the connection would be a second owner.
 function buildConnectionString(): string {
-    const explicit = process.env.PG_BOSS_CONNECTION_STRING || process.env.DATABASE_URL;
-    if (explicit) {
-        return explicit;
-    }
-
-    const password = process.env.BIDBEACON_DATABASE_PASSWORD;
-    if (!password) {
-        throw new Error('BIDBEACON_DATABASE_PASSWORD is required for PgBoss connection');
-    }
-
-    // Use same defaults as src/db/index.ts
-    const host = process.env.BIDBEACON_DATABASE_HOST || 'postgres';
-    const user = process.env.BIDBEACON_DATABASE_USER || 'bidbeacon';
-    const port = process.env.BIDBEACON_DATABASE_PORT || '5432';
-    const database = process.env.BIDBEACON_DATABASE_NAME || 'bidbeacon';
-
-    return `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${database}`;
+    const { host, port, name, user, password } = getDatabaseConfig();
+    return `postgres://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${name}`;
 }
 
 // ============================================================================

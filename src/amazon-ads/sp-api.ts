@@ -18,10 +18,10 @@ type SpRequestOptions<T> = {
 export const spRequest = async <T>(options: SpRequestOptions<T>, region: ApiRegion = 'na') => {
     return withTracking({ apiName: options.apiName, region, itemCount: options.itemCount }, async recordRequestMetrics => {
         const accessToken = await refreshAccessToken();
-        const clientId = process.env.ADS_API_CLIENT_ID;
+        const clientId = process.env.BIDBEACON_ADS_API_CLIENT_ID;
 
         if (!clientId) {
-            throw new Error('Missing ADS_API_CLIENT_ID environment variable');
+            throw new Error('Missing BIDBEACON_ADS_API_CLIENT_ID environment variable');
         }
 
         const baseUrl = getApiBaseUrl(region);
