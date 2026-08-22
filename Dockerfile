@@ -5,21 +5,23 @@ RUN apk add --no-cache libc6-compat
 
 FROM base AS deps
 COPY package.json bun.lock bunfig.toml .npmrc ./
-RUN --mount=type=secret,id=hugeicons_license_key,env=HUGEICONS_LICENSE_KEY,required=true \
-    --mount=type=secret,id=merchbase_npm_token,env=MERCHBASE_NPM_TOKEN,required=true \
+RUN --mount=type=secret,id=hugeicons_license_key,env=MERCHBASE_HUGEICONS_LICENSE_KEY,required=true \
+    --mount=type=secret,id=merchbase_npm_token,env=MERCHBASE_GITHUB_NPM_TOKEN,required=true \
     bun install --frozen-lockfile
 
 FROM deps AS build
-ARG VITE_CLERK_PUBLISHABLE
+ARG VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY
 COPY . .
-RUN export VITE_CLERK_PUBLISHABLE_KEY="$VITE_CLERK_PUBLISHABLE" && \
-    bun run build && \
+# The build scripts deliberately do not go through `varlock run`: this stage has
+# no 1Password access. Every value the dashboard bundle needs arrives as a build
+# argument above, and the server bundle needs none.
+RUN bun run build && \
     bun run build:dashboard
 
 # Production dependencies only - prune dev deps from node_modules
 FROM deps AS prod-deps
-RUN --mount=type=secret,id=hugeicons_license_key,env=HUGEICONS_LICENSE_KEY,required=true \
-    --mount=type=secret,id=merchbase_npm_token,env=MERCHBASE_NPM_TOKEN,required=true \
+RUN --mount=type=secret,id=hugeicons_license_key,env=MERCHBASE_HUGEICONS_LICENSE_KEY,required=true \
+    --mount=type=secret,id=merchbase_npm_token,env=MERCHBASE_GITHUB_NPM_TOKEN,required=true \
     bun install --frozen-lockfile --production
 
 FROM node:20-alpine AS runtime
