@@ -1,9 +1,9 @@
 {
-    "name": "Merchbase BidBeacon",
-    "install": "bash .cursor/install.sh",
-    "start": "bash .cursor/start.sh",
-    "ports": [
-        { "name": "api", "port": 8080 },
-        { "name": "dashboard", "port": 4173 }
-    ]
+  "name": "Merchbase BidBeacon",
+  "install": "bash .cursor/install.sh",
+  "start": "bash .cursor/start.sh",
+  "ports": [
+    { "name": "api", "port": 8080 },
+    { "name": "dashboard", "port": 4173 }
+  ]
 }
