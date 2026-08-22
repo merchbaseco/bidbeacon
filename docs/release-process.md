@@ -101,9 +101,10 @@ Publish npm package:
 
 ```bash
 cd packages/bidbeacon-api-client
-# Load NPM_TOKEN from the repository .env:
-NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm whoami
-NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm publish --access public --provenance=false
+# The publish token is an @internal schema item gated behind the release
+# switch, resolved from the Tooling vault. It never touches a file.
+MERCHBASE_NPM_PUBLISH_TOKEN="$(BIDBEACON_RESOLVE_RELEASE_TOKENS=true bunx varlock printenv MERCHBASE_NPM_PUBLISH_TOKEN)" \
+  npm publish --access public --provenance=false
 ```
 
 Note: the repo root package is marked `private: true` and has a `prepublishOnly` block.
@@ -119,9 +120,10 @@ Publish CLI package:
 
 ```bash
 cd packages/bidbeacon-cli
-# Load NPM_TOKEN from the repository .env:
-NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm whoami
-NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm publish --access public --provenance=false
+# The publish token is an @internal schema item gated behind the release
+# switch, resolved from the Tooling vault. It never touches a file.
+MERCHBASE_NPM_PUBLISH_TOKEN="$(BIDBEACON_RESOLVE_RELEASE_TOKENS=true bunx varlock printenv MERCHBASE_NPM_PUBLISH_TOKEN)" \
+  npm publish --access public --provenance=false
 ```
 
 Optional verification:

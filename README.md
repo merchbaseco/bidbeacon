@@ -14,11 +14,14 @@ Fastify-based API for BidBeacon's Amazon Ads integration.
 
 ```bash
 bun install --frozen-lockfile
-cp .env.example .env
-# Fill in .env with your credentials
-# Set BIDBEACON_DATABASE_HOST=localhost for local Postgres
 bun run dev
 ```
+
+There is no `.env` step. `.env.schema` is the environment contract and values
+resolve from 1Password through the desktop app — see
+[docs/infrastructure.md](docs/infrastructure.md). Do not create a `.env` in the
+checkout: varlock loads it above the schema and it will silently override
+resolved values.
 
 Run just the server if you don't want the dashboard:
 
@@ -26,10 +29,12 @@ Run just the server if you don't want the dashboard:
 bun run dev:server
 ```
 
-`bun run dev` and `bun run dev:server` now default to `DISABLE_SERVER_JOB_RUNNER=true`, so local app-server sessions do not start PgBoss workers unless you explicitly opt in:
+`bun run dev` and `bun run dev:server` resolve
+`BIDBEACON_DISABLE_SERVER_JOB_RUNNER=true` from the schema's development arm, so
+local app-server sessions do not start PgBoss workers. Override for one run:
 
 ```bash
-DISABLE_SERVER_JOB_RUNNER=false bun run dev:server
+BIDBEACON_DISABLE_SERVER_JOB_RUNNER=false bun run dev:server
 ```
 
 Run the worker in a second terminal if needed:
@@ -41,8 +46,12 @@ bun run worker
 ### Docker (server container)
 
 ```bash
-docker compose up --build
+bun run deploy:dry-run   # proves every op() reference resolves
 ```
+
+The stack is deployed by the `Deploy Stack` workflow, not by a local
+`docker compose up` — Compose alone has no values to interpolate now that the
+schema owns them.
 
 The API will be available at `http://localhost:8091/api/health`.
 
@@ -52,7 +61,7 @@ Postgres is bound to `127.0.0.1` for local-only access.
 
 - Run `bun run dev:dashboard` to start the TanStack Start UI.
 - Default port is `4173`; if it's taken, Vite will pick the next available port.
-- `/api` requests are proxied to production by default. Set `DASHBOARD_API_PROXY_TARGET` in `.env` to override (e.g. `http://localhost:8080`).
+- `/api` requests are proxied to `BIDBEACON_DASHBOARD_API_PROXY_TARGET`, declared in `.env.schema`.
 
 ## Scripts
 
@@ -89,8 +98,10 @@ Publish (public scope):
 
 ```bash
 cd packages/bidbeacon-api-client
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm whoami
-NPM_TOKEN="$(security find-generic-password -a "$USER" -s rankwrangler-npm-token -w)" npm publish --access public
+# The suite publish token, resolved from the Tooling vault behind the release
+# switch. (This block previously read RankWrangler's Keychain item.)
+MERCHBASE_NPM_PUBLISH_TOKEN="$(BIDBEACON_RESOLVE_RELEASE_TOKENS=true bunx varlock printenv MERCHBASE_NPM_PUBLISH_TOKEN)" \
+  npm publish --access public
 ```
 
 Check current package version:

@@ -293,19 +293,26 @@ docker exec bidbeacon-postgres psql -U bidbeacon -d bidbeacon -c "SELECT * FROM 
 
 ## Deployment
 
+Environment contract, secret sources, and the deploy path:
+[docs/infrastructure.md](docs/infrastructure.md). Read it before changing
+`.env.schema`, `compose.yml`, the `Dockerfile`, or the deploy workflow.
+
 ### Build & Deploy
 
+Deploys go through GitHub Actions, on the mini's self-hosted runner. Manual
+dispatch only — **pushing to `main` does not deploy**.
+
 ```bash
-# Full rebuild and deploy
-docker compose up -d --build
+gh workflow run "Deploy Stack" -R merchbaseco/bidbeacon --ref main
 
-# Rebuild specific service
-docker compose build --no-cache server
-docker compose up -d server worker
-
-# Just restart (no rebuild)
-docker compose up -d
+# Prove every op() reference resolves without shipping anything
+bun run deploy:dry-run
 ```
+
+Never create a `.env` in a checkout. Varlock loads it above `.env.schema`, its
+values silently win, and an unescaped `$` in one of them makes every `op()`
+reference in the file fail to resolve. The deploy script refuses to run when it
+finds one.
 
 ### Service Names
 
@@ -364,9 +371,10 @@ Publish (public):
 
 ```bash
 cd packages/bidbeacon-api-client
-# Load NPM_TOKEN from the repository .env
-NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm whoami
-NPM_TOKEN="$(node --env-file=../../.env -p 'process.env.NPM_TOKEN')" npm publish --access public --provenance=false
+# The publish token is an @internal schema item gated behind the release
+# switch, resolved from the Tooling vault. It never touches a file.
+MERCHBASE_NPM_PUBLISH_TOKEN="$(BIDBEACON_RESOLVE_RELEASE_TOKENS=true bunx varlock printenv MERCHBASE_NPM_PUBLISH_TOKEN)" \
+  npm publish --access public --provenance=false
 ```
 
 Update `packages/bidbeacon-api-client/package.json` version before each publish.
@@ -404,3 +412,12 @@ psql -h zachs-mac-mini.taila0b849.ts.net -p 5432 -U bidbeacon -d bidbeacon -c "S
 ```
 
 See `docs/database-queries.md` for the full query workflow and examples.
+
+## Cloud agents
+
+Cursor cloud agents run the repo-managed **Merchbase BidBeacon** environment
+(`.cursor/environment.json`). Install and start scripts resolve everything from
+1Password through the fleet-wide Development identity; there is no per-repo
+Cursor secret and no `.env` step. A cloud agent has no Tailscale, so
+`.cursor/start.sh` provisions a local Postgres and points
+`BIDBEACON_DATABASE_HOST` at loopback for that session only.
