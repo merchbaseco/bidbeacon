@@ -46,7 +46,10 @@ The reverse proxy must forward `/mcp` and the four discovery paths to the API se
 Verify without opening a listening test port:
 
 ```bash
-bun run test --run src/mcp/auth.test.ts src/mcp/server.test.ts src/mcp/http.test.ts
+bun run test --run src/mcp/auth.test.ts src/mcp/http.test.ts
+bun run test:integration src/mcp/server.integration-check.ts
 ```
+
+`server.integration-check.ts` boots PGlite, so it belongs to the integration lane and takes the second command; see "Two lanes, on purpose" in `docs/testing.md`.
 
 The MCP tests use the SDK's linked in-memory transport and Fastify injection. They do not contact Clerk, Amazon Ads, or a database service.

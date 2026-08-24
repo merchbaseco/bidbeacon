@@ -33,9 +33,9 @@ them. Three names stay outside the schema entirely because the published
 | Stage | How values arrive |
 | --- | --- |
 | Local development | `varlock run` resolves the Development vault through the 1Password desktop app, or the local-agents identity in the Keychain |
-| CI (`Quality`) | Offline. `check` pins `VARLOCK_ENV=test`, so every value is a fake-but-shaped literal and nothing contacts 1Password |
+| CI (`Quality`) | Offline. `check:fast` pins `VARLOCK_ENV=test`, so every value is a fake-but-shaped literal and nothing contacts 1Password. Quality runs the fast lane only — see "Two lanes, on purpose" in `docs/testing.md` |
 | CI install step | The deploy identity fills the schema's development slot; `varlock printenv` resolves the GitHub Packages read token under the install switch |
-| Deploy | `scripts/deploy-with-varlock.ts` pins `VARLOCK_ENV=production`, resolves the Production vault, and hands values to Compose as process environment |
+| Deploy | `scripts/deploy-with-varlock.ts` pins `VARLOCK_ENV=production`, resolves the Production vault, hands values to Compose as process environment, and ends with `docker image prune -f` so the rebuilt images do not leave dangling layers pooling on the Mac mini |
 | Runtime | Compose bakes the resolved environment into each container at `up` time. The containers never contact 1Password |
 
 Actions' own `github.token` is deliberately **not** used for package installs:

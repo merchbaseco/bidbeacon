@@ -1,6 +1,26 @@
+---
+summary: Test lanes, the polite-Quality CI policy, and what the acceptance harnesses cover.
+read_when:
+  - changing CI, the Quality workflow, or which suites run on every commit
+  - adding a suite that boots PGlite or otherwise costs seconds per test
+  - writing or moving operation acceptance tests
+---
+
 # Testing
 
 We use Vitest for unit tests. Run with `bun run test`.
+
+## Two lanes, on purpose
+
+`bun run check` is split, and the split is deliberate — preserve it.
+
+`bun run check:fast` is the polite lane: `env:check`, `env:contract`, lint, and `test:run` (the fast Vitest suites). It is what the Quality workflow runs on every push and PR, and it is meant to stay near a minute. `bun run check` is `check:fast` plus the heavy lanes, `bun run test:integration` and `bun run build`. Full `check` still runs on the operator's machine, in cloud agents, and before a deploy, so total coverage is unchanged — the heavy work simply stops running on every commit.
+
+The heavy lane is structural, not a list of exclusions. Every suite that boots PGlite is named `*.integration-check.ts`: `vitest.config.ts` discovers `*.test.ts` only, and `vitest.integration.config.ts` discovers `*.integration-check.ts`. A new database-backed suite joins the lane by taking that suffix — nothing goes into an ignore file. Each moved file carries a header saying so.
+
+Quality does not build the images either. The Deploy workflow builds them for real on the Mac mini and is the build's proof, so repeating the build on every commit buys nothing.
+
+This shape is fleet-wide, not a BidBeacon quirk: Quality answers one question per push — is the contract intact and does the fast stuff pass? — under about sixty seconds, with installs capped at `timeout-minutes: 5` and a concurrency group that cancels in progress. Builds, browser and GPU tests, golden corpora, database simulations, and licensed downloads all belong to full `check` instead. Canonical standard: `~/Programming/agents/docs/quality-ci-standard.md` (agents repo).
 
 ## What to test
 - Report state machine eligibility and refresh scheduling.
@@ -18,12 +38,12 @@ The shared operation seam under `src/operations/` accepts an injected Drizzle da
 
 Use the builders in `src/operations/testing/fixtures.ts` for shared advertiser access, ad entities, performance, report metadata, and change-history rows. Search acceptance uses resource-specific builders in `src/operations/testing/search-fixtures.ts`, `src/operations/testing/search-ad-resources-fixtures.ts`, and `src/operations/testing/search-product-fixtures.ts`; every performance fixture uses the production Target archive shape, and Product acceptance proves advertised-ASIN aggregation across multiple targets. Campaign mutation data remains isolated in its own fixture module. `createFakeAmazonAdsGateway` records gateway calls, returns representative accepted responses, and can fail a selected operation call without duplicating Amazon validation. The PGlite migration loader omits only PostgreSQL deployment settings unavailable in PGlite (`pg_stat_statements` and the `performance_hourly` storage tuning); table definitions and operation queries still come from the repository’s production migrations and schema.
 
-Performance acceptance lives in `src/operations/performance.test.ts`. It proves Account aggregation, Product attribution, exact Ad-versus-Target grouping, caller-ordered multi-series output, cross-account isolation, zero activity, ratios, coverage, DST-safe hourly buckets, and point-limit rejection before archive queries begin.
+Performance acceptance lives in `src/operations/performance.integration-check.ts`. It proves Account aggregation, Product attribution, exact Ad-versus-Target grouping, caller-ordered multi-series output, cross-account isolation, zero activity, ratios, coverage, DST-safe hourly buckets, and point-limit rejection before archive queries begin.
 
 The account acceptance harness builds a shared operation principal from the product access projection and verifies both Clerk-session and suite-API-key credential kinds. It lists only authorized marketplace-specific Advertiser Account UUIDs, returns the canonical metadata contract, ignores dashboard selection, and rejects Amazon account/profile identifiers or cross-account UUIDs. The access-migration test loads a legacy `ads_account_id` membership and verifies that the migration expands it to every matching `advertiser_account.id` without granting an unrelated account.
 
 Campaign mutation acceptance lives at the same shared operation seam in
-`src/operations/campaign-mutations.test.ts`. It uses the PGlite database and the programmable
+`src/operations/campaign-mutations.integration-check.ts`. It uses the PGlite database and the programmable
 Amazon gateway to assert public-to-Amazon mappings for every Campaign control, account-local date
 conversion, placement omission versus zero removal, canonical responses, archive reconciliation,
 immediate Change events, stable Amazon errors, and cross-account isolation. Campaign-specific
@@ -31,7 +51,7 @@ builders live in `src/operations/testing/campaign-mutation-fixtures.ts`; do not 
 mutation data to the shared fixture module.
 
 Ad-group and Ad mutation acceptance lives at the same seam in
-`src/operations/ad-mutations.test.ts`. It asserts all four primitive operations, exact gateway
+`src/operations/ad-mutations.integration-check.ts`. It asserts all four primitive operations, exact gateway
 payloads, ASIN and state validation, terminal archive enforcement, Sponsored Products and
 account-owned Campaign/Ad-group ancestry before Amazon, canonical response mappings, archive
 reconciliation, immediate Change events, stable Amazon errors, and cross-account isolation.
@@ -39,16 +59,16 @@ Ad-mutation builders live in
 `src/operations/testing/ad-mutation-fixtures.ts`; keep them separate from Campaign fixtures and
 do not use an alternate repository or local Postgres service.
 
-Target Search acceptance lives in `src/operations/search-target.test.ts` with builders in
+Target Search acceptance lives in `src/operations/search-target.integration-check.ts` with builders in
 `src/operations/testing/search-target-fixtures.ts`. It uses production target settings,
 target-grain daily performance, and target report metadata through embedded PGlite; coverage
 must not use advertised-ASIN rows. Change-event Search acceptance lives in
-`src/operations/search-change-events.test.ts` with builders in
+`src/operations/search-change-events.integration-check.ts` with builders in
 `src/operations/testing/search-change-event-fixtures.ts`; it verifies inclusive account-local
 history dates, public event mappings, JSON values, deterministic cursors, and the absence of
 performance coverage.
 
-Target mutation acceptance lives at the same seam in `src/operations/target-mutations.test.ts`.
+Target mutation acceptance lives at the same seam in `src/operations/target-mutations.integration-check.ts`.
 It asserts positive keyword/product and ad-group negative keyword/product creation, broad/phrase/
 exact keyword match types, individual-ASIN-only product targeting, explicit Campaign/Ad-group
 ancestry, exact gateway payloads, canonical response mappings, positive bid eligibility, terminal
@@ -58,7 +78,7 @@ in `src/operations/testing/target-mutation-fixtures.ts`; keep them target-specif
 production operation path with embedded PGlite and the programmable gateway.
 
 Composite Sponsored Products creation acceptance lives in
-`src/operations/composite-campaign-mutations.test.ts`. It uses the same embedded PGlite and
+`src/operations/composite-campaign-mutations.integration-check.ts`. It uses the same embedded PGlite and
 programmable gateway to cover complete validation, automatic/manual keyword/manual product
 topologies, default-bid inheritance, placement controls, negative Targets, child-enabled versus
 Campaign-gated state, canonical success output, and every partial-failure position. Its Amazon

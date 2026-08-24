@@ -297,6 +297,11 @@ Environment contract, secret sources, and the deploy path:
 [docs/infrastructure.md](docs/infrastructure.md). Read it before changing
 `.env.schema`, `compose.yml`, the `Dockerfile`, or the deploy workflow.
 
+CI shape: the Quality workflow runs `bun run check:fast` and nothing heavier, on
+purpose. Read "Two lanes, on purpose" in [docs/testing.md](docs/testing.md)
+before changing `.github/workflows/quality.yml`, the `check` / `check:fast`
+scripts, or which suites run on every commit.
+
 ### Build & Deploy
 
 Deploys go through GitHub Actions, on the mini's self-hosted runner. Manual
