@@ -84,7 +84,12 @@
       }
     },
     {
-      "includes": ["**/*.test.{ts,tsx}", "**/__tests__/**/*", "tests/**"],
+      "includes": [
+        "**/*.test.{ts,tsx}",
+        "**/*.integration-check.{ts,tsx}",
+        "**/__tests__/**/*",
+        "tests/**"
+      ],
       "linter": {
         "rules": {
           "style": {

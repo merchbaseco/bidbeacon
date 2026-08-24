@@ -1,3 +1,11 @@
+// PGlite database-simulation suite. The `.integration-check.ts` suffix keeps
+// this file out of the default Vitest discovery (`vitest.config.ts` includes
+// `*.test.ts` only) on purpose: every test here boots a WebAssembly Postgres
+// and applies the production migrations, which costs seconds per test and far
+// more on a cold CI runner. It runs in the `test:integration` lane instead, via
+// `vitest.integration.config.ts`. `bun run check` runs both lanes; the Quality
+// workflow runs `check:fast`, the fast lane only. Add new database-backed
+// suites with the same suffix — the lane is structural, with no list to keep.
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { advertiserAccount, campaign } from '@/db/schema';
 import { createFakeAmazonAdsGateway } from './amazon-ads-gateway';
