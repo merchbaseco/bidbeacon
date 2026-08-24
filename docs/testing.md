@@ -20,7 +20,7 @@ The heavy lane is structural, not a list of exclusions. Every suite that boots P
 
 Quality does not build the images either. The Deploy workflow builds them for real on the Mac mini and is the build's proof, so repeating the build on every commit buys nothing.
 
-This shape is fleet-wide, not a BidBeacon quirk: Quality answers one question per push — is the contract intact and does the fast stuff pass? — under about sixty seconds, with installs capped at `timeout-minutes: 5` and a concurrency group that cancels in progress. Builds, browser and GPU tests, golden corpora, database simulations, and licensed downloads all belong to full `check` instead. Canonical standard: `~/Programming/agents/docs/quality-ci-standard.md` (agents repo).
+This shape is fleet-wide, not a BidBeacon quirk: Quality answers one question per push — is the contract intact and does the fast stuff pass? — under about sixty seconds, with installs capped at `timeout-minutes: 5` and a concurrency group that cancels in progress. Builds, browser and GPU tests, golden corpora, database simulations, and licensed downloads all belong to full `check` instead. Treat that division as the standard when editing the Quality workflow.
 
 ## What to test
 - Report state machine eligibility and refresh scheduling.
