@@ -35,6 +35,7 @@ jobs:
       # the Development vault through the deploy identity. The plugin version is
       # pinned in .env.schema, so this works before node_modules exists.
       - name: Install dependencies
+        timeout-minutes: 5
         env:
           CURSOR_CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
         run: |
@@ -49,7 +50,16 @@ jobs:
           export MERCHBASE_GITHUB_NPM_TOKEN
           bun install --frozen-lockfile
 
-      # `check` pins the schema's `test` lifecycle itself, so the gates run
+      # `check:fast` pins the schema's `test` lifecycle itself, so the gates run
       # fully offline with no 1Password access of their own.
-      - name: Run quality gates
-        run: bun run check
+      #
+      # Policy, not an oversight: Quality runs the fast lane only. It
+      # deliberately does not run `bun run build` — the Deploy workflow builds
+      # the images for real and is the build's proof — and does not run the
+      # PGlite database-simulation suites, which boot a WebAssembly Postgres per
+      # test and live in the `test:integration` lane. Nothing is skipped where
+      # it matters: `bun run check` runs `check:fast`, `test:integration`, and
+      # `build`, and that is what gates local work and the deploy path. Keep
+      # this job free of builds and database simulations.
+      - name: Run fast quality gates
+        run: bun run check:fast
