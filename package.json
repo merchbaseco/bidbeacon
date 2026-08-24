@@ -13,7 +13,8 @@
     "build": "vite build && bun run skill:package",
     "build:dashboard": "vite build --config vite.config.dashboard.ts",
     "build:dashboard:local": "varlock run -- bun run build:dashboard",
-    "check": "bun run env:check && bun run env:contract && bun run lint && bun run test:run && bun run build",
+    "check": "bun run check:fast && bun run test:integration && bun run build",
+    "check:fast": "bun run env:check && bun run env:contract && bun run lint && bun run test:run",
     "cli:build": "cd packages/bidbeacon-cli && bun run build",
     "db:generate": "varlock run -- drizzle-kit generate",
     "db:studio": "varlock run -- drizzle-kit studio",
@@ -39,6 +40,7 @@
     "start:worker": "varlock run -- node dist/worker.js",
     "test": "vitest",
     "test:run": "VARLOCK_ENV=test varlock run -- vitest run",
+    "test:integration": "VARLOCK_ENV=test varlock run -- vitest run --config vitest.integration.config.ts",
     "version:check": "tsx scripts/verify-release-versions.ts",
     "worker": "varlock run -- tsx src/worker/index.ts"
   },
