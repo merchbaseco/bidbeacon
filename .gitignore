@@ -10,5 +10,11 @@ coverage/
 .context/
 .agents/
 
+# Agent-local state, including Claude worktrees. A checkout under
+# .claude/worktrees/ carries its own biome.json, which the linter would
+# otherwise walk into and fail on. Committed agent definitions stay tracked.
+.claude/*
+!.claude/agents/
+
 # Varlock schema is the committed contract
 !.env.schema

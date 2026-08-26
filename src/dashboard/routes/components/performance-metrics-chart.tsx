@@ -273,7 +273,10 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                 {hasLeadingPoint ? <div className="pointer-events-none absolute top-0 bottom-0 left-0 z-10 w-16 bg-gradient-to-r from-background to-transparent" /> : null}
 
                 <div className="absolute inset-0" ref={chartRef} style={hasLeadingPoint ? { left: `-${leadingOffsetPercent}%`, width: `calc(100% + ${leadingOffsetPercent}%)` } : undefined}>
-                    <ResponsiveContainer height="100%" width="100%">
+                    {/* The wrapper's height is fixed in CSS, so declare it.
+                        Recharts otherwise starts at -1x-1 and warns on the
+                        first render, before its ResizeObserver reports. */}
+                    <ResponsiveContainer height="100%" initialDimension={{ width: 0, height: 360 }} width="100%">
                         <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }} onMouseLeave={handleChartLeave}>
                             <defs>
                                 <linearGradient id="clicksGradient" x1="0" x2="0" y1="0" y2="1">

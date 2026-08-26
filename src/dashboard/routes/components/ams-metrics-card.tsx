@@ -1,8 +1,15 @@
 import { useMemo } from 'react';
-import { Bar, BarChart, ResponsiveContainer, YAxis } from 'recharts';
+import { Bar, BarChart, YAxis } from 'recharts';
 import { api } from '@/dashboard/lib/trpc';
 import { Card } from '../../components/ui/card';
 import { Spinner } from '../../components/ui/spinner';
+
+// The sparkline is a fixed-size ornament, so the chart is sized directly
+// instead of through a ResponsiveContainer. The container measured its parent
+// on first paint, before layout had given it a box, and reported width(-1)
+// and height(-1) to Recharts once per row on every mount.
+const SPARKLINE_WIDTH = 72;
+const SPARKLINE_HEIGHT = 24;
 
 type MetricRow = {
     label: string;
@@ -38,22 +45,20 @@ const Sparkline = ({ data, globalMax }: { data: number[]; globalMax?: number }) 
     }, [data, maxValue]);
 
     return (
-        <div className="h-6 w-18">
-            <ResponsiveContainer debounce={300} height="100%" width="100%">
-                <BarChart data={chartData} margin={{ top: 0, right: 0, bottom: 0, left: 0 }}>
-                    <YAxis domain={[0, maxValue]} hide />
-                    <Bar
-                        dataKey="value"
-                        isAnimationActive={false}
-                        radius={[2, 2, 0, 0]}
-                        shape={(props: any) => {
-                            const { x = 0, y = 0, width = 0, height = 0, payload } = props ?? {};
-                            const opacity = payload?.opacity ?? 0.5;
-                            return <rect className="text-indigo-500" fill="currentColor" height={height} opacity={opacity} rx={2} width={width} x={x} y={y} />;
-                        }}
-                    />
-                </BarChart>
-            </ResponsiveContainer>
+        <div className="shrink-0">
+            <BarChart data={chartData} height={SPARKLINE_HEIGHT} margin={{ top: 0, right: 0, bottom: 0, left: 0 }} width={SPARKLINE_WIDTH}>
+                <YAxis domain={[0, maxValue]} hide />
+                <Bar
+                    dataKey="value"
+                    isAnimationActive={false}
+                    radius={[2, 2, 0, 0]}
+                    shape={(props: any) => {
+                        const { x = 0, y = 0, width = 0, height = 0, payload } = props ?? {};
+                        const opacity = payload?.opacity ?? 0.5;
+                        return <rect className="text-indigo-500" fill="currentColor" height={height} opacity={opacity} rx={2} width={width} x={x} y={y} />;
+                    }}
+                />
+            </BarChart>
         </div>
     );
 };

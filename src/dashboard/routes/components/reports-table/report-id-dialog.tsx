@@ -43,12 +43,17 @@ export function ReportIdDialog({ row, accountId }: ReportIdDialogProps) {
 
     return (
         <Dialog onOpenChange={handleOpenChange} open={open}>
-            <DialogTrigger>
-                <Button size="sm" variant="secondary">
-                    <HugeiconsIcon icon={SecondBracketSquareIcon} size={16} />
-                    Report_{row.reportId ? row.reportId.slice(-6) : ''}
-                </Button>
-            </DialogTrigger>
+            {/* `render` merges the trigger into the Button. Nesting the Button
+                inside the trigger instead would emit a <button> inside the
+                trigger's own <button>, which is invalid HTML. */}
+            <DialogTrigger
+                render={
+                    <Button size="sm" variant="secondary">
+                        <HugeiconsIcon icon={SecondBracketSquareIcon} size={16} />
+                        Report_{row.reportId ? row.reportId.slice(-6) : ''}
+                    </Button>
+                }
+            />
             <DialogPopup className="sm:max-w-2xl">
                 <DialogHeader>
                     <DialogTitle>Retrieve Report Response</DialogTitle>

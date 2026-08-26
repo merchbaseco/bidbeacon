@@ -141,8 +141,8 @@ const PerformanceTableContent = ({ accountId, className, countryCode }: { accoun
                 <Table className="table-fixed">
                     <colgroup>
                         <col />
-                        {COLUMN_WIDTHS.map(width => (
-                            <col className={width} key={width} />
+                        {METRIC_COLUMNS.map(column => (
+                            <col className={column.width} key={column.id} />
                         ))}
                     </colgroup>
                     <TableHeader>
@@ -163,8 +163,8 @@ const PerformanceTableContent = ({ accountId, className, countryCode }: { accoun
                         <Table className="table-fixed">
                             <colgroup>
                                 <col />
-                                {COLUMN_WIDTHS.map(width => (
-                                    <col className={width} key={width} />
+                                {METRIC_COLUMNS.map(column => (
+                                    <col className={column.width} key={column.id} />
                                 ))}
                             </colgroup>
                             <TableBody className="before:hidden">
@@ -506,7 +506,17 @@ const AD_PRODUCT_OPTIONS = [
     { value: 'AMAZON_DSP', label: 'Amazon DSP' },
 ] as const;
 
-const COLUMN_WIDTHS = ['w-[80px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[110px]', 'w-[90px]'] as const;
+// Keyed by column identity, not by width: five of these columns share
+// `w-[110px]`, so using the class as the React key collides.
+const METRIC_COLUMNS = [
+    { id: 'status', width: 'w-[80px]' },
+    { id: 'spend', width: 'w-[110px]' },
+    { id: 'sales', width: 'w-[110px]' },
+    { id: 'purchases', width: 'w-[110px]' },
+    { id: 'acos', width: 'w-[110px]' },
+    { id: 'roas', width: 'w-[110px]' },
+    { id: 'details', width: 'w-[90px]' },
+] as const;
 
 export { PerformanceTable };
 
