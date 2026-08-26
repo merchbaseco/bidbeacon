@@ -426,3 +426,10 @@ Cursor cloud agents run the repo-managed **Merchbase BidBeacon** environment
 Cursor secret and no `.env` step. A cloud agent has no Tailscale, so
 `.cursor/start.sh` provisions a local Postgres and points
 `BIDBEACON_DATABASE_HOST` at loopback for that session only.
+
+That local database is then filled with synthetic development data on every
+boot, so a cloud session opens a dashboard with campaigns, a week of
+performance, and an event stream instead of empty states. The same seed is
+available locally as `bun run db:seed:dev`, and it refuses any database host
+that is not loopback — local development resolves to the shared database over
+Tailscale. See `docs/development-data.md`.

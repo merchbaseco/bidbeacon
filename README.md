@@ -43,6 +43,18 @@ Run the worker in a second terminal if needed:
 bun run worker
 ```
 
+### Synthetic development data
+
+`bun run db:seed:dev` fills a **local** database with one fabricated advertiser
+account — campaigns, targets, a fortnight of performance ending today, reports,
+and an event stream — so the dashboard renders something real instead of empty
+states. It writes local rows only and never calls Amazon.
+
+Local development points at the shared database over Tailscale, so the seed
+refuses any database host that is not loopback, with no override flag. Cursor
+cloud agents seed their own PostgreSQL on every boot. See
+[docs/development-data.md](docs/development-data.md).
+
 ### Docker (server container)
 
 ```bash
@@ -72,6 +84,7 @@ Postgres is bound to `127.0.0.1` for local-only access.
 - `bun run start` – run compiled server
 - `bun run worker` – run worker in dev mode
 - `bun run dev:dashboard` – run dashboard dev server (proxies /api to production)
+- `bun run db:seed:dev` – fill a local database with synthetic development data; refuses any non-loopback host
 - `./test-api.sh` – smoke test the health endpoint
 
 ## Optional Agent Skill

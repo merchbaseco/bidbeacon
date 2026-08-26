@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Per-boot startup for BidBeacon Cursor cloud agents.
 # Starts the local PostgreSQL cluster, ensures the role/database exist using the
-# credential the schema resolves, then launches the development servers under
-# varlock. Idempotent and safe to re-run.
+# credential the schema resolves, refills the database with synthetic
+# development data, then launches the development servers under varlock.
+# Idempotent and safe to re-run.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -71,6 +72,21 @@ SQL
 unset DB_PASSWORD
 
 echo "[start] PostgreSQL ready on 127.0.0.1:5432 (database: ${DB_NAME})."
+
+# Synthetic development data, so a cloud session opens a dashboard with
+# campaigns, a week of performance, and an event stream instead of empty
+# states. The seed applies pending migrations first, then clears and refills
+# its own account. Seeded per boot rather than baked into the environment
+# snapshot, because the dataset is anchored to the current date and a week-old
+# snapshot would show a week-old week. It can only ever reach this cluster: the
+# seed refuses any database host that is not loopback, and BIDBEACON_DATABASE_HOST
+# is pinned to 127.0.0.1 above. Best-effort — a session must still boot if
+# seeding fails.
+echo "[start] Seeding synthetic development data..."
+if ! bunx varlock run -- bunx tsx scripts/seed-dev-data.ts >/dev/null; then
+    echo "[start] Skipping synthetic dev data (seed failed)." >&2
+fi
+
 echo "[start] Launching development servers (api:8080, dashboard:4173)..."
 
 exec bunx varlock run -- node_modules/.bin/concurrently -k -n server,dashboard -c cyan,magenta \

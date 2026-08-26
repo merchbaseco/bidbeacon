@@ -17,6 +17,7 @@
     "check:fast": "bun run env:check && bun run env:contract && bun run lint && bun run test:run",
     "cli:build": "cd packages/bidbeacon-cli && bun run build",
     "db:generate": "varlock run -- drizzle-kit generate",
+    "db:seed:dev": "varlock run -- tsx scripts/seed-dev-data.ts",
     "db:studio": "varlock run -- drizzle-kit studio",
     "deploy": "bun run scripts/deploy-with-varlock.ts",
     "deploy:dry-run": "bun run scripts/deploy-with-varlock.ts --dry-run",

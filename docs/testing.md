@@ -85,4 +85,14 @@ Campaign-gated state, canonical success output, and every partial-failure positi
 responses live in `src/operations/testing/composite-campaign-fixtures.ts`; the gateway supports
 response sequences so each synchronous child has an independent accepted resource.
 
+The development-data seed is covered from both ends. `src/dev-seed/plan.test.ts` runs in the fast
+lane and asserts what the seed promises — every table filled, the state branches each surface
+renders differently, a head and a long tail of spend, negatives that never accrue spend, and a
+newest day that is always today. `src/dev-seed/local-database-guard.test.ts` pins the refusals that
+matter: the production compose host, the shared database reached over Tailscale, and
+`NODE_ENV=production` even on loopback. `src/dev-seed/seed-dev-data.integration-check.ts` joins the
+heavy lane, writing a plan into embedded PGlite through the real writer and then calling the
+dashboard's own routers, so a drifted column, foreign key, or join fails there rather than in a
+cloud session. See [development-data.md](development-data.md).
+
 Auth tests must not use production credentials or database writes. Use the shared package's fake Clerk client/projection store patterns and assert that legacy `bbk_`, `BB_API_KEY`, query-string WebSocket credentials, and product-local API-key routes remain absent.
