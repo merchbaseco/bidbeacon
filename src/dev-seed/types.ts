@@ -72,6 +72,8 @@ export interface DevSeedPlan {
     accountId: string;
     advertiserAccountId: string;
     countryCode: string;
+    /** Oldest day of daily performance, in the account's reporting timezone. */
+    fromDay: string | null;
     merchbaseUserId: string;
     rows: {
         accountDatasetMetadata: InferInsertModel<typeof accountDatasetMetadata>[];
@@ -94,5 +96,7 @@ export interface DevSeedPlan {
     };
     /** Row counts per table. */
     summary: Record<string, number>;
+    /** Newest day of daily performance — always today in that timezone. */
+    throughDay: string | null;
     timezone: string;
 }

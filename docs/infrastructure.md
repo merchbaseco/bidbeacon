@@ -93,10 +93,54 @@ interpolate because the image demands those literal names; they are consumed
 only when the data volume is first initialised, so if that volume is ever
 recreated, give the database a `$`-free password first.
 
+## Development-only knobs
+
+Two schema items exist to make a fresh checkout — a worktree, or a cloud VM
+that has never seen the product — boot into something worth looking at. Neither
+is delivered to any container, and both are listed as deliberately undelivered
+in `scripts/env-contract-check.ts`.
+
+`BIDBEACON_DEV_HOST` is the dashboard dev server's bind address, and
+`vite.config.dashboard.ts` is its only reader. It defaults to `127.0.0.1`, which
+keeps a dev server — and the synthetic seed data behind it — off the network.
+An environment that reaches the server through a port forwarder sets `0.0.0.0`
+for its own dev command, because such forwarders find a session's ports by
+watching for listening sockets and a loopback-only bind is invisible to them.
+`.cursor/start.sh` exports exactly that, which is where the knowledge that
+Cursor works this way belongs; app code stays vendor-neutral. Only the socket
+widens — the app still believes it serves its own origin. The API server needs
+no equivalent because `src/index.ts` already listens on `0.0.0.0`.
+
+It is deliberately **not** internal-marked. Varlock strips internal-marked items
+from the environment it hands a `varlock run` child even when the parent shell
+exported one, so an internal-marked knob could never reach the dev server it
+configures.
+
+`BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID` is the Clerk User the development
+dashboard signs in as automatically — the shared Merchbase Dev Sign-In user. It
+is an opaque development-instance identifier rather than a credential, so it is
+committed on purpose: an ephemeral checkout has to be correct without vault
+access. It resolves to nothing in production, and the endpoint that mints
+tickets for it (`dev.createClerkSignInToken`) independently refuses
+`NODE_ENV=production` — which the Dockerfile sets — and any non-loopback `Host`.
+See `docs/development-data.md`.
+
+Because the parties in `BIDBEACON_CLERK_AUTHORIZED_PARTIES` are matched exactly
+against a token's `azp`, the development arm lists both loopback spellings of
+each dev-server port: `BIDBEACON_DEV_HOST` decides which one Vite prints, and a
+session opened on the other one would otherwise be rejected.
+
 ## Adding a variable
 
 Declare it in `.env.schema` with an explicit `@sensitive` or `@public`, a `test`
 arm, and per-lifecycle `op()` references. Add it to the `environment:` list of
-each service that reads it. Run `bun run env:contract`, which fails if the
-schema, the source's `process.env` reads, the Compose delivery, and the
-Dockerfile `ARG`s disagree. It is wired into `check`.
+each service that reads it, or — for a development-only knob no container may
+have — add it to `notDeliveredNames` in `scripts/env-contract-check.ts` with the
+reason. Run `bun run env:contract`, which fails if the schema, the source's
+`process.env` reads, the Compose delivery, and the Dockerfile `ARG`s disagree.
+It is wired into `check`.
+
+One parser trap: that check reads a variable's decorators out of the comment
+block above it, by substring. Writing `@internal` in prose above an item — even
+to say it is *not* internal — marks it internal and drops it out of the
+deliverable set.

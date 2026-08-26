@@ -58,6 +58,15 @@ describe('buildDevSeedPlan', () => {
         expect(hourlyDays.size).toBe(2);
     });
 
+    it('reports the window it actually wrote', () => {
+        const plan = buildPlan();
+        const days = [...new Set(plan.rows.performanceDaily.map(row => String(row.bucketDate)))].sort();
+
+        expect(plan.throughDay).toBe(formatInTimeZone(NOW, plan.timezone, 'yyyy-MM-dd'));
+        expect(plan.throughDay).toBe(days.at(-1));
+        expect(plan.fromDay).toBe(days[0]);
+    });
+
     it('leaves today in progress rather than mysteriously complete', () => {
         const plan = buildPlan();
         const today = formatInTimeZone(NOW, plan.timezone, 'yyyy-MM-dd');

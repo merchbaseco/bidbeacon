@@ -36,12 +36,17 @@ const postgresImageNames = new Set(['POSTGRES_DB', 'POSTGRES_USER', 'POSTGRES_PA
 // Read on end users' machines by the published @bidbeacon/cli, and by the
 // runtime image for its own purposes. Out of the schema by design: renaming one
 // would break a published contract or the container itself.
-const outOfContractNames = new Set(['MERCHBASE_API_KEY', 'BB_BASE_URL', 'BB_STORAGE_DIR', 'NODE_ENV', 'HOME', 'PATH']);
+// `DEV` is Vite's own build-time constant, replaced by a literal at bundle
+// time. It is a property of how the dashboard is built, not a value anyone
+// delivers, so it can never be a schema item.
+const outOfContractNames = new Set(['MERCHBASE_API_KEY', 'BB_BASE_URL', 'BB_STORAGE_DIR', 'NODE_ENV', 'HOME', 'PATH', 'DEV']);
 
 // Schema items that deliberately never reach a container, with the reason.
 // Anything not listed here that the container code reads must be delivered.
 const notDeliveredNames = new Map([
     ['BIDBEACON_DASHBOARD_API_PROXY_TARGET', 'development-only Vite dev-server proxy target'],
+    ['BIDBEACON_DEV_HOST', 'development-only Vite dev-server bind address'],
+    ['BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID', 'development-only auto sign-in subject; the container must never be able to mint a session for it'],
     ['BIDBEACON_SEARCH_CURSOR_SECRET', 'optional and unprovisioned; the server falls back to a per-process key'],
     ['BIDBEACON_RUN_LIVE_SMOKE', 'opt-in live smoke switch, operator-supplied'],
     ['BIDBEACON_LIVE_ACCOUNT_ID', 'opt-in live smoke input, operator-supplied'],

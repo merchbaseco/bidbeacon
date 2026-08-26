@@ -55,7 +55,7 @@
     "@fastify/cors": "11.2.0",
     "@fastify/helmet": "13.0.2",
     "@fastify/websocket": "11.2.0",
-    "@merchbaseco/access": "0.3.0",
+    "@merchbaseco/access": "0.4.0",
     "@modelcontextprotocol/sdk": "1.30.0",
     "@rankwrangler/http-client": "0.9.0",
     "@trpc/client": "11.8.1",

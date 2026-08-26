@@ -1,3 +1,4 @@
+import { DEV_SIGN_IN_MERCHBASE_USER_ID } from '@merchbaseco/access/dev';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { buildAdStructure } from './build-ad-structure';
 import { buildIngestionState } from './build-ingestion-state';
@@ -19,7 +20,12 @@ export const DEFAULT_SEED_OPTIONS = {
     campaignCount: 6,
     countryCode: 'US',
     dayCount: 14,
-    merchbaseUserId: 'mbu_dev_seed',
+    // The shared Merchbase Dev Sign-In user, so the account the auto sign-in
+    // flow lands on is the account this data belongs to. The value comes from
+    // `@merchbaseco/access/dev` rather than a local literal: the same constant
+    // is what `bootstrapDevAccessProjection` writes into the Access Projection,
+    // and two copies of it could drift into a signed-in user who owns nothing.
+    merchbaseUserId: DEV_SIGN_IN_MERCHBASE_USER_ID,
     seed: 'bidbeacon-dev',
 } as const;
 
@@ -110,13 +116,19 @@ export const buildDevSeedPlan = (options: DevSeedOptions): DevSeedPlan => {
         ],
     };
 
+    // Read back off the rows rather than recomputed from `now`, so the window
+    // the seed reports is the window it actually wrote.
+    const dayLabels = [...new Set(performance.daily.map(row => String(row.bucketDate)))].sort();
+
     return {
         accountId: options.accountId,
         advertiserAccountId,
         countryCode: options.countryCode,
+        fromDay: dayLabels[0] ?? null,
         merchbaseUserId: options.merchbaseUserId,
         rows,
         summary: Object.fromEntries(Object.entries(rows).map(([table, tableRows]) => [table, tableRows.length])),
+        throughDay: dayLabels.at(-1) ?? null,
         timezone,
     };
 };

@@ -13,6 +13,7 @@ import './global.css';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { LighthouseIcon } from '@hugeicons-pro/core-solid-rounded';
 import { Outlet } from 'react-router';
+import { DevAutoSignIn } from './components/dev-auto-sign-in';
 import { MoreMenu } from './components/more-menu';
 import { Toaster } from './components/ui/toast';
 import { TRPCProvider } from './lib/trpc-provider';
@@ -69,6 +70,7 @@ export function RootRoute() {
 
 const SignInPage = () => (
     <div className="flex min-h-screen items-center justify-center bg-background">
+        <DevAutoSignIn />
         <SignIn />
     </div>
 );

@@ -193,7 +193,9 @@ TanStack Start app with file-based routing in `src/dashboard/routes/`.
 
 - `bun run dev` starts the API server + dashboard locally (no worker).
 - Default port is `4173`; if the port is busy, Vite will choose the next open port.
-- `/api` requests proxy to production by default via `vite.config.dashboard.ts`.
+- The dashboard talks to its own origin in development, so `/api` goes through the Vite proxy to `BIDBEACON_DASHBOARD_API_PROXY_TARGET` — the local API server by default. A built bundle uses the deployed origin.
+- The dev server binds `BIDBEACON_DEV_HOST`, loopback by default. See "Development-only knobs" in `docs/infrastructure.md`.
+- In development the dashboard signs itself in as the shared Merchbase Dev Sign-In user; see `docs/development-data.md`.
 
 ### Component Library
 
@@ -432,4 +434,16 @@ boot, so a cloud session opens a dashboard with campaigns, a week of
 performance, and an event stream instead of empty states. The same seed is
 available locally as `bun run db:seed:dev`, and it refuses any database host
 that is not loopback — local development resolves to the shared database over
-Tailscale. See `docs/development-data.md`.
+Tailscale.
+
+Before it writes a single product row the seed bootstraps the Access Projection
+that authorizes the shared Merchbase Dev Sign-In user, via
+`@merchbaseco/access/dev`; without it the seeded data is invisible to every
+request. The dashboard then signs itself in as that user automatically in
+development, so a fresh VM opens on data rather than a sign-in form nobody can
+type a password into. The seed prints a receipt — database, user mapping, row
+counts, through-day — and boot scripts must not swallow it.
+
+See `docs/development-data.md`, and "Development-only knobs" in
+`docs/infrastructure.md` for `BIDBEACON_DEV_HOST` and
+`BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID`.

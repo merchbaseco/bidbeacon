@@ -7,6 +7,7 @@ import { performanceRouter } from './app/performance';
 import { reportsRouter } from './app/reports';
 import { usersRouter } from './app/users';
 import { workerRouter } from './app/worker';
+import { devRouter } from './dev/router';
 import { publicOperationProcedures } from './public/operation-router';
 import { publicApiRouter } from './public/router';
 import { router } from './trpc';
@@ -17,6 +18,7 @@ export const appRouter = router({
     ads: adsRouter,
     entityHistory: createEntityHistoryRouter(db),
     api: publicApiRouter,
+    dev: devRouter,
     metrics: metricsRouter,
     performanceTable: performanceRouter,
     users: usersRouter,

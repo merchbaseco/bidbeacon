@@ -75,19 +75,33 @@ echo "[start] PostgreSQL ready on 127.0.0.1:5432 (database: ${DB_NAME})."
 
 # Synthetic development data, so a cloud session opens a dashboard with
 # campaigns, a week of performance, and an event stream instead of empty
-# states. The seed applies pending migrations first, then clears and refills
-# its own account. Seeded per boot rather than baked into the environment
-# snapshot, because the dataset is anchored to the current date and a week-old
-# snapshot would show a week-old week. It can only ever reach this cluster: the
-# seed refuses any database host that is not loopback, and BIDBEACON_DATABASE_HOST
-# is pinned to 127.0.0.1 above. Best-effort — a session must still boot if
-# seeding fails.
+# states. The seed applies pending migrations first, bootstraps the Access
+# Projection the shared Dev Sign-In user is authorized through, then clears and
+# refills its own account. Seeded per boot rather than baked into the
+# environment snapshot, because the dataset is anchored to the current date and
+# a week-old snapshot would show a week-old week. It can only ever reach this
+# cluster: the seed refuses any database host that is not loopback, and
+# BIDBEACON_DATABASE_HOST is pinned to 127.0.0.1 above. Best-effort — a session
+# must still boot if seeding fails.
+#
+# Its receipt goes to this log verbatim. A boot that silently seeded nothing
+# and a boot that seeded a full week used to look identical here; now the log
+# names the database, the user the data is granted to, the row counts, and the
+# day the week runs through. The receipt contains no credential — the sign-in
+# ticket the dashboard later exchanges is minted per request and never printed.
 echo "[start] Seeding synthetic development data..."
-if ! bunx varlock run -- bunx tsx scripts/seed-dev-data.ts >/dev/null; then
+if ! bunx varlock run -- bunx tsx scripts/seed-dev-data.ts; then
     echo "[start] Skipping synthetic dev data (seed failed)." >&2
 fi
 
-echo "[start] Launching development servers (api:8080, dashboard:4173)..."
+# Cursor forwards a session's ports by watching the VM for listening sockets,
+# and the repository's loopback default is invisible to that watcher. Widening
+# the dashboard's bind is a property of this environment, not of the app, so it
+# is exported here rather than detected in vite.config.dashboard.ts. The API
+# server already binds every interface, so it needs no equivalent.
+export BIDBEACON_DEV_HOST=0.0.0.0
+
+echo "[start] Launching development servers (api:8080 on 0.0.0.0, dashboard:4173 on ${BIDBEACON_DEV_HOST})..."
 
 exec bunx varlock run -- node_modules/.bin/concurrently -k -n server,dashboard -c cyan,magenta \
     "bunx tsx src/index.ts" \

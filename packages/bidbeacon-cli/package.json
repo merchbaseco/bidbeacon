@@ -20,7 +20,7 @@
   },
   "dependencies": {
     "@bidbeacon/http-client": "3.1.0",
-    "@merchbaseco/access": "0.3.0"
+    "@merchbaseco/access": "0.4.0"
   },
   "files": [
     "dist",
