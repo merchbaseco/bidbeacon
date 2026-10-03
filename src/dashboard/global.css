@@ -33,6 +33,7 @@
     /* Lighthouse ink: the header mark's indigo, its outline ink, and a hard offset shadow. */
     --color-beacon: var(--beacon);
     --color-beacon-ink: var(--beacon-ink);
+    --color-beacon-lamp: var(--beacon-lamp);
     --shadow-ink: 2px 2px 0 0 var(--beacon-shadow);
     --shadow-ink-sm: 1px 1px 0 0 var(--beacon-shadow);
 
@@ -123,10 +124,7 @@
     --beacon: var(--color-indigo-500);
     --beacon-ink: var(--color-indigo-950);
     --beacon-shadow: var(--color-indigo-900);
-    /* Chart lines in light mode: a same-hue edge and a hard highlight band, like .ink-dot. */
-    --chart-clicks-edge: var(--color-indigo-700);
-    --chart-purchases-edge: var(--color-emerald-700);
-    --chart-line-highlight: rgb(255 255 255 / 0.5);
+    --beacon-lamp: var(--color-amber-500);
 
     --destructive-foreground: var(--color-red-700);
     --info: var(--color-blue-500);
@@ -187,9 +185,7 @@
     --beacon: var(--color-indigo-500);
     --beacon-ink: #0a0a14;
     --beacon-shadow: var(--color-indigo-700);
-    --chart-clicks-edge: var(--beacon-ink);
-    --chart-purchases-edge: var(--beacon-ink);
-    --chart-line-highlight: transparent;
+    --beacon-lamp: var(--color-amber-400);
 
     --destructive-foreground: var(--color-red-400);
     --info: var(--color-blue-500);
@@ -327,9 +323,4 @@ html.dark {
     border: 1.5px solid var(--beacon-ink);
     border-radius: 9999px;
     box-shadow: inset 1.5px 1.5px 0 rgb(255 255 255 / 0.45);
-}
-
-/* Lighthouse ink: the chart's highlight band rides just above the line's center. */
-.chart-ink-highlight .recharts-area-curve {
-    transform: translateY(-1px);
 }

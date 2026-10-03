@@ -11,14 +11,14 @@ const METRICS: MetricConfig[] = [
         key: 'clicks',
         label: 'Clicks',
         formatter: value => value.toLocaleString(),
-        color: '#6366f1',
+        color: 'var(--color-beacon)',
         isGood: 'up',
     },
     {
         key: 'purchases',
         label: 'Purchases',
         formatter: value => value.toLocaleString(),
-        color: '#10b981',
+        color: 'var(--color-beacon-lamp)',
         isGood: 'up',
     },
     {

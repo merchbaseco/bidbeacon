@@ -279,8 +279,8 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                     <ResponsiveContainer height="100%" initialDimension={{ width: 0, height: 360 }} width="100%">
                         <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }} onMouseLeave={handleChartLeave}>
                             <defs>
-                                <CelBands color="#6366f1" id="clicksGradient" />
-                                <CelBands color="#10b981" id="purchasesGradient" />
+                                <CelBands color="var(--color-beacon)" id="clicksGradient" />
+                                <CelBands color="var(--color-beacon-lamp)" id="purchasesGradient" />
                             </defs>
 
                             <XAxis axisLine={false} dataKey="label" interval={0} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} tickLine={false} />
@@ -303,8 +303,28 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                                 zIndex={0}
                             />
 
-                            <InkSeries dataKey="clicks" fill="url(#clicksGradient)" stroke="#6366f1" zIndex={1} />
-                            <InkSeries dataKey="purchases" fill="url(#purchasesGradient)" stroke="#10b981" zIndex={2} />
+                            <Area
+                                dataKey="clicks"
+                                dot={false}
+                                fill="url(#clicksGradient)"
+                                isAnimationActive={false}
+                                stroke="var(--color-beacon)"
+                                strokeWidth={2}
+                                type="monotone"
+                                yAxisId="clicks"
+                                zIndex={1}
+                            />
+                            <Area
+                                dataKey="purchases"
+                                dot={false}
+                                fill="url(#purchasesGradient)"
+                                isAnimationActive={false}
+                                stroke="var(--color-beacon-lamp)"
+                                strokeWidth={2}
+                                type="monotone"
+                                yAxisId="purchases"
+                                zIndex={2}
+                            />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
@@ -406,47 +426,11 @@ const CustomTooltip = ({
 /** Flat cel bands under a series line, hard-stopped like the header lighthouse's shading. */
 const CelBands = ({ color, id }: { color: string; id: string }) => (
     <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%" stopColor={color} stopOpacity={0.22} />
-        <stop offset="34%" stopColor={color} stopOpacity={0.22} />
-        <stop offset="34%" stopColor={color} stopOpacity={0.11} />
-        <stop offset="68%" stopColor={color} stopOpacity={0.11} />
-        <stop offset="68%" stopColor={color} stopOpacity={0.04} />
-        <stop offset="100%" stopColor={color} stopOpacity={0.04} />
+        <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.22 }} />
+        <stop offset="34%" style={{ stopColor: color, stopOpacity: 0.22 }} />
+        <stop offset="34%" style={{ stopColor: color, stopOpacity: 0.11 }} />
+        <stop offset="68%" style={{ stopColor: color, stopOpacity: 0.11 }} />
+        <stop offset="68%" style={{ stopColor: color, stopOpacity: 0.04 }} />
+        <stop offset="100%" style={{ stopColor: color, stopOpacity: 0.04 }} />
     </linearGradient>
-);
-
-/**
- * One series drawn like the header lighthouse: an edge underlay, the line in its own color,
- * and a hard 1px highlight band. Edge and highlight colors come from theme tokens (global.css).
- */
-const InkSeries = ({ dataKey, fill, stroke, zIndex }: { dataKey: 'clicks' | 'purchases'; fill: string; stroke: string; zIndex: number }) => (
-    <>
-        <Area
-            activeDot={false}
-            className="chart-ink-edge"
-            dataKey={dataKey}
-            dot={false}
-            fill={fill}
-            isAnimationActive={false}
-            stroke={`var(--chart-${dataKey}-edge)`}
-            strokeWidth={3.5}
-            type="monotone"
-            yAxisId={dataKey}
-            zIndex={zIndex}
-        />
-        <Area dataKey={dataKey} dot={false} fill="none" isAnimationActive={false} stroke={stroke} strokeWidth={2} type="monotone" yAxisId={dataKey} zIndex={zIndex} />
-        <Area
-            activeDot={false}
-            className="chart-ink-highlight"
-            dataKey={dataKey}
-            dot={false}
-            fill="none"
-            isAnimationActive={false}
-            stroke="var(--chart-line-highlight)"
-            strokeWidth={0.75}
-            type="monotone"
-            yAxisId={dataKey}
-            zIndex={zIndex}
-        />
-    </>
 );
