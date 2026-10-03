@@ -52,12 +52,12 @@ export const createLighthouseGlare = (scene: Scene, lamp: Vector3, peak: number)
             veilMaterial.uniforms.amount.value = exposure * peak;
             veilMaterial.uniforms.lamp.value.copy(lampPixel);
             veilMaterial.uniforms.radius.value = 140 * pixelRatio;
-            glow.material.opacity = exposure;
-            glow.scale.setScalar(0.9 + 1.6 * exposure);
-            streak.material.opacity = exposure * 0.8;
-            streak.scale.set(1.5 + 7 * exposure, 0.07, 1);
-            tilted.material.opacity = exposure * 0.45;
-            tilted.scale.set(1 + 4 * exposure, 0.05, 1);
+            glow.material.opacity = exposure * 0.75;
+            glow.scale.setScalar(0.8 + 1.2 * exposure);
+            streak.material.opacity = exposure * 0.45;
+            streak.scale.set(1.2 + 5 * exposure, 0.05, 1);
+            tilted.material.opacity = exposure * 0.25;
+            tilted.scale.set(0.8 + 3 * exposure, 0.04, 1);
         },
         dispose: () => {
             glowTexture.dispose();
