@@ -33,7 +33,7 @@ Search returns paginated resource snapshots and range-aggregated resource metric
 
 The server exposes tools only. It does not expose MCP resources, prompts, sampling, Apps, stdio transport, or selected-account/session state. Input and output JSON Schemas are generated from the operation schemas. Successful calls return the same JSON value as portable text content and `structuredContent`. Operation failures use the stable `{ error: { code, message, details } }` envelope documented in [the CLI contract](cli-spec.md).
 
-Server info advertises `websiteUrl` and a 128x128 PNG icon at `https://bidbeacon.merchbase.co/icon.png` (SEP-973). Clients require the icon to share the `/mcp` origin and refuse SVG, so the dashboard ships raster `icon.png` and `favicon.ico` from `src/dashboard/public/`, served by the reverse proxy's static file server.
+Server info advertises `websiteUrl` and a 128x128 PNG icon at `https://bidbeacon.merchbase.co/icon.png` (SEP-973). Clients require the icon to share the `/mcp` origin and refuse SVG, so the dashboard ships raster `icon.png` and `favicon.ico` from `src/dashboard/public/`, served by the reverse proxy's static file server. Both are rendered from the lighthouse source in `design/brand/icon/` (`bun run brand:icon`).
 
 ## Optional Amazon Ads skill
 

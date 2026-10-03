@@ -111,7 +111,7 @@
       }
     },
     {
-      "includes": ["src/db/index.ts"],
+      "includes": ["src/db/index.ts", "design/brand/icon/scene.html"],
       "linter": {
         "rules": {
           "performance": {

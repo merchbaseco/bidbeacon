@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <style>
+        html,
+        body {
+            margin: 0;
+            background: transparent;
+        }
+        canvas {
+            display: block;
+        }
+        </style>
+        <script type="importmap">
+        { "imports": { "three": "http://local/three.module.js" } }
+        </script>
+    </head>
+    <body>
+        <script type="module">
+        // BidBeacon icon: cel-shaded lighthouse, three flat tones per part, inverted-hull ink outline.
+        // render-icon.ts loads this page at ?size=2048 and composites the canvas onto the rounded tile.
+        import * as THREE from 'three';
+
+        const q = new URLSearchParams(location.search);
+        const SIZE = Number(q.get('size') || 512);
+        // Final framing: low three-quarter view, moderate perspective, tower exits the bottom edge.
+        const CAM = [1.4, 1.2, 3.2];
+        const LOOK = [0.55, 2.95, 0];
+        const FOV = 50,
+            BEAM_LEN = 7;
+        const BEAM_ROT = [0.3, 0, 0.3];
+        const C = {
+            ink: '#0a0a14',
+            white: ['#ffffff', '#e9e9f0', '#b4b4c8'],
+            indigo: ['#818cf8', '#6366f1', '#4338ca'],
+            capIndigo: ['#6366f1', '#4f46e5', '#312e81'],
+            deck: ['#ffffff', '#e9e9f0', '#b4b4c8'],
+            plinth: ['#d4d4d8', '#a1a1aa', '#71717a'],
+            lamp: '#fcd34d',
+        };
+        const LIGHT = new THREE.Vector3(-0.6, 0.45, 0.66).normalize(); // view space
+
+        // Three hard cel steps: highlight / lit / shade. No smooth falloff.
+        const cel = ([hi, lit, shade]) =>
+            new THREE.ShaderMaterial({
+                uniforms: { hi: { value: new THREE.Color(hi) }, lit: { value: new THREE.Color(lit) }, shade: { value: new THREE.Color(shade) }, L: { value: LIGHT } },
+                vertexShader: 'varying vec3 vN; void main(){ vN = normalize(normalMatrix*normal); gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+                fragmentShader: `uniform vec3 hi; uniform vec3 lit; uniform vec3 shade; uniform vec3 L; varying vec3 vN;
+    void main(){ float d = dot(normalize(vN), L); gl_FragColor = vec4(d > 0.62 ? hi : (d > 0.05 ? lit : shade), 1.0);
+#include <colorspace_fragment>
+}`,
+            });
+        const inkMat = new THREE.MeshBasicMaterial({ color: C.ink, side: THREE.BackSide });
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+        renderer.setPixelRatio(1);
+        renderer.setSize(SIZE, SIZE);
+        renderer.toneMapping = THREE.NoToneMapping;
+        renderer.setClearColor(0x00_00_00, 0);
+        document.body.appendChild(renderer.domElement);
+
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(FOV, 1, 0.1, 100);
+        camera.position.set(...CAM);
+        camera.lookAt(...LOOK);
+
+        const OUTLINE = 0.028; // world units of ink
+        // Adds a convex part plus its ink hull (scaled about its own centre by a constant world offset).
+        function part(geo, tones, y, { outline = OUTLINE } = {}) {
+            geo.computeBoundingBox();
+            const b = geo.boundingBox,
+                s = new THREE.Vector3();
+            b.getSize(s);
+            const m = new THREE.Mesh(geo, cel(tones));
+            m.position.y = y;
+            scene.add(m);
+            if (outline > 0) {
+                const h = new THREE.Mesh(geo, inkMat);
+                h.position.y = y;
+                h.scale.set((s.x + 2 * outline) / s.x, (s.y + 2 * outline) / s.y, (s.z + 2 * outline) / s.z);
+                scene.add(h);
+            }
+            return m;
+        }
+
+        // Plinth: octagonal step.
+        part(new THREE.CylinderGeometry(0.98, 1.08, 0.32, 8), C.plinth, 0.16);
+        // Tower: tapered shaft in white / indigo bands; two indigo stripes stay legible at 16px.
+        const R0 = 0.82,
+            R1 = 0.56,
+            H = 2.0,
+            base = 0.32;
+        const bands = [
+            ['white', 0.4],
+            ['indigo', 0.4],
+            ['white', 0.4],
+            ['indigo', 0.4],
+            ['white', 0.4],
+        ];
+        let y = base;
+        const rAt = h => R0 + (R1 - R0) * ((h - base) / H);
+        for (const [tone, h] of bands) {
+            part(new THREE.CylinderGeometry(rAt(y + h), rAt(y), h, 64), C[tone], y + h / 2);
+            y += h;
+        }
+        // Gallery deck + railing ring.
+        part(new THREE.CylinderGeometry(0.78, 0.66, 0.13, 64), C.deck, y + 0.06);
+        y += 0.12;
+        part(new THREE.CylinderGeometry(0.76, 0.76, 0.16, 64, 1, true), C.capIndigo, y + 0.08, { outline: OUTLINE * 0.7 });
+        // Lantern room: glowing glass with ink mullions.
+        const lanternH = 0.58,
+            lanternR = 0.46;
+        const lantern = part(new THREE.CylinderGeometry(lanternR, lanternR, lanternH, 64), C.lamp, y + lanternH / 2);
+        lantern.material = new THREE.MeshBasicMaterial({ color: C.lamp });
+        const lampY = y + lanternH / 2;
+        // Window bars placed symmetrically about the camera's line of sight.
+        const camAz = Math.atan2(CAM[2], CAM[0]);
+        for (let i = 0; i < 8; i++) {
+            const a = camAz + ((i + 0.5) / 8) * Math.PI * 2;
+            const bar = new THREE.Mesh(new THREE.BoxGeometry(0.045, lanternH, 0.045), new THREE.MeshBasicMaterial({ color: C.ink }));
+            bar.position.set(Math.cos(a) * (lanternR + 0.01), lampY, Math.sin(a) * (lanternR + 0.01));
+            bar.rotation.y = -a;
+            scene.add(bar);
+        }
+        y += lanternH;
+        // Cap: roof ring, dome, finial.
+        part(new THREE.CylinderGeometry(0.56, 0.56, 0.09, 64), C.capIndigo, y + 0.04);
+        y += 0.09;
+        part(new THREE.SphereGeometry(0.5, 64, 32, 0, Math.PI * 2, 0, Math.PI / 2), C.capIndigo, y);
+        part(new THREE.SphereGeometry(0.08, 24, 16), C.capIndigo, y + 0.56, { outline: OUTLINE * 0.7 });
+
+        // Beam: flat hard-edged amber cone bands sharing the lamp apex, no falloff.
+        {
+            const len = BEAM_LEN;
+            // Opaque flat bands, outer then core. Apex tucked behind the lantern so the beam emerges from the glass.
+            const BANDS = [
+                [0.3, '#f59e0b'],
+                [0.14, '#fcd34d'],
+            ];
+            const back = new THREE.Vector3(-CAM[0], 0, -CAM[2]).normalize().multiplyScalar(0.25);
+            BANDS.forEach(([spread, color], i) => {
+                const geo = new THREE.ConeGeometry(len * spread, len, 256, 1, true);
+                geo.translate(0, -len / 2, 0);
+                const mat = new THREE.MeshBasicMaterial({ color, depthWrite: false, side: THREE.FrontSide });
+                const beam = new THREE.Mesh(geo, mat);
+                beam.position.set(back.x, lampY, back.z);
+                beam.rotation.set(BEAM_ROT[0], BEAM_ROT[1], Math.PI / 2 + BEAM_ROT[2]);
+                beam.renderOrder = 10 + i;
+                scene.add(beam);
+            });
+        }
+
+        renderer.render(scene, camera);
+        window.__done = true;
+        </script>
+    </body>
+</html>

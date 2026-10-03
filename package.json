@@ -10,6 +10,7 @@
     "api-client:build": "bun run api-client:types && tsc -p packages/bidbeacon-api-client/tsconfig.json && cp packages/bidbeacon-api-client/src/app-router.d.ts packages/bidbeacon-api-client/dist/app-router.d.ts",
     "api-client:types": "dts-bundle-generator --no-check -o packages/bidbeacon-api-client/src/app-router.d.ts src/api/router-public.ts --project tsconfig.api-client.json",
     "bb": "bun packages/bidbeacon-cli/src/index.ts",
+    "brand:icon": "bun install --cwd design/brand/icon --frozen-lockfile && bun design/brand/icon/render-icon.ts",
     "build": "vite build && bun run skill:package",
     "build:dashboard": "vite build --config vite.config.dashboard.ts",
     "build:dashboard:local": "varlock run -- bun run build:dashboard",
