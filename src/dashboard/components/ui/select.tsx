@@ -42,7 +42,7 @@ function SelectPopup({
     className,
     children,
     sideOffset = 4,
-    alignItemWithTrigger = true,
+    alignItemWithTrigger = false,
     ...props
 }: SelectPrimitive.Popup.Props & {
     sideOffset?: SelectPrimitive.Positioner.Props['sideOffset'];
