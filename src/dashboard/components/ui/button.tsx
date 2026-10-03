@@ -36,7 +36,7 @@ const buttonVariants = cva(
                 ghost: 'border-transparent hover:bg-accent data-pressed:bg-accent',
                 link: 'border-transparent underline-offset-4 hover:underline',
                 outline:
-                    'not-disabled:active:translate-px border-border bg-background bg-clip-padding shadow-xs not-disabled:not-active:not-data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] not-disabled:hover:border-beacon/70 not-disabled:hover:shadow-ink not-disabled:active:shadow-ink-sm disabled:shadow-none data-pressed:border-beacon data-pressed:shadow-ink dark:bg-input/32 dark:not-in-data-[slot=group]:bg-clip-border dark:not-disabled:before:shadow-[0_-1px_--theme(--color-white/4%)] dark:not-disabled:not-active:not-data-pressed:before:shadow-[0_-1px_--theme(--color-white/8%)] [:hover,[data-pressed]]:bg-accent/50 dark:[:hover,[data-pressed]]:bg-input/64',
+                    'not-disabled:active:translate-px border-beacon/40 bg-background bg-clip-padding shadow-ink-sm not-disabled:not-active:not-data-pressed:before:shadow-[0_1px_--theme(--color-black/4%)] not-disabled:hover:border-beacon/70 not-disabled:hover:shadow-ink not-disabled:active:shadow-ink-sm disabled:shadow-none data-pressed:border-beacon data-pressed:shadow-ink dark:bg-input/32 dark:not-in-data-[slot=group]:bg-clip-border dark:not-disabled:before:shadow-[0_-1px_--theme(--color-white/4%)] dark:not-disabled:not-active:not-data-pressed:before:shadow-[0_-1px_--theme(--color-white/8%)] [:hover,[data-pressed]]:bg-accent/50 dark:[:hover,[data-pressed]]:bg-input/64',
                 secondary: 'border-secondary bg-secondary text-secondary-foreground hover:bg-secondary/90 data-pressed:bg-secondary/90',
             },
         },

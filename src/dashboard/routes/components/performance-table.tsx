@@ -240,7 +240,7 @@ const PerformanceTableContent = ({ accountId, className, countryCode }: { accoun
                                                 <TableCell className="text-right">{formatPercent(row.metrics.acos)}</TableCell>
                                                 <TableCell className="text-right">{formatRatio(row.metrics.roas)}</TableCell>
                                                 <TableCell className="text-right">
-                                                    <Button onClick={() => setDetailsRow(row)} size="xs" variant="outline">
+                                                    <Button className="border-border shadow-xs" onClick={() => setDetailsRow(row)} size="xs" variant="outline">
                                                         Details
                                                     </Button>
                                                 </TableCell>

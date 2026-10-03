@@ -303,32 +303,8 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                                 zIndex={0}
                             />
 
-                            <Area
-                                activeDot={false}
-                                dataKey="clicks"
-                                dot={false}
-                                fill="url(#clicksGradient)"
-                                isAnimationActive={false}
-                                stroke="var(--color-beacon-ink)"
-                                strokeWidth={3.5}
-                                type="monotone"
-                                yAxisId="clicks"
-                                zIndex={1}
-                            />
-                            <Area dataKey="clicks" dot={false} fill="none" isAnimationActive={false} stroke="#6366f1" strokeWidth={2} type="monotone" yAxisId="clicks" zIndex={1} />
-                            <Area
-                                activeDot={false}
-                                dataKey="purchases"
-                                dot={false}
-                                fill="url(#purchasesGradient)"
-                                isAnimationActive={false}
-                                stroke="var(--color-beacon-ink)"
-                                strokeWidth={3.5}
-                                type="monotone"
-                                yAxisId="purchases"
-                                zIndex={2}
-                            />
-                            <Area dataKey="purchases" dot={false} fill="none" isAnimationActive={false} stroke="#10b981" strokeWidth={2} type="monotone" yAxisId="purchases" zIndex={2} />
+                            <InkSeries dataKey="clicks" fill="url(#clicksGradient)" stroke="#6366f1" zIndex={1} />
+                            <InkSeries dataKey="purchases" fill="url(#purchasesGradient)" stroke="#10b981" zIndex={2} />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
@@ -437,4 +413,40 @@ const CelBands = ({ color, id }: { color: string; id: string }) => (
         <stop offset="68%" stopColor={color} stopOpacity={0.04} />
         <stop offset="100%" stopColor={color} stopOpacity={0.04} />
     </linearGradient>
+);
+
+/**
+ * One series drawn like the header lighthouse: an edge underlay, the line in its own color,
+ * and a hard 1px highlight band. Edge and highlight colors come from theme tokens (global.css).
+ */
+const InkSeries = ({ dataKey, fill, stroke, zIndex }: { dataKey: 'clicks' | 'purchases'; fill: string; stroke: string; zIndex: number }) => (
+    <>
+        <Area
+            activeDot={false}
+            className="chart-ink-edge"
+            dataKey={dataKey}
+            dot={false}
+            fill={fill}
+            isAnimationActive={false}
+            stroke={`var(--chart-${dataKey}-edge)`}
+            strokeWidth={3.5}
+            type="monotone"
+            yAxisId={dataKey}
+            zIndex={zIndex}
+        />
+        <Area dataKey={dataKey} dot={false} fill="none" isAnimationActive={false} stroke={stroke} strokeWidth={2} type="monotone" yAxisId={dataKey} zIndex={zIndex} />
+        <Area
+            activeDot={false}
+            className="chart-ink-highlight"
+            dataKey={dataKey}
+            dot={false}
+            fill="none"
+            isAnimationActive={false}
+            stroke="var(--chart-line-highlight)"
+            strokeWidth={0.75}
+            type="monotone"
+            yAxisId={dataKey}
+            zIndex={zIndex}
+        />
+    </>
 );
