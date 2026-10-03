@@ -33,6 +33,8 @@ Search returns paginated resource snapshots and range-aggregated resource metric
 
 The server exposes tools only. It does not expose MCP resources, prompts, sampling, Apps, stdio transport, or selected-account/session state. Input and output JSON Schemas are generated from the operation schemas. Successful calls return the same JSON value as portable text content and `structuredContent`. Operation failures use the stable `{ error: { code, message, details } }` envelope documented in [the CLI contract](cli-spec.md).
 
+Server info advertises `websiteUrl` and a 128x128 PNG icon at `https://bidbeacon.merchbase.co/icon.png` (SEP-973). Clients require the icon to share the `/mcp` origin and refuse SVG, so the dashboard ships raster `icon.png` and `favicon.ico` from `src/dashboard/public/`, served by the reverse proxy's static file server.
+
 ## Optional Amazon Ads skill
 
 The public repository exposes the independently installable `bidbeacon-amazon-ads` Agent Skill in the skills.sh-compatible `skills/bidbeacon-amazon-ads` folder. Install it with `npx skills add merchbaseco/bidbeacon --skill bidbeacon-amazon-ads -g`. A production build also copies the same independently readable folder to `dist/skills/bidbeacon-amazon-ads`. Its compact router progressively discloses one recipe for the active job: account review, Campaign or ASIN investigation, optimization, campaign launch, negative targeting, pause/archive, partial-failure recovery, or explicit user-requested skill extension. Recipes contain high-level judgment, branching, and completion bounds without copying MCP schemas or worked request bodies.
@@ -46,7 +48,7 @@ The reverse proxy must forward `/mcp` and the four discovery paths to the API se
 Verify without opening a listening test port:
 
 ```bash
-bun run test --run src/mcp/auth.test.ts src/mcp/http.test.ts
+bun run test --run src/mcp/auth.test.ts src/mcp/http.test.ts src/mcp/server.test.ts
 bun run test:integration src/mcp/server.integration-check.ts
 ```
 

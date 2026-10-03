@@ -41,11 +41,17 @@ export const MCP_TOOL_NAMES = [
     'update_target',
 ] as const;
 
+const BIDBEACON_WEBSITE_URL = 'https://bidbeacon.merchbase.co';
+// Served by the dashboard's static file server from src/dashboard/public; must share the /mcp origin.
+const BIDBEACON_ICON_URL = `${BIDBEACON_WEBSITE_URL}/icon.png`;
+
 export const MCP_SERVER_INFO = {
     name: 'bidbeacon',
     title: 'BidBeacon',
     version: packageJson.version,
-} as const;
+    websiteUrl: BIDBEACON_WEBSITE_URL,
+    icons: [{ src: BIDBEACON_ICON_URL, mimeType: 'image/png', sizes: ['128x128'] }],
+};
 
 export const MCP_SERVER_INSTRUCTIONS = [
     'Discover the BidBeacon Advertiser Account UUID with list_advertiser_accounts before any scoped call.',
