@@ -20,12 +20,12 @@ const badgeVariants = cva(
             variant: {
                 default: 'bg-primary text-primary-foreground [button,a&]:hover:bg-primary/90',
                 destructive: 'bg-destructive text-white [button,a&]:hover:bg-destructive/90',
-                error: 'bg-destructive/8 text-destructive-foreground dark:bg-destructive/16',
-                info: 'bg-info/8 text-info-foreground dark:bg-info/16',
+                error: 'border-current/24 bg-destructive/8 text-destructive-foreground dark:bg-destructive/16',
+                info: 'border-current/24 bg-info/8 text-info-foreground dark:bg-info/16',
                 outline: 'border-border bg-transparent dark:bg-input/32 [button,a&]:hover:bg-accent/50 dark:[button,a&]:hover:bg-input/48',
                 secondary: 'bg-secondary text-secondary-foreground [button,a&]:hover:bg-secondary/90',
-                success: 'bg-success/8 text-success-foreground dark:bg-success/16',
-                warning: 'bg-warning/8 text-warning-foreground dark:bg-warning/16',
+                success: 'border-current/24 bg-success/8 text-success-foreground dark:bg-success/16',
+                warning: 'border-current/24 bg-warning/8 text-warning-foreground dark:bg-warning/16',
             },
         },
     }

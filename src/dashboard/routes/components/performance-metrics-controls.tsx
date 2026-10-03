@@ -203,7 +203,7 @@ const MetricLabel = ({ metric, value, change }: { metric: MetricConfig; value: n
         <div className="flex shrink-0 flex-col gap-0.5">
             <div className="flex items-center gap-1.5">
                 <span className="text-muted-foreground text-xs md:text-sm">{metric.label}</span>
-                {showDot && <span className="size-2 rounded-full" style={{ backgroundColor: metric.color }} />}
+                {showDot && <span className="ink-dot" style={{ backgroundColor: metric.color }} />}
             </div>
             <div className="flex items-baseline gap-1 md:gap-2">
                 <span className="font-semibold text-lg tracking-tight md:text-2xl">{metric.formatter(value)}</span>

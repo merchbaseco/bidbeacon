@@ -279,14 +279,8 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                     <ResponsiveContainer height="100%" initialDimension={{ width: 0, height: 360 }} width="100%">
                         <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }} onMouseLeave={handleChartLeave}>
                             <defs>
-                                <linearGradient id="clicksGradient" x1="0" x2="0" y1="0" y2="1">
-                                    <stop offset="0%" stopColor="#6366f1" stopOpacity={0.3} />
-                                    <stop offset="100%" stopColor="#6366f1" stopOpacity={0} />
-                                </linearGradient>
-                                <linearGradient id="purchasesGradient" x1="0" x2="0" y1="0" y2="1">
-                                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-                                </linearGradient>
+                                <CelBands color="#6366f1" id="clicksGradient" />
+                                <CelBands color="#10b981" id="purchasesGradient" />
                             </defs>
 
                             <XAxis axisLine={false} dataKey="label" interval={0} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} tickLine={false} />
@@ -309,18 +303,32 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
                                 zIndex={0}
                             />
 
-                            <Area dataKey="clicks" dot={false} fill="url(#clicksGradient)" isAnimationActive={false} stroke="#6366f1" strokeWidth={2} type="monotone" yAxisId="clicks" zIndex={1} />
                             <Area
+                                activeDot={false}
+                                dataKey="clicks"
+                                dot={false}
+                                fill="url(#clicksGradient)"
+                                isAnimationActive={false}
+                                stroke="var(--color-beacon-ink)"
+                                strokeWidth={3.5}
+                                type="monotone"
+                                yAxisId="clicks"
+                                zIndex={1}
+                            />
+                            <Area dataKey="clicks" dot={false} fill="none" isAnimationActive={false} stroke="#6366f1" strokeWidth={2} type="monotone" yAxisId="clicks" zIndex={1} />
+                            <Area
+                                activeDot={false}
                                 dataKey="purchases"
                                 dot={false}
                                 fill="url(#purchasesGradient)"
                                 isAnimationActive={false}
-                                stroke="#10b981"
-                                strokeWidth={2}
+                                stroke="var(--color-beacon-ink)"
+                                strokeWidth={3.5}
                                 type="monotone"
                                 yAxisId="purchases"
                                 zIndex={2}
                             />
+                            <Area dataKey="purchases" dot={false} fill="none" isAnimationActive={false} stroke="#10b981" strokeWidth={2} type="monotone" yAxisId="purchases" zIndex={2} />
                         </ComposedChart>
                     </ResponsiveContainer>
                 </div>
@@ -407,11 +415,7 @@ const CustomTooltip = ({
                     return (
                         <div className="flex items-center justify-between gap-4" key={metric.key}>
                             <div className="flex items-center gap-1.5">
-                                {metric.color ? (
-                                    <span className="size-2 rounded-full" style={{ backgroundColor: metric.color }} />
-                                ) : (
-                                    <span className="size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />
-                                )}
+                                {metric.color ? <span className="ink-dot" style={{ backgroundColor: metric.color }} /> : <span className="size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />}
                                 <span className="text-muted-foreground text-xs">{metric.label}</span>
                             </div>
                             <span className="font-medium text-xs">{metric.formatter(value)}</span>
@@ -422,3 +426,15 @@ const CustomTooltip = ({
         </div>
     );
 };
+
+/** Flat cel bands under a series line, hard-stopped like the header lighthouse's shading. */
+const CelBands = ({ color, id }: { color: string; id: string }) => (
+    <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stopColor={color} stopOpacity={0.22} />
+        <stop offset="34%" stopColor={color} stopOpacity={0.22} />
+        <stop offset="34%" stopColor={color} stopOpacity={0.11} />
+        <stop offset="68%" stopColor={color} stopOpacity={0.11} />
+        <stop offset="68%" stopColor={color} stopOpacity={0.04} />
+        <stop offset="100%" stopColor={color} stopOpacity={0.04} />
+    </linearGradient>
+);
