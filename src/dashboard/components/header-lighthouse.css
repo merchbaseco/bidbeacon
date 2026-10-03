@@ -1,84 +1,28 @@
-/* Header lighthouse. Tune the beam here. */
+/* Header lighthouse: a full-width layer over the header, clipped by its overflow. */
 .header-lighthouse {
-    /* One full revolution of the beam. */
-    --lighthouse-revolution: 10s;
-    /* Layout of header-lighthouse-beam.webp: one revolution, 1.5deg apart, left to right then
-       top to bottom, frame 0 facing the viewer. Change only alongside a re-rendered sheet. */
-    --lighthouse-columns: 12;
-    --lighthouse-rows: 20;
-    /* Frame held when motion is reduced (column, row): the beam reaching out to the left. */
-    --lighthouse-rest-column: 4;
-    --lighthouse-rest-row: 3;
-
-    /* Both layers share this box; the deck's centre is the box's centre. */
-    --lighthouse-width: 440px;
-    --lighthouse-height: 68px;
-
     position: absolute;
-    bottom: 0;
-    left: calc(50% - var(--lighthouse-width) / 2);
-    width: var(--lighthouse-width);
-    height: var(--lighthouse-height);
+    inset: 0;
     pointer-events: none;
 }
 
-.header-lighthouse-tower,
-.header-lighthouse-beam {
+/* The static tower, cut at the hairline with the deck on the header's centre. */
+.header-lighthouse-tower {
     position: absolute;
-    inset: 0;
+    bottom: 0;
+    left: calc(50% - 220px);
+    width: 440px;
+    height: 68px;
+}
+
+.header-lighthouse-tower[data-hidden="true"] {
+    visibility: hidden;
+}
+
+/* The live scene renders the same framing across the header's full width. */
+.header-lighthouse-canvas {
+    position: absolute;
+    bottom: 0;
+    left: 0;
     width: 100%;
-    height: 100%;
-}
-
-/* A 2x grid of every frame. Columns step fast and rows step slow, so together they
-   walk the frames in order; each animation snaps a whole frame at a time. */
-.header-lighthouse-beam {
-    background-image: url("/header-lighthouse-beam.webp");
-    background-repeat: no-repeat;
-    background-size: calc(var(--lighthouse-width) * var(--lighthouse-columns))
-        auto;
-    animation:
-        lighthouse-beam-columns
-        calc(var(--lighthouse-revolution) / var(--lighthouse-rows))
-        steps(var(--lighthouse-columns)) infinite,
-        lighthouse-beam-rows var(--lighthouse-revolution)
-        steps(var(--lighthouse-rows)) infinite;
-}
-
-@keyframes lighthouse-beam-columns {
-    from {
-        background-position-x: 0;
-    }
-    to {
-        background-position-x: calc(
-            var(--lighthouse-width) *
-            var(--lighthouse-columns) *
-            -1
-        );
-    }
-}
-
-@keyframes lighthouse-beam-rows {
-    from {
-        background-position-y: 0;
-    }
-    to {
-        background-position-y: calc(
-            var(--lighthouse-height) *
-            var(--lighthouse-rows) *
-            -1
-        );
-    }
-}
-
-@media (prefers-reduced-motion: reduce) {
-    .header-lighthouse-beam {
-        animation: none;
-        background-position: calc(
-                var(--lighthouse-width) *
-                var(--lighthouse-rest-column) *
-                -1
-            )
-            calc(var(--lighthouse-height) * var(--lighthouse-rest-row) * -1);
-    }
+    height: 68px;
 }

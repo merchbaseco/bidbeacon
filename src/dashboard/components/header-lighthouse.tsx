@@ -1,3 +1,4 @@
+import { lazy, Suspense, useCallback, useState } from 'react';
 import './header-lighthouse.css';
 
 /**
@@ -5,22 +6,30 @@ import './header-lighthouse.css';
  * around the lantern.
  *
  * Purely decorative: the brand's accessible name stays on the header wordmark. The
- * header must be `relative overflow-hidden`. Both layers are pre-rendered from the
- * same cel-shaded 3D scene and share one box: the tower is a still raster cropped at
- * the hairline, and the beam is a sprite sheet of one revolution with the tower's
- * occlusion and the lantern flash baked in, so it simply paints over the tower.
- * Timing lives in the stylesheet.
+ * header must be `relative overflow-hidden`; it clips the canvas at the hairline and
+ * wherever the beam leaves the bar. A pre-rendered raster of the tower shows until the
+ * lazily loaded three.js scene draws its first frame, and stays if WebGL is unavailable.
  */
-export const HeaderLighthouse = () => (
-    <div aria-hidden className="header-lighthouse hidden md:block">
-        <img
-            alt=""
-            className="header-lighthouse-tower"
-            height={68}
-            src="/header-lighthouse.png"
-            srcSet="/header-lighthouse.png 1x, /header-lighthouse@2x.png 2x, /header-lighthouse@3x.png 3x"
-            width={440}
-        />
-        <div className="header-lighthouse-beam" />
-    </div>
-);
+export const HeaderLighthouse = () => {
+    const [isLive, setIsLive] = useState(false);
+    const handleReady = useCallback(() => setIsLive(true), []);
+
+    return (
+        <div aria-hidden className="header-lighthouse hidden md:block">
+            <img
+                alt=""
+                className="header-lighthouse-tower"
+                data-hidden={isLive}
+                height={68}
+                src="/header-lighthouse.png"
+                srcSet="/header-lighthouse.png 1x, /header-lighthouse@2x.png 2x, /header-lighthouse@3x.png 3x"
+                width={440}
+            />
+            <Suspense fallback={null}>
+                <HeaderLighthouseCanvas onReady={handleReady} />
+            </Suspense>
+        </div>
+    );
+};
+
+const HeaderLighthouseCanvas = lazy(() => import('./header-lighthouse-canvas').then(module => ({ default: module.HeaderLighthouseCanvas })));
