@@ -1,25 +1,25 @@
 import { useAtom, useSetAtom } from 'jotai';
-import { Button } from '../../../components/ui/button';
-import { ButtonGroup } from '../../../components/ui/button-group';
+import { ToggleGroup, ToggleGroupItem } from '../../../components/ui/toggle-group';
 import { aggregationAtom, offsetAtom } from './atoms';
 
 export const EntityAggregationFilter = () => {
     const [aggregation, setAggregation] = useAtom(aggregationAtom);
     const setOffset = useSetAtom(offsetAtom);
 
-    const handleChange = (value: 'daily' | 'hourly') => {
-        setAggregation(value);
+    const handleValueChange = (value: unknown[]) => {
+        const next = value[0];
+        // A segmented control always keeps one choice; ignore attempts to deselect.
+        if (next !== 'daily' && next !== 'hourly') {
+            return;
+        }
+        setAggregation(next);
         setOffset(0);
     };
 
     return (
-        <ButtonGroup>
-            <Button onClick={() => handleChange('daily')} size="sm" variant={aggregation === 'daily' ? 'default' : 'outline'}>
-                Daily
-            </Button>
-            <Button onClick={() => handleChange('hourly')} size="sm" variant={aggregation === 'hourly' ? 'default' : 'outline'}>
-                Hourly
-            </Button>
-        </ButtonGroup>
+        <ToggleGroup aria-label="Aggregation" className="ink-raised ink-segmented" onValueChange={handleValueChange} size="sm" value={[aggregation]}>
+            <ToggleGroupItem value="daily">Daily</ToggleGroupItem>
+            <ToggleGroupItem value="hourly">Hourly</ToggleGroupItem>
+        </ToggleGroup>
     );
 };

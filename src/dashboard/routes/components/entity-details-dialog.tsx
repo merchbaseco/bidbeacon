@@ -660,7 +660,7 @@ const RelatedList = <Item,>({
                             </div>
                             <div className="flex items-center gap-2">
                                 <StatusBadge state={getState(item)} />
-                                <Button onClick={() => onSelect(item)} size="xs" variant="outline">
+                                <Button className="ink-raised--quiet border-border" onClick={() => onSelect(item)} size="xs" variant="outline">
                                     Details
                                 </Button>
                             </div>

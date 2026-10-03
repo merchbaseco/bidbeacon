@@ -428,6 +428,35 @@ html.dark {
     --tw-shadow: 0 0 #0000;
 }
 
+/* Grouped controls are one object: items inside a group never raise on their own. */
+:is(
+        [data-slot="button-group"],
+        [data-slot="toggle-group"],
+        [data-slot="pagination"]
+    )
+    .ink-raised.ink-raised {
+    --ink-offset: 0px;
+    transform: none;
+}
+
+/* Segmented control: the group is the raised object; the chosen segment fills indigo. */
+.ink-segmented {
+    gap: 2px;
+    padding: 1px;
+    border: 1px solid color-mix(in oklab, var(--beacon) 40%, transparent);
+    border-radius: var(--radius-lg);
+    background-color: var(--background);
+}
+
+.ink-segmented > * {
+    border-radius: calc(var(--radius-lg) - 2px);
+}
+
+.ink-segmented > [data-pressed] {
+    background-color: var(--beacon);
+    color: var(--color-white);
+}
+
 @media (prefers-reduced-motion: reduce) {
     .ink-raised:is(:hover, :active, [data-pressed], [data-popup-open]) {
         transform: none;
