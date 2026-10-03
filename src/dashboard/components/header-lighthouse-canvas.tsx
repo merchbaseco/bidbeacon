@@ -33,7 +33,7 @@ export const HeaderLighthouseCanvas = ({ onReady }: { onReady: () => void }) => 
         let hasRendered = false;
 
         const draw = () => {
-            lighthouse.render(angle);
+            lighthouse.render(angle, !reducedMotion.matches);
             if (!hasRendered) {
                 hasRendered = true;
                 onReady();

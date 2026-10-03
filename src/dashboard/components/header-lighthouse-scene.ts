@@ -16,9 +16,22 @@ import {
     ShaderMaterial,
     SphereGeometry,
     SRGBColorSpace,
+    Vector2,
     Vector3,
     WebGLRenderer,
 } from 'three';
+import { createLighthouseGlare } from './header-lighthouse-glare';
+
+/** Tunables. The beam's axis tilt, its spread, and the camera flash as it crosses the lens. */
+/** Axis tilt: down far enough that the beam's lower edge reaches the camera (24deg below the lamp). */
+const BEAM_ELEVATION_DEGREES = -16;
+/** Half-angles of the optic: a little taller than wide, like a real lighthouse lens. */
+const BEAM_HALF_WIDTH_DEGREES = 6;
+const BEAM_HALF_HEIGHT_DEGREES = 8.5;
+/** Glare starts building this far outside the beam's edge. */
+const FLASH_WIDTH_DEGREES = 9;
+/** Peak whitening of the canvas, 0..1. */
+const FLASH_PEAK = 0.4;
 
 /**
  * The header lighthouse as a live three.js scene: cel-shaded tower with ink outlines,
@@ -47,20 +60,31 @@ export const createLighthouseScene = (canvas: HTMLCanvasElement) => {
     scene.add(beam);
 
     const lampPosition = new Vector3(0, lampY, 0);
+    const glare = createLighthouseGlare(scene, lampPosition, FLASH_PEAK);
     const toCamera = CAMERA_POSITION.clone().sub(lampPosition).normalize();
     const cameraAzimuth = Math.atan2(CAMERA_POSITION.z, CAMERA_POSITION.x);
-    const beamDirection = new Vector3();
-    const mostFacing = Math.cos(Math.asin(toCamera.y) - BEAM_ELEVATION);
+    const cameraElevation = Math.asin(toCamera.y);
+    const lampPixel = new Vector2();
+    const projected = new Vector3();
+    const drawingBuffer = new Vector2();
 
     return {
         /** `angle` is radians from facing the viewer, increasing anticlockwise from above. */
-        render: (angle: number) => {
-            const azimuth = cameraAzimuth + angle;
-            beam.rotation.y = -azimuth;
-            beamDirection.set(Math.cos(azimuth) * Math.cos(BEAM_ELEVATION), Math.sin(BEAM_ELEVATION), Math.sin(azimuth) * Math.cos(BEAM_ELEVATION));
-            // The lens is brightest seen down the beam: blend toward white as the beam faces the camera.
-            const facing = Math.max(0, (beamDirection.dot(toCamera) - 0.55) / (mostFacing - 0.55));
-            lamp.color.copy(LAMP_COLOR).lerp(LAMP_FLASH_COLOR, facing ** 2);
+        render: (angle: number, allowFlash = true) => {
+            beam.rotation.y = -(cameraAzimuth + angle);
+            // Where the camera sits inside the optic's elliptical cone: 0 on the axis, 1 at its edge.
+            const across = wrapAngle(angle) / BEAM_HALF_WIDTH;
+            const below = (cameraElevation - BEAM_ELEVATION) / BEAM_HALF_HEIGHT;
+            const fromAxis = Math.hypot(across, below);
+            const outsideDegrees = Math.max(0, fromAxis - 1) * Math.min(BEAM_HALF_WIDTH_DEGREES, BEAM_HALF_HEIGHT_DEGREES);
+            const exposure = allowFlash ? Math.max(0, 1 - outsideDegrees / FLASH_WIDTH_DEGREES) ** 2 : 0;
+            // The lens glows wider than the flash: the glass brightens as the beam swings round.
+            const lensGlow = Math.max(0, 1 - outsideDegrees / (FLASH_WIDTH_DEGREES * 4)) ** 2;
+            lamp.color.copy(LAMP_COLOR).lerp(LAMP_FLASH_COLOR, allowFlash ? lensGlow : 0);
+            renderer.getDrawingBufferSize(drawingBuffer);
+            projected.copy(lampPosition).project(camera);
+            lampPixel.set(((projected.x + 1) / 2) * drawingBuffer.x, ((projected.y + 1) / 2) * drawingBuffer.y);
+            glare.update(exposure, lampPixel, renderer.getPixelRatio());
             renderer.render(scene, camera);
         },
         resize: (widthCss: number, pixelRatio: number) => {
@@ -79,6 +103,7 @@ export const createLighthouseScene = (canvas: HTMLCanvasElement) => {
                     }
                 }
             });
+            glare.dispose();
             renderer.dispose();
         },
     };
@@ -96,9 +121,10 @@ const CAMERA_POSITION = new Vector3(-1.4, 1.0, 3.6);
 const CAMERA_TARGET = new Vector3(-0.1, 2.5, 0);
 const CAMERA_ROLL = 0.09;
 
-const BEAM_ELEVATION = (10 * Math.PI) / 180;
+const BEAM_ELEVATION = (BEAM_ELEVATION_DEGREES * Math.PI) / 180;
+const BEAM_HALF_WIDTH = (BEAM_HALF_WIDTH_DEGREES * Math.PI) / 180;
+const BEAM_HALF_HEIGHT = (BEAM_HALF_HEIGHT_DEGREES * Math.PI) / 180;
 const BEAM_LENGTH = 9;
-const BEAM_HALF_ANGLE = (7 * Math.PI) / 180;
 
 const INK = '#0a0a14';
 const LAMP_COLOR = new Color('#fcd34d');
@@ -164,8 +190,10 @@ const buildTower = (scene: Scene) => {
 
 /** An open cone (no end cap) along +x from the lamp, brightest down its core, fading with distance. */
 const buildBeam = () => {
-    const geometry = new ConeGeometry(Math.tan(BEAM_HALF_ANGLE) * BEAM_LENGTH, BEAM_LENGTH, 96, 1, true);
+    const geometry = new ConeGeometry(Math.tan(BEAM_HALF_WIDTH) * BEAM_LENGTH, BEAM_LENGTH, 96, 1, true);
     geometry.translate(0, -BEAM_LENGTH / 2, 0);
+    // Local x becomes vertical once the cone is laid on its side: stretch it to the taller half-angle.
+    geometry.scale(Math.tan(BEAM_HALF_HEIGHT) / Math.tan(BEAM_HALF_WIDTH), 1, 1);
     const material = new ShaderMaterial({
         depthWrite: false,
         side: DoubleSide,
@@ -226,3 +254,6 @@ const celMaterial = ([highlight, lit, shade]: Tones) =>
                 #include <colorspace_fragment>
             }`,
     });
+
+/** Signed angle in (-pi, pi]. */
+const wrapAngle = (angle: number) => Math.atan2(Math.sin(angle), Math.cos(angle));
