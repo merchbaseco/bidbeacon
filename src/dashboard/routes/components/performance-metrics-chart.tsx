@@ -1,17 +1,15 @@
 import { useAtomValue } from 'jotai';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Area, Bar, ComposedChart, ReferenceLine, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { useCallback, useMemo } from 'react';
+import { Area } from '@/dashboard/components/charts/area';
+import { ComposedChart } from '@/dashboard/components/charts/composed-chart';
+import { SeriesBar } from '@/dashboard/components/charts/series-bar';
+import { ChartTooltip } from '@/dashboard/components/charts/tooltip';
+import { XAxis } from '@/dashboard/components/charts/x-axis';
 import type { RouterOutputs } from '@/dashboard/lib/trpc';
 import { cn } from '@/dashboard/lib/utils';
 import { customRangeAtom, performanceRangeAtom } from '@/dashboard/state/performance-metrics-state';
 import { Spinner } from '../../components/ui/spinner';
-import { ChartHoverIndicator } from './chart-hover-indicator';
 import { METRICS } from './performance-metrics-config';
-
-type HoverState = {
-    coordinate: { x: number; y: number };
-    label: string;
-};
 
 type HourlyPerformanceData = RouterOutputs['metrics']['hourlyPerformance'];
 
@@ -27,17 +25,6 @@ const CHARTED_METRICS = METRICS.filter(metric => metric.key === 'impressions' ||
 const PerformanceMetricsChart = ({ data, isLoading, error, className }: PerformanceMetricsChartProps) => {
     const range = useAtomValue(performanceRangeAtom);
     const customRange = useAtomValue(customRangeAtom);
-    const chartRef = useRef<HTMLDivElement>(null);
-    const [hoverState, setHoverState] = useState<HoverState | null>(null);
-
-    const handleHoverChange = useCallback((state: HoverState | null) => {
-        setHoverState(state);
-    }, []);
-
-    const handleChartLeave = useCallback(() => {
-        setHoverState(null);
-    }, []);
-
     const fallbackRange = useMemo(() => {
         if (customRange?.start && customRange?.end) {
             const customDates = normalizeLocalDateRange(customRange.start, customRange.end);
@@ -99,7 +86,6 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     const resolvedGranularity = data?.granularity ?? 'hour';
     const resolvedTimezone = data?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
     const legacyHourlyData = (data as { hourlyData?: Array<{ hour: number; hourLabel: string; impressions: number; clicks: number; purchases: number; spend: number; acos: number }> })?.hourlyData;
-    const legacyLeadingHour = (data as { leadingHour?: { hour: number; hourLabel: string; impressions: number; clicks: number; purchases: number; spend: number; acos: number } })?.leadingHour;
 
     const resolvedPoints = useMemo(() => {
         if (data?.points) {
@@ -125,125 +111,42 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
         });
     }, [data?.points, legacyHourlyData]);
 
-    const resolvedLeadingPoint = useMemo(() => {
-        if (data?.leadingPoint) {
-            return data.leadingPoint;
-        }
-        if (!legacyLeadingHour) {
-            return null;
-        }
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        yesterday.setHours(23, 0, 0, 0);
-        return {
-            intervalStart: yesterday.toISOString(),
-            impressions: legacyLeadingHour.impressions,
-            clicks: legacyLeadingHour.clicks,
-            purchases: legacyLeadingHour.purchases,
-            spend: Number(legacyLeadingHour.spend),
-            acos: legacyLeadingHour.acos,
-        };
-    }, [data?.leadingPoint, legacyLeadingHour]);
-    const hasLeadingPoint = Boolean(resolvedLeadingPoint);
-
     const chartData = useMemo(() => {
         if (!data) {
             return [];
         }
-        const leading = resolvedLeadingPoint ? [resolvedLeadingPoint, ...resolvedPoints] : resolvedPoints;
-        const rangeStart = resolvedRange?.start ? new Date(resolvedRange.start) : null;
-        const rangeEnd = resolvedRange?.end ? new Date(resolvedRange.end) : null;
-        const spansYears = !!rangeStart && !!rangeEnd && rangeStart.getFullYear() !== rangeEnd.getFullYear();
-
-        const dayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: resolvedTimezone });
-        const monthFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', year: spansYears ? '2-digit' : undefined, timeZone: resolvedTimezone });
         const tooltipDayFormatter = new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: resolvedTimezone });
         const tooltipMonthFormatter = new Intl.DateTimeFormat('en-US', { month: 'long', year: 'numeric', timeZone: resolvedTimezone });
         const tooltipHourFormatter = new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit', timeZone: resolvedTimezone });
-        const hourLabelFormatter = new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: resolvedTimezone });
 
-        return leading.map(point => {
+        return resolvedPoints.map(point => {
             const date = new Date(point.intervalStart);
-            let label = '';
-            let tooltipLabel = '';
-
+            let tooltipLabel = tooltipDayFormatter.format(date);
             if (resolvedGranularity === 'hour') {
-                const hourLabel = hourLabelFormatter.format(date);
-                label = hourLabel;
                 tooltipLabel = `${tooltipDayFormatter.format(date)} · ${tooltipHourFormatter.format(date)}`;
             }
-
-            if (resolvedGranularity === 'day') {
-                label = dayFormatter.format(date);
-                tooltipLabel = tooltipDayFormatter.format(date);
-            }
-
             if (resolvedGranularity === 'month') {
-                label = monthFormatter.format(date);
                 tooltipLabel = tooltipMonthFormatter.format(date);
             }
-
-            return {
-                ...point,
-                label,
-                tooltipLabel,
-            };
+            return { ...point, date, tooltipLabel };
         });
-    }, [data, resolvedGranularity, resolvedLeadingPoint, resolvedPoints, resolvedRange?.end, resolvedRange?.start, resolvedTimezone]);
+    }, [data, resolvedGranularity, resolvedPoints, resolvedTimezone]);
 
-    const yAxisDomains = useMemo(() => {
-        const points = resolvedPoints;
-        const maxImpressions = Math.max(1, ...points.map(point => point.impressions));
-        const maxClicks = Math.max(1, ...points.map(point => point.clicks));
-        const maxPurchases = Math.max(1, ...points.map(point => point.purchases));
-        return {
-            impressions: [0, maxImpressions * 1.1] as [number, number],
-            clicks: [0, maxClicks * 1.1] as [number, number],
-            purchases: [0, maxPurchases * 1.1] as [number, number],
-        };
-    }, [resolvedPoints]);
-
-    const isCustomRangeActive = Boolean(customRange?.start && customRange?.end);
-    const isLiveRange = range === 'today' && !isCustomRangeActive;
-    const isStreamingRange = isLiveRange && resolvedGranularity === 'hour';
-
-    const currentHourLabel = useMemo(() => {
-        if (!isLiveRange) {
-            return null;
-        }
-        const now = new Date();
-        return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: resolvedTimezone }).format(now);
-    }, [isLiveRange, resolvedTimezone]);
-
-    // Custom tick formatter for X axis - emphasize key labels without crowding
-    const formatXAxisTick = (value: string, index: number) => {
-        const totalTicks = chartData.length;
-        if (hasLeadingPoint && index === 0) {
-            return '';
-        }
-
+    const formatXLabel = useMemo(() => {
+        const rangeStart = resolvedRange?.start ? new Date(resolvedRange.start) : null;
+        const rangeEnd = resolvedRange?.end ? new Date(resolvedRange.end) : null;
+        const spansYears = !!rangeStart && !!rangeEnd && rangeStart.getFullYear() !== rangeEnd.getFullYear();
         if (resolvedGranularity === 'hour') {
-            const highlightLabels = new Set(['00:00', '12:00', '23:00']);
-            if (highlightLabels.has(value)) {
-                return value;
-            }
-            if (range === 'today' && currentHourLabel && value === currentHourLabel) {
-                return value;
-            }
-            return '';
+            return new Intl.DateTimeFormat('en-US', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: resolvedTimezone }).format;
         }
+        if (resolvedGranularity === 'month') {
+            return new Intl.DateTimeFormat('en-US', { month: 'short', year: spansYears ? '2-digit' : undefined, timeZone: resolvedTimezone }).format;
+        }
+        return new Intl.DateTimeFormat('en-US', { month: 'short', day: 'numeric', timeZone: resolvedTimezone }).format;
+    }, [resolvedGranularity, resolvedRange?.end, resolvedRange?.start, resolvedTimezone]);
 
-        if (totalTicks <= 6) {
-            return value;
-        }
-        const interval = Math.ceil((totalTicks - 1) / 5);
-        if (index % interval === 0 || index === totalTicks - 1) {
-            return value;
-        }
-        return '';
-    };
+    const renderTooltip = useCallback(({ point }: { point: Record<string, unknown> }) => <PerformanceTooltip point={point} />, []);
 
-    const leadingOffsetPercent = hasLeadingPoint ? 3.5 : 0;
     if (isLoading) {
         return (
             <div className={cn('w-full', className)}>
@@ -270,65 +173,13 @@ const PerformanceMetricsChart = ({ data, isLoading, error, className }: Performa
     return (
         <div className={cn('w-full', className)}>
             <div className="relative h-[360px] w-full overflow-hidden">
-                {hasLeadingPoint ? <div className="pointer-events-none absolute top-0 bottom-0 left-0 z-10 w-16 bg-gradient-to-r from-background to-transparent" /> : null}
-
-                <div className="absolute inset-0" ref={chartRef} style={hasLeadingPoint ? { left: `-${leadingOffsetPercent}%`, width: `calc(100% + ${leadingOffsetPercent}%)` } : undefined}>
-                    {/* The wrapper's height is fixed in CSS, so declare it.
-                        Recharts otherwise starts at -1x-1 and warns on the
-                        first render, before its ResizeObserver reports. */}
-                    <ResponsiveContainer height="100%" initialDimension={{ width: 0, height: 360 }} width="100%">
-                        <ComposedChart data={chartData} margin={{ top: 20, right: 20, left: 0, bottom: 0 }} onMouseLeave={handleChartLeave}>
-                            <defs>
-                                <CelBands color="var(--color-beacon)" id="clicksGradient" />
-                                <CelBands color="var(--color-beacon-lamp)" id="purchasesGradient" />
-                            </defs>
-
-                            <XAxis axisLine={false} dataKey="label" interval={0} tick={{ fill: '#9CA3AF', fontSize: 11 }} tickFormatter={formatXAxisTick} tickLine={false} />
-
-                            <YAxis allowDataOverflow domain={yAxisDomains.impressions} hide yAxisId="impressions" />
-                            <YAxis allowDataOverflow domain={yAxisDomains.clicks} hide yAxisId="clicks" />
-                            <YAxis allowDataOverflow domain={yAxisDomains.purchases} hide yAxisId="purchases" />
-
-                            {currentHourLabel ? <ReferenceLine stroke="#d1d5db" strokeDasharray="4 4" x={currentHourLabel} yAxisId="impressions" /> : null}
-
-                            <Tooltip content={<CustomTooltip onHoverChange={handleHoverChange} />} cursor={{ fill: 'transparent' }} isAnimationActive={false} position={{ y: 12 }} />
-
-                            <Bar
-                                className="text-zinc-200 dark:text-zinc-800"
-                                dataKey="impressions"
-                                fill="currentColor"
-                                isAnimationActive={false}
-                                radius={[2, 2, 0, 0]}
-                                yAxisId="impressions"
-                                zIndex={0}
-                            />
-
-                            <Area
-                                dataKey="clicks"
-                                dot={false}
-                                fill="url(#clicksGradient)"
-                                isAnimationActive={false}
-                                stroke="var(--color-beacon)"
-                                strokeWidth={2}
-                                type="monotone"
-                                yAxisId="clicks"
-                                zIndex={1}
-                            />
-                            <Area
-                                dataKey="purchases"
-                                dot={false}
-                                fill="url(#purchasesGradient)"
-                                isAnimationActive={false}
-                                stroke="var(--color-beacon-lamp)"
-                                strokeWidth={2}
-                                type="monotone"
-                                yAxisId="purchases"
-                                zIndex={2}
-                            />
-                        </ComposedChart>
-                    </ResponsiveContainer>
-                </div>
-                <ChartHoverIndicator active={!!hoverState} containerRef={chartRef} coordinate={hoverState?.coordinate} label={hoverState?.label} />
+                <ComposedChart aspectRatio="auto" className="h-full" data={chartData} formatXLabel={formatXLabel} margin={{ top: 20, right: 24, bottom: 28, left: 24 }}>
+                    <SeriesBar dataKey="impressions" fill="var(--chart-bar)" radius={2} />
+                    <Area dataKey="clicks" fill="var(--chart-line-primary)" fillOpacity={0.25} yAxisId="clicks" />
+                    <Area dataKey="purchases" fill="var(--chart-line-secondary)" fillOpacity={0.25} yAxisId="purchases" />
+                    <XAxis numTicks={resolvedGranularity === 'hour' ? 5 : 6} />
+                    <ChartTooltip content={renderTooltip} />
+                </ComposedChart>
             </div>
         </div>
     );
@@ -358,63 +209,24 @@ const parseLocalDateInput = (value: string) => {
 
 export { PerformanceMetricsChart };
 
-const CustomTooltip = ({
-    active,
-    payload,
-    label,
-    coordinate,
-    onHoverChange,
-}: {
-    active?: boolean;
-    payload?: Array<{
-        dataKey: string;
-        value: number;
-        payload: { label?: string; tooltipLabel?: string } & Record<string, number | string>;
-    }>;
-    label?: string | number;
-    coordinate?: { x: number; y: number };
-    onHoverChange?: (state: HoverState | null) => void;
-}) => {
-    useEffect(() => {
-        if (!onHoverChange) {
-            return;
-        }
-        if (active && coordinate && label !== undefined) {
-            onHoverChange({
-                coordinate,
-                label: typeof label === 'string' ? label : label.toString(),
-            });
-        } else {
-            onHoverChange(null);
-        }
-    }, [active, coordinate, label, onHoverChange]);
-
-    if (!(active && payload) || payload.length === 0) {
-        return null;
-    }
-
-    const dataPoint = payload[0]?.payload;
-    if (!dataPoint) {
-        return null;
-    }
-    const heading = dataPoint.tooltipLabel ?? dataPoint.label ?? label;
-
+const PerformanceTooltip = ({ point }: { point: Record<string, unknown> }) => {
+    const heading = typeof point.tooltipLabel === 'string' ? point.tooltipLabel : undefined;
     return (
-        <div className="min-w-[160px] rounded-lg border border-border bg-card p-3 shadow-lg">
-            <div className="mb-2 font-medium text-foreground text-sm">{heading}</div>
+        <div className="min-w-[160px] px-3 py-2.5">
+            {heading ? <div className="mb-2 font-medium text-chart-tooltip-foreground text-xs">{heading}</div> : null}
             <div className="space-y-1.5">
                 {CHARTED_METRICS.map(metric => {
-                    const value = dataPoint[metric.key];
+                    const value = point[metric.key];
                     if (typeof value !== 'number') {
                         return null;
                     }
                     return (
                         <div className="flex items-center justify-between gap-4" key={metric.key}>
                             <div className="flex items-center gap-1.5">
-                                {metric.color ? <span className="ink-dot" style={{ backgroundColor: metric.color }} /> : <span className="size-2 rounded-full bg-zinc-300 dark:bg-zinc-600" />}
-                                <span className="text-muted-foreground text-xs">{metric.label}</span>
+                                <span className="ink-dot" style={{ backgroundColor: metric.color ?? 'var(--chart-foreground-muted)' }} />
+                                <span className="text-chart-tooltip-muted text-xs">{metric.label}</span>
                             </div>
-                            <span className="font-medium text-xs">{metric.formatter(value)}</span>
+                            <span className="font-medium text-chart-tooltip-foreground text-xs tabular-nums">{metric.formatter(value)}</span>
                         </div>
                     );
                 })}
@@ -422,15 +234,3 @@ const CustomTooltip = ({
         </div>
     );
 };
-
-/** Flat cel bands under a series line, hard-stopped like the header lighthouse's shading. */
-const CelBands = ({ color, id }: { color: string; id: string }) => (
-    <linearGradient id={id} x1="0" x2="0" y1="0" y2="1">
-        <stop offset="0%" style={{ stopColor: color, stopOpacity: 0.22 }} />
-        <stop offset="34%" style={{ stopColor: color, stopOpacity: 0.22 }} />
-        <stop offset="34%" style={{ stopColor: color, stopOpacity: 0.11 }} />
-        <stop offset="68%" style={{ stopColor: color, stopOpacity: 0.11 }} />
-        <stop offset="68%" style={{ stopColor: color, stopOpacity: 0.04 }} />
-        <stop offset="100%" style={{ stopColor: color, stopOpacity: 0.04 }} />
-    </linearGradient>
-);

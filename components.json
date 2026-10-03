@@ -12,13 +12,14 @@
   },
   "iconLibrary": "lucide",
   "aliases": {
-    "components": "@/components",
-    "utils": "@/lib/utils",
-    "ui": "@/components/ui",
-    "lib": "@/lib",
-    "hooks": "@/hooks"
+    "components": "@/dashboard/components",
+    "utils": "@/dashboard/lib/utils",
+    "ui": "@/dashboard/components/ui",
+    "lib": "@/dashboard/lib",
+    "hooks": "@/dashboard/hooks"
   },
   "registries": {
-    "@coss": "https://coss.com/ui/r/{name}.json"
+    "@coss": "https://coss.com/ui/r/{name}.json",
+    "@bklit": "https://ui.bklit.com/r/{name}.json"
   }
 }
