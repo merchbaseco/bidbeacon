@@ -1,76 +1,55 @@
 /* Header lighthouse. Tune the beam here. */
 .header-lighthouse {
-    /* Beam angle at rest and at the far end of the sweep (0deg points right, -90deg straight up). */
-    --lighthouse-beam-rest: -150deg;
-    --lighthouse-beam-peak: -30deg;
-    /* One full cycle: rest, then sweep out and back with ease-in-out. */
-    --lighthouse-beam-duration: 10s;
-    /* Share of each cycle spent at rest, 0..1. */
-    --lighthouse-beam-rest-fraction: 0.5;
+    /* One full revolution of the beam. */
+    --lighthouse-revolution: 10s;
+    /* Frames in header-lighthouse-beam.webp (one revolution, 3deg apart, 0 = facing the viewer). */
+    --lighthouse-frames: 120;
+    /* Frame held when motion is reduced: the beam reaching up and to the left. */
+    --lighthouse-rest-frame: 45;
 
-    /* Geometry of the raster, in CSS px: the deck's centre sits on the page centre,
-       and the lamp is measured from the same render. */
-    --lighthouse-deck-center: 48.18px;
-    --lighthouse-lamp-x: 48.94px;
-    --lighthouse-lamp-bottom: 25.75px;
+    /* Both layers share this box; the deck's centre is the box's centre. */
+    --lighthouse-width: 200px;
+    --lighthouse-height: 68px;
 
     position: absolute;
-    inset: 0;
+    bottom: 0;
+    left: calc(50% - var(--lighthouse-width) / 2);
+    width: var(--lighthouse-width);
+    height: var(--lighthouse-height);
     pointer-events: none;
 }
 
-.header-lighthouse-mark {
+.header-lighthouse-tower,
+.header-lighthouse-beam {
     position: absolute;
-    bottom: 0;
-    left: calc(50% - var(--lighthouse-deck-center));
-    width: 84px;
-    height: 63px;
+    inset: 0;
+    width: 100%;
+    height: 100%;
 }
 
-/* `--lighthouse-beam-clock` runs 0 -> 1 linearly each cycle. After the rest share it
-   drives a cosine sweep, which eases in and out at both ends and needs no extra stops. */
-@property --lighthouse-beam-clock {
-    syntax: "<number>";
-    inherits: false;
-    initial-value: 0;
+/* A 2x vertical strip of every frame, stepped one frame at a time. */
+.header-lighthouse-beam {
+    background-image: url("/header-lighthouse-beam.webp");
+    background-repeat: no-repeat;
+    background-size: var(--lighthouse-width) auto;
+    animation: lighthouse-beam-turn var(--lighthouse-revolution)
+        steps(var(--lighthouse-frames)) infinite;
 }
 
-@keyframes lighthouse-beam-clock {
+@keyframes lighthouse-beam-turn {
     from {
-        --lighthouse-beam-clock: 0;
+        background-position: 0 0;
     }
     to {
-        --lighthouse-beam-clock: 1;
+        background-position: 0
+            calc(var(--lighthouse-height) * var(--lighthouse-frames) * -1);
     }
-}
-
-.header-lighthouse-beam {
-    --lighthouse-beam-phase: clamp(
-        0,
-        (var(--lighthouse-beam-clock) - var(--lighthouse-beam-rest-fraction)) /
-        (1 - var(--lighthouse-beam-rest-fraction)),
-        1
-    );
-
-    position: absolute;
-    /* The 1px SVG box's top-left corner is the beam apex, so lift it 1px onto the lamp. */
-    bottom: calc(var(--lighthouse-lamp-bottom) - 1px);
-    left: calc(50% - var(--lighthouse-deck-center) + var(--lighthouse-lamp-x));
-    transform-origin: 0 0;
-    transform: rotate(
-        calc(
-            var(--lighthouse-beam-rest) +
-            (var(--lighthouse-beam-peak) - var(--lighthouse-beam-rest)) *
-            (1 - cos(2 * pi * var(--lighthouse-beam-phase))) /
-            2
-        )
-    );
-    animation: lighthouse-beam-clock var(--lighthouse-beam-duration) linear
-        infinite;
 }
 
 @media (prefers-reduced-motion: reduce) {
     .header-lighthouse-beam {
         animation: none;
+        background-position: 0
+            calc(var(--lighthouse-height) * var(--lighthouse-rest-frame) * -1);
     }
 }
