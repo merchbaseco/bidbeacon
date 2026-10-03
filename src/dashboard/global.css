@@ -34,8 +34,6 @@
     --color-beacon: var(--beacon);
     --color-beacon-ink: var(--beacon-ink);
     --color-beacon-lamp: var(--beacon-lamp);
-    --shadow-ink: 2px 2px 0 0 var(--beacon-shadow);
-    --shadow-ink-sm: 1px 1px 0 0 var(--beacon-shadow);
 
     --color-destructive-foreground: var(--destructive-foreground);
     --color-info: var(--info);
@@ -142,6 +140,10 @@
     --beacon: var(--color-indigo-500);
     --beacon-ink: var(--color-indigo-950);
     --beacon-shadow: var(--color-indigo-900);
+    /* Raised ink controls: shadow depth at rest, hover lift, press travel. */
+    --ink-depth: 3px;
+    --ink-lift: 1px;
+    --ink-press: 2px;
     --beacon-lamp: var(--color-amber-500);
 
     --destructive-foreground: var(--color-red-700);
@@ -380,4 +382,54 @@ html.dark {
     border: 1.5px solid var(--beacon-ink);
     border-radius: 9999px;
     box-shadow: inset 1.5px 1.5px 0 rgb(255 255 255 / 0.45);
+}
+
+/*
+ * Lighthouse ink: a control raised on a hard offset shadow. Hover lifts the face while the
+ * shadow's far edge stays planted; press pushes it toward the shadow. Composes with Tailwind's
+ * ring variables so focus rings still show.
+ */
+.ink-raised {
+    --ink-offset: var(--ink-depth);
+    --tw-shadow: var(--ink-offset) var(--ink-offset) 0 0 var(--beacon-shadow);
+    box-shadow:
+        var(--tw-inset-shadow, 0 0 #0000),
+        var(--tw-inset-ring-shadow, 0 0 #0000),
+        var(--tw-ring-offset-shadow, 0 0 #0000),
+        var(--tw-ring-shadow, 0 0 #0000), var(--tw-shadow);
+    transition-property: transform, box-shadow, background-color;
+    transition-duration: 110ms;
+    transition-timing-function: ease-out;
+}
+
+/* Quiet: no shadow at rest (dense repeated controls); lifts the same way on hover. */
+.ink-raised--quiet {
+    --ink-offset: 0px;
+}
+
+.ink-raised:where(:not(:disabled, [data-disabled])):hover {
+    --ink-offset: calc(var(--ink-depth) + var(--ink-lift));
+    transform: translate(
+        calc(var(--ink-lift) * -1),
+        calc(var(--ink-lift) * -1)
+    );
+}
+
+.ink-raised:where(:not(:disabled, [data-disabled])):is(
+        :active,
+        [data-pressed],
+        [data-popup-open]
+    ) {
+    --ink-offset: calc(var(--ink-depth) - var(--ink-press));
+    transform: translate(var(--ink-press), var(--ink-press));
+}
+
+.ink-raised:is(:disabled, [data-disabled]) {
+    --tw-shadow: 0 0 #0000;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ink-raised:is(:hover, :active, [data-pressed], [data-popup-open]) {
+        transform: none;
+    }
 }
