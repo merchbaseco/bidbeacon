@@ -14,6 +14,7 @@ import { HugeiconsIcon } from '@hugeicons/react';
 import { LighthouseIcon } from '@hugeicons-pro/core-solid-rounded';
 import { Outlet } from 'react-router';
 import { DevAutoSignIn } from './components/dev-auto-sign-in';
+import { HeaderLighthouse } from './components/header-lighthouse';
 import { MoreMenu } from './components/more-menu';
 import { Toaster } from './components/ui/toast';
 import { TRPCProvider } from './lib/trpc-provider';
@@ -36,15 +37,16 @@ export function RootRoute() {
             <div aria-hidden className="background-frame" />
 
             <div className="relative z-10">
-                <header className="border-border border-b">
-                    <div className="mx-auto max-w-background-frame-max p-4">
+                <header className="relative overflow-hidden border-border border-b">
+                    <HeaderLighthouse />
+                    <div className="relative mx-auto max-w-background-frame-max p-4">
                         <div className="flex items-center justify-between gap-4 md:grid md:grid-cols-3">
                             <div className="hidden items-center gap-4 md:flex">
                                 <AccountSelector />
                             </div>
                             <div className="flex items-center gap-2 text-neutral-950 md:justify-center dark:text-neutral-50">
-                                <HugeiconsIcon icon={LighthouseIcon} size={28} />
-                                <p className="font-bold font-mono text-xl md:text-2xl">BidBeacon</p>
+                                <HugeiconsIcon className="md:hidden" icon={LighthouseIcon} size={28} />
+                                <p className="font-bold font-mono text-xl md:sr-only">BidBeacon</p>
                             </div>
                             <div className="flex items-center justify-end gap-2">
                                 <div className="md:hidden">
