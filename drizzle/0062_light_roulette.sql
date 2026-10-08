@@ -1,0 +1,1 @@
+ALTER TABLE "worker_control" ADD COLUMN "last_polled_at" timestamp with time zone;

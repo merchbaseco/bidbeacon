@@ -23,6 +23,13 @@ describe('compose access runtime environment', () => {
         expect(worker).not.toContain('BIDBEACON_CLERK_WEBHOOK_SIGNING_SECRET');
         expect(worker).not.toContain('BIDBEACON_RANKWRANGLER_BASE_URL');
     });
+
+    it('probes the worker with the poll healthcheck', () => {
+        const worker = getServiceBlock('worker', 'caddy');
+
+        expect(worker).toContain('test: ["CMD", "node", "dist/worker-healthcheck.js"]');
+        expect(worker).not.toContain('pgrep');
+    });
 });
 
 const getServiceBlock = (service: string, nextService: string) => {

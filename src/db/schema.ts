@@ -693,6 +693,10 @@ export const workerControl = pgTable('worker_control', {
     id: text('id').primaryKey().default('main'),
     enabled: boolean('enabled').notNull().default(true),
     messagesPerSecond: bigint('messages_per_second', { mode: 'number' }).notNull().default(0), // max messages per second (0 = unlimited)
+    lastPolledAt: timestamp('last_polled_at', {
+        withTimezone: true,
+        mode: 'date',
+    }),
     updatedAt: timestamp('updated_at', {
         withTimezone: true,
         mode: 'date',

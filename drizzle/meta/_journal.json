@@ -435,6 +435,13 @@
       "when": 1786232092449,
       "tag": "0061_open_lester",
       "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1791490878680,
+      "tag": "0062_light_roulette",
+      "breakpoints": true
     }
   ]
 }

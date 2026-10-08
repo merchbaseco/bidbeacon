@@ -331,6 +331,8 @@ Docker Compose services vs container names:
 
 ### Checking Health
 
+The service URL is `GET /api/health` (public `https://bidbeacon.merchbase.co/api/health`). 200 means the checks passed. 503 means `status` is `degraded`, and `failing` names the checks from `docs/infrastructure.md`. A paused worker or a stuck poll shows up as `ams-stream`, not as a running process.
+
 ```bash
 # Container status
 docker ps --format "table {{.Names}}\t{{.Status}}" | grep bidbeacon

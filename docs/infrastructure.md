@@ -130,6 +130,33 @@ against a token's `azp`, the development arm lists both loopback spellings of
 each dev-server port: `BIDBEACON_DEV_HOST` decides which one Vite prints, and a
 session opened on the other one would otherwise be rejected.
 
+## Health
+
+`GET /api/health` is unauthenticated.
+
+The route returns 200 `{"status":"ok"}` when every check passes. It returns 503 `{"status":"degraded","failing":[...]}` otherwise. `timestamp` and `service` are also present. The body lists failing check names only.
+
+| Check | Query | Cadence | Limit |
+| --- | --- | --- | --- |
+| `database` | `SELECT 1` | each request | query succeeds |
+| `report-dispatch` | latest succeeded `job_metrics.finished_at` for `dispatch-due-reports` | every minute | 10 minutes |
+| `report-datasets` | latest succeeded `job_metrics.finished_at` for `update-report-datasets` | every 5 minutes | 20 minutes |
+| `hourly-performance` | latest succeeded `job_metrics.finished_at` for `summarize-hourly-target-stream` | every 5 minutes | 20 minutes |
+| `daily-performance` | latest succeeded `job_metrics.finished_at` for `summarize-daily-target-stream` | every 15 minutes | 60 minutes |
+| `campaign-sync` | latest succeeded `job_metrics.finished_at` for `sync-ad-entities` | daily at 03:00 UTC | 36 hours |
+| `change-history` | latest succeeded `job_metrics.finished_at` for `sync-change-history` | hourly at minute 20 | 3 hours |
+| `ams-stream` | `worker_control.last_polled_at` where `id = 'main'` | after every successful SQS receive | 5 minutes |
+
+Job checks use the scheduler row (`dispatch-due-reports`, `update-report-datasets`, `summarize-hourly-target-stream`, `summarize-daily-target-stream`, `sync-ad-entities`, `sync-change-history`), which is written on every run including when there is nothing to do. They do not use per-account jobs or `update-report-status`.
+
+`ams-stream` is `worker_control.last_polled_at`, written after every successful receive, including an empty queue. It is not written while the worker is paused, so a pause fails this check after 5 minutes.
+
+A missing signal passes only until the server process is older than that check's limit, because the worker container starts after the server healthcheck and a new database has no job rows yet. An old timestamp fails immediately.
+
+Docker: server and caddy probe this URL. The worker probe runs `node dist/worker-healthcheck.js`, which applies the same 5 minute poll limit with no startup grace. `start_period` is 90s.
+
+Deploy smoke `curl --fail https://bidbeacon.merchbase.co/api/health` stays valid because a healthy service still returns 200.
+
 ## Adding a variable
 
 Declare it in `.env.schema` with an explicit `@sensitive` or `@public`, a `test`

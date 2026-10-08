@@ -9,6 +9,7 @@ export default defineConfig({
             input: {
                 index: resolve(__dirname, 'src/index.ts'),
                 worker: resolve(__dirname, 'src/worker/index.ts'),
+                'worker-healthcheck': resolve(__dirname, 'src/worker/healthcheck.ts'),
             },
             external: [
                 // Node.js built-ins
