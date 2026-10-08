@@ -132,9 +132,13 @@ session opened on the other one would otherwise be rejected.
 
 ## Health
 
-`GET /api/health` is unauthenticated.
+Two unauthenticated URLs.
 
-The route returns 200 `{"status":"ok"}` when every check passes. It returns 503 `{"status":"degraded","failing":[...]}` otherwise. `timestamp` and `service` are also present. The body lists failing check names only.
+`GET /api/live` is liveness. It runs `SELECT 1` and does not read job or poll timestamps. It returns 200 `{"status":"ok"}` when that query succeeds, and 503 `{"status":"degraded","failing":["database"]}` when it does not. `timestamp` and `service` are also present.
+
+Container probes and the deploy smoke check use liveness. The server image and the Compose server probe fetch `http://127.0.0.1:8080/api/live`. Caddy fetches `http://localhost/api/live`. The worker and Caddy wait on `server: service_healthy`, so they wait on liveness. Deploy smoke curls `https://bidbeacon.merchbase.co/api/live`.
+
+`GET /api/health` is the freshness report for the external watcher. It returns 200 `{"status":"ok"}` when every check passes. It returns 503 `{"status":"degraded","failing":[...]}` otherwise. `timestamp` and `service` are also present. The body lists failing check names only.
 
 | Check | Query | Cadence | Limit |
 | --- | --- | --- | --- |
@@ -151,11 +155,9 @@ Job checks use the scheduler row (`dispatch-due-reports`, `update-report-dataset
 
 `ams-stream` is `worker_control.last_polled_at`, written after every successful receive, including an empty queue. It is not written while the worker is paused, so a pause fails this check after 5 minutes.
 
-A missing signal passes only until the server process is older than that check's limit, because the worker container starts after the server healthcheck and a new database has no job rows yet. An old timestamp fails immediately.
+A missing freshness timestamp passes only until the server process is older than that check's limit, so a new database does not page before the first cron. An old timestamp fails `GET /api/health` immediately. It does not stop the server, the worker, or Caddy, because those containers probe `/api/live` instead.
 
-Docker: server and caddy probe this URL. The worker probe runs `node dist/worker-healthcheck.js`, which applies the same 5 minute poll limit with no startup grace. `start_period` is 90s.
-
-Deploy smoke `curl --fail https://bidbeacon.merchbase.co/api/health` stays valid because a healthy service still returns 200.
+The worker probe is `node dist/worker-healthcheck.js`. It reads `last_polled_at` in that container and does not call the server. A poll older than 5 minutes fails that probe until the worker writes a new one. The worker process still starts, because it waits on server liveness. `start_period` is 90s, which covers the first receive.
 
 ## Adding a variable
 

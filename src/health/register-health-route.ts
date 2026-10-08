@@ -3,7 +3,35 @@ import { assessHealth, type HealthSignals } from '@/health/health-checks';
 
 const healthServiceName = 'bidbeacon-server';
 
-export const registerHealthRoute = (fastify: FastifyInstance, options: { now?: () => Date; readSignals: () => Promise<HealthSignals> }) => {
+export const registerHealthRoute = (fastify: FastifyInstance, options: { now?: () => Date; pingDatabase: () => Promise<boolean>; readSignals: () => Promise<HealthSignals> }) => {
+    fastify.get('/api/live', async (request, reply) => {
+        const readNow = options.now ?? defaultNow;
+        let databaseOk = false;
+
+        try {
+            databaseOk = await options.pingDatabase();
+        } catch (error) {
+            request.log.error({ err: error }, 'Liveness check failed');
+        }
+
+        const timestamp = readNow().toISOString();
+        if (!databaseOk) {
+            reply.code(503);
+            return {
+                status: 'degraded' as const,
+                failing: ['database'],
+                timestamp,
+                service: healthServiceName,
+            };
+        }
+
+        return {
+            status: 'ok' as const,
+            timestamp,
+            service: healthServiceName,
+        };
+    });
+
     fastify.get('/api/health', async (request, reply) => {
         const readNow = options.now ?? defaultNow;
         let signals: HealthSignals;

@@ -17,6 +17,7 @@ describe('GET /api/health', () => {
     it('returns 200 and the ok body without an Authorization header', async () => {
         app = Fastify({ logger: false });
         registerHealthRoute(app, {
+            pingDatabase: async () => true,
             now: () => {
                 throw new Error('success path must use signals.observedAt');
             },
@@ -47,6 +48,7 @@ describe('GET /api/health', () => {
 
         app = Fastify({ logger: false });
         registerHealthRoute(app, {
+            pingDatabase: async () => true,
             now: () => {
                 throw new Error('success path must use signals.observedAt');
             },
@@ -77,6 +79,7 @@ describe('GET /api/health', () => {
     it('returns 503 database when reading signals throws', async () => {
         app = Fastify({ logger: false });
         registerHealthRoute(app, {
+            pingDatabase: async () => true,
             now: () => thrownAt,
             readSignals: async () => {
                 throw new Error('connect ECONNREFUSED 10.1.2.3 password=secret');
@@ -100,9 +103,37 @@ describe('GET /api/health', () => {
         expect(response.body).not.toContain('password=secret');
     });
 
+    it('returns 503 database from liveness when the ping fails and hides the error', async () => {
+        app = Fastify({ logger: false });
+        registerHealthRoute(app, {
+            now: () => thrownAt,
+            pingDatabase: async () => {
+                throw new Error('connect ECONNREFUSED 10.1.2.3 password=secret');
+            },
+            readSignals: async () => signals(),
+        });
+        await app.ready();
+
+        const response = await app.inject({
+            method: 'GET',
+            url: '/api/live',
+        });
+
+        expect(response.statusCode).toBe(503);
+        expect(response.json()).toEqual({
+            status: 'degraded',
+            failing: ['database'],
+            timestamp: thrownAt.toISOString(),
+            service: 'bidbeacon-server',
+        });
+        expect(response.body).not.toContain('10.1.2.3');
+        expect(response.body).not.toContain('password=secret');
+    });
+
     it('returns 503 for HEAD when the service is degraded', async () => {
         app = Fastify({ logger: false });
         registerHealthRoute(app, {
+            pingDatabase: async () => true,
             readSignals: async () =>
                 signals({
                     databaseOk: false,

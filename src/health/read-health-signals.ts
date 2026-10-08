@@ -3,12 +3,19 @@ import type { Database } from '@/db/index';
 import { jobMetrics, workerControl } from '@/db/schema';
 import { type HealthSignals, healthChecks } from '@/health/health-checks';
 
+export const pingDatabase = async (database: Database) => {
+    try {
+        await database.execute(sql`SELECT 1`);
+        return true;
+    } catch {
+        return false;
+    }
+};
+
 export const readHealthSignals = async (database: Database, processStartedAt: Date): Promise<HealthSignals> => {
     const observedAt = new Date();
 
-    try {
-        await database.execute(sql`SELECT 1`);
-    } catch {
+    if (!(await pingDatabase(database))) {
         return {
             at: blankMeasuredAt(),
             databaseOk: false,

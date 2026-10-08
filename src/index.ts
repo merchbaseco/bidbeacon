@@ -12,7 +12,7 @@ import { appRouter } from '@/api/router.js';
 import { db, testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
 import { accountDatasetMetadata, reportDatasetMetadata } from '@/db/schema.js';
-import { readHealthSignals } from '@/health/read-health-signals';
+import { pingDatabase, readHealthSignals } from '@/health/read-health-signals';
 import { registerHealthRoute } from '@/health/register-health-route';
 import { startJobs, stopJobs } from '@/jobs/index.js';
 import { createBidBeaconMcpAuth } from '@/mcp/auth';
@@ -152,6 +152,7 @@ async function registerRoutes(fastify: FastifyInstance) {
     const ticketStore = createBidBeaconRealtimeTicketStore();
 
     registerHealthRoute(fastify, {
+        pingDatabase: () => pingDatabase(db),
         readSignals: () => readHealthSignals(db, healthProcessStartedAt),
     });
 

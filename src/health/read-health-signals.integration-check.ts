@@ -12,7 +12,7 @@ import Fastify from 'fastify';
 import { afterEach, describe, expect, it } from 'vitest';
 import { jobMetrics, workerControl } from '@/db/schema';
 import { assessHealth, healthChecks } from '@/health/health-checks';
-import { readHealthSignals } from '@/health/read-health-signals';
+import { pingDatabase, readHealthSignals } from '@/health/read-health-signals';
 import { registerHealthRoute } from '@/health/register-health-route';
 import { createTestDatabase, type TestDatabase } from '@/operations/testing/create-test-database';
 import { recordAmsPoll } from '@/worker/record-ams-poll';
@@ -47,6 +47,7 @@ describe('read health signals', () => {
         const app = Fastify({ logger: false });
         const db = database.db;
         registerHealthRoute(app, {
+            pingDatabase: () => pingDatabase(db as never),
             readSignals: () => readHealthSignals(db as never, processStartedAt),
         });
         await app.ready();
@@ -54,8 +55,14 @@ describe('read health signals', () => {
             method: 'GET',
             url: '/api/health',
         });
+        const live = await app.inject({
+            method: 'GET',
+            url: '/api/live',
+        });
         await app.close();
 
+        expect(live.statusCode).toBe(200);
+        expect(live.json().status).toBe('ok');
         expect(response.statusCode).toBe(200);
         expect(response.json()).toEqual({
             service: 'bidbeacon-server',

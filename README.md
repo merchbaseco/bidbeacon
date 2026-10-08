@@ -5,7 +5,7 @@ Fastify-based API for BidBeacon's Amazon Ads integration.
 ## Production
 
 - **URL:** https://bidbeacon.merchbase.co
-- **Health check:** `GET /api/health` returns 200 when the checks passed and 503 when `status` is `degraded`.
+- **Health check:** `GET /api/health` returns 200 when the freshness checks passed and 503 when `status` is `degraded`. Container probes and deploy smoke use `GET /api/live` (`SELECT 1` only).
 - **Remote MCP:** `POST https://bidbeacon.merchbase.co/mcp` (Clerk OAuth; see [`docs/mcp.md`](docs/mcp.md))
 
 ## Local Development
