@@ -5,7 +5,7 @@ Fastify-based API for BidBeacon's Amazon Ads integration.
 ## Production
 
 - **URL:** https://bidbeacon.merchbase.co
-- **Health check:** `GET /api/health`
+- **Health check:** `GET /api/health` returns 200 when the freshness checks passed and 503 when `status` is `degraded`. Container probes and deploy smoke use `GET /api/live` (`SELECT 1` only).
 - **Remote MCP:** `POST https://bidbeacon.merchbase.co/mcp` (Clerk OAuth; see [`docs/mcp.md`](docs/mcp.md))
 
 ## Local Development
@@ -31,7 +31,9 @@ bun run dev:server
 
 `bun run dev` and `bun run dev:server` resolve
 `BIDBEACON_DISABLE_SERVER_JOB_RUNNER=true` from the schema's development arm, so
-local app-server sessions do not start PgBoss workers. Override for one run:
+local app-server sessions do not start PgBoss workers. With the runner left
+disabled, those job checks fail once the process is older than the limit unless
+this database already has a fresh succeeded row. Override for one run:
 
 ```bash
 BIDBEACON_DISABLE_SERVER_JOB_RUNNER=false bun run dev:server

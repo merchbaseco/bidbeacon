@@ -7,6 +7,7 @@ import { createContextLogger } from '@/utils/logger';
 import { resolveAmsAccountIds } from './account-resolution';
 import { createDatabaseAmsAccountLookup } from './database-account-resolution';
 import { type AmsMessage, processAmsMessage } from './message-processor';
+import { recordAmsPoll } from './record-ams-poll';
 import { routePayload } from './router';
 import { deleteMessage, receiveMessages, testAwsConnection } from './sqs-client';
 
@@ -106,6 +107,12 @@ async function runWorker(): Promise<void> {
             // Always use 10 second long polling
             const waitTimeSeconds = 10;
             const messages = await receiveMessages(waitTimeSeconds);
+
+            try {
+                await recordAmsPoll(db, new Date());
+            } catch (error) {
+                logger.error({ err: error }, 'Failed to record AMS poll');
+            }
 
             // If shutting down, exit immediately without processing
             if (shuttingDown) {

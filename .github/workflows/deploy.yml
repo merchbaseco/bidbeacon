@@ -73,5 +73,5 @@ jobs:
       - name: Verify from the consumer
         run: |
           curl --fail --show-error --silent --max-time 20 \
-            https://bidbeacon.merchbase.co/api/health > /dev/null
-          echo "Health endpoint OK."
+            https://bidbeacon.merchbase.co/api/live > /dev/null
+          echo "Liveness endpoint OK."

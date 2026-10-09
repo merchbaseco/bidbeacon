@@ -130,6 +130,35 @@ against a token's `azp`, the development arm lists both loopback spellings of
 each dev-server port: `BIDBEACON_DEV_HOST` decides which one Vite prints, and a
 session opened on the other one would otherwise be rejected.
 
+## Health
+
+Two unauthenticated URLs.
+
+`GET /api/live` is liveness. It runs `SELECT 1` and does not read job or poll timestamps. It returns 200 `{"status":"ok"}` when that query succeeds, and 503 `{"status":"degraded","failing":["database"]}` when it does not. `timestamp` and `service` are also present.
+
+Container probes and the deploy smoke check use liveness. The server image and the Compose server probe fetch `http://127.0.0.1:8080/api/live`. Caddy fetches `http://localhost/api/live`. The worker and Caddy wait on `server: service_healthy`, so they wait on liveness. Deploy smoke curls `https://bidbeacon.merchbase.co/api/live`.
+
+`GET /api/health` is the freshness report for the external watcher. It returns 200 `{"status":"ok"}` when every check passes. It returns 503 `{"status":"degraded","failing":[...]}` otherwise. `timestamp` and `service` are also present. The body lists failing check names only.
+
+| Check | Query | Cadence | Limit |
+| --- | --- | --- | --- |
+| `database` | `SELECT 1` | each request | query succeeds |
+| `report-dispatch` | latest succeeded `job_metrics.finished_at` for `dispatch-due-reports` | every minute | 10 minutes |
+| `report-datasets` | latest succeeded `job_metrics.finished_at` for `update-report-datasets` | every 5 minutes | 20 minutes |
+| `hourly-performance` | latest succeeded `job_metrics.finished_at` for `summarize-hourly-target-stream` | every 5 minutes | 20 minutes |
+| `daily-performance` | latest succeeded `job_metrics.finished_at` for `summarize-daily-target-stream` | every 15 minutes | 60 minutes |
+| `campaign-sync` | latest succeeded `job_metrics.finished_at` for `sync-ad-entities` | daily at 03:00 UTC | 36 hours |
+| `change-history` | latest succeeded `job_metrics.finished_at` for `sync-change-history` | hourly at minute 20 | 3 hours |
+| `ams-stream` | `worker_control.last_polled_at` where `id = 'main'` | after every successful SQS receive | 5 minutes |
+
+Job checks use the scheduler row (`dispatch-due-reports`, `update-report-datasets`, `summarize-hourly-target-stream`, `summarize-daily-target-stream`, `sync-ad-entities`, `sync-change-history`), which is written on every run including when there is nothing to do. They do not use per-account jobs or `update-report-status`.
+
+`ams-stream` is `worker_control.last_polled_at`, written after every successful receive, including an empty queue. It is not written while the worker is paused, so a pause fails this check after 5 minutes.
+
+A missing freshness timestamp passes only until the server process is older than that check's limit, so a new database does not page before the first cron. An old timestamp fails `GET /api/health` immediately. It does not stop the server, the worker, or Caddy, because those containers probe `/api/live` instead.
+
+The worker probe is `node dist/worker-healthcheck.js`. It reads `last_polled_at` in that container and does not call the server. A poll older than 5 minutes fails that probe until the worker writes a new one. The worker process still starts, because it waits on server liveness. `start_period` is 90s, which covers the first receive.
+
 ## Adding a variable
 
 Declare it in `.env.schema` with an explicit `@sensitive` or `@public`, a `test`

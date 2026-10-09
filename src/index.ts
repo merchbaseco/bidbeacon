@@ -12,6 +12,8 @@ import { appRouter } from '@/api/router.js';
 import { db, testConnection } from '@/db/index.js';
 import { runMigrations } from '@/db/migrate.js';
 import { accountDatasetMetadata, reportDatasetMetadata } from '@/db/schema.js';
+import { pingDatabase, readHealthSignals } from '@/health/read-health-signals';
+import { registerHealthRoute } from '@/health/register-health-route';
 import { startJobs, stopJobs } from '@/jobs/index.js';
 import { createBidBeaconMcpAuth } from '@/mcp/auth';
 import { registerBidBeaconMcpRoutes } from '@/mcp/http';
@@ -22,6 +24,7 @@ import { getBidBeaconAccess } from '@/services/access/bidbeacon-access';
 import { emitEvent } from '@/utils/events.js';
 
 const PORT = Number(process.env.BIDBEACON_PORT) || 8080;
+const healthProcessStartedAt = new Date();
 
 // ============================================================================
 // BidBeacon Server Startup
@@ -148,12 +151,10 @@ async function registerRoutes(fastify: FastifyInstance) {
     const access = getBidBeaconAccess();
     const ticketStore = createBidBeaconRealtimeTicketStore();
 
-    // Health check endpoint
-    fastify.get('/api/health', async () => ({
-        status: 'ok',
-        timestamp: new Date().toISOString(),
-        service: 'bidbeacon-server',
-    }));
+    registerHealthRoute(fastify, {
+        pingDatabase: () => pingDatabase(db),
+        readSignals: () => readHealthSignals(db, healthProcessStartedAt),
+    });
 
     // Auth, realtime ticket, and WebSocket endpoints are registered before tRPC.
     await registerClerkAccessWebhookRoute(fastify, {

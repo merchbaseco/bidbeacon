@@ -331,6 +331,8 @@ Docker Compose services vs container names:
 
 ### Checking Health
 
+The watcher URL is `GET /api/health` (public `https://bidbeacon.merchbase.co/api/health`). 200 means the freshness checks passed. 503 means `status` is `degraded`, and `failing` names the checks from `docs/infrastructure.md`. A paused worker or a stuck poll shows up as `ams-stream`. Container health and deploy smoke use `GET /api/live`, which is `SELECT 1` only, so a stale job does not keep the server, worker, or Caddy from starting.
+
 ```bash
 # Container status
 docker ps --format "table {{.Names}}\t{{.Status}}" | grep bidbeacon
