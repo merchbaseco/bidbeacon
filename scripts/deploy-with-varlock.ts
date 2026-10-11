@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { delimiter, join } from 'node:path';
+import { parseCommitSha, readExpectedRevision, removeRevisionStamp, writeRevisionStamp } from '../src/health/revision-stamp';
 
 /**
  * The production deploy runs under the deploy-agent role: every venue that
@@ -25,7 +26,43 @@ const installTokenName = 'MERCHBASE_GITHUB_NPM_TOKEN';
 const hugeiconsTokenName = 'MERCHBASE_HUGEICONS_LICENSE_KEY';
 const projectName = 'bidbeacon';
 
-const dryRun = process.argv.includes('--dry-run');
+const deployArgv = process.argv.slice(2);
+const dryRun = deployArgv.includes('--dry-run');
+
+let expectedRevision: string | undefined;
+try {
+    expectedRevision = readExpectedRevision(deployArgv);
+} catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    process.exit(1);
+}
+
+const readHeadCommitSha = (): string => {
+    const resolved = spawnSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' });
+    if (resolved.status !== 0) {
+        console.error('git rev-parse HEAD failed; cannot determine deploy revision.');
+        process.exit(resolved.status ?? 1);
+    }
+
+    try {
+        return parseCommitSha((resolved.stdout ?? '').trim());
+    } catch (error) {
+        console.error(error instanceof Error ? error.message : String(error));
+        process.exit(1);
+    }
+};
+
+const assertRevisionMatchesExpected = (headSha: string) => {
+    if (expectedRevision !== undefined && headSha !== expectedRevision) {
+        console.error(`Expected revision ${expectedRevision} but HEAD is ${headSha}.`);
+        process.exit(1);
+    }
+};
+
+if (expectedRevision !== undefined) {
+    const headSha = readHeadCommitSha();
+    assertRevisionMatchesExpected(headSha);
+}
 
 // A leftover .env in the deploy checkout silently poisons the whole resolution:
 // varlock loads it at higher precedence than the schema, so its stale values win,
@@ -137,10 +174,21 @@ if (dryRun) {
 
 console.log('Building images. Compose warnings about unset runtime variables are expected here — the build only consumes build arguments and the install tokens.');
 
-const build = spawnSync('docker', ['compose', ...composeArgs, 'build'], { env: buildEnvironment, stdio: 'inherit' });
-if (build.status !== 0) {
+const headSha = readHeadCommitSha();
+assertRevisionMatchesExpected(headSha);
+writeRevisionStamp(process.cwd(), headSha);
+
+let buildStatus: number | null = 1;
+try {
+    const build = spawnSync('docker', ['compose', ...composeArgs, 'build'], { env: buildEnvironment, stdio: 'inherit' });
+    buildStatus = build.status;
+} finally {
+    removeRevisionStamp(process.cwd());
+}
+
+if (buildStatus !== 0) {
     console.error('Image build failed; deploy not attempted.');
-    process.exit(build.status ?? 1);
+    process.exit(buildStatus ?? 1);
 }
 
 // Migrations run automatically on server startup (src/db/migrate.ts), so `up`

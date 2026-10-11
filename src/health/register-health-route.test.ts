@@ -36,6 +36,30 @@ describe('GET /api/health', () => {
             status: 'ok',
             timestamp: observedAt.toISOString(),
             service: 'bidbeacon-server',
+            revision: 'dev',
+        });
+    });
+
+    it('returns 200 and the live ok body', async () => {
+        app = Fastify({ logger: false });
+        registerHealthRoute(app, {
+            pingDatabase: async () => true,
+            now: () => observedAt,
+            readSignals: async () => signals(),
+        });
+        await app.ready();
+
+        const response = await app.inject({
+            method: 'GET',
+            url: '/api/live',
+        });
+
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({
+            status: 'ok',
+            timestamp: observedAt.toISOString(),
+            service: 'bidbeacon-server',
+            revision: 'dev',
         });
     });
 
@@ -73,6 +97,7 @@ describe('GET /api/health', () => {
             failing: ['report-dispatch', 'ams-stream'],
             timestamp: observedAt.toISOString(),
             service: 'bidbeacon-server',
+            revision: 'dev',
         });
     });
 
@@ -98,6 +123,7 @@ describe('GET /api/health', () => {
             failing: ['database'],
             timestamp: thrownAt.toISOString(),
             service: 'bidbeacon-server',
+            revision: 'dev',
         });
         expect(response.body).not.toContain('10.1.2.3');
         expect(response.body).not.toContain('password=secret');
@@ -125,6 +151,7 @@ describe('GET /api/health', () => {
             failing: ['database'],
             timestamp: thrownAt.toISOString(),
             service: 'bidbeacon-server',
+            revision: 'dev',
         });
         expect(response.body).not.toContain('10.1.2.3');
         expect(response.body).not.toContain('password=secret');

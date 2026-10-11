@@ -134,11 +134,13 @@ session opened on the other one would otherwise be rejected.
 
 Two unauthenticated URLs.
 
-`GET /api/live` is liveness. It runs `SELECT 1` and does not read job or poll timestamps. It returns 200 `{"status":"ok"}` when that query succeeds, and 503 `{"status":"degraded","failing":["database"]}` when it does not. `timestamp` and `service` are also present.
+`GET /api/live` is liveness. It runs `SELECT 1` and does not read job or poll timestamps. It returns 200 `{"status":"ok"}` when that query succeeds, and 503 `{"status":"degraded","failing":["database"]}` when it does not. `timestamp`, `service`, and `revision` are also present.
 
 Container probes and the deploy smoke check use liveness. The server image and the Compose server probe fetch `http://127.0.0.1:8080/api/live`. Caddy fetches `http://localhost/api/live`. The worker and Caddy wait on `server: service_healthy`, so they wait on liveness. Deploy smoke curls `https://bidbeacon.merchbase.co/api/live`.
 
-`GET /api/health` is the freshness report for the external watcher. It returns 200 `{"status":"ok"}` when every check passes. It returns 503 `{"status":"degraded","failing":[...]}` otherwise. `timestamp` and `service` are also present. The body lists failing check names only.
+`GET /api/health` is the freshness report for the external watcher. It returns 200 `{"status":"ok"}` when every check passes. It returns 503 `{"status":"degraded","failing":[...]}` otherwise. `timestamp`, `service`, and `revision` are also present. The body lists failing check names only.
+
+In production, `revision` is the 40-character lowercase hex SHA of the commit `bun run deploy` built, taken from `git rev-parse HEAD` on the deploy checkout and compiled into the server bundle at image build time. Local development and tests report `dev`.
 
 | Check | Query | Cadence | Limit |
 | --- | --- | --- | --- |

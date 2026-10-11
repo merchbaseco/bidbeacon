@@ -68,6 +68,7 @@ describe('read health signals', () => {
             service: 'bidbeacon-server',
             status: 'ok',
             timestamp: expect.stringMatching(isoTimestamp),
+            revision: 'dev',
         });
     });
 
