@@ -36,6 +36,7 @@ describe('cold start after a long outage', () => {
             status: 'ok',
             timestamp: observedAt.toISOString(),
             service: 'bidbeacon-server',
+            revision: 'dev',
         });
         expect(liveHead.statusCode).toBe(200);
         expect(health.statusCode).toBe(503);
@@ -44,6 +45,7 @@ describe('cold start after a long outage', () => {
             failing: ['campaign-sync', 'ams-stream'],
             timestamp: observedAt.toISOString(),
             service: 'bidbeacon-server',
+            revision: 'dev',
         });
 
         const server = serviceBlock('server', '\n  worker:\n');

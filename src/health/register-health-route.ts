@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import { deployedRevision } from '@/health/deployed-revision';
 import { assessHealth, type HealthSignals } from '@/health/health-checks';
 
 const healthServiceName = 'bidbeacon-server';
@@ -17,19 +18,16 @@ export const registerHealthRoute = (fastify: FastifyInstance, options: { now?: (
         const timestamp = readNow().toISOString();
         if (!databaseOk) {
             reply.code(503);
-            return {
-                status: 'degraded' as const,
-                failing: ['database'],
-                timestamp,
-                service: healthServiceName,
-            };
+            return healthResponse(
+                {
+                    status: 'degraded' as const,
+                    failing: ['database'],
+                },
+                timestamp
+            );
         }
 
-        return {
-            status: 'ok' as const,
-            timestamp,
-            service: healthServiceName,
-        };
+        return healthResponse({ status: 'ok' as const }, timestamp);
     });
 
     fastify.get('/api/health', async (request, reply) => {
@@ -41,12 +39,13 @@ export const registerHealthRoute = (fastify: FastifyInstance, options: { now?: (
         } catch (error) {
             request.log.error({ err: error }, 'Health check failed');
             reply.code(503);
-            return {
-                status: 'degraded' as const,
-                failing: ['database'],
-                timestamp: readNow().toISOString(),
-                service: healthServiceName,
-            };
+            return healthResponse(
+                {
+                    status: 'degraded' as const,
+                    failing: ['database'],
+                },
+                readNow().toISOString()
+            );
         }
 
         const report = assessHealth(signals);
@@ -54,19 +53,16 @@ export const registerHealthRoute = (fastify: FastifyInstance, options: { now?: (
 
         switch (report.status) {
             case 'ok':
-                return {
-                    status: 'ok' as const,
-                    timestamp,
-                    service: healthServiceName,
-                };
+                return healthResponse({ status: 'ok' as const }, timestamp);
             case 'degraded':
                 reply.code(503);
-                return {
-                    status: 'degraded' as const,
-                    failing: report.failing,
-                    timestamp,
-                    service: healthServiceName,
-                };
+                return healthResponse(
+                    {
+                        status: 'degraded' as const,
+                        failing: report.failing,
+                    },
+                    timestamp
+                );
             default: {
                 const unexpected: never = report;
                 throw new Error(`Unexpected health status: ${String(unexpected)}`);
@@ -76,3 +72,12 @@ export const registerHealthRoute = (fastify: FastifyInstance, options: { now?: (
 };
 
 const defaultNow = () => new Date();
+
+type HealthBodyCore = { status: 'ok' } | { status: 'degraded'; failing: string[] };
+
+const healthResponse = (core: HealthBodyCore, timestamp: string) => ({
+    ...core,
+    timestamp,
+    service: healthServiceName,
+    revision: deployedRevision,
+});

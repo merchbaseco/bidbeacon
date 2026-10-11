@@ -49,7 +49,7 @@ jobs:
           # own `github.token` is deliberately not used for package installs —
           # it cannot download another repository's GitHub Package.
           CURSOR_CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
-        run: bun run deploy
+        run: bun run deploy -- --expected-revision "${GITHUB_SHA}"
 
       - name: Install the host CLI wrapper
         run: |
@@ -73,5 +73,13 @@ jobs:
       - name: Verify from the consumer
         run: |
           curl --fail --show-error --silent --max-time 20 \
-            https://bidbeacon.merchbase.co/api/live > /dev/null
+            https://bidbeacon.merchbase.co/api/live > /tmp/bidbeacon-live.json
+          bun -e '
+            const expected = process.env.GITHUB_SHA;
+            const body = JSON.parse(await Bun.file("/tmp/bidbeacon-live.json").text());
+            if (body.revision !== expected) {
+              console.error(`revision mismatch: got ${body.revision}, expected ${expected}`);
+              process.exit(1);
+            }
+          '
           echo "Liveness endpoint OK."

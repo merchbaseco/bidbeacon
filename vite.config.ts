@@ -1,5 +1,6 @@
 import { resolve } from 'node:path';
 import { defineConfig } from 'vite';
+import { revisionBuildAlias } from './src/health/revision-stamp';
 
 export default defineConfig({
     build: {
@@ -29,8 +30,6 @@ export default defineConfig({
         minify: false,
     },
     resolve: {
-        alias: {
-            '@': resolve(__dirname, 'src'),
-        },
+        alias: [...revisionBuildAlias(__dirname), { find: '@', replacement: resolve(__dirname, 'src') }],
     },
 });
