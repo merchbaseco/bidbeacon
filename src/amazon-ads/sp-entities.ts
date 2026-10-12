@@ -355,7 +355,9 @@ const normalizeDeleteError = (error: Record<string, unknown>, index: number) => 
         ...(parsed.code === undefined ? {} : { code: parsed.code }),
         ...(parsed.errorCode === undefined ? {} : { errorCode: parsed.errorCode }),
         ...(parsed.message === undefined ? {} : { message: parsed.message }),
+        ...(parsed.details === undefined ? {} : { details: parsed.details }),
         ...(parsed.field === undefined ? {} : { field: parsed.field }),
+        ...(parsed.trigger === undefined ? {} : { trigger: parsed.trigger }),
         index: parsed.index ?? index,
     };
 };
