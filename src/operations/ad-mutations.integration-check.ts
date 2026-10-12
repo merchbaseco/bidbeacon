@@ -556,6 +556,58 @@ describe('Ad-group and Ad mutation operations', () => {
         });
         expect(amazonAds.calls).toEqual([]);
 
+        const rejectedAdContext = createOperationContext({
+            amazonAds: createFakeAmazonAdsGateway({
+                responses: {
+                    createAds: {
+                        error: [
+                            {
+                                index: 0,
+                                errors: [
+                                    {
+                                        errorType: 'adEligibilityError',
+                                        errorValue: {
+                                            adEligibilityError: {
+                                                reason: 'AD_INELIGIBLE',
+                                                message: 'Product is ineligible for advertising. Listing is not yet advertisable. Authorization: Bearer super-secret-token',
+                                                cause: { location: 'asin', trigger: 'B0HJ000001' },
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            }),
+            db: database.db,
+            principal: {
+                accessibleAccountIds: [adMutationAccountId],
+                credentialKind: 'api_key',
+                merchbaseUserId: 'ad-mutation-user',
+            },
+        });
+        const adRejection = await createAd(rejectedAdContext, {
+            accountId: adMutationAccountId,
+            adGroupId: 'ad-mutation-ad-group-1',
+            asin: 'B0HJ000001',
+            state: 'ENABLED',
+        }).catch(error => error);
+        expect(adRejection).toMatchObject({
+            code: 'AMAZON_REJECTED',
+            message: 'Amazon Ads rejected the Ad operation.',
+            details: {
+                amazon: {
+                    code: 'AD_INELIGIBLE',
+                    errorCode: 'adEligibilityError',
+                    field: 'asin',
+                    index: 0,
+                    message: 'Product is ineligible for advertising. Listing is not yet advertisable. Authorization: Bearer [redacted]',
+                },
+            },
+        });
+        expect(JSON.stringify(adRejection)).not.toContain('super-secret-token');
+
         const rejectedContext = createOperationContext({
             amazonAds: createFakeAmazonAdsGateway({ responses: { createAdGroups: { error: [{ code: 'INVALID_ARGUMENT', message: 'name already exists' }] } } }),
             db: database.db,
