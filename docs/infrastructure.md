@@ -47,15 +47,11 @@ grants this repository access, so it is not a substitute for
 
 Two, and only two:
 
-- `GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN` — the vault-reading repository secret. Reads
+- `GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN` — the single repository secret. Reads
   the Production and Development vaults. Fills both the production deploy slot
   and, in CI, the development slot used to resolve install credentials.
 - `CURSOR_CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN` — the fleet-wide Cursor Runtime
   Secret, account-scoped, not set per repo.
-
-`HAUS_DEPLOY_TRIGGER_URL` and `HAUS_DEPLOY_TRIGGER_TOKEN` are repository
-secrets for the deploy-failure webhook. They are not vault identities. The
-Deploying section says when the workflow calls that webhook.
 
 ## Deploying
 
@@ -72,10 +68,6 @@ runs `bun run deploy`. After `up`, `scripts/verify-deployed-secrets.ts`
 name-diffs what Docker actually baked into the containers against the schema's
 sensitivity split — a delivered name the schema does not declare is stale, and a
 production-required sensitive item missing from a container is a failure.
-
-When the Deploy Stack job fails or is cancelled, its last step POSTs to Haus
-if both `HAUS_DEPLOY_TRIGGER_URL` and `HAUS_DEPLOY_TRIGGER_TOKEN` are set. An
-empty secret skips the POST and leaves the job conclusion unchanged.
 
 For a local check that every `op()` reference resolves without shipping
 anything: `bun run deploy:dry-run`.

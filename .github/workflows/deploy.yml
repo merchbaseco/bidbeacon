@@ -22,11 +22,9 @@ jobs:
 
     steps:
       - name: Check out repository
-        id: checkout
         uses: actions/checkout@v4
 
       - name: Sync the deployment checkout
-        id: sync
         working-directory: /Users/zknicker/srv/bidbeacon
         run: |
           # Move the long-lived deploy checkout to the exact dispatched commit.
@@ -37,7 +35,6 @@ jobs:
           git rev-parse HEAD
 
       - name: Deploy
-        id: deploy
         working-directory: /Users/zknicker/srv/bidbeacon
         env:
           # The deploy-agent role slot, filled here by the GitHub deploy
@@ -55,7 +52,6 @@ jobs:
         run: bun run deploy -- --expected-revision "${GITHUB_SHA}"
 
       - name: Install the host CLI wrapper
-        id: install_wrapper
         run: |
           BB_BIN_DIR="$(dirname "$(command -v bun)")"
           cat > "${BB_BIN_DIR}/bb" <<'WRAPPER'
@@ -75,7 +71,6 @@ jobs:
           chmod +x "${BB_BIN_DIR}/bb"
 
       - name: Verify from the consumer
-        id: verify
         run: |
           curl --fail --show-error --silent --max-time 20 \
             https://bidbeacon.merchbase.co/api/live > /tmp/bidbeacon-live.json
@@ -88,64 +83,3 @@ jobs:
             }
           '
           echo "Liveness endpoint OK."
-
-      - name: Notify Haus of a failed deploy
-        if: failure() || cancelled()
-        continue-on-error: true
-        timeout-minutes: 1
-        env:
-          HAUS_DEPLOY_TRIGGER_URL: ${{ secrets.HAUS_DEPLOY_TRIGGER_URL }}
-          HAUS_DEPLOY_TRIGGER_TOKEN: ${{ secrets.HAUS_DEPLOY_TRIGGER_TOKEN }}
-          REPO: ${{ github.repository }}
-          WORKFLOW: ${{ github.workflow }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-          SHA: ${{ github.sha }}
-          REF: ${{ github.ref }}
-          CONCLUSION: ${{ job.status }}
-          CHECKOUT_OUTCOME: ${{ steps.checkout.outcome }}
-          SYNC_OUTCOME: ${{ steps.sync.outcome }}
-          DEPLOY_OUTCOME: ${{ steps.deploy.outcome }}
-          INSTALL_OUTCOME: ${{ steps.install_wrapper.outcome }}
-          VERIFY_OUTCOME: ${{ steps.verify.outcome }}
-        run: |
-          if [ -z "${HAUS_DEPLOY_TRIGGER_URL}" ] || [ -z "${HAUS_DEPLOY_TRIGGER_TOKEN}" ]; then
-            echo "::notice::Haus deploy webhook is not configured. Skipping notification."
-            exit 0
-          fi
-
-          failed_step="unknown"
-          for candidate in \
-            "Check out repository|${CHECKOUT_OUTCOME}" \
-            "Sync the deployment checkout|${SYNC_OUTCOME}" \
-            "Deploy|${DEPLOY_OUTCOME}" \
-            "Install the host CLI wrapper|${INSTALL_OUTCOME}" \
-            "Verify from the consumer|${VERIFY_OUTCOME}"; do
-            outcome="${candidate##*|}"
-            if [ "${outcome}" = "failure" ] || [ "${outcome}" = "cancelled" ]; then
-              failed_step="${candidate%%|*}"
-              break
-            fi
-          done
-          export FAILED_STEP="${failed_step}"
-
-          bun -e '
-            const payload = {
-              repo: process.env.REPO,
-              workflow: process.env.WORKFLOW,
-              run_url: process.env.RUN_URL,
-              sha: process.env.SHA,
-              ref: process.env.REF,
-              conclusion: process.env.CONCLUSION,
-              failed_step: process.env.FAILED_STEP,
-            };
-            process.stdout.write(JSON.stringify(payload));
-          ' | curl --fail --show-error --silent \
-            --proto '=https' \
-            --request POST \
-            --max-time 10 \
-            --output /dev/null \
-            --user-agent "BidBeacon-Deploy-Notifier/1.0" \
-            --header "Authorization: Bearer ${HAUS_DEPLOY_TRIGGER_TOKEN}" \
-            --header "Content-Type: application/json" \
-            --data-binary @- \
-            "${HAUS_DEPLOY_TRIGGER_URL}"
