@@ -224,4 +224,41 @@ describe('Sponsored Products Target entity gateway', () => {
             error: [{ errorCode: 'validationError', message: 'Campaign cannot be archived.', index: 0 }],
         });
     });
+
+    it('surfaces an Amazon delete rejection reason and field', async () => {
+        const response = {
+            campaigns: {
+                error: [
+                    {
+                        index: 0,
+                        errors: [
+                            {
+                                errorType: 'adEligibilityError',
+                                errorValue: {
+                                    adEligibilityError: {
+                                        reason: 'AD_INELIGIBLE',
+                                        message: 'Product is ineligible for advertising.',
+                                        cause: { location: 'asin', trigger: 'B0HJ000001' },
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                ],
+            },
+        };
+        spApiMocks.request.mockImplementation(async (options: SpRequestOptions) => options.responseSchema?.parse(response));
+
+        await expect(deleteCampaigns({ profileId: 3001, campaigns: [{ campaignId: 'campaign-1' }] })).resolves.toEqual({
+            error: [
+                {
+                    code: 'AD_INELIGIBLE',
+                    errorCode: 'adEligibilityError',
+                    message: 'Product is ineligible for advertising.',
+                    field: 'asin',
+                    index: 0,
+                },
+            ],
+        });
+    });
 });

@@ -1,11 +1,13 @@
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { and, eq } from 'drizzle-orm';
+import { readAmazonRejection } from '@/amazon-ads/mutation-error';
 import { campaign, entityChangeHistory } from '@/db/schema';
 import { getAdvertiserAccountMetadata } from '@/utils/advertiser-account-metadata';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { createAd, createAdGroup } from './ad-mutations';
 import type { CanonicalAd, CanonicalAdGroup } from './ad-schemas';
 import { resolveAdvertiserAccount } from './advertiser-accounts';
+import { logAmazonRejection } from './amazon-rejection';
 import {
     type CampaignCreateInput,
     type CampaignUpdateChanges,
@@ -368,12 +370,7 @@ const sanitizeCompositeAmazonError = (error: unknown) => {
     const details = error instanceof OperationError ? error.details : undefined;
     const amazon = details?.amazon;
     if (isRecord(amazon)) {
-        return {
-            ...(readString(amazon.code) ? { code: readString(amazon.code) } : {}),
-            ...(readString(amazon.errorCode) ? { errorCode: readString(amazon.errorCode) } : {}),
-            ...(typeof amazon.statusCode === 'number' ? { statusCode: amazon.statusCode } : {}),
-            ...(readString(amazon.message) ? { message: sanitizeCompositeErrorMessage(readString(amazon.message) as string) } : {}),
-        };
+        return readAmazonRejection(amazon);
     }
 
     const message = error instanceof Error ? error.message : String(error);
@@ -619,9 +616,9 @@ const assertArchiveOnlyPatch = (changes: CampaignUpdateChanges, entityLabel: str
 };
 
 const extractCampaign = (response: CampaignResponse): AmazonRecord => {
-    const error = response.error?.[0];
-    if (error) {
-        throw new OperationError('AMAZON_REJECTED', 'Amazon Ads rejected the Campaign operation.', { amazon: sanitizeAmazonError(error) });
+    if (response.error && response.error.length > 0) {
+        logAmazonRejection(response.error);
+        throw new OperationError('AMAZON_REJECTED', 'Amazon Ads rejected the Campaign operation.', { amazon: readAmazonRejection(response.error) });
     }
 
     const success = response.success?.[0];
@@ -643,23 +640,18 @@ const mapAmazonException = (error: unknown) => {
     const statusCode = readStatusCode(error);
     const message = error instanceof Error ? error.message : String(error);
     const unavailable = statusCode === undefined ? AMAZON_UNAVAILABLE_MESSAGE_REGEX.test(message) || AMAZON_STATUS_CODE_REGEX.test(message) : [408, 409, 429, 500, 502, 503, 504].includes(statusCode);
-    return new OperationError(
-        unavailable ? 'AMAZON_UNAVAILABLE' : 'AMAZON_REJECTED',
-        unavailable ? 'Amazon Ads was unavailable after the synchronous retry policy.' : 'Amazon Ads rejected the Campaign operation.',
-        {
+    if (unavailable) {
+        return new OperationError('AMAZON_UNAVAILABLE', 'Amazon Ads was unavailable after the synchronous retry policy.', {
             amazon: {
                 ...(statusCode === undefined ? {} : { statusCode }),
                 message: sanitizeErrorMessage(message),
             },
-        }
-    );
-};
+        });
+    }
 
-const sanitizeAmazonError = (error: AmazonRecord) => ({
-    ...(readString(error.code) ? { code: readString(error.code) } : {}),
-    ...(readString(error.errorCode) ? { errorCode: readString(error.errorCode) } : {}),
-    ...(readString(error.message) ? { message: sanitizeErrorMessage(readString(error.message) as string) } : {}),
-});
+    logAmazonRejection(error);
+    return new OperationError('AMAZON_REJECTED', 'Amazon Ads rejected the Campaign operation.', { amazon: readAmazonRejection(error) });
+};
 
 const sanitizeErrorMessage = (message: string) => message.replace(/Bearer\s+[^\s]+/gi, 'Bearer [redacted]').slice(0, 500);
 

@@ -46,8 +46,15 @@ export const spRequest = async <T>(options: SpRequestOptions<T>, region: ApiRegi
 
         if (!response.ok) {
             const errorText = await response.text();
-            const error = new Error(`Amazon Ads request failed: ${response.status} ${response.statusText}. ${errorText}`);
-            (error as Error & { statusCode?: number }).statusCode = response.status;
+            const error = new Error(`Amazon Ads request failed: ${response.status} ${response.statusText}. ${errorText}`) as Error & {
+                amazonResponse?: unknown;
+                statusCode?: number;
+            };
+            error.statusCode = response.status;
+            const amazonResponse = parseJsonBody(errorText);
+            if (amazonResponse !== undefined) {
+                error.amazonResponse = amazonResponse;
+            }
             throw error;
         }
 
@@ -57,4 +64,13 @@ export const spRequest = async <T>(options: SpRequestOptions<T>, region: ApiRegi
         }
         return jsonData as T;
     });
+};
+
+const parseJsonBody = (text: string): unknown => {
+    try {
+        const parsed = JSON.parse(text);
+        return typeof parsed === 'object' && parsed !== null ? parsed : undefined;
+    } catch {
+        return undefined;
+    }
 };

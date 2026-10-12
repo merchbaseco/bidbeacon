@@ -857,6 +857,60 @@ describe('Target mutation operations', () => {
             })
         ).rejects.toMatchObject({ code: 'AMAZON_REJECTED' });
 
+        const nestedRejectionContext = createOperationContext({
+            amazonAds: createFakeAmazonAdsGateway({
+                responses: {
+                    createTargets: {
+                        error: [
+                            {
+                                index: 0,
+                                errors: [
+                                    {
+                                        errorType: 'adEligibilityError',
+                                        errorValue: {
+                                            adEligibilityError: {
+                                                reason: 'AD_INELIGIBLE',
+                                                message: 'Product is ineligible for advertising. Listing is not yet advertisable. Authorization: Bearer super-secret-token',
+                                                cause: { location: 'asin', trigger: 'B0HJ000001' },
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            }),
+            db: database.db,
+            principal: {
+                accessibleAccountIds: [targetMutationAccountId],
+                credentialKind: 'api_key',
+                merchbaseUserId: 'target-mutation-user',
+            },
+        });
+        const targetRejection = await createKeywordTarget(nestedRejectionContext, {
+            accountId: targetMutationAccountId,
+            adGroupId: 'target-mutation-ad-group-1',
+            keyword: 'ineligible',
+            matchType: 'EXACT',
+            bid: 0.3,
+            state: 'ENABLED',
+        }).catch(error => error);
+        expect(targetRejection).toMatchObject({
+            code: 'AMAZON_REJECTED',
+            message: 'Amazon Ads rejected the Target operation.',
+            details: {
+                amazon: {
+                    code: 'AD_INELIGIBLE',
+                    errorCode: 'adEligibilityError',
+                    field: 'asin',
+                    index: 0,
+                    message: 'Product is ineligible for advertising. Listing is not yet advertisable. Authorization: Bearer [redacted]',
+                },
+            },
+        });
+        expect(JSON.stringify(targetRejection)).not.toContain('super-secret-token');
+
         const unavailableContext = createOperationContext({
             amazonAds: createFakeAmazonAdsGateway({ failure: { operation: 'createTargets', message: '503 Service Unavailable' } }),
             db: database.db,

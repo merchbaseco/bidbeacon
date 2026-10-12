@@ -521,6 +521,61 @@ describe('Campaign mutation operations', () => {
             createCampaign(context, { accountId: campaignMutationAccountId, name: 'Rejected', state: 'ENABLED', dailyBudget: 25, bidStrategy: 'FIXED', targetingMode: 'AUTO', startDate: '2026-08-10' })
         ).rejects.toMatchObject({ code: 'AMAZON_REJECTED' });
 
+        const nestedRejectionContext = createOperationContext({
+            amazonAds: createFakeAmazonAdsGateway({
+                responses: {
+                    createCampaigns: {
+                        error: [
+                            {
+                                index: 0,
+                                errors: [
+                                    {
+                                        errorType: 'adEligibilityError',
+                                        errorValue: {
+                                            adEligibilityError: {
+                                                reason: 'AD_INELIGIBLE',
+                                                message: 'Product is ineligible for advertising. Listing is not yet advertisable. Authorization: Bearer super-secret-token',
+                                                cause: { location: 'asin', trigger: 'B0HJ000001' },
+                                            },
+                                        },
+                                    },
+                                ],
+                            },
+                        ],
+                    },
+                },
+            }),
+            db: database.db,
+            principal: {
+                accessibleAccountIds: [campaignMutationAccountId],
+                credentialKind: 'api_key',
+                merchbaseUserId: 'campaign-mutation-user',
+            },
+        });
+        const campaignRejection = await createCampaign(nestedRejectionContext, {
+            accountId: campaignMutationAccountId,
+            name: 'Ineligible',
+            state: 'ENABLED',
+            dailyBudget: 25,
+            bidStrategy: 'FIXED',
+            targetingMode: 'AUTO',
+            startDate: '2026-08-10',
+        }).catch(error => error);
+        expect(campaignRejection).toMatchObject({
+            code: 'AMAZON_REJECTED',
+            message: 'Amazon Ads rejected the Campaign operation.',
+            details: {
+                amazon: {
+                    code: 'AD_INELIGIBLE',
+                    errorCode: 'adEligibilityError',
+                    field: 'asin',
+                    index: 0,
+                    message: 'Product is ineligible for advertising. Listing is not yet advertisable. Authorization: Bearer [redacted]',
+                },
+            },
+        });
+        expect(JSON.stringify(campaignRejection)).not.toContain('super-secret-token');
+
         const unavailableContext = createOperationContext({
             amazonAds: createFakeAmazonAdsGateway({ failure: { operation: 'createCampaigns', message: '503 Service Unavailable' } }),
             db: database.db,
