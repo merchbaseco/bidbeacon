@@ -956,7 +956,7 @@ Stable error codes:
 | `COMPOSITE_PARTIAL_FAILURE` | Composite creation created some resources before a later failure |
 | `INTERNAL_ERROR` | BidBeacon failed without a safe public diagnosis |
 
-Errors do not silently retry a mutation as a new background operation. Useful Amazon error codes and messages appear in `details` without exposing credentials or raw transport payloads.
+Errors do not silently retry a mutation as a new background operation. Useful Amazon error codes and messages appear in `details` without exposing credentials or raw transport payloads, and `details.amazon` includes the Amazon code, the Amazon message, and, when Amazon sends them, the batch index and the field.
 
 Performance coverage issues are successful Search results, not tool errors.
 

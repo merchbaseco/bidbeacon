@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { ApiRegion } from './config';
+import { readAmazonRejection } from './mutation-error';
 import { spRequest } from './sp-api';
 
 const multiStatusSchema = z.object({
@@ -349,14 +350,13 @@ const isEntityNotFoundError = (error: Record<string, unknown>) => {
 };
 
 const normalizeDeleteError = (error: Record<string, unknown>, index: number) => {
-    const firstError = Array.isArray(error.errors) && isRecord(error.errors[0]) ? error.errors[0] : error;
-    const errorValue = isRecord(firstError.errorValue) ? firstError.errorValue : undefined;
-    const nestedValue = errorValue ? Object.values(errorValue).find(isRecord) : undefined;
+    const parsed = readAmazonRejection({ ...error, index: typeof error.index === 'number' ? error.index : index });
     return {
-        ...(typeof firstError.code === 'string' ? { code: firstError.code } : {}),
-        ...(typeof firstError.errorType === 'string' ? { errorCode: firstError.errorType } : {}),
-        ...(typeof firstError.message === 'string' ? { message: firstError.message } : typeof nestedValue?.message === 'string' ? { message: nestedValue.message } : {}),
-        index,
+        ...(parsed.code === undefined ? {} : { code: parsed.code }),
+        ...(parsed.errorCode === undefined ? {} : { errorCode: parsed.errorCode }),
+        ...(parsed.message === undefined ? {} : { message: parsed.message }),
+        ...(parsed.field === undefined ? {} : { field: parsed.field }),
+        index: parsed.index ?? index,
     };
 };
 
