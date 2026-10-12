@@ -256,6 +256,7 @@ describe('Sponsored Products Target entity gateway', () => {
                     errorCode: 'adEligibilityError',
                     message: 'Product is ineligible for advertising.',
                     field: 'asin',
+                    trigger: 'B0HJ000001',
                     index: 0,
                 },
             ],

@@ -34,6 +34,7 @@ const eligibilityDetails = {
     field: 'asin',
     index: 0,
     message: 'Product is ineligible for advertising. Listing is not yet advertisable. Authorization: Bearer [redacted]',
+    trigger: 'B0HJ000001',
 };
 
 const batchItems = [
@@ -61,6 +62,7 @@ const batchDetails = {
     field: 'asin',
     index: 0,
     message: 'Product is ineligible for advertising. Listing is not yet advertisable. Authorization: Bearer [redacted]',
+    trigger: 'B0HJ000001',
     errors: [
         eligibilityDetails,
         {
@@ -69,6 +71,7 @@ const batchDetails = {
             field: 'keywordText',
             index: 1,
             message: 'Keyword already exists',
+            trigger: 'shirt',
         },
     ],
 };
@@ -125,29 +128,131 @@ describe('readAmazonRejection', () => {
         expect(plain).toEqual({ message: 'Amazon rejected this request with Bearer [redacted]' });
     });
 
-    it('logs the eligibility reason without the bearer token', () => {
-        logAmazonRejection(eligibilityItem);
-
-        expect(logger.error).toHaveBeenCalledWith(
-            {
-                amazonError: {
+    it('reads an entityStateError variant, including null sibling keys', () => {
+        expect(
+            readAmazonRejection([
+                {
                     index: 0,
                     errors: [
                         {
-                            errorType: 'adEligibilityError',
+                            errorType: 'entityStateError',
                             errorValue: {
-                                adEligibilityError: {
-                                    reason: 'AD_INELIGIBLE',
-                                    message: 'Product is ineligible for advertising. Listing is not yet advertisable. Authorization: Bearer [redacted]',
-                                    cause: { location: 'asin', trigger: 'B0HJ000001' },
+                                dateError: null,
+                                entityStateError: {
+                                    cause: { location: 'asin', trigger: 'B0HJVB2PV7' },
+                                    message: 'Parent products cannot be advertised',
+                                    reason: 'PARENT_ASIN',
+                                },
+                                otherError: null,
+                            },
+                        },
+                    ],
+                },
+            ])
+        ).toEqual({
+            code: 'PARENT_ASIN',
+            errorCode: 'entityStateError',
+            field: 'asin',
+            index: 0,
+            message: 'Parent products cannot be advertised',
+            trigger: 'B0HJVB2PV7',
+        });
+    });
+
+    it('reads an otherError variant and a string errorValue', () => {
+        expect(
+            readAmazonRejection([
+                {
+                    index: 0,
+                    errors: [
+                        {
+                            errorType: 'otherError',
+                            errorValue: {
+                                otherError: {
+                                    cause: { location: 'asin', trigger: 'B0HJVB2PV7' },
+                                    message: 'Listing is not yet advertisable',
+                                    reason: 'NOT_ADVERTISABLE',
                                 },
                             },
                         },
                     ],
                 },
-            },
-            'Amazon Ads rejected an entity operation'
-        );
-        expect(JSON.stringify(vi.mocked(logger.error).mock.calls)).not.toContain('super-secret-token');
+            ])
+        ).toEqual({
+            code: 'NOT_ADVERTISABLE',
+            errorCode: 'otherError',
+            field: 'asin',
+            index: 0,
+            message: 'Listing is not yet advertisable',
+            trigger: 'B0HJVB2PV7',
+        });
+        expect(
+            readAmazonRejection([
+                {
+                    index: 0,
+                    errors: [
+                        {
+                            errorType: 'otherError',
+                            errorValue: { otherError: 'Listing is not yet advertisable' },
+                        },
+                    ],
+                },
+            ])
+        ).toEqual({
+            errorCode: 'otherError',
+            index: 0,
+            message: 'Listing is not yet advertisable',
+        });
+    });
+
+    it('reads a bare nested message and top-level details instead of returning only the index', () => {
+        expect(readAmazonRejection([{ index: 0, errors: [{ message: 'Parent ASIN cannot be advertised' }] }])).toEqual({
+            index: 0,
+            message: 'Parent ASIN cannot be advertised',
+        });
+        expect(readAmazonRejection([{ index: 0, errors: [{ errorType: 'entityStateError', errorValue: { entityStateError: null } }] }])).toEqual({
+            code: 'entityStateError',
+            errorCode: 'entityStateError',
+            index: 0,
+        });
+        expect(
+            readAmazonRejection([
+                {
+                    index: 0,
+                    errors: [{ errorType: 'otherError', errorValue: { otherError: { description: 'Parent ASIN cannot be advertised' } } }],
+                },
+            ])
+        ).toEqual({
+            errorCode: 'otherError',
+            index: 0,
+            message: 'Parent ASIN cannot be advertised',
+        });
+        expect(
+            readAmazonRejection([
+                {
+                    index: 0,
+                    errors: [{ code: 'PARENT_ASIN', details: 'B0HJVB2PV7 is a parent ASIN', message: 'Parent products cannot be advertised' }],
+                },
+            ])
+        ).toEqual({
+            code: 'PARENT_ASIN',
+            details: 'B0HJVB2PV7 is a parent ASIN',
+            index: 0,
+            message: 'Parent products cannot be advertised',
+        });
+    });
+
+    it('logs the full redacted rejection instead of a shallow object', () => {
+        logAmazonRejection({ ...eligibilityItem, Authorization: 'Bearer super-secret-token' });
+
+        const logged = vi.mocked(logger.error).mock.calls[0]?.[0];
+        expect(typeof logged).toBe('string');
+        expect(logged).toContain('Amazon Ads rejected an entity operation');
+        expect(logged).toContain('AD_INELIGIBLE');
+        expect(logged).toContain('adEligibilityError');
+        expect(logged).toContain('B0HJ000001');
+        expect(logged).toContain('cause');
+        expect(logged).not.toContain('super-secret-token');
+        expect(logged).not.toContain('[Array]');
     });
 });

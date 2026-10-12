@@ -1,7 +1,16 @@
+import { inspect } from 'node:util';
 import { logger } from '@/utils/logger';
 
 export const logAmazonRejection = (raw: unknown) => {
-    logger.error({ amazonError: redactForLog(raw) }, 'Amazon Ads rejected an entity operation');
+    logger.error(`Amazon Ads rejected an entity operation ${formatRejection(redactForLog(raw))}`);
+};
+
+const formatRejection = (value: unknown) => {
+    try {
+        return JSON.stringify(value);
+    } catch {
+        return inspect(value, { breakLength: Number.POSITIVE_INFINITY, depth: null, maxArrayLength: null });
+    }
 };
 
 const SENSITIVE_LOG_KEYS = new Set(['access_token', 'amazon-advertising-api-clientid', 'authorization', 'client_secret', 'clientid', 'cookie', 'headers', 'password', 'refresh_token', 'token']);
