@@ -176,6 +176,21 @@ equivalent. See "Development-only knobs" in `docs/infrastructure.md`.
 A boot therefore ends with a dashboard that opens signed in, on an account it
 owns, showing this week.
 
+Claude cloud sessions use the committed `.claude/settings.json` SessionStart
+hook, scoped by `CLAUDE_CODE_REMOTE=true`. It fetches the current fleet from
+`zknicker/agents`, installs native Claude skills and agents, installs BidBeacon
+dependencies, and calls `scripts/cloud-postgres.sh` for the same loopback-only
+database and synthetic seed as Cursor. Claude's cached environment setup
+installs the 1Password CLI and the browser command; it does not cache running
+services. The personal environment and credential flow live in the agents
+repository's `docs/cloud-environments.md`.
+
+The hook selects the fake Amazon Ads gateway. To start the app and capture
+proof, invoke `/verify-bidbeacon`; `.claude/skills/verify-bidbeacon` exposes
+the existing repository verification skill to Claude. Start and clean up app
+processes through that skill rather than leaving a foreground server inside
+a SessionStart hook.
+
 ## What the seed promises
 
 `src/dev-seed/plan.test.ts` is the contract: it asserts the coverage this

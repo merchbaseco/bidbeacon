@@ -16,6 +16,10 @@ coverage/
 # otherwise walk into and fail on. Committed agent definitions stay tracked.
 .claude/*
 !.claude/agents/
+!.claude/settings.json
+!.claude/cloud-start.sh
+!.claude/cloud-bootstrap/
+!.claude/skills/
 
 # Varlock schema is the committed contract
 !.env.schema
