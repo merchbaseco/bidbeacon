@@ -185,6 +185,12 @@ installs the 1Password CLI and the browser command; it does not cache running
 services. The personal environment and credential flow live in the agents
 repository's `docs/cloud-environments.md`.
 
+For dashboard verification, the Claude environment must also allow
+`tolerant-roughy-27.clerk.accounts.dev` for the development sign-in page and
+`api.clerk.com` for the API's short-lived development sign-in ticket. Allowing
+only the frontend host leaves the dashboard at the sign-in form. These are
+network settings in the saved Claude environment, not repository secrets.
+
 The hook selects the fake Amazon Ads gateway. To start the app and capture
 proof, invoke `/verify-bidbeacon`; `.claude/skills/verify-bidbeacon` exposes
 the existing repository verification skill to Claude. Start and clean up app
