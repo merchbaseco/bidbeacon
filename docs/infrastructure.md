@@ -95,10 +95,18 @@ recreated, give the database a `$`-free password first.
 
 ## Development-only knobs
 
-Two schema items exist to make a fresh checkout — a worktree, or a cloud VM
-that has never seen the product — boot into something worth looking at. Neither
-is delivered to any container, and both are listed as deliberately undelivered
-in `scripts/env-contract-check.ts`.
+These schema items exist to make a fresh checkout, a worktree, or a cloud VM
+boot into something worth looking at. None of them are delivered to a container.
+`scripts/env-contract-check.ts` lists each one as deliberately undelivered.
+
+`BIDBEACON_AMAZON_ADS_GATEWAY` selects the Ads client. `amazon` is the default
+and the only value production will run. `fake` records create, update, and
+delete calls on the local gateway and returns their payloads without opening a
+connection. The server throws at the first operation context if `fake` is set
+while `NODE_ENV` or `VARLOCK_ENV` is production. Outside production, `fake`
+also resolves the three Amazon Ads credential items to a placeholder, so a VM
+without the Ads vault can boot. `.cursor/skills/verify-bidbeacon/control-bidbeacon`
+exports `fake` before varlock. `.cursor/start.sh` does not.
 
 `BIDBEACON_DEV_HOST` is the dashboard dev server's bind address, and
 `vite.config.dashboard.ts` is its only reader. It defaults to `127.0.0.1`, which

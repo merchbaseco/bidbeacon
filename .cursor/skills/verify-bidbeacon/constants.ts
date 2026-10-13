@@ -35,4 +35,5 @@ export type VerifyRun = {
     evidenceDir: string;
     tokenPath: string;
     dir: string;
+    amazonAds: 'amazon' | 'fake';
 };

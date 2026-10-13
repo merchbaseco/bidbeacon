@@ -54,9 +54,9 @@ Browser commands talk to headless Chrome through the DevTools socket. They use a
 .cursor/skills/verify-bidbeacon/control-bidbeacon worker fixture
 ```
 
-`http get` is a tRPC query, `GET /api/<procedure>?input=<json>`, with the session bearer. `worker fixture` runs `processAmsMessage` and `routePayload` against local Postgres. Its `deleteMessage` records the call and does not import the SQS client.
+`http get` is a tRPC query, `GET /api/<procedure>?input=<json>`. `http post` is a tRPC mutation. Both send `Authorization: Bearer ak_dev_bidbeacon_local`. `mcp` and `cli` send that same key. `worker fixture` runs `processAmsMessage` and `routePayload` against local Postgres. Its `deleteMessage` records the call and does not import the SQS client.
 
-`http`, `mcp`, and `cli` exit 2 before any request when the name is an Amazon write (`create_*`, `update_*`, `bb create`, `bb update`, `accounts.sync`, bid updates, and report create or retrieve).
+The helper selects `BIDBEACON_AMAZON_ADS_GATEWAY=fake` before varlock starts, and a server it starts inherits that value. Writes are sent only when doctor reports `"amazonAds": "fake"`. An adopted server stays on the live gateway, and `create_*`, `update_*`, `bb create`, and `bb update` exit 2 before any request.
 
 Varlock prints `Command failed with exit code` whenever this helper exits non-zero. Read the helper's stderr line and the exit code. The banner is not a varlock outage.
 
@@ -70,6 +70,7 @@ A proof shows the action and the resulting state.
 - HTTP proof is the status line and the JSON body, including the expected campaign or account name.
 - Worker proof is `worker/fixture.json` with `"status": "processed"`, `clicks` `7`, and `sqsDeleteCalls` `1`. Read the row back with `worker show` before cleanup.
 - A failed entry stays a failure. Save the command output. Do not claim it passed through a different command.
+- An Amazon write also keeps `/tmp/bidbeacon-amazon-ads-calls.jsonl`. Cleanup copies it to `amazon-ads-calls.jsonl` in the evidence directory. The line names the operation and the payload. It is not an Amazon response.
 
 ## Cleanup
 
@@ -85,24 +86,21 @@ Cleanup sends `SIGTERM` to the api, dashboard, and Chrome process groups this ru
 
 ## External systems
 
-The running server always uses `productionAmazonAdsGateway`. There is no env switch to the test fake. Reads of seeded Postgres do not call Amazon. `create_*` and `update_*` do. Do not drive them.
+A server this helper starts uses the local Amazon Ads gateway. The default for every other process, including `.cursor/start.sh`, stays the live gateway. `fake` is refused when `NODE_ENV` or `VARLOCK_ENV` is production. An ineligible ASIN `B0INELIGBL`, or the string `PRODUCT_INELIGIBLE` on a submitted entity, comes back as `errors[{code,message}]` at that index. Every other create, update, and delete is echoed as success and appended to `/tmp/bidbeacon-amazon-ads-calls.jsonl`.
 
 Default `search` on `ad` or `product` asks RankWrangler for a title and swallows a failure. Pass `fields` that omit `ad.productTitle` and `product.title`.
 
-`bb` reads `MERCHBASE_API_KEY` or the keychain. The cloud schema does not provide a suite API key. `cli` sets `MERCHBASE_API_KEY` to an empty string and uses an empty `BB_STORAGE_DIR`. Expect that entry to fail closed until a key exists.
-
-MCP on `/mcp` accepts a Clerk OAuth bearer. It rejects `ak_` keys. A dashboard session JWT is not an OAuth token. Call the tool anyway and keep the 401 evidence. Do not treat `bun run test:integration src/mcp/server.integration-check.ts` as a drive of the HTTP server. That file uses an in-memory transport and `createFakeAmazonAdsGateway`.
+`http`, `mcp`, and `cli` authenticate as `ak_dev_bidbeacon_local`. That key resolves to the seeded dev user only when neither `NODE_ENV` nor `VARLOCK_ENV` is production. Other `ak_` keys are still rejected by `/mcp`. Do not treat `bun run test:integration src/mcp/server.integration-check.ts` as a drive of the HTTP server.
 
 Do not run `bun run worker`. Importing the SQS client requires `BIDBEACON_AMS_QUEUE_URL`, and a successful AWS login long-polls the real queue into this database.
 
 ## Gaps
 
-The cloud environment still has to resolve, through varlock and the Development vault, `MERCHBASE_CLERK_SECRET_KEY`, `MERCHBASE_CLERK_PUBLISHABLE_KEY`, `MERCHBASE_CLERK_JWT_KEY`, `MERCHBASE_CLERK_ISSUER`, `BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID`, and the `BIDBEACON_DATABASE_*` settings. Amazon Ads client id, secret, and refresh token are also required for the server process to boot, even when a journey never calls Amazon.
+The cloud environment still has to resolve, through varlock and the Development vault, `MERCHBASE_CLERK_SECRET_KEY`, `MERCHBASE_CLERK_PUBLISHABLE_KEY`, `MERCHBASE_CLERK_JWT_KEY`, `MERCHBASE_CLERK_ISSUER`, `BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID`, and the `BIDBEACON_DATABASE_*` settings. With `BIDBEACON_AMAZON_ADS_GATEWAY=fake` outside production, the Amazon Ads client id, secret, and refresh token resolve to a placeholder and are not read.
 
-These are not available, and the journeys that need them stay failed:
+These journeys stay failed:
 
-- A suite `MERCHBASE_API_KEY` for `bb`.
-- A Clerk OAuth access token for `/mcp`.
+- A real suite API key or a real Clerk OAuth token. The local dev key is the credential this skill can mint.
 - AWS credentials used only to poll SQS. The fixture covers the handler, not the poller.
 
 `GET /api/health` is the wrong ready check for this stack.

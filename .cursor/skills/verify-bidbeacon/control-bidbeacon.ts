@@ -1,10 +1,12 @@
 import { spawn } from 'node:child_process';
-import { openSync } from 'node:fs';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { openSync, writeFileSync } from 'node:fs';
+import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
 import { dirname, join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { LOCAL_AMAZON_ADS_CALL_LOG } from '@/operations/local-amazon-ads-gateway';
+import { DEV_LOCAL_API_KEY } from '@/services/access/dev-local-credential';
 import { ensureChrome, fillLabel, navigate, pageText, screenshot, sessionToken } from './chrome-session';
 import { amazonWriteRefusal, DASHBOARD_PORTS, SEED_ACCOUNT_NAME, type VerifyRun } from './constants';
 import { ensurePostgres, ensureSeed, psql, seedAccountName } from './postgres';
@@ -67,6 +69,7 @@ const launch = async (args: string[]) => {
         dashboardPort,
         dir,
         evidenceDir,
+        amazonAds: 'amazon',
         id,
         owned: false,
         tokenPath: join(dir, 'session.token'),
@@ -74,7 +77,7 @@ const launch = async (args: string[]) => {
     await writeRun(run);
     const api = await adoptOrStart(run, 'api');
     const dashboard = await adoptOrStart(run, 'dashboard');
-    const started = await updateRun({ apiPid: api.pid, dashboardPid: dashboard.pid, owned: api.started || dashboard.started });
+    const started = await updateRun({ amazonAds: api.started ? 'fake' : 'amazon', apiPid: api.pid, dashboardPid: dashboard.pid, owned: api.started || dashboard.started });
     await waitUntilReady(started);
     const report = await doctorReport(started);
     process.stdout.write(`${JSON.stringify({ ...report, seed }, null, 2)}\n`);
@@ -134,21 +137,33 @@ const browser = async (args: string[]) => {
 };
 
 const http = async (args: string[]) => {
+    const method = args[0];
     const procedure = args[1];
-    if (args[0] !== 'get' || !procedure) {
-        throw new Error('Use http get <procedure> --input <json> [--expect <text>] [--path <file>].');
+    if ((method !== 'get' && method !== 'post') || !procedure) {
+        throw new Error('Use http get|post <procedure> --input <json> [--expect <text>] [--path <file>].');
     }
-    refuseAmazon(procedure);
     const run = await readRun();
-    const token = (await readFile(run.tokenPath, 'utf8')).trim();
-    const input = JSON.parse(flag(args, '--input') ?? '{}') as unknown;
-    const response = await fetch(`${run.apiBase}/api/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`, {
-        headers: { Authorization: `Bearer ${token}` },
-    });
+    if (run.amazonAds !== 'fake') {
+        refuseAmazon(procedure);
+    }
+    const input = JSON.parse(flag(args, '--input') ?? (method === 'post' ? 'null' : '{}')) as unknown;
+    const headers = { Authorization: `Bearer ${DEV_LOCAL_API_KEY}` };
+    const response =
+        method === 'get'
+            ? await fetch(`${run.apiBase}/api/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`, { headers })
+            : await fetch(`${run.apiBase}/api/${procedure}`, {
+                  body: JSON.stringify(input),
+                  headers: { ...headers, 'content-type': 'application/json' },
+                  method: 'POST',
+              });
     const body = await response.text();
     const path = await writeEvidence(run, flag(args, '--path') ?? `http/${procedure}.json`, `${response.status}\n${body}\n`);
     const expect = flag(args, '--expect');
-    if (!response.ok || (expect && !body.includes(expect))) {
+    if (expect && !body.includes(expect)) {
+        process.stderr.write(`${procedure} failed. Evidence: ${path}\n`);
+        process.exit(1);
+    }
+    if (!(response.ok || expect)) {
         process.stderr.write(`${procedure} failed. Evidence: ${path}\n`);
         process.exit(1);
     }
@@ -160,9 +175,11 @@ const mcp = async (args: string[]) => {
     if (args[0] !== 'call' || !tool) {
         throw new Error('Use mcp call <tool> [--input <json>] [--expect <text>] [--path <file>].');
     }
-    refuseAmazon(tool);
     const run = await readRun();
-    const token = (await readFile(run.tokenPath, 'utf8')).trim();
+    if (run.amazonAds !== 'fake') {
+        refuseAmazon(tool);
+    }
+    const token = DEV_LOCAL_API_KEY;
     const input = JSON.parse(flag(args, '--input') ?? '{}') as Record<string, unknown>;
     const client = new Client({ name: 'verify-bidbeacon', version: '1.0.0' });
     const transport = new StreamableHTTPClientTransport(new URL(`${run.apiBase}/mcp`), {
@@ -191,16 +208,18 @@ const mcp = async (args: string[]) => {
 const cli = async (args: string[]) => {
     const separator = args.indexOf('--');
     const commandArgs = separator === -1 ? args : args.slice(separator + 1);
-    if (commandArgs[0] === 'create' || commandArgs[0] === 'update') {
-        refuseAmazon(`${commandArgs[0]}_campaign`);
-    }
-    for (const arg of commandArgs) {
-        refuseAmazon(arg);
-    }
     const run = await readRun();
+    if (run.amazonAds !== 'fake') {
+        if (commandArgs[0] === 'create' || commandArgs[0] === 'update') {
+            refuseAmazon(`${commandArgs[0]}_campaign`);
+        }
+        for (const arg of commandArgs) {
+            refuseAmazon(arg);
+        }
+    }
     const storage = join(run.dir, 'bb-storage');
     await mkdir(storage, { recursive: true });
-    const env = { ...process.env, BB_BASE_URL: run.apiBase, BB_STORAGE_DIR: storage, MERCHBASE_API_KEY: '' };
+    const env = { ...process.env, BB_BASE_URL: run.apiBase, BB_STORAGE_DIR: storage, MERCHBASE_API_KEY: DEV_LOCAL_API_KEY };
     const result = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve, reject) => {
         const child = spawn('bun', ['packages/bidbeacon-cli/src/index.ts', ...commandArgs], { cwd: repoRoot, env });
         let stdout = '';
@@ -232,6 +251,7 @@ const cleanup = async () => {
     stopPid(run.dashboardPid);
     stopPid(run.chromePid);
     await psql("DELETE FROM ams_sp_traffic WHERE idempotency_id = 'verify-bidbeacon-sp-traffic'").catch(() => undefined);
+    await copyFile(LOCAL_AMAZON_ADS_CALL_LOG, join(run.evidenceDir, 'amazon-ads-calls.jsonl')).catch(() => undefined);
     await rm(run.dir, { force: true, recursive: true });
     await rm('/tmp/bidbeacon-verify/run.json', { force: true });
     process.stdout.write(`${run.evidenceDir}\n`);
@@ -243,7 +263,7 @@ const doctorReport = async (run: VerifyRun) => {
     const dashboardResponse = await fetch(`${run.dashboardBase}/`);
     const dashboardTitle = (await dashboardResponse.text()).includes('BidBeacon Dashboard');
     const account = await seedAccountName();
-    const refusal = amazonWriteRefusal('create_campaign');
+    const refusal = run.amazonAds === 'fake' ? 'fake gateway selected' : amazonWriteRefusal('create_campaign');
     const started = [run.apiPid, run.dashboardPid].filter((pid): pid is number => pid !== null);
     const alive = started.every(pidAlive);
     const ok = liveResponse.status === 200 && live.service === 'bidbeacon-server' && dashboardResponse.status === 200 && dashboardTitle && account === SEED_ACCOUNT_NAME && refusal !== null && alive;
@@ -253,6 +273,7 @@ const doctorReport = async (run: VerifyRun) => {
     }
     return {
         account,
+        amazonAds: run.amazonAds,
         amazonWriteGuard: refusal,
         apiBase: run.apiBase,
         dashboardBase: run.dashboardBase,
@@ -274,8 +295,12 @@ const adoptOrStart = async (run: VerifyRun, kind: 'api' | 'dashboard') => {
     }
     const logPath = join(run.dir, `${kind}.log`);
     const log = openSync(logPath, 'a');
+    if (kind === 'api') {
+        writeFileSync(LOCAL_AMAZON_ADS_CALL_LOG, '');
+    }
     const env = {
         ...process.env,
+        BIDBEACON_AMAZON_ADS_GATEWAY: 'fake',
         BIDBEACON_DASHBOARD_API_PROXY_TARGET: run.apiBase,
         BIDBEACON_DATABASE_HOST: '127.0.0.1',
         BIDBEACON_DEV_HOST: '127.0.0.1',

@@ -44,6 +44,7 @@ Each feature file starts with an H1 and one paragraph. Then it has four H2 secti
 
 ## Features
 
+- [Update a campaign](./update-campaign.md) pauses a seeded campaign through the local Amazon Ads gateway and reads the new state back.
 - [Account home](./account-home.md) covers the signed-in dashboard for the seeded account.
 - [Campaign search](./campaign-search.md) covers the campaign table search and the HTTP search query.
 - [Stream fixture](./stream-fixture.md) covers one Sponsored Products traffic message through the worker handler.

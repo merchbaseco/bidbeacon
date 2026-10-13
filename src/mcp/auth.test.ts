@@ -1,5 +1,6 @@
 import { ServiceAccessError } from '@merchbaseco/access';
 import { describe, expect, it, vi } from 'vitest';
+import { DEV_LOCAL_API_KEY } from '@/services/access/dev-local-credential';
 import { authenticateMcpRequest, createBidBeaconMcpAuth, type McpAuthDependencies } from './auth';
 
 const oauthToken = 'oat_test-token';
@@ -19,6 +20,40 @@ describe('BidBeacon MCP authentication', () => {
 
         await expect(authenticateMcpRequest(undefined, dependencies)).resolves.toEqual({ status: 'unauthorized' });
         expect(dependencies.authorize).not.toHaveBeenCalled();
+    });
+
+    it('refuses the local dev key before OAuth when NODE_ENV is production', async () => {
+        const previousNode = process.env.NODE_ENV;
+        const previousVarlock = process.env.VARLOCK_ENV;
+        process.env.NODE_ENV = 'production';
+        process.env.VARLOCK_ENV = 'development';
+        try {
+            const authorize = vi.fn();
+            const dependencies = createBidBeaconMcpAuth({ oauthAccess: { authorize } } as never);
+
+            await expect(authenticateMcpRequest(`Bearer ${DEV_LOCAL_API_KEY}`, dependencies)).resolves.toEqual({ status: 'unauthorized' });
+            expect(authorize).not.toHaveBeenCalled();
+        } finally {
+            restoreEnv('NODE_ENV', previousNode);
+            restoreEnv('VARLOCK_ENV', previousVarlock);
+        }
+    });
+
+    it('refuses the local dev key before OAuth when VARLOCK_ENV is production', async () => {
+        const previousNode = process.env.NODE_ENV;
+        const previousVarlock = process.env.VARLOCK_ENV;
+        process.env.NODE_ENV = 'development';
+        process.env.VARLOCK_ENV = 'production';
+        try {
+            const authorize = vi.fn();
+            const dependencies = createBidBeaconMcpAuth({ oauthAccess: { authorize } } as never);
+
+            await expect(authenticateMcpRequest(`Bearer ${DEV_LOCAL_API_KEY}`, dependencies)).resolves.toEqual({ status: 'unauthorized' });
+            expect(authorize).not.toHaveBeenCalled();
+        } finally {
+            restoreEnv('NODE_ENV', previousNode);
+            restoreEnv('VARLOCK_ENV', previousVarlock);
+        }
     });
 
     it('never sends an API key to the MCP OAuth authorizer', async () => {
@@ -93,3 +128,7 @@ describe('BidBeacon MCP authentication', () => {
         expect(authorize).toHaveBeenCalledWith(oauthToken);
     });
 });
+
+const restoreEnv = (name: 'NODE_ENV' | 'VARLOCK_ENV', previous: string | undefined) => {
+    process.env[name] = previous;
+};
