@@ -19,7 +19,7 @@ MCP requests require a Clerk OAuth bearer token on every request. OAuth discover
 - `/.well-known/oauth-authorization-server`
 - `/.well-known/oauth-authorization-server/mcp`
 
-API keys are not accepted by `/mcp`. Each authenticated request resolves a fresh stable Merchbase User and its accessible BidBeacon Advertiser Account UUIDs. Every tool call except `list_advertiser_accounts` must include an explicit `accountId`; selected dashboard account state is never consulted.
+API keys are not accepted by `/mcp`, except the fixed local key `ak_dev_bidbeacon_local`. That key resolves to the seeded dev user only when `NODE_ENV` and `VARLOCK_ENV` are both outside production, and it is refused when either one is production. Each authenticated request resolves a fresh stable Merchbase User and its accessible BidBeacon Advertiser Account UUIDs. Every tool call except `list_advertiser_accounts` must include an explicit `accountId`; selected dashboard account state is never consulted.
 
 Set `MCP_RESOURCE_URL` to the externally reachable `/mcp` URL when deploying outside the default production host. The value must be an absolute `http` or `https` URL ending in `/mcp`, without query or fragment components.
 

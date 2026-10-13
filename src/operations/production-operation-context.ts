@@ -1,11 +1,11 @@
 import { db } from '@/db';
+import { resolveAmazonAdsGateway } from './amazon-ads-gateway-selection';
 import { createOperationContext, type OperationPrincipal } from './operation-context';
 import { createRankWranglerProductResolver, pendingRankWranglerProductResolver } from './product-resolver';
-import { productionAmazonAdsGateway } from './production-amazon-ads-gateway';
 
 export const createProductionOperationContext = (principal?: OperationPrincipal, accessCredential?: string | null) =>
     createOperationContext({
-        amazonAds: productionAmazonAdsGateway,
+        amazonAds: resolveAmazonAdsGateway(process.env),
         db,
         principal,
         products: accessCredential

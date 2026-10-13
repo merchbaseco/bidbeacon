@@ -1,9 +1,11 @@
 import { type ClerkAuthenticatorOptions, createClerkAuthenticator, createServiceAccess, ServiceAccessError } from '@merchbaseco/access';
+import { DEV_SIGN_IN_MERCHBASE_USER_ID } from '@merchbaseco/access/dev';
 import { eq } from 'drizzle-orm';
 import type { Database } from '@/db/index';
 import { db } from '@/db/index';
 import { userAccountAccess } from '@/db/schema';
 import { createAccessProjectionStore } from './access-projection-store';
+import { classifyDevLocalCredential } from './dev-local-credential';
 
 export interface BidBeaconPrincipal {
     accessibleAccountIds: string[];
@@ -50,7 +52,28 @@ export const createBidBeaconAccess = (options: CreateBidBeaconAccessOptions) => 
 
 export type BidBeaconAccess = ReturnType<typeof createBidBeaconAccess>;
 
+export const authorizeDevLocalCredential = async (credential: string) => {
+    const decision = classifyDevLocalCredential(credential, process.env);
+    if (decision === 'absent') {
+        return null;
+    }
+    if (decision === 'refused') {
+        throw new ServiceAccessError('unauthenticated');
+    }
+    const principal = await resolveBidBeaconPrincipal(db, DEV_SIGN_IN_MERCHBASE_USER_ID);
+    return {
+        credentialKind: 'api_key' as const,
+        merchbaseUserId: principal.merchbaseUserId,
+        principal,
+    };
+};
+
 export const authorizeBidBeaconCredential = async (access: Pick<BidBeaconAccess, 'apiKeyAccess' | 'oauthAccess' | 'sessionAccess'>, credential: string) => {
+    const dev = await authorizeDevLocalCredential(credential);
+    if (dev) {
+        return dev;
+    }
+
     if (credential.startsWith('ak_')) {
         return access.apiKeyAccess.authorize(credential);
     }

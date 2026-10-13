@@ -1,6 +1,7 @@
 import { ServiceAccessError } from '@merchbaseco/access';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import type { BidBeaconAccess } from '@/services/access/bidbeacon-access';
+import { authorizeDevLocalCredential, type BidBeaconAccess } from '@/services/access/bidbeacon-access';
+import { DEV_LOCAL_API_KEY } from '@/services/access/dev-local-credential';
 
 export const MCP_SCOPES = ['openid', 'email', 'profile'] as const;
 const bearerTokenPattern = /^Bearer\s+(\S+)$/i;
@@ -22,6 +23,13 @@ export type McpAuthResult =
 
 export const createBidBeaconMcpAuth = (access: Pick<BidBeaconAccess, 'oauthAccess'>): McpAuthDependencies => ({
     authorize: async token => {
+        const dev = await authorizeDevLocalCredential(token);
+        if (dev) {
+            return {
+                accessibleAccountIds: [...dev.principal.accessibleAccountIds],
+                merchbaseUserId: dev.merchbaseUserId,
+            };
+        }
         const authorized = await access.oauthAccess.authorize(token);
         return {
             accessibleAccountIds: [...authorized.principal.accessibleAccountIds],
@@ -32,7 +40,7 @@ export const createBidBeaconMcpAuth = (access: Pick<BidBeaconAccess, 'oauthAcces
 
 export const authenticateMcpRequest = async (authorization: string | undefined, dependencies: McpAuthDependencies): Promise<McpAuthResult> => {
     const token = extractBearerToken(authorization);
-    if (!token || token.startsWith('ak_')) {
+    if (!token || (token.startsWith('ak_') && token !== DEV_LOCAL_API_KEY)) {
         return { status: 'unauthorized' };
     }
 

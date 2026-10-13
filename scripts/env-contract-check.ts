@@ -46,6 +46,7 @@ const outOfContractNames = new Set(['MERCHBASE_API_KEY', 'BB_BASE_URL', 'BB_STOR
 const notDeliveredNames = new Map([
     ['BIDBEACON_DASHBOARD_API_PROXY_TARGET', 'development-only Vite dev-server proxy target'],
     ['BIDBEACON_DEV_HOST', 'development-only Vite dev-server bind address'],
+    ['BIDBEACON_AMAZON_ADS_GATEWAY', 'development-only fake Amazon Ads gateway selector; production containers must not receive it'],
     ['BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID', 'development-only auto sign-in subject; the container must never be able to mint a session for it'],
     ['BIDBEACON_SEARCH_CURSOR_SECRET', 'optional and unprovisioned; the server falls back to a per-process key'],
     ['BIDBEACON_RUN_LIVE_SMOKE', 'opt-in live smoke switch, operator-supplied'],

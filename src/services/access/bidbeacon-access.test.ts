@@ -1,6 +1,7 @@
 import { ServiceAccessError } from '@merchbaseco/access';
 import { describe, expect, it, vi } from 'vitest';
 import { authorizeBidBeaconCredential, resolveBidBeaconPrincipal } from './bidbeacon-access';
+import { DEV_LOCAL_API_KEY } from './dev-local-credential';
 
 vi.mock('@/db/index', () => ({ db: {} }));
 
@@ -33,6 +34,23 @@ describe('BidBeacon Merchbase Access adapter', () => {
         access.sessionAccess.authorize.mockRejectedValueOnce(new ServiceAccessError('access_unavailable'));
         await expect(authorizeBidBeaconCredential(access as never, 'four.five.six')).rejects.toMatchObject({ code: 'access_unavailable' });
         expect(access.oauthAccess.authorize).toHaveBeenCalledTimes(1);
+    });
+
+    it('refuses the local dev key in production before the suite API-key adapter', async () => {
+        const previousNode = process.env.NODE_ENV;
+        process.env.NODE_ENV = 'production';
+        try {
+            const access = {
+                apiKeyAccess: { authorize: vi.fn() },
+                oauthAccess: { authorize: vi.fn() },
+                sessionAccess: { authorize: vi.fn() },
+            };
+
+            await expect(authorizeBidBeaconCredential(access as never, DEV_LOCAL_API_KEY)).rejects.toMatchObject({ code: 'unauthenticated' });
+            expect(access.apiKeyAccess.authorize).not.toHaveBeenCalled();
+        } finally {
+            process.env.NODE_ENV = previousNode;
+        }
     });
 
     it('fails closed for retired local key prefixes and malformed credential boundaries', async () => {

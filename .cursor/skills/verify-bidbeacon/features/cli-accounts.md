@@ -1,6 +1,6 @@
 # CLI accounts
 
-CLI accounts lists advertiser accounts with the `bb` command. The cloud VM has no suite API key, so this entry fails closed until one is provided.
+CLI accounts lists advertiser accounts with the `bb` command. The helper sends the local dev key `ak_dev_bidbeacon_local`.
 
 ## Sub-features
 
@@ -16,16 +16,14 @@ CLI accounts lists advertiser accounts with the `bb` command. The cloud VM has n
 
 Preconditions:
 
-- Doctor reports the local API base URL.
-- `MERCHBASE_API_KEY` is unset in the `cli` child. The helper also points `BB_STORAGE_DIR` at an empty directory inside the run.
+- Doctor reports `"amazonAds": "fake"` and the local API base URL.
+- The helper sets `MERCHBASE_API_KEY` to `ak_dev_bidbeacon_local` and points `BB_STORAGE_DIR` at an empty directory inside the run.
 
 - **List accounts.** Run `.cursor/skills/verify-bidbeacon/control-bidbeacon cli -- advertiser-accounts list`. Exit 0 and stdout include `Cedar & Coil (dev seed)`. The captured output is `cli/advertiser-accounts.txt`.
-- **Refuse a write.** Run `.cursor/skills/verify-bidbeacon/control-bidbeacon cli -- create`. Exit code is `2` and stderr says the Amazon write was refused.
-- **Proof.** `cli/advertiser-accounts.txt` contains the exit code and the command output. A missing-key error is a failed `cli-list`, not a pass.
+- **Proof.** `cli/advertiser-accounts.txt` contains the exit code and the account name.
 
 ## Gotchas
 
-- The Development vault schema does not include a suite API key. Expect `cli-list` to fail until someone provides `MERCHBASE_API_KEY` for `mbu_0ae4691c2dff45559d559bea99cd621b`.
-- Passing the dashboard session JWT as `MERCHBASE_API_KEY` does not work. The CLI sends that value down the API-key path, and keys start with `ak_`.
-- HTTP `list_advertiser_accounts` is a different entry, on [MCP accounts](./mcp-accounts.md) and the dashboard session. A passing HTTP call does not verify `bb`.
-- `bb create` and `bb update` call Amazon even when a key exists. The helper refuses them.
+- The dev key is refused when `NODE_ENV` or `VARLOCK_ENV` is production. `cli-list` then fails with `AUTHENTICATION_REQUIRED`.
+- A passing HTTP `list_advertiser_accounts` does not verify `bb`.
+- `bb create` and `bb update` are sent only when doctor reports `"amazonAds": "fake"`. On an adopted live server the helper exits 2 before the CLI starts.
