@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+cd "$ROOT"
+
+export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
+export PATH="$BUN_INSTALL/bin:$PATH"
+export BIDBEACON_DATABASE_HOST=127.0.0.1
+
+if [ "${1:-}" = "worker" ]; then
+    shift
+    exec bunx varlock run -- bun "$ROOT/.cursor/skills/verify-bidbeacon/worker-fixture.ts" "$@"
+fi
+
+exec bunx varlock run -- bun "$ROOT/.cursor/skills/verify-bidbeacon/control-bidbeacon.ts" "$@"
