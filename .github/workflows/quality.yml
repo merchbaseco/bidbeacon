@@ -26,7 +26,7 @@ jobs:
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: '1.3.5'
+          bun-version: '1.4.2'
 
       # The private @merchbaseco/* scope needs a real GitHub Packages read
       # token: Actions' own `github.token` cannot download another repository's

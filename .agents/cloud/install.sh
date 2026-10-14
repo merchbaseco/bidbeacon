@@ -51,12 +51,15 @@ fi
 # --- System dependency: Bun (pinned by package.json packageManager) ------
 export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
 export PATH="$BUN_INSTALL/bin:$PATH"
-if ! command -v bun >/dev/null 2>&1; then
-    echo "[install] Installing Bun 1.3.5..."
-    curl -fsSL https://bun.sh/install | bash -s "bun-v1.3.5"
+BUN_VERSION="$(node -p 'require("./package.json").packageManager.split("@")[1]')"
+if [ "$(bun --version 2>/dev/null || true)" != "$BUN_VERSION" ]; then
+    # Cloud images can already carry another repo's Bun; install this pin over it.
+    echo "[install] Installing Bun ${BUN_VERSION}..."
+    curl -fsSL https://bun.sh/install | bash -s "bun-v${BUN_VERSION}"
     if ! grep -q 'BUN_INSTALL' "$HOME/.bashrc" 2>/dev/null; then
         printf '\nexport BUN_INSTALL="$HOME/.bun"\nexport PATH="$BUN_INSTALL/bin:$PATH"\n' >> "$HOME/.bashrc"
     fi
+    hash -r
 else
     echo "[install] Bun already present ($(bun --version))."
 fi
@@ -89,6 +92,10 @@ if [ -z "${MERCHBASE_HUGEICONS_LICENSE_KEY:-}" ]; then
     export MERCHBASE_HUGEICONS_LICENSE_KEY
 fi
 
-bun install --frozen-lockfile
+# A proxy auth failure can leave bun install hanging silently; fail loudly instead.
+timeout 900 bun install --frozen-lockfile || {
+    echo "[install] ERROR: bun install failed or timed out" >&2
+    exit 1
+}
 
 echo "[install] Done."

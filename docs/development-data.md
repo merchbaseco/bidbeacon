@@ -194,7 +194,11 @@ The hook selects the fake Amazon Ads gateway. To start the app and capture
 proof, invoke `/verify-bidbeacon`; `.claude/skills/verify-bidbeacon` exposes
 the existing repository verification skill to Claude. Start and clean up app
 processes through that skill rather than leaving a foreground server inside
-a SessionStart hook.
+a SessionStart hook. For a one-off screenshot of a running dashboard, use
+`capture-page http://127.0.0.1:4174/ /tmp/bidbeacon.png --settle 8000`.
+`capture-page` is the fleet's Playwright wrapper around the image's Chromium;
+it routes external hosts such as Clerk through the agent proxy and keeps
+loopback direct. Raw `chromium --screenshot` hangs against the Vite dev server.
 
 ## What the seed promises
 
