@@ -10,8 +10,8 @@
  *
  * Never runs automatically on a developer machine. Local development resolves
  * `BIDBEACON_DATABASE_HOST` to the shared database over Tailscale, so the seed
- * refuses any host that is not loopback and there is no override flag. Cursor
- * cloud agents get it for free: `.cursor/start.sh` points the host at its own
+ * refuses any host that is not loopback and there is no override flag. Cloud
+ * agents get it for free: `.agents/cloud/start.sh` points the host at its own
  * PostgreSQL and seeds on every boot.
  *
  * Everything written is a local row. The seed never calls Amazon.

@@ -424,18 +424,19 @@ See `docs/database-queries.md` for the full query workflow and examples.
 
 ## Cloud agents
 
-Cloud agent platforms share the fleet `cloud-agent/` contract (`zknicker/agents`
-`docs/cloud-environments.md`): `install.sh`, `session.sh` (loopback Postgres and
-seed), `env.sh`, and `context.md` are BidBeacon's; `fetch-fleet.sh`,
-`fleet/.env.schema`, and `.claude/session-start.sh` are fleet-owned copies
-refreshed with `port-cloud-agent`. `.cursor/` and `.claude/` keep only thin
-platform adapters. Cursor runs the repo-managed
-**Merchbase BidBeacon** environment (`.cursor/environment.json`); Claude runs
-the `.claude/settings.json` SessionStart hook. Everything resolves from
+BidBeacon follows the fleet cloud agent contract; set up or repair it with the
+`zknicker/agents` `cloud-agent-setup` skill. `.agents/cloud/install.sh`,
+`start.sh` (loopback Postgres and seed), and `env.sh` (loopback database, fake
+Amazon Ads gateway) are BidBeacon's; `.agents/cloud/bootstrap.sh` is a
+fleet-owned copy, never edited here. Cursor runs the repo-managed
+**Merchbase BidBeacon** environment (`.cursor/environment.json`), whose `dev`
+terminal launches the servers; Claude runs `bootstrap.sh claude` from the
+`.claude/settings.json` SessionStart hook. For live verification use
+`verify-bidbeacon`. Everything resolves from
 1Password through the fleet-wide Development identity,
 `CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN`; there is no per-repo cloud secret and no
 `.env` step. A cloud agent has no Tailscale, so
-`cloud-agent/session.sh` provisions a local Postgres and points
+`.agents/cloud/start.sh` provisions a local Postgres and points
 `BIDBEACON_DATABASE_HOST` at loopback for that session only.
 
 That local database is then filled with synthetic development data on every

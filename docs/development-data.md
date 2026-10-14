@@ -160,15 +160,15 @@ only and nothing is written to disk.
 
 ## Cloud sessions
 
-Cursor cloud agents get all of it for free. `.cursor/start.sh` provisions the
+Cloud agents get all of it for free. `.agents/cloud/start.sh` provisions the
 VM's own PostgreSQL, pins the database host to loopback for the session, and
 seeds on every boot — receipt and all, straight into the boot log. Seeding is
 per boot rather than baked into the environment snapshot because the dataset is
 anchored to the current date, and a week-old snapshot would show a week-old
 week. A failed seed logs and is skipped; it never blocks the session.
 
-The same script exports `BIDBEACON_DEV_HOST=0.0.0.0` before launching the dev
-servers, because Cursor forwards a session's ports by watching the VM for
+Cursor's `dev` terminal in `.cursor/environment.json` sets
+`BIDBEACON_DEV_HOST=0.0.0.0` when it launches the dev servers, because Cursor forwards a session's ports by watching the VM for
 listening sockets and the repository's loopback default is invisible to that
 watcher. The API server already binds every interface, so it needs no
 equivalent. See "Development-only knobs" in `docs/infrastructure.md`.
@@ -177,11 +177,10 @@ A boot therefore ends with a dashboard that opens signed in, on an account it
 owns, showing this week.
 
 Claude cloud sessions use the committed `.claude/settings.json` SessionStart
-hook, scoped by `CLAUDE_CODE_REMOTE=true`. It fetches the current fleet with
-`cloud-agent/fetch-fleet.sh` and runs the fleet's `claude/cloud/start.sh` (1Password
-CLI, browser command, native Claude skills and agents), then runs the shared
-`cloud-agent/install.sh` and `cloud-agent/session.sh` for the same
-loopback-only database and synthetic seed as Cursor. Running services are not
+hook, scoped by `CLAUDE_CODE_REMOTE=true`. It runs `.agents/cloud/bootstrap.sh
+claude`, which loads the current fleet (1Password CLI, browser command, native
+Claude skills and agents) and then runs `.agents/cloud/install.sh` and
+`start.sh` for the same loopback-only database and synthetic seed as Cursor. Running services are not
 cached. The shared environment and credential flow live in the agents
 repository's `docs/cloud-environments.md`.
 

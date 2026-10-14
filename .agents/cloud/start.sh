@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# BidBeacon per-session services (repo-owned part of the fleet cloud-agent
+# BidBeacon per-session services (repo-owned part of the fleet cloud agent
 # contract): the loopback PostgreSQL cluster and its synthetic seed.
 set -euo pipefail
 
-REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 export BIDBEACON_DATABASE_HOST=127.0.0.1
 if [ "$(id -u)" -eq 0 ]; then

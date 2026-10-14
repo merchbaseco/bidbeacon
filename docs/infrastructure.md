@@ -107,7 +107,7 @@ connection. The server throws at the first operation context if `fake` is set
 while `NODE_ENV` or `VARLOCK_ENV` is production. Outside production, `fake`
 also resolves the three Amazon Ads credential items to a placeholder, so a VM
 without the Ads vault can boot. `.cursor/skills/verify-bidbeacon/control-bidbeacon`
-exports `fake` before varlock. `.cursor/start.sh` does not.
+exports `fake` before varlock, and cloud sessions get it from `.agents/cloud/env.sh`.
 
 `BIDBEACON_DEV_HOST` is the dashboard dev server's bind address, and
 `vite.config.dashboard.ts` is its only reader. It defaults to `127.0.0.1`, which
@@ -115,8 +115,8 @@ keeps a dev server — and the synthetic seed data behind it — off the network
 An environment that reaches the server through a port forwarder sets `0.0.0.0`
 for its own dev command, because such forwarders find a session's ports by
 watching for listening sockets and a loopback-only bind is invisible to them.
-`.cursor/start.sh` exports exactly that, which is where the knowledge that
-Cursor works this way belongs; app code stays vendor-neutral. Only the socket
+Cursor's `dev` terminal in `.cursor/environment.json` sets exactly that, which is
+where the knowledge that Cursor works this way belongs; app code stays vendor-neutral. Only the socket
 widens — the app still believes it serves its own origin. The API server needs
 no equivalent because `src/index.ts` already listens on `0.0.0.0`.
 

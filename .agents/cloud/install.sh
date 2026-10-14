@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
-# Idempotent BidBeacon cloud agent install (repo-owned part of the fleet
-# cloud-agent contract), shared by every platform: Cursor's environment.json
-# install and Claude's .claude/session-start.sh.
+# Idempotent BidBeacon cloud agent install, the repo-owned part of the fleet
+# cloud agent contract (zknicker/agents cloud-agent-setup skill). Cursor runs it
+# as its snapshot install; Claude runs it from the fleet start each session.
 # Installs the system toolchain (PostgreSQL + Bun) if missing, then installs
 # dependencies. There is no .env step: the committed .env.schema is the
 # environment contract and values resolve from 1Password through the fleet-wide
 # Development identity each platform provides as CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN.
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
 # Pinned so `bunx varlock` behaves identically before node_modules exists.
@@ -22,7 +22,7 @@ fi
 # --- System dependency: PostgreSQL --------------------------------------
 # Local development on a MacBook reaches the production database over
 # Tailscale. A cloud agent has no Tailscale, so it runs its own Postgres and
-# start.sh points the schema's database host at loopback for that session.
+# .agents/cloud/start.sh points the schema's database host at loopback for that session.
 if ! command -v psql >/dev/null 2>&1; then
     echo "[install] Installing PostgreSQL..."
     install_postgres() {
@@ -64,7 +64,7 @@ fi
 # --- Install-time credentials -------------------------------------------
 # Both are @internal schema items, so `varlock run` deliberately does not
 # export them; they are fetched explicitly under the install switch and
-# resolved from the Development vault via the fleet cloud-agent identity.
+# resolved from the Development vault via CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN.
 if [ -z "${MERCHBASE_GITHUB_NPM_TOKEN:-}" ]; then
     echo "[install] Resolving the GitHub Packages read token from 1Password..."
     MERCHBASE_GITHUB_NPM_TOKEN="$(

@@ -6,8 +6,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR\"/.claude/session-start.sh",
-            "timeout": 600
+            "command": "[ \"${CLAUDE_CODE_REMOTE:-}\" != true ] || bash \"$CLAUDE_PROJECT_DIR\"/.agents/cloud/bootstrap.sh claude",
+            "timeout": 900
           }
         ]
       }
