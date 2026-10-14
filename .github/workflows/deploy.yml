@@ -48,7 +48,7 @@ jobs:
           # the licensed @hugeicons-pro key from the Development vault. Actions'
           # own `github.token` is deliberately not used for package installs —
           # it cannot download another repository's GitHub Package.
-          CURSOR_CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
+          CI_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
         run: bun run deploy -- --expected-revision "${GITHUB_SHA}"
 
       - name: Install the host CLI wrapper

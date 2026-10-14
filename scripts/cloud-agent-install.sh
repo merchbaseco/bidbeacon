@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
-# Idempotent repository bootstrap for BidBeacon Cursor cloud agents.
+# Idempotent cloud agent install for BidBeacon, shared by every cloud agent
+# platform (Cursor's environment.json install, Claude's SessionStart hook).
 # Installs the system toolchain (PostgreSQL + Bun) if missing, then installs
 # dependencies. There is no .env step: the committed .env.schema is the
 # environment contract and values resolve from 1Password through the fleet-wide
-# Development identity that Cursor injects as a Runtime Secret.
+# Development identity each platform provides as CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -62,7 +63,7 @@ fi
 # --- Install-time credentials -------------------------------------------
 # Both are @internal schema items, so `varlock run` deliberately does not
 # export them; they are fetched explicitly under the install switch and
-# resolved from the Development vault via the Cursor fleet identity.
+# resolved from the Development vault via the fleet cloud-agent identity.
 if [ -z "${MERCHBASE_GITHUB_NPM_TOKEN:-}" ]; then
     echo "[install] Resolving the GitHub Packages read token from 1Password..."
     MERCHBASE_GITHUB_NPM_TOKEN="$(
