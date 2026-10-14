@@ -9,7 +9,9 @@ src/health/deployed-revision.stamp.ts
 coverage/
 .nyc_output/
 .context/
-.agents/
+# Cursor links fleet skills into .agents/skills; the cloud agent scripts stay tracked.
+.agents/*
+!.agents/cloud/
 
 # Agent-local state, including Claude worktrees. A checkout under
 # .claude/worktrees/ carries its own biome.json, which the linter would
@@ -17,7 +19,6 @@ coverage/
 .claude/*
 !.claude/agents/
 !.claude/settings.json
-!.claude/session-start.sh
 !.claude/skills/
 
 # Varlock schema is the committed contract

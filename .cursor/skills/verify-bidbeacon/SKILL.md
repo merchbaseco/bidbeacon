@@ -11,7 +11,7 @@ The command is `.cursor/skills/verify-bidbeacon/control-bidbeacon`, run from the
 
 ## Launch
 
-One local Postgres database named `bidbeacon` is shared by every server on this VM. Do not start a second server on ports `8080` and `4173` while `.cursor/start.sh` already holds them.
+One local Postgres database named `bidbeacon` is shared by every server on this VM. Do not start a second server on ports `8080` and `4173` while Cursor's `dev` terminal already holds them.
 
 ```bash
 .cursor/skills/verify-bidbeacon/control-bidbeacon launch --api-port 8090 --dashboard-port 4174
@@ -86,7 +86,7 @@ Cleanup sends `SIGTERM` to the api, dashboard, and Chrome process groups this ru
 
 ## External systems
 
-A server this helper starts uses the local Amazon Ads gateway. The default for every other process, including `.cursor/start.sh`, stays the live gateway. `fake` is refused when `NODE_ENV` or `VARLOCK_ENV` is production. An ineligible ASIN `B0INELIGBL`, or the string `PRODUCT_INELIGIBLE` on a submitted entity, comes back as `errors[{code,message}]` at that index. Every other create, update, and delete is echoed as success and appended to `/tmp/bidbeacon-amazon-ads-calls.jsonl`.
+A server this helper starts uses the local Amazon Ads gateway. Cloud sessions also select it through `.agents/cloud/env.sh`; every other process defaults to the live gateway. `fake` is refused when `NODE_ENV` or `VARLOCK_ENV` is production. An ineligible ASIN `B0INELIGBL`, or the string `PRODUCT_INELIGIBLE` on a submitted entity, comes back as `errors[{code,message}]` at that index. Every other create, update, and delete is echoed as success and appended to `/tmp/bidbeacon-amazon-ads-calls.jsonl`.
 
 Default `search` on `ad` or `product` asks RankWrangler for a title and swallows a failure. Pass `fields` that omit `ad.productTitle` and `product.title`.
 
