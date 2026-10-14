@@ -1,6 +1,6 @@
 {
   "name": "Merchbase BidBeacon",
-  "install": "bash scripts/cloud-agent-install.sh",
+  "install": "bash cloud-agent/install.sh",
   "start": "bash .cursor/start.sh",
   "ports": [
     { "name": "api", "port": 8080 },

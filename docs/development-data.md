@@ -178,9 +178,9 @@ owns, showing this week.
 
 Claude cloud sessions use the committed `.claude/settings.json` SessionStart
 hook, scoped by `CLAUDE_CODE_REMOTE=true`. It fetches the current fleet with
-`scripts/fetch-fleet.sh` and runs the fleet's `claude/cloud/start.sh` (1Password
+`cloud-agent/fetch-fleet.sh` and runs the fleet's `claude/cloud/start.sh` (1Password
 CLI, browser command, native Claude skills and agents), then runs the shared
-`scripts/cloud-agent-install.sh` and `scripts/cloud-postgres.sh` for the same
+`cloud-agent/install.sh` and `cloud-agent/session.sh` for the same
 loopback-only database and synthetic seed as Cursor. Running services are not
 cached. The shared environment and credential flow live in the agents
 repository's `docs/cloud-environments.md`.

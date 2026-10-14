@@ -12,8 +12,8 @@ cd "$REPO_ROOT"
 export BUN_INSTALL="${BUN_INSTALL:-$HOME/.bun}"
 export PATH="$BUN_INSTALL/bin:$PATH"
 
-export BIDBEACON_DATABASE_HOST=127.0.0.1
-bash scripts/cloud-postgres.sh
+. cloud-agent/env.sh
+bash cloud-agent/session.sh
 
 root="$REPO_ROOT"
 
