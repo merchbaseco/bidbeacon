@@ -37,7 +37,7 @@ jobs:
       - name: Install dependencies
         timeout-minutes: 5
         env:
-          CURSOR_CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
+          CI_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
         run: |
           MERCHBASE_GITHUB_NPM_TOKEN="$(
             BIDBEACON_RESOLVE_INSTALL_TOKENS=true \

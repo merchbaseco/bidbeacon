@@ -17,8 +17,7 @@ coverage/
 .claude/*
 !.claude/agents/
 !.claude/settings.json
-!.claude/cloud-start.sh
-!.claude/cloud-bootstrap/
+!.claude/session-start.sh
 !.claude/skills/
 
 # Varlock schema is the committed contract

@@ -50,8 +50,9 @@ Two, and only two:
 - `GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN` — the single repository secret. Reads
   the Production and Development vaults. Fills both the production deploy slot
   and, in CI, the development slot used to resolve install credentials.
-- `CURSOR_CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN` — the fleet-wide Cursor Runtime
-  Secret, account-scoped, not set per repo.
+- `CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN` — the fleet-wide cloud-agent identity,
+  set in each cloud agent platform's own store (a Cursor account Runtime Secret,
+  the Claude cloud environment), not per repo.
 
 ## Deploying
 
