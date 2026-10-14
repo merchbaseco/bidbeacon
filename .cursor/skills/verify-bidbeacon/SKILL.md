@@ -45,6 +45,14 @@ Browser commands talk to headless Chrome through the DevTools socket. They use a
 .cursor/skills/verify-bidbeacon/control-bidbeacon browser token
 ```
 
+For a quick look at the dashboard in a Claude cloud session, outside a verification run, capture it with:
+
+```bash
+capture-page http://127.0.0.1:4174/ /tmp/bidbeacon.png --settle 8000
+```
+
+`capture-page` is the fleet's Playwright wrapper around the image's Chromium; it routes external hosts such as Clerk through the agent proxy and keeps loopback direct. Do not use `google-chrome --screenshot` or `/opt/pw-browsers/chromium --screenshot` there: they hang against the Vite dev server. Evidence for a verification run still comes from `browser screenshot`.
+
 `browser token` writes the Clerk session JWT to the run's token file, mode `600`. Do not print the token. Later HTTP and MCP commands read that file.
 
 ```bash
