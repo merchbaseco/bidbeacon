@@ -14,6 +14,7 @@ const CAMPAIGN_RESOURCE_FIELDS = [
     'campaign.dailyBudget',
     'campaign.targetingMode',
     'campaign.bidStrategy',
+    'campaign.placementBidAdjustments',
     'campaign.startDate',
     'campaign.endDate',
 ] as const;
@@ -136,6 +137,7 @@ export const searchFieldRegistry: Readonly<Record<SearchField, SearchFieldDefini
     'campaign.dailyBudget': definition('campaign.dailyBudget', 'number', numericOperators, campaignResources, ['campaign']),
     'campaign.targetingMode': definition('campaign.targetingMode', 'string', stringEqualityOperators, campaignResources),
     'campaign.bidStrategy': definition('campaign.bidStrategy', 'string', stringEqualityOperators, campaignResources),
+    'campaign.placementBidAdjustments': definition('campaign.placementBidAdjustments', 'json', jsonOperators, campaignResources),
     'campaign.startDate': definition('campaign.startDate', 'date', dateOperators, campaignResources),
     'campaign.endDate': definition('campaign.endDate', 'date', dateOperators, campaignResources),
     'adGroup.id': definition('adGroup.id', 'string', stringEqualityOperators, childResources, ['ad_group', 'ad', 'target']),

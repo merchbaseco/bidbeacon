@@ -20,6 +20,7 @@ export const campaign = pgTable(
         endDate: date('end_date'), // Optional - only some campaigns have this
         targetingSettings: text('targeting_settings').notNull(), // AUTO or MANUAL
         bidStrategy: text('bid_strategy'), // From optimization.bidStrategy
+        placementBidAdjustments: jsonb('placement_bid_adjustments'),
         budgetType: text('budget_type'), // From budgetCaps.budgetType
         budgetPeriod: text('budget_period'), // From budgetCaps.recurrenceTimePeriod
         budgetAmount: numeric('budget_amount', { precision: 6, scale: 2 }), // From budgetCaps.budgetValue.monetaryBudget.amount

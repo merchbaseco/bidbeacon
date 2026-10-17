@@ -17,6 +17,7 @@ import { db } from '@/db/index';
 import { accountDatasetMetadata, ad, adGroup, advertiserAccount, campaign, target } from '@/db/schema';
 import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
+import { placementFromExportOptimization } from '@/operations/placement-bid-adjustments';
 import { utcNow } from '@/utils/date';
 import { emitEvent } from '@/utils/events';
 import { withJobMetrics } from '@/utils/job-metrics';
@@ -28,10 +29,12 @@ const gunzipAsync = promisify(gunzip);
 // ============================================================================
 
 // Campaign schema
-const optimizationSchema = z.object({
-    bidStrategy: z.string(),
-    placementBidAdjustments: z.array(z.any()).optional(),
-});
+const optimizationSchema = z
+    .object({
+        bidStrategy: z.string(),
+        placementBidAdjustments: z.unknown().optional(),
+    })
+    .passthrough();
 
 const monetaryBudgetSchema = z.object({
     currencyCode: z.string(),
@@ -565,6 +568,7 @@ export const syncAdEntitiesForAccountJob = boss
                                     endDate: c.endDate ?? null,
                                     targetingSettings: c.targetingSettings,
                                     bidStrategy: c.optimization?.bidStrategy ?? null,
+                                    placementBidAdjustments: placementFromExportOptimization(c.optimization),
                                     budgetType: c.budgetCaps?.budgetType ?? null,
                                     budgetPeriod: c.budgetCaps?.recurrenceTimePeriod ?? null,
                                     budgetAmount: c.budgetCaps?.budgetValue?.monetaryBudget?.amount?.toString() ?? null,

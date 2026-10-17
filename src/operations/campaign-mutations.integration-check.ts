@@ -148,6 +148,12 @@ describe('Campaign mutation operations', () => {
                 bidStrategy: 'SALES_DOWN_ONLY',
                 startDate: '2026-08-10',
                 endDate: '2026-08-12',
+                placementBidAdjustments: {
+                    topOfSearch: 50,
+                    restOfSearch: 10,
+                    productPages: 20,
+                    amazonBusiness: 5,
+                },
             },
         ]);
 
@@ -292,6 +298,7 @@ describe('Campaign mutation operations', () => {
                 state: 'ENABLED',
                 budgetAmount: '40.00',
                 bidStrategy: 'SALES_UP_AND_DOWN',
+                placementBidAdjustments: { productPages: 20 },
             },
         ]);
         const changes = await database.db
@@ -448,12 +455,75 @@ describe('Campaign mutation operations', () => {
         });
 
         expect(result.placementBidAdjustments).toBeUndefined();
+        const [row] = await database.db.select({ placementBidAdjustments: campaign.placementBidAdjustments }).from(campaign);
+        expect(row?.placementBidAdjustments).toBeNull();
         await expect(
             database.db
                 .select()
                 .from(entityChangeHistory)
                 .where(and(eq(entityChangeHistory.entityId, 'campaign-created-1'), eq(entityChangeHistory.fieldName, 'placementBidAdjustments')))
         ).resolves.toEqual([]);
+    });
+
+    it('leaves a stored placement map unchanged when a budget update omits placements', async () => {
+        database = await createTestDatabase();
+        await database.db.insert(advertiserAccount).values(buildCampaignMutationAccount());
+        await database.db.insert(campaign).values(
+            buildCampaignMutationArchiveRow({
+                placementBidAdjustments: { topOfSearch: 165, productPages: 30 },
+            })
+        );
+        const amazonAds = createFakeAmazonAdsGateway({
+            responses: {
+                updateCampaigns: {
+                    success: [
+                        {
+                            campaign: buildAmazonCampaignResponse({
+                                campaignId: 'campaign-existing-1',
+                                name: 'Existing campaign',
+                                state: 'PAUSED',
+                                status: { deliveryStatus: 'NOT_DELIVERING' },
+                                startDateTime: '2026-08-01T07:00:00.000Z',
+                                endDateTime: '2026-09-01T06:59:59.999Z',
+                                budgets: [
+                                    {
+                                        budgetValue: {
+                                            monetaryBudgetValue: {
+                                                monetaryBudget: { value: 40, currencyCode: 'USD' },
+                                            },
+                                        },
+                                    },
+                                ],
+                                optimizations: { bidSettings: { bidStrategy: 'SALES_DOWN_ONLY' } },
+                            }),
+                        },
+                    ],
+                },
+            },
+        });
+        const context = createOperationContext({
+            amazonAds,
+            db: database.db,
+            principal: {
+                accessibleAccountIds: [campaignMutationAccountId],
+                credentialKind: 'session',
+                merchbaseUserId: 'campaign-mutation-user',
+            },
+        });
+
+        const result = await updateCampaign(context, {
+            accountId: campaignMutationAccountId,
+            campaignId: 'campaign-existing-1',
+            changes: { dailyBudget: 40 },
+        });
+
+        expect(result.placementBidAdjustments).toBeUndefined();
+        expect(result.dailyBudget).toBe(40);
+        const [row] = await database.db.select({ placementBidAdjustments: campaign.placementBidAdjustments, budgetAmount: campaign.budgetAmount }).from(campaign);
+        expect(row).toEqual({
+            placementBidAdjustments: { topOfSearch: 165, productPages: 30 },
+            budgetAmount: '40.00',
+        });
     });
 
     it('rejects invalid input, missing campaigns, Amazon rejection, unavailability, and cross-account access', async () => {

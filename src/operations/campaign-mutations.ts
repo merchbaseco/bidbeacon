@@ -20,6 +20,7 @@ import {
 import { type CompositeCampaignCreateInput, type CompositeCampaignCreationResult, compositeCampaignCreateInputSchema, compositeCampaignCreationResultSchema } from './composite-campaign-schemas';
 import type { OperationContext } from './operation-context';
 import { OperationError } from './operation-errors';
+import { type PlacementPersistence, parsePlacementBidAdjustments, placementWrite, readStoredPlacementBidAdjustments, toAmazonPlacementBidAdjustments } from './placement-bid-adjustments';
 import { createAutomaticTarget, createKeywordTarget, createNegativeKeyword, createNegativeProductTarget, createProductTarget } from './target-mutations';
 import type { CanonicalTarget } from './target-schemas';
 
@@ -36,29 +37,6 @@ const PUBLIC_BID_STRATEGIES = {
     RULE_BASED: 'DYNAMIC_DOWN_ONLY',
     SALES_DOWN_ONLY: 'DYNAMIC_DOWN_ONLY',
     SALES_UP_AND_DOWN: 'DYNAMIC_UP_AND_DOWN',
-} as const;
-
-const AMAZON_PLACEMENT_KEYS = {
-    amazonBusiness: 'AMAZON_BUSINESS',
-    productPages: 'PRODUCT_PAGE',
-    restOfSearch: 'REST_OF_SEARCH',
-    topOfSearch: 'TOP_OF_SEARCH',
-} as const;
-
-const PUBLIC_PLACEMENT_KEYS = {
-    AMAZON_BUSINESS: 'amazonBusiness',
-    PLACEMENT_AMAZON_BUSINESS: 'amazonBusiness',
-    PLACEMENT_PRODUCT_PAGE: 'productPages',
-    PLACEMENT_REST_OF_SEARCH: 'restOfSearch',
-    PLACEMENT_TOP: 'topOfSearch',
-    PLACEMENT_TOP_OF_SEARCH: 'topOfSearch',
-    PRODUCT_PAGE: 'productPages',
-    REST_OF_SEARCH: 'restOfSearch',
-    TOP_OF_SEARCH: 'topOfSearch',
-    placementAmazonBusiness: 'amazonBusiness',
-    placementProductPage: 'productPages',
-    placementRestOfSearch: 'restOfSearch',
-    placementTop: 'topOfSearch',
 } as const;
 
 type AmazonRecord = Record<string, unknown>;
@@ -122,14 +100,20 @@ export const updateCampaign = async (context: OperationContext, input: unknown):
               });
     const amazonCampaign = extractCampaign(response);
     const previous = mapArchiveFallback(current);
+    const storedPlacement = readStoredPlacementBidAdjustments(current.placementBidAdjustments);
     const canonical = mapCanonicalCampaign({
         account,
         amazonCampaign,
         fallback: buildUpdateFallback(previous, parsedInput.changes, amazonCampaign),
     });
     const now = new Date();
+    const placement = placementWrite({
+        resolution: parsePlacementBidAdjustments(amazonCampaign),
+        requested: parsedInput.changes.placementBidAdjustments,
+        stored: storedPlacement,
+    });
 
-    await reconcileCampaign(context, account, canonical, current, now);
+    await reconcileCampaign(context, account, canonical, current, now, placement);
     const historyChanges: CampaignHistoryChange[] = [];
     if (parsedInput.changes.state !== undefined) {
         historyChanges.push({ eventType: 'state_change', fieldName: 'state', previousValue: previous.state, newValue: canonical.state });
@@ -144,7 +128,7 @@ export const updateCampaign = async (context: OperationContext, input: unknown):
         historyChanges.push({
             eventType: 'bid_change',
             fieldName: 'placementBidAdjustments',
-            previousValue: serializePlacementBidAdjustments(previous.placementBidAdjustments),
+            previousValue: serializePlacementBidAdjustments(storedPlacement ?? undefined),
             newValue: serializePlacementBidAdjustments(canonical.placementBidAdjustments),
         });
     }
@@ -301,7 +285,7 @@ const createCampaignWithOptions = async (context: OperationContext, input: unkno
     });
     const now = new Date();
 
-    await reconcileCampaign(context, account, canonical, undefined, now);
+    await reconcileCampaign(context, account, canonical, undefined, now, createPlacementWrite(amazonCampaign, parsedInput.placementBidAdjustments));
     await recordCampaignChanges(context, account, canonical.id, now, [
         { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
         { eventType: 'budget_change', fieldName: 'budgetAmount', previousValue: null, newValue: canonical.dailyBudget },
@@ -388,7 +372,7 @@ const buildCreatePayload = (input: CampaignCreateInput, account: ResolvedAccount
     const bidSettings: AmazonRecord = {
         bidStrategy: AMAZON_BID_STRATEGIES[input.bidStrategy],
     };
-    const placementBidAdjustments = mapPlacementBidAdjustmentsToAmazon(input.placementBidAdjustments);
+    const placementBidAdjustments = toAmazonPlacementBidAdjustments(input.placementBidAdjustments);
     if (placementBidAdjustments) {
         bidSettings.bidAdjustments = { placementBidAdjustments };
     }
@@ -423,7 +407,7 @@ const buildUpdatePayload = (campaignId: string, changes: CampaignUpdateChanges, 
     if (changes.bidStrategy !== undefined) {
         bidSettings.bidStrategy = AMAZON_BID_STRATEGIES[changes.bidStrategy];
     }
-    const placementBidAdjustments = mapPlacementBidAdjustmentsToAmazon(changes.placementBidAdjustments);
+    const placementBidAdjustments = toAmazonPlacementBidAdjustments(changes.placementBidAdjustments);
     if (placementBidAdjustments) {
         bidSettings.bidAdjustments = { placementBidAdjustments };
     }
@@ -443,20 +427,9 @@ const buildAmazonBudget = (value: number, currencyCode: string) => ({
     },
 });
 
-const mapPlacementBidAdjustmentsToAmazon = (adjustments: CampaignCreateInput['placementBidAdjustments'] | CampaignUpdateChanges['placementBidAdjustments']) => {
-    if (!adjustments) {
-        return undefined;
-    }
-
-    return Object.entries(adjustments).map(([key, percentage]) => ({
-        percentage,
-        placement: AMAZON_PLACEMENT_KEYS[key as keyof typeof AMAZON_PLACEMENT_KEYS],
-    }));
-};
-
 const mapCanonicalCampaign = ({ account, amazonCampaign, fallback }: { account: ResolvedAccount; amazonCampaign: AmazonRecord; fallback: CampaignFallback }): CanonicalCampaign => {
     const state = resolveCampaignState(amazonCampaign, fallback.state);
-    const placementBidAdjustments = resolvePlacementBidAdjustments(amazonCampaign);
+    const placementBidAdjustments = parsePlacementBidAdjustments(amazonCampaign);
     const canonical = {
         id: readString(amazonCampaign.campaignId) ?? fallback.id,
         name: readString(amazonCampaign.name) ?? fallback.name,
@@ -467,7 +440,7 @@ const mapCanonicalCampaign = ({ account, amazonCampaign, fallback }: { account: 
         targetingMode: resolveTargetingMode(amazonCampaign, fallback.targetingMode),
         startDate: resolveCampaignDate(amazonCampaign, 'startDate', 'startDateTime', account.countryCode) ?? fallback.startDate,
         endDate: resolveOptionalCampaignDate(amazonCampaign, 'endDate', 'endDateTime', account.countryCode, fallback.endDate),
-        placementBidAdjustments: placementBidAdjustments.present ? placementBidAdjustments.value : fallback.placementBidAdjustments,
+        placementBidAdjustments: placementBidAdjustments.present ? (placementBidAdjustments.value ?? undefined) : fallback.placementBidAdjustments,
     } satisfies CanonicalCampaign;
 
     if (!canonical.placementBidAdjustments || Object.keys(canonical.placementBidAdjustments).length === 0) {
@@ -505,7 +478,7 @@ const buildCreateFallback = (input: CampaignCreateInput, amazonCampaign: AmazonR
     targetingMode: input.targetingMode,
     startDate: input.startDate,
     endDate: input.endDate ?? null,
-    placementBidAdjustments: normalizePlacementBidAdjustments(input.placementBidAdjustments),
+    placementBidAdjustments: canonicalPlacementUpdate(undefined, input.placementBidAdjustments),
 });
 
 const buildUpdateFallback = (previous: CampaignFallback, changes: CampaignUpdateChanges, amazonCampaign: AmazonRecord): CampaignFallback => ({
@@ -515,7 +488,7 @@ const buildUpdateFallback = (previous: CampaignFallback, changes: CampaignUpdate
     deliveryStatus: changes.state ? inferDeliveryStatus(changes.state) : previous.deliveryStatus,
     dailyBudget: changes.dailyBudget ?? previous.dailyBudget,
     bidStrategy: changes.bidStrategy ?? previous.bidStrategy,
-    placementBidAdjustments: mergePlacementBidAdjustments(previous.placementBidAdjustments, changes.placementBidAdjustments),
+    placementBidAdjustments: canonicalPlacementUpdate(previous.placementBidAdjustments, changes.placementBidAdjustments),
 });
 
 const mapArchiveFallback = (row: CampaignArchiveRow): CampaignFallback => ({
@@ -528,9 +501,17 @@ const mapArchiveFallback = (row: CampaignArchiveRow): CampaignFallback => ({
     targetingMode: mapArchiveTargetingMode(row.targetingSettings),
     startDate: toDateString(row.startDate) ?? '1970-01-01',
     endDate: toDateString(row.endDate),
+    placementBidAdjustments: readStoredPlacementBidAdjustments(row.placementBidAdjustments) ?? undefined,
 });
 
-const reconcileCampaign = async (context: OperationContext, account: ResolvedAccount, canonical: CanonicalCampaign, current: CampaignArchiveRow | undefined, changedAt: Date) => {
+const reconcileCampaign = async (
+    context: OperationContext,
+    account: ResolvedAccount,
+    canonical: CanonicalCampaign,
+    current: CampaignArchiveRow | undefined,
+    changedAt: Date,
+    placement: PlacementPersistence
+) => {
     const values = {
         campaignId: canonical.id,
         accountId: account.adsAccountId,
@@ -548,6 +529,7 @@ const reconcileCampaign = async (context: OperationContext, account: ResolvedAcc
         budgetAmount: canonical.dailyBudget.toFixed(2),
         creationDateTime: current?.creationDateTime ?? changedAt,
         lastUpdatedDateTime: changedAt,
+        ...placementColumns(placement),
     };
 
     if (current) {
@@ -774,76 +756,54 @@ const resolveOptionalCampaignDate = (record: AmazonRecord, dateKey: string, date
     return resolved === undefined ? fallback : resolved;
 };
 
-const resolvePlacementBidAdjustments = (record: AmazonRecord) => {
-    const direct = record.placementBidAdjustments;
-    const optimizations = record.optimizations;
-    const bidSettings = optimizations && typeof optimizations === 'object' && !Array.isArray(optimizations) ? (optimizations as AmazonRecord).bidSettings : undefined;
-    const bidAdjustments = bidSettings && typeof bidSettings === 'object' && !Array.isArray(bidSettings) ? (bidSettings as AmazonRecord).bidAdjustments : undefined;
-    const nested = bidAdjustments && typeof bidAdjustments === 'object' && !Array.isArray(bidAdjustments) ? (bidAdjustments as AmazonRecord).placementBidAdjustments : undefined;
-    const directPresent = Object.hasOwn(record, 'placementBidAdjustments');
-    const nestedPresent = Boolean(bidAdjustments && typeof bidAdjustments === 'object' && !Array.isArray(bidAdjustments) && Object.hasOwn(bidAdjustments, 'placementBidAdjustments'));
-    if (!(directPresent || nestedPresent)) {
-        return { present: false as const, value: undefined };
+const createPlacementWrite = (amazonCampaign: AmazonRecord, requested: CampaignCreateInput['placementBidAdjustments']): PlacementPersistence => {
+    const resolution = parsePlacementBidAdjustments(amazonCampaign);
+    if (resolution.present) {
+        return placementWrite({ resolution, requested: undefined, stored: null });
     }
-
-    const source = directPresent ? direct : nested;
-    if (Array.isArray(source)) {
-        const result = normalizePlacementBidAdjustments(
-            Object.fromEntries(
-                source.flatMap(value => {
-                    if (!value || typeof value !== 'object' || Array.isArray(value)) {
-                        return [];
-                    }
-                    const adjustment = value as AmazonRecord;
-                    const placement = readString(adjustment.placement) ?? readString(adjustment.predicate);
-                    const key = placement ? PUBLIC_PLACEMENT_KEYS[placement as keyof typeof PUBLIC_PLACEMENT_KEYS] : undefined;
-                    return key ? [[key, parsePlacementValue(adjustment.percentage)]] : [];
-                })
-            )
-        );
-        return { present: true as const, value: result };
-    }
-    if (!source || typeof source !== 'object') {
-        return { present: true as const, value: undefined };
-    }
-
-    const values = source as AmazonRecord;
-    const result = normalizePlacementBidAdjustments({
-        topOfSearch: parsePlacementValue(values.topOfSearch ?? values.placementTop ?? values.TOP_OF_SEARCH ?? values.PLACEMENT_TOP),
-        restOfSearch: parsePlacementValue(values.restOfSearch ?? values.placementRestOfSearch ?? values.REST_OF_SEARCH ?? values.PLACEMENT_REST_OF_SEARCH),
-        productPages: parsePlacementValue(values.productPages ?? values.productPage ?? values.placementProductPage ?? values.PRODUCT_PAGE ?? values.PLACEMENT_PRODUCT_PAGE),
-        amazonBusiness: parsePlacementValue(values.amazonBusiness ?? values.placementAmazonBusiness ?? values.AMAZON_BUSINESS ?? values.PLACEMENT_AMAZON_BUSINESS),
-    });
-    return { present: true as const, value: result };
+    return placementWrite({ resolution, requested: requested ?? {}, stored: null });
 };
 
-const normalizePlacementBidAdjustments = (value: AmazonRecord | undefined) => {
-    if (!value) {
+const canonicalPlacementUpdate = (
+    stored: CanonicalCampaign['placementBidAdjustments'],
+    requested: CampaignCreateInput['placementBidAdjustments'] | CampaignUpdateChanges['placementBidAdjustments']
+) => {
+    if (requested === undefined) {
         return undefined;
     }
-    const result = Object.fromEntries(Object.entries(value).filter(([, adjustment]) => typeof adjustment === 'number' && adjustment > 0)) as CanonicalCampaign['placementBidAdjustments'];
-    return result && Object.keys(result).length > 0 ? result : undefined;
+    return canonicalPlacementValue(
+        placementWrite({
+            resolution: { present: false },
+            requested,
+            stored: stored ?? null,
+        })
+    );
 };
 
-const mergePlacementBidAdjustments = (
-    previous: CanonicalCampaign['placementBidAdjustments'],
-    changes: CampaignCreateInput['placementBidAdjustments'] | CampaignUpdateChanges['placementBidAdjustments']
-) => {
-    if (!changes) {
-        return previous;
+const canonicalPlacementValue = (decision: PlacementPersistence) => {
+    switch (decision.mode) {
+        case 'replace':
+            return decision.value ?? undefined;
+        case 'preserve':
+            return undefined;
+        default: {
+            const unreachable: never = decision;
+            return unreachable;
+        }
     }
-    return normalizePlacementBidAdjustments({ ...previous, ...changes });
 };
 
-const parsePlacementValue = (value: unknown) => {
-    if (typeof value === 'number' && Number.isFinite(value)) {
-        return value;
+const placementColumns = (decision: PlacementPersistence) => {
+    switch (decision.mode) {
+        case 'replace':
+            return { placementBidAdjustments: decision.value };
+        case 'preserve':
+            return {};
+        default: {
+            const unreachable: never = decision;
+            return unreachable;
+        }
     }
-    if (typeof value === 'string' && value.trim() !== '') {
-        const parsed = Number(value);
-        return Number.isFinite(parsed) ? parsed : undefined;
-    }
-    return undefined;
 };
 
 const mapAmazonBidStrategyToPublic = (value: string | null | undefined): CanonicalCampaign['bidStrategy'] | undefined => {

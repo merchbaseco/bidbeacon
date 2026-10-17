@@ -1,0 +1,1 @@
+ALTER TABLE "campaign" ADD COLUMN "placement_bid_adjustments" jsonb;

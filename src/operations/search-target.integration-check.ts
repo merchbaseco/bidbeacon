@@ -401,6 +401,30 @@ describe('Target Search operation', () => {
             })
         ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
     });
+
+    it('selects the campaign placement object through a target row', async () => {
+        database = await createTestDatabase();
+        await database.db.insert(advertiserAccount).values(buildSearchTargetAdvertiserAccount());
+        await database.db.insert(campaign).values(
+            buildSearchTargetCampaign({
+                placementBidAdjustments: { topOfSearch: 165, productPages: 30 },
+            })
+        );
+        await database.db.insert(target).values(buildSearchTarget());
+
+        const result = await search(createSearchContext(database), {
+            accountId: SEARCH_TARGET_ACCOUNT_ID,
+            resource: 'target',
+            fields: ['target.id', 'campaign.placementBidAdjustments'],
+        });
+
+        expect(result.rows).toEqual([
+            {
+                'target.id': 'search-target-keyword-1',
+                'campaign.placementBidAdjustments': { topOfSearch: 165, productPages: 30 },
+            },
+        ]);
+    });
 });
 
 const createSearchContext = (database: TestDatabase, accessibleAccountIds: string[] = [SEARCH_TARGET_ACCOUNT_ID]): OperationContext =>

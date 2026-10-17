@@ -239,6 +239,13 @@ describe('Campaign Search operation', () => {
                 targetingSettings: 'MANUAL',
                 bidStrategy: 'RULE_BASED',
             }),
+            buildSearchCampaign({
+                id: 'search-campaign-row-3',
+                campaignId: 'campaign-search-3',
+                name: 'Gamma campaign',
+                targetingSettings: 'AUTO',
+                bidStrategy: 'AUTO_FOR_SALES',
+            }),
         ]);
         await database.db.insert(target).values([
             buildSearchTarget(),
@@ -268,6 +275,11 @@ describe('Campaign Search operation', () => {
                 'campaign.id': 'campaign-search-2',
                 'campaign.targetingMode': 'MANUAL_PRODUCT',
                 'campaign.bidStrategy': null,
+            },
+            {
+                'campaign.id': 'campaign-search-3',
+                'campaign.targetingMode': 'AUTO',
+                'campaign.bidStrategy': 'DYNAMIC_UP_AND_DOWN',
             },
         ]);
     });
@@ -459,6 +471,58 @@ describe('Campaign Search operation', () => {
             search(createSearchContext(database), { accountId: SEARCH_ACCOUNT_ID, resource: 'campaign', fields: ['campaign.id'], dateRange: { startDate: '2026-08-01', endDate: '2026-08-02' } })
         ).rejects.toMatchObject({ code: 'INVALID_INPUT' });
         await expect(search(createSearchContext(database), { accountId: SEARCH_ACCOUNT_ID, resource: 'future' })).rejects.toMatchObject({ code: 'INVALID_INPUT' });
+    });
+
+    it('returns placement adjustments only when Search requests that field', async () => {
+        vi.useFakeTimers();
+        vi.setSystemTime(new Date('2026-08-07T12:00:00.000Z'));
+        database = await createTestDatabase();
+        await database.db.insert(advertiserAccount).values(buildSearchAdvertiserAccount());
+        await database.db.insert(campaign).values([
+            buildSearchCampaign({ placementBidAdjustments: { topOfSearch: 165, productPages: 30 } }),
+            buildSearchCampaign({
+                id: 'search-campaign-row-2',
+                campaignId: 'campaign-search-2',
+                name: 'Beta campaign',
+                placementBidAdjustments: null,
+            }),
+        ]);
+
+        const selected = await search(createSearchContext(database), {
+            accountId: SEARCH_ACCOUNT_ID,
+            resource: 'campaign',
+            fields: ['campaign.id', 'campaign.placementBidAdjustments'],
+        });
+        expect(selected.rows).toEqual([
+            {
+                'campaign.id': 'campaign-search-1',
+                'campaign.placementBidAdjustments': { topOfSearch: 165, productPages: 30 },
+            },
+            {
+                'campaign.id': 'campaign-search-2',
+                'campaign.placementBidAdjustments': null,
+            },
+        ]);
+
+        const defaults = await search(createSearchContext(database), { accountId: SEARCH_ACCOUNT_ID, resource: 'campaign' });
+        expect(defaults.context.fields).toEqual([
+            'campaign.id',
+            'campaign.name',
+            'campaign.state',
+            'campaign.deliveryStatus',
+            'campaign.dailyBudget',
+            'metrics.impressions',
+            'metrics.clicks',
+            'metrics.spend',
+            'metrics.orders',
+            'metrics.sales',
+            'metrics.acos',
+            'metrics.cpc',
+            'metrics.ctr',
+            'metrics.roas',
+            'metrics.cvr',
+        ]);
+        expect(defaults.rows.map(row => Object.hasOwn(row, 'campaign.placementBidAdjustments'))).toEqual([false, false]);
     });
 });
 
