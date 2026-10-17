@@ -20,12 +20,14 @@ Every performance-bearing resource reads the canonical Target-grain daily archiv
 
 | Resource | Default fields | Additional selectable fields |
 | --- | --- | --- |
-| `campaign` | `campaign.id`, `campaign.name`, `campaign.state`, `campaign.deliveryStatus`, `campaign.dailyBudget` | `campaign.targetingMode`, `campaign.bidStrategy`, `campaign.startDate`, `campaign.endDate` |
+| `campaign` | `campaign.id`, `campaign.name`, `campaign.state`, `campaign.deliveryStatus`, `campaign.dailyBudget` | `campaign.targetingMode`, `campaign.bidStrategy`, `campaign.placementBidAdjustments`, `campaign.startDate`, `campaign.endDate` |
 | `ad_group` | `adGroup.id`, `adGroup.name`, `adGroup.state`, `adGroup.deliveryStatus`, `adGroup.defaultBid`, `campaign.id`, `campaign.name` | None |
 | `ad` | `ad.id`, `ad.state`, `ad.deliveryStatus`, `ad.asin`, `ad.productTitle`, `adGroup.id`, `adGroup.name`, `campaign.id`, `campaign.name` | `ad.type` |
 | `target` | `target.id`, `target.state`, `target.deliveryStatus`, `target.type`, `target.scope`, `target.bid`, `target.negative`, `target.keyword`, `target.asin`, `target.matchType`, `campaign.id`, `campaign.name`, `adGroup.id`, `adGroup.name` | — |
 | `product` | `product.asin`, `product.title` | None |
 | `change_event` | `changeEvent.id`, `changeEvent.resourceType`, `changeEvent.resourceId`, `changeEvent.eventType`, `changeEvent.field`, `changeEvent.previousValue`, `changeEvent.newValue`, `changeEvent.changedAt`, `changeEvent.source` | None |
+
+`campaign.bidStrategy` and `campaign.placementBidAdjustments` are opt-in. Omitting `fields` leaves both out of the response. `campaign.placementBidAdjustments` is `null`, or an object with any of `topOfSearch`, `restOfSearch`, `productPages`, and `amazonBusiness`. Each number is an integer percent increase on the keyword bid for that placement. A `topOfSearch` value of `165` multiplies the bid by `1 + 165/100`, so a `0.17` bid becomes about `0.45`.
 
 For `ad_group`, `ad`, and `target`, every field of the listed ancestor resources is also selectable. The table's Additional selectable fields column lists only fields belonging to the selected resource itself.
 

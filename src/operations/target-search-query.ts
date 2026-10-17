@@ -2,6 +2,7 @@ import { addDays } from 'date-fns';
 import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
 import { adGroup, campaign, performanceDaily, target } from '@/db/schema';
 import type { OperationContext } from './operation-context';
+import { readStoredPlacementBidAdjustments } from './placement-bid-adjustments';
 import { buildSearchMetricValues, emptySearchMetrics, type SearchMetricTotals } from './search-metrics';
 import type { SearchFilter, SearchPlan } from './search-planner';
 import type { SearchRow } from './search-query';
@@ -29,6 +30,7 @@ type TargetSearchSettings = {
     campaignDailyBudget: string | null;
     campaignTargetingSettings: string;
     campaignBidStrategy: string | null;
+    placementBidAdjustments: unknown;
     campaignStartDate: string;
     campaignEndDate: string | null;
 };
@@ -90,6 +92,7 @@ const queryTargetSettingsRows = async (context: OperationContext, account: { ads
             campaignDailyBudget: campaign.budgetAmount,
             campaignTargetingSettings: campaign.targetingSettings,
             campaignBidStrategy: campaign.bidStrategy,
+            placementBidAdjustments: campaign.placementBidAdjustments,
             campaignStartDate: campaign.startDate,
             campaignEndDate: campaign.endDate,
             bucketDate: sql<string | null>`NULL`.as('bucket_date'),
@@ -151,6 +154,7 @@ const queryTargetPerformanceRows = async (context: OperationContext, account: { 
             campaignDailyBudget: campaign.budgetAmount,
             campaignTargetingSettings: campaign.targetingSettings,
             campaignBidStrategy: campaign.bidStrategy,
+            placementBidAdjustments: campaign.placementBidAdjustments,
             campaignStartDate: campaign.startDate,
             campaignEndDate: campaign.endDate,
             bucketDate: plan.segmented ? performanceDaily.bucketDate : sql<string | null>`NULL`.as('bucket_date'),
@@ -191,6 +195,7 @@ const queryTargetPerformanceRows = async (context: OperationContext, account: { 
             campaign.budgetAmount,
             campaign.targetingSettings,
             campaign.bidStrategy,
+            campaign.placementBidAdjustments,
             campaign.startDate,
             campaign.endDate,
             ...(plan.segmented ? [performanceDaily.bucketDate] : [])
@@ -226,6 +231,7 @@ const buildTargetSearchRow = (row: TargetSearchDatabaseRow, totals: SearchMetric
             'campaign.dailyBudget': row.campaignDailyBudget === null ? null : toNumber(row.campaignDailyBudget),
             'campaign.targetingMode': normalizeTargetingMode(row.campaignTargetingSettings, type),
             'campaign.bidStrategy': normalizeBidStrategy(row.campaignBidStrategy),
+            'campaign.placementBidAdjustments': readStoredPlacementBidAdjustments(row.placementBidAdjustments),
             'campaign.startDate': toDateString(row.campaignStartDate),
             'campaign.endDate': row.campaignEndDate ? toDateString(row.campaignEndDate) : null,
             'metrics.impressions': metrics.impressions,

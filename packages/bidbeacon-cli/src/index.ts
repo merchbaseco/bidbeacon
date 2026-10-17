@@ -6,6 +6,7 @@ import { type BidBeaconClient, createBidBeaconClient, type RouterInputs } from '
 import { clearStoredApiKey, getMissingApiKeyMessage, loadAuthState, setStoredApiKey } from './auth';
 import { normalizeApiBaseUrl, withTransportHint } from './base-url';
 import { renderHelp, resolveHelpTopicKey } from './help';
+import { SEARCH_FIELD_NAMES } from './search-field-names';
 
 const DEFAULT_BASE_URL = 'http://localhost:8080';
 const DEFAULT_STORAGE_DIR = join(homedir(), '.bidbeacon');
@@ -24,60 +25,6 @@ const VERSION_PREFIX_REGEX = /^v/i;
 const WHERE_SYMBOL_EXPRESSION_REGEX = /^(?<field>[A-Za-z][A-Za-z0-9_.]*)\s*(?<operator>>=|<=|>|<|=)\s*(?<value>.+)$/;
 const WHERE_WORD_EXPRESSION_REGEX = /^(?<field>[A-Za-z][A-Za-z0-9_.]*)\s+(?<operator>contains|in)\s+(?<value>.+)$/i;
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const SEARCH_FIELD_NAMES = new Set([
-    'campaign.id',
-    'campaign.name',
-    'campaign.state',
-    'campaign.deliveryStatus',
-    'campaign.dailyBudget',
-    'campaign.targetingMode',
-    'campaign.bidStrategy',
-    'campaign.startDate',
-    'campaign.endDate',
-    'adGroup.id',
-    'adGroup.name',
-    'adGroup.state',
-    'adGroup.deliveryStatus',
-    'adGroup.defaultBid',
-    'ad.id',
-    'ad.state',
-    'ad.deliveryStatus',
-    'ad.asin',
-    'ad.productTitle',
-    'ad.type',
-    'target.id',
-    'target.state',
-    'target.deliveryStatus',
-    'target.type',
-    'target.scope',
-    'target.bid',
-    'target.negative',
-    'target.keyword',
-    'target.asin',
-    'target.matchType',
-    'product.asin',
-    'product.title',
-    'changeEvent.id',
-    'changeEvent.resourceType',
-    'changeEvent.resourceId',
-    'changeEvent.eventType',
-    'changeEvent.field',
-    'changeEvent.previousValue',
-    'changeEvent.newValue',
-    'changeEvent.changedAt',
-    'changeEvent.source',
-    'metrics.impressions',
-    'metrics.clicks',
-    'metrics.spend',
-    'metrics.orders',
-    'metrics.sales',
-    'metrics.acos',
-    'metrics.cpc',
-    'metrics.ctr',
-    'metrics.roas',
-    'metrics.cvr',
-]);
-
 const main = async () => {
     const parsed = parseArgs(process.argv.slice(2));
     const helpContext = await buildHelpContext();
