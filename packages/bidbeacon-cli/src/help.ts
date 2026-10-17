@@ -22,7 +22,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
         commands: [
             { left: 'advertiser-accounts list', right: 'List advertiser accounts available to the credential' },
             { left: 'search <resource>', right: 'Search rows with explicit account, fields, filters, and paging' },
-            { left: 'performance', right: 'Read one complete bounded Account, Product, Ad, or Target time series' },
+            { left: 'performance', right: 'Read one complete bounded Account, Product, Ad, Target, or Campaign time series' },
             { left: 'create <operation>', right: 'Create one resource or a Sponsored Products composite' },
             { left: 'update <resource>', right: 'Update one resource with explicit changes' },
             { left: 'auth', right: 'Set, clear, or inspect shared Merchbase API-key auth' },
@@ -92,19 +92,25 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
     },
     performance: {
         key: 'performance',
-        usage: 'bb performance --account <uuid> --dimension <account|product|ad|target> --interval <hour|day|month> [options]',
+        usage: 'bb performance --account <uuid> --dimension <account|product|ad|target|campaign> --interval <hour|day|month> [options]',
         summary: 'Read complete bounded temporal performance without cursors.',
         options: [
             { left: '--account <uuid>', right: 'Required advertiser account UUID' },
-            { left: '--dimension <value>', right: 'Account, Product, Ad, or Target' },
+            { left: '--dimension <value>', right: 'Account, Product, Ad, Target, or Campaign' },
             { left: '--entity-ids <id,...>', right: 'Required outside Account; maximum 25 IDs' },
             { left: '--interval <value>', right: 'Hour, day, or month' },
             { left: '--metrics <metric,...>', right: 'Canonical performance metrics' },
             { left: '--start-date <YYYY-MM-DD>', right: 'Account-local inclusive start date' },
             { left: '--end-date <YYYY-MM-DD>', right: 'Account-local inclusive end date' },
+            { left: '--comparison-start-date <YYYY-MM-DD>', right: 'Optional explicit comparison start. Pair with --comparison-end-date' },
+            { left: '--comparison-end-date <YYYY-MM-DD>', right: 'Optional explicit comparison end. Pair with --comparison-start-date' },
             { left: '--json <object|@file|->', right: 'Canonical Performance input from JSON, file, or stdin' },
         ],
-        notes: ['Performance returns one atomic result or a structured size/execution error. It never returns a cursor.'],
+        notes: [
+            'Performance returns one atomic result or a structured size/execution error. It never returns a cursor.',
+            'impressionDays above zero means the subject served. Zero means it did not serve only when that window coverage is COMPLETE.',
+            'Days enabled are not available. Change history starts on 2026-08-07 and records only BidBeacon edits.',
+        ],
     },
     create: {
         key: 'create',

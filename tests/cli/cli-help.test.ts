@@ -42,6 +42,8 @@ describe('bb help topics', () => {
         const performanceOutput = renderHelp('performance', { version: '0.0.0' });
         expect(performanceOutput).toContain('--dimension <value>');
         expect(performanceOutput).toContain('--entity-ids <id,...>');
+        expect(performanceOutput).toContain('--comparison-start-date <YYYY-MM-DD>');
+        expect(performanceOutput).toContain('campaign');
     });
 
     it('renders auth, config, and changelog guidance', () => {

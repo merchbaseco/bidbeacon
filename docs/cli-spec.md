@@ -38,7 +38,7 @@ Sponsored Products is the only writable ad product in this version.
 | --- | --- | --- |
 | `list_advertiser_accounts` | `bb advertiser-accounts list` | Discover accessible Account IDs and account metadata |
 | `search` | `bb search <resource>` | Read current settings, performance, products, or change history |
-| `performance` | `bb performance` | Read complete bounded Account, Product, Ad, or Target temporal performance |
+| `performance` | `bb performance` | Read complete bounded Account, Product, Ad, Target, or Campaign temporal performance |
 | `create_sponsored_products_campaign` | `bb create sponsored-products-campaign` | Create one complete ordinary Sponsored Products campaign |
 | `create_campaign` | `bb create campaign` | Create a campaign without children |
 | `create_ad_group` | `bb create ad-group` | Add an ad group to an existing campaign |
@@ -336,7 +336,7 @@ Issue status is `PENDING`, `FAILED`, `PARSE_ERRORS`, or `UNKNOWN`. `PARSE_ERRORS
 
 ## Performance
 
-`performance` returns one complete bounded temporal result without a cursor. It supports `dimension: account | product | ad | target`, `interval: hour | day | month`, an explicit inclusive account-local date range, and a selected subset of the ten canonical performance metrics. Product, Ad, and Target requests require one through 25 explicit `entityIds`; Account forbids them. Performance accepts no general filter or sorting language.
+`performance` returns one complete bounded temporal result without a cursor. It supports `dimension: account | product | ad | target | campaign`, `interval: hour | day | month`, an explicit inclusive account-local date range, an optional explicit `comparisonDateRange`, and a selected subset of the ten canonical performance metrics. Product, Ad, Target, and Campaign requests require one through 25 explicit `entityIds`. Account forbids them. Campaign groups `campaign_id` and does not return names. Performance accepts no general filter or sorting language, and it has no comparison preset.
 
 ```bash
 bb performance \
@@ -345,10 +345,12 @@ bb performance \
   --interval day \
   --start-date 2026-07-01 \
   --end-date 2026-07-30 \
-  --metrics impressions,spend,sales,orders
+  --metrics impressions,spend,sales,orders \
+  --comparison-start-date 2025-07-01 \
+  --comparison-end-date 2025-07-30
 ```
 
-Account results contain totals and points. Product, Ad, and Target results contain one series per requested identity in caller order. Points are zero-filled; hourly points use unambiguous ISO start/end instants. Coverage remains separate from atomic response delivery. Exact limits and errors are defined in [performance-api.md](performance-api.md).
+Account results contain totals, points, and `activity`. Product, Ad, Target, and Campaign results contain one series per requested identity in caller order. Each series has the same totals, points, and `activity`. A comparison range adds `comparison` beside those fields and `context.comparison` with that range and its own coverage. Performance does not compute deltas and does not pair points by index. `activity.impressionDays` above zero means the subject served. Zero means it did not serve only when that window's coverage is `COMPLETE`. Otherwise zero is inconclusive. Days enabled are not available. Change history starts on 2026-08-07 and records only BidBeacon's own edits. Points are zero-filled. Hourly points use unambiguous ISO start/end instants. Coverage remains separate from atomic response delivery. Exact limits and errors are defined in [performance-api.md](performance-api.md).
 
 ## Search field behavior
 

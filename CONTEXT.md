@@ -17,11 +17,11 @@ A Search whose resource rows include metrics aggregated over a requested or dete
 _Avoid_: Performance Search, segmented Search, unstated reporting window
 
 **Performance**:
-The public read operation for one complete, bounded temporal measurement of an Advertiser account or an explicit small set of Products, Ads, or Targets. It returns selected metric totals and ordered zero-filled points without a cursor, or rejects the request with a structured size or execution error.
+The public read operation for one complete, bounded temporal measurement of an Advertiser account or an explicit small set of Products, Ads, Targets, or Campaigns. It returns selected metric totals, ordered zero-filled points, and impression activity without a cursor, or rejects the request with a structured size or execution error. An optional comparison date range returns a second window beside the first.
 _Avoid_: Chart operation, report job, generic analytics query
 
 **Performance dimension**:
-The subject measured by Performance: the whole Advertiser account or an explicitly identified Product, Ad, or Target. Dimension is distinct from interval; it selects an archive-native identity, not a generic grouping language.
+The subject measured by Performance: the whole Advertiser account or an explicitly identified Product, Ad, Target, or Campaign. Dimension is distinct from interval; it selects an archive-native identity, not a generic grouping language. Campaign groups stored campaign ids and does not return campaign names.
 _Avoid_: Search resource, grain
 
 **Performance interval**:
@@ -29,7 +29,7 @@ The account-local time bucket of each Performance point: hour, day, or month. Ho
 _Avoid_: Browser-local interval, display grouping
 
 **Performance series**:
-The totals and ordered zero-filled points returned atomically by Performance. Atomic response completeness is distinct from Performance coverage, which describes the underlying archive evidence.
+The totals, ordered zero-filled points, and impression activity returned atomically by Performance. Atomic response completeness is distinct from Performance coverage, which describes the underlying archive evidence. `impressionDays` above zero means the subject served. Zero means it did not serve only when coverage is complete.
 _Avoid_: Search page, cursor traversal, `complete` flag
 
 **Performance coverage**:

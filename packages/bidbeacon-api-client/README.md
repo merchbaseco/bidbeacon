@@ -58,7 +58,7 @@ type SearchInput = CliRouterInputs['search'];
 type SearchOutput = CliRouterOutputs['search'];
 ```
 
-Search returns `summary` totals for the complete filtered resource result before pagination. Performance returns complete bounded Account or ordered Product, Ad, or Target temporal points without a cursor. Ratio fields are `null` when their denominator is zero.
+Search returns `summary` totals for the complete filtered resource result before pagination. Performance returns complete bounded Account or ordered Product, Ad, Target, or Campaign temporal points without a cursor. An optional comparison range returns a second window. Ratio fields are `null` when their denominator is zero.
 
 Batching is enabled by default. Configure it with `batch`, `batchMaxItems`, and `batchMaxURLLength`, or set `batch: false` for one HTTP request per operation.
 

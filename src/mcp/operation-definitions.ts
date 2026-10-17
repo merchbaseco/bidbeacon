@@ -57,7 +57,7 @@ export const MCP_SERVER_INSTRUCTIONS = [
     'Discover the BidBeacon Advertiser Account UUID with list_advertiser_accounts before any scoped call.',
     'Pass accountId explicitly on every scoped call; never rely on selected-account state.',
     'Omit fields for ordinary Search reads: defaults return legible settings and the last seven account-local performance days aggregated at the resource grain. Supplying fields replaces those defaults; use it only for a narrower resource shape.',
-    'Use Performance for complete hourly, daily, or monthly Account and bounded Product, Ad, or Target time series; never exhaust Search cursors to build a chart.',
+    'Use Performance for complete hourly, daily, or monthly Account and bounded Product, Ad, Target, or Campaign time series. Pass comparisonDateRange for an explicit second window. Read activity.impressionDays with that window coverage: above zero means it served, and zero means it did not serve only when coverage is COMPLETE. Never exhaust Search cursors to build a chart.',
     'Inspect current settings and relevant performance before consequential updates; prefer composite campaign creation for ordinary launches and primitives only for bespoke or recovery work.',
     'Treat coverage issues as archive uncertainty, not zero performance.',
 ].join('\n');
@@ -117,7 +117,7 @@ export const MCP_OPERATION_DEFINITIONS: readonly McpOperationDefinition[] = [
         name: 'performance',
         title: 'Read Performance',
         description:
-            'Read one complete bounded temporal performance result for an explicit BidBeacon Advertiser Account UUID. Supports Account or explicit Product, Ad, and Target dimensions, hourly, daily, or monthly intervals, selected canonical metrics, zero-filled points, totals, timezone, and archive coverage. Returns no cursor; failures return a stable BidBeacon tool error with actionable structured limits.',
+            'Read one complete bounded temporal performance result for an explicit BidBeacon Advertiser Account UUID. Supports Account or explicit Product, Ad, Target, and Campaign dimensions, hourly, daily, or monthly intervals, selected canonical metrics, zero-filled points, totals, impression activity, an optional explicit comparisonDateRange, timezone, and archive coverage for each window. impressionDays above zero means the subject served. Zero means it did not serve only when that window coverage is COMPLETE. Otherwise the window is inconclusive. Days enabled are not available. Returns no cursor and no server-computed deltas. Failures return a stable BidBeacon tool error with actionable structured limits.',
         inputSchema: performanceInputSchema,
         outputSchema: performanceMcpOutputSchema,
         annotations: readOnlyAnnotations,

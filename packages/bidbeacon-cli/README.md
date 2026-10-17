@@ -25,7 +25,7 @@ bb changelog
 
 All account-scoped commands require an explicit advertiser account UUID. The CLI does not read or write a selected account. `bb advertiser-accounts list` is the only unscoped operation.
 
-Search supports explicit fields, account-local inclusive dates, stable ordering, keyset cursors, repeated `--where` AND filters, and `--all`. Use `in ["a", "b"]` for alternatives. Metric fields use the canonical vocabulary, including `metrics.orders` and `metrics.cvr`. Search responses include a full filtered-resource `summary`. `bb performance` returns complete bounded Account or ordered Product, Ad, or Target temporal points without a cursor. Ratios are `null` when their denominator is zero.
+Search supports explicit fields, account-local inclusive dates, stable ordering, keyset cursors, repeated `--where` AND filters, and `--all`. Use `in ["a", "b"]` for alternatives. Metric fields use the canonical vocabulary, including `metrics.orders` and `metrics.cvr`. Search responses include a full filtered-resource `summary`. `bb performance` returns complete bounded Account or ordered Product, Ad, Target, or Campaign temporal points without a cursor. `--comparison-start-date` and `--comparison-end-date` request a second explicit window. Ratios are `null` when their denominator is zero.
 
 Primitive create and update operations accept camel-case operation properties as kebab-case flags. Nested input can come from a JSON literal, `@file`, or stdin:
 

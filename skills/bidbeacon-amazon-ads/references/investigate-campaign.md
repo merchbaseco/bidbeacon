@@ -2,7 +2,7 @@
 
 Build the smallest evidence chain that distinguishes the cause.
 
-1. Search the Campaign's current settings and relevant performance. Choose the most relevant baseline—an equal prior-season window for seasonal ads, longer history for persistent or omni Campaigns.
+1. Search the Campaign's current settings. Use Performance `dimension: campaign` with `comparisonDateRange` for a second window. `impressionDays` above zero served. Zero with `COMPLETE` coverage did not.
 2. Follow the live hypothesis:
    - delivery
    - traffic
@@ -10,7 +10,7 @@ Build the smallest evidence chain that distinguishes the cause.
    - targeting or placement
    - a prior change near the onset
 3. Treat Campaign performance as triage. Before a broad action, inspect Target or advertised-ASIN composition, especially for multi-product or historically valuable Campaigns.
-4. Keep aggregate, Product, Ad, and Target results as distinct dimensions. Request bounded Ad or Target Performance only when temporal history distinguishes the cause.
+4. Keep aggregate, Product, Ad, and Target results as distinct dimensions. Request bounded Campaign, Ad, or Target Performance only when temporal history distinguishes the cause.
 5. Stop when the evidence identifies a cause, narrows the next question, or shows insufficient data.
 6. For a selected action, use [optimization](optimize-resource.md). To evaluate an earlier action, compare before and after accounting for coverage and elapsed time; include aligned MerchBase sales when business outcome matters.
 

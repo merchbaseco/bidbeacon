@@ -193,7 +193,7 @@ const handlePerformanceCommand = async (subcommand: string | undefined, rest: st
     if (subcommand || rest.length > 0) {
         throw invalidInput('Use `bb performance` without a subcommand.', {});
     }
-    assertNoUnexpectedFlags(flags, ['account', 'dimension', 'entity-ids', 'interval', 'metrics', 'start-date', 'end-date', 'json', 'help']);
+    assertNoUnexpectedFlags(flags, ['account', 'dimension', 'entity-ids', 'interval', 'metrics', 'start-date', 'end-date', 'comparison-start-date', 'comparison-end-date', 'json', 'help']);
     const accountId = requireAccount(flags);
     const json = await readJsonFlag(flags);
     const flagInput: Record<string, unknown> = { accountId };
@@ -219,6 +219,14 @@ const handlePerformanceCommand = async (subcommand: string | undefined, rest: st
     }
     if (startDate && endDate) {
         flagInput.dateRange = { startDate, endDate };
+    }
+    const comparisonStartDate = readOptionalFlag(flags, 'comparison-start-date');
+    const comparisonEndDate = readOptionalFlag(flags, 'comparison-end-date');
+    if ((comparisonStartDate && !comparisonEndDate) || (!comparisonStartDate && comparisonEndDate)) {
+        throw invalidInput('`--comparison-start-date` and `--comparison-end-date` must be supplied together.', {});
+    }
+    if (comparisonStartDate && comparisonEndDate) {
+        flagInput.comparisonDateRange = { startDate: comparisonStartDate, endDate: comparisonEndDate };
     }
     const input = mergeTopLevelInput(json ?? {}, flagInput, 'performance');
     const client = (await createApiClient()) as BidBeaconClient & { performance: { query: (value: unknown) => Promise<unknown> } };
