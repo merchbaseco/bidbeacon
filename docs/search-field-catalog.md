@@ -27,7 +27,7 @@ Every performance-bearing resource reads the canonical Target-grain daily archiv
 | `product` | `product.asin`, `product.title` | None |
 | `change_event` | `changeEvent.id`, `changeEvent.resourceType`, `changeEvent.resourceId`, `changeEvent.eventType`, `changeEvent.field`, `changeEvent.previousValue`, `changeEvent.newValue`, `changeEvent.changedAt`, `changeEvent.source` | None |
 
-`campaign.bidStrategy` and `campaign.placementBidAdjustments` are opt-in. Omitting `fields` leaves both out of the response. `campaign.placementBidAdjustments` is `null`, or an object with any of `topOfSearch`, `restOfSearch`, `productPages`, and `amazonBusiness`. Each number is an integer percent increase on the keyword bid for that placement. A `topOfSearch` value of `165` multiplies the bid by `1 + 165/100`, so a `0.17` bid becomes about `0.45`.
+`campaign.bidStrategy` and `campaign.placementBidAdjustments` are opt-in. Omitting `fields` leaves both out of the response. `campaign.bidStrategy` is `FIXED`, `DYNAMIC_DOWN_ONLY`, `DYNAMIC_UP_AND_DOWN`, or `null`. Stored `AUTO_FOR_SALES` is returned as `DYNAMIC_UP_AND_DOWN`. Stored `RULE_BASED` stays `null`. `campaign.placementBidAdjustments` is `null`, or an object with any of `topOfSearch`, `restOfSearch`, `productPages`, and `amazonBusiness`. Each number is an integer percent increase on the keyword bid for that placement. A `topOfSearch` value of `165` multiplies the bid by `1 + 165/100`, so a `0.17` bid becomes about `0.45`.
 
 For `ad_group`, `ad`, and `target`, every field of the listed ancestor resources is also selectable. The table's Additional selectable fields column lists only fields belonging to the selected resource itself.
 

@@ -239,6 +239,13 @@ describe('Campaign Search operation', () => {
                 targetingSettings: 'MANUAL',
                 bidStrategy: 'RULE_BASED',
             }),
+            buildSearchCampaign({
+                id: 'search-campaign-row-3',
+                campaignId: 'campaign-search-3',
+                name: 'Gamma campaign',
+                targetingSettings: 'AUTO',
+                bidStrategy: 'AUTO_FOR_SALES',
+            }),
         ]);
         await database.db.insert(target).values([
             buildSearchTarget(),
@@ -268,6 +275,11 @@ describe('Campaign Search operation', () => {
                 'campaign.id': 'campaign-search-2',
                 'campaign.targetingMode': 'MANUAL_PRODUCT',
                 'campaign.bidStrategy': null,
+            },
+            {
+                'campaign.id': 'campaign-search-3',
+                'campaign.targetingMode': 'AUTO',
+                'campaign.bidStrategy': 'DYNAMIC_UP_AND_DOWN',
             },
         ]);
     });

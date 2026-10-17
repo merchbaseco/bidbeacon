@@ -312,6 +312,7 @@ const normalizeBidStrategy = (value: string | null) => {
         case 'FIXED':
             return 'FIXED';
         case 'SALES_UP_AND_DOWN':
+        case 'AUTO_FOR_SALES':
         case 'DYNAMIC_UP_AND_DOWN':
             return 'DYNAMIC_UP_AND_DOWN';
         case 'LEGACY_FOR_SALES':
