@@ -1,6 +1,6 @@
 import { addDays, addHours } from 'date-fns';
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
-import { and, asc, eq, gte, inArray, isNotNull, lt, lte, sql } from 'drizzle-orm';
+import { and, asc, eq, gte, inArray, isNotNull, lt, lte, type SQLWrapper, sql } from 'drizzle-orm';
 import { ad, campaign, performanceDaily, performanceHourly } from '@/db/schema';
 import { getAdvertiserAccountMetadata } from '@/utils/advertiser-account-metadata';
 import { resolveAdvertiserAccount } from './advertiser-accounts';
@@ -17,6 +17,7 @@ const MAX_POINTS = 5000;
 const MAX_RESPONSE_BYTES = 5 * 1024 * 1024;
 const EXECUTION_TIMEOUT_MS = 10_000;
 const ISO_DATE_REGEX = /^\d{4}-\d{2}-\d{2}$/;
+const CALENDAR_DATE_PREFIX = /^(\d{4}-\d{2}-\d{2})/;
 
 export type PerformanceExecutionOptions = {
     beforeQuery?: () => Promise<void>;
@@ -24,7 +25,21 @@ export type PerformanceExecutionOptions = {
     timeoutMs?: number;
 };
 
-type MetricRow = SearchMetricTotals & { bucket: string | Date; entityId?: string };
+type DateRange = { startDate: string; endDate: string };
+type Bucket = { key: string; point: Record<string, string> };
+type MetricRow = SearchMetricTotals & {
+    bucket: string | Date;
+    entityId?: string;
+    impressionDays?: number | string | null;
+    firstImpressionDate?: string | Date | null;
+    lastImpressionDate?: string | Date | null;
+};
+type SeriesWindow = {
+    totals: Record<string, number | null>;
+    points: Record<string, unknown>[];
+    activity: { impressionDays: number; firstImpressionDate: string | null; lastImpressionDate: string | null };
+};
+type EntityColumn = 'ad' | 'target' | 'campaign';
 
 export const performance = async (context: OperationContext, input: unknown, options: PerformanceExecutionOptions = {}) => {
     const parsed = performanceInputSchema.safeParse(input);
@@ -36,19 +51,35 @@ export const performance = async (context: OperationContext, input: unknown, opt
     const account = await resolveAdvertiserAccount(context, { accountId: parsed.data.accountId });
     const metadata = getAdvertiserAccountMetadata(account.countryCode);
     const buckets = buildBuckets(parsed.data.interval, parsed.data.dateRange, metadata.timezone);
+    const comparisonRange = parsed.data.comparisonDateRange;
+    const comparisonBuckets = comparisonRange ? buildBuckets(parsed.data.interval, comparisonRange, metadata.timezone) : [];
     const entityCount = parsed.data.dimension === 'account' ? 1 : getEntityIds(parsed.data).length;
-    const estimatedPoints = entityCount * buckets.length;
+    const estimatedPoints = entityCount * (buckets.length + comparisonBuckets.length);
     if (estimatedPoints > MAX_POINTS) {
         throw resultTooLarge(parsed.data, estimatedPoints, MAX_POINTS);
     }
 
     const execute = async () => {
         await options.beforeQuery?.();
-        const [rows, coverage] = await Promise.all([
-            queryPerformanceRows(context, account, parsed.data, metadata.timezone),
-            queryPerformanceCoverage(context, account, parsed.data.dateRange, metadata.timezone, parsed.data.interval === 'hour' ? 'hourly' : 'daily'),
-        ]);
-        const result = buildResult(parsed.data, rows, buckets, coverage, {
+        const timeoutMs = options.timeoutMs ?? EXECUTION_TIMEOUT_MS;
+        const aggregation = parsed.data.interval === 'hour' ? 'hourly' : 'daily';
+        const comparisonInput = comparisonRange ? { ...parsed.data, dateRange: comparisonRange } : undefined;
+        const read = <T>(run: (db: OperationContext['db']) => Promise<T>) => withStatementTimeout(context.db, timeoutMs, run);
+        const [rows, coverage, comparisonRows, comparisonCoverage] = await Promise.all([
+            read(db => queryPerformanceRows({ ...context, db }, account, parsed.data, metadata.timezone)),
+            read(db => queryPerformanceCoverage({ ...context, db }, account, parsed.data.dateRange, metadata.timezone, aggregation)),
+            comparisonInput ? read(db => queryPerformanceRows({ ...context, db }, account, comparisonInput, metadata.timezone)) : undefined,
+            comparisonInput ? read(db => queryPerformanceCoverage({ ...context, db }, account, comparisonInput.dateRange, metadata.timezone, aggregation)) : undefined,
+        ]).catch(error => {
+            if (isStatementTimeout(error)) {
+                throw new OperationError('EXECUTION_TIMEOUT', 'Performance execution exceeded the server time limit.', {
+                    timeoutMs,
+                    suggestions: ['Use a coarser interval or shorter date range.'],
+                });
+            }
+            throw error;
+        });
+        const result = buildResult(parsed.data, rows, buckets, coverage, comparisonRows, comparisonBuckets, comparisonCoverage, metadata.timezone, {
             id: account.id,
             timezone: metadata.timezone,
             currency: metadata.currency,
@@ -69,9 +100,9 @@ export const performance = async (context: OperationContext, input: unknown, opt
 };
 
 const validatePerformanceInput = (input: PerformanceInput) => {
-    const { startDate, endDate } = input.dateRange;
-    if (!(isIsoDate(startDate) && isIsoDate(endDate)) || startDate > endDate) {
-        throw new OperationError('INVALID_INPUT', 'Performance dates must be valid inclusive YYYY-MM-DD dates with startDate on or before endDate.');
+    assertDateRange(input.dateRange);
+    if (input.comparisonDateRange) {
+        assertDateRange(input.comparisonDateRange);
     }
     if (new Set(input.metrics).size !== input.metrics.length) {
         throw new OperationError('INVALID_INPUT', 'Performance metrics must be unique.');
@@ -88,10 +119,23 @@ const validatePerformanceInput = (input: PerformanceInput) => {
         throw new OperationError('INVALID_INPUT', 'Account Performance does not accept entityIds.');
     }
 
-    const start = new Date(`${startDate}T00:00:00.000Z`);
-    const end = new Date(`${endDate}T00:00:00.000Z`);
+    assertRangeWithinIntervalCap(input, input.dateRange);
+    if (input.comparisonDateRange) {
+        assertRangeWithinIntervalCap(input, input.comparisonDateRange);
+    }
+};
+
+const assertDateRange = (dateRange: DateRange) => {
+    if (!(isIsoDate(dateRange.startDate) && isIsoDate(dateRange.endDate)) || dateRange.startDate > dateRange.endDate) {
+        throw new OperationError('INVALID_INPUT', 'Performance dates must be valid inclusive YYYY-MM-DD dates with startDate on or before endDate.');
+    }
+};
+
+const assertRangeWithinIntervalCap = (input: PerformanceInput, dateRange: DateRange) => {
+    const start = new Date(`${dateRange.startDate}T00:00:00.000Z`);
+    const end = new Date(`${dateRange.endDate}T00:00:00.000Z`);
     const requestedDays = Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
-    const requestedMonths = monthIndex(endDate) - monthIndex(startDate) + 1;
+    const requestedMonths = monthIndex(dateRange.endDate) - monthIndex(dateRange.startDate) + 1;
     const maxRange = input.interval === 'hour' ? MAX_ACCOUNT_HOURS_DAYS : input.interval === 'day' ? MAX_ACCOUNT_DAYS : MAX_ACCOUNT_MONTHS;
     const requestedRange = input.interval === 'month' ? requestedMonths : requestedDays;
     if (requestedRange > maxRange) {
@@ -106,6 +150,9 @@ const validatePerformanceInput = (input: PerformanceInput) => {
 };
 
 const queryPerformanceRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, input: PerformanceInput, timezone: string): Promise<MetricRow[]> => {
+    if (input.interval === 'month') {
+        return queryMonthlyRows(context, account, input);
+    }
     if (input.interval === 'hour') {
         const start = fromZonedTime(`${input.dateRange.startDate}T00:00:00`, timezone);
         const endExclusive = fromZonedTime(`${nextDate(input.dateRange.endDate)}T00:00:00`, timezone);
@@ -124,7 +171,7 @@ const queryPerformanceRows = async (context: OperationContext, account: { adsAcc
                 .orderBy(asc(performanceHourly.bucketStart)) as Promise<MetricRow[]>;
         }
         if (input.dimension !== 'product') {
-            const entityColumn = input.dimension === 'ad' ? performanceHourly.adId : performanceHourly.entityId;
+            const entityColumn = performanceEntityColumn(input.dimension, performanceHourly);
             return context.db
                 .select({ entityId: entityColumn, bucket: performanceHourly.bucketStart, ...metricSelect(performanceHourly) })
                 .from(performanceHourly)
@@ -150,7 +197,7 @@ const queryPerformanceRows = async (context: OperationContext, account: { adsAcc
             .orderBy(asc(ad.productAsin), asc(performanceHourly.bucketStart)) as Promise<MetricRow[]>;
     }
 
-    const bucket = input.interval === 'month' ? sql<string>`substring(${performanceDaily.bucketDate}::text, 1, 7)`.as('bucket') : performanceDaily.bucketDate;
+    const bucket = performanceDaily.bucketDate;
     const conditions = [
         eq(performanceDaily.accountId, account.adsAccountId),
         eq(performanceDaily.entityType, 'target'),
@@ -166,7 +213,7 @@ const queryPerformanceRows = async (context: OperationContext, account: { adsAcc
             .orderBy(asc(bucket)) as Promise<MetricRow[]>;
     }
     if (input.dimension !== 'product') {
-        const entityColumn = input.dimension === 'ad' ? performanceDaily.adId : performanceDaily.entityId;
+        const entityColumn = performanceEntityColumn(input.dimension, performanceDaily);
         return context.db
             .select({ entityId: entityColumn, bucket, ...metricSelect(performanceDaily) })
             .from(performanceDaily)
@@ -200,30 +247,128 @@ const metricSelect = (table: typeof performanceDaily | typeof performanceHourly)
     sales: sql<number>`coalesce(sum(${table.sales}), 0)`.as('sales'),
 });
 
+const queryMonthlyRows = async (context: OperationContext, account: { adsAccountId: string; countryCode: string }, input: PerformanceInput): Promise<MetricRow[]> => {
+    const conditions = [
+        eq(performanceDaily.accountId, account.adsAccountId),
+        eq(performanceDaily.entityType, 'target'),
+        gte(performanceDaily.bucketDate, input.dateRange.startDate),
+        lte(performanceDaily.bucketDate, input.dateRange.endDate),
+    ];
+    const dayMetrics = {
+        bucketDate: performanceDaily.bucketDate,
+        impressions: sql<number>`sum(${performanceDaily.impressions})`.as('impressions'),
+        clicks: sql<number>`sum(${performanceDaily.clicks})`.as('clicks'),
+        spend: sql<number>`sum(${performanceDaily.spend})`.as('spend'),
+        orders: sql<number>`sum(${performanceDaily.purchases})`.as('orders'),
+        sales: sql<number>`sum(${performanceDaily.sales})`.as('sales'),
+    };
+
+    if (input.dimension === 'account') {
+        const days = context.db
+            .select(dayMetrics)
+            .from(performanceDaily)
+            .where(and(...conditions))
+            .groupBy(performanceDaily.bucketDate)
+            .as('performance_days');
+        return context.db
+            .select({ bucket: monthOf(days.bucketDate), ...monthMetricSelect(days) })
+            .from(days)
+            .groupBy(monthOf(days.bucketDate))
+            .orderBy(asc(monthOf(days.bucketDate))) as Promise<MetricRow[]>;
+    }
+
+    if (input.dimension === 'product') {
+        const days = context.db
+            .select({ entityId: ad.productAsin, ...dayMetrics })
+            .from(performanceDaily)
+            .innerJoin(ad, and(eq(ad.adId, performanceDaily.adId), eq(ad.campaignId, performanceDaily.campaignId), eq(ad.adProduct, 'SPONSORED_PRODUCTS')))
+            .innerJoin(
+                campaign,
+                and(
+                    eq(campaign.campaignId, performanceDaily.campaignId),
+                    eq(campaign.accountId, account.adsAccountId),
+                    eq(campaign.countryCode, account.countryCode),
+                    eq(campaign.adProduct, 'SPONSORED_PRODUCTS')
+                )
+            )
+            .where(and(...conditions, isNotNull(ad.productAsin), inArray(ad.productAsin, getEntityIds(input))))
+            .groupBy(ad.productAsin, performanceDaily.bucketDate)
+            .as('performance_days');
+        return context.db
+            .select({ entityId: days.entityId, bucket: monthOf(days.bucketDate), ...monthMetricSelect(days) })
+            .from(days)
+            .groupBy(days.entityId, monthOf(days.bucketDate))
+            .orderBy(asc(days.entityId), asc(monthOf(days.bucketDate))) as Promise<MetricRow[]>;
+    }
+
+    const entityColumn = performanceEntityColumn(input.dimension, performanceDaily);
+    const days = context.db
+        .select({ entityId: entityColumn, ...dayMetrics })
+        .from(performanceDaily)
+        .where(and(...conditions, inArray(entityColumn, getEntityIds(input))))
+        .groupBy(entityColumn, performanceDaily.bucketDate)
+        .as('performance_days');
+    return context.db
+        .select({ entityId: days.entityId, bucket: monthOf(days.bucketDate), ...monthMetricSelect(days) })
+        .from(days)
+        .groupBy(days.entityId, monthOf(days.bucketDate))
+        .orderBy(asc(days.entityId), asc(monthOf(days.bucketDate))) as Promise<MetricRow[]>;
+};
+
+const monthOf = (bucketDate: SQLWrapper) => sql<string>`substring(${bucketDate}::text, 1, 7)`;
+
+const monthMetricSelect = (days: { impressions: SQLWrapper; clicks: SQLWrapper; spend: SQLWrapper; orders: SQLWrapper; sales: SQLWrapper; bucketDate: SQLWrapper }) => ({
+    impressions: sql<number>`coalesce(sum(${days.impressions}), 0)`.as('impressions'),
+    clicks: sql<number>`coalesce(sum(${days.clicks}), 0)`.as('clicks'),
+    spend: sql<number>`coalesce(sum(${days.spend}), 0)`.as('spend'),
+    orders: sql<number>`coalesce(sum(${days.orders}), 0)`.as('orders'),
+    sales: sql<number>`coalesce(sum(${days.sales}), 0)`.as('sales'),
+    impressionDays: sql<number>`count(*) filter (where ${days.impressions} > 0)`.as('impression_days'),
+    firstImpressionDate: sql<string | null>`min(${days.bucketDate}) filter (where ${days.impressions} > 0)`.as('first_impression_date'),
+    lastImpressionDate: sql<string | null>`max(${days.bucketDate}) filter (where ${days.impressions} > 0)`.as('last_impression_date'),
+});
+
 const buildResult = (
     input: PerformanceInput,
     rows: MetricRow[],
-    buckets: Array<{ key: string; point: Record<string, string> }>,
+    buckets: Bucket[],
     coverage: Awaited<ReturnType<typeof queryPerformanceCoverage>>,
+    comparisonRows: MetricRow[] | undefined,
+    comparisonBuckets: Bucket[],
+    comparisonCoverage: Awaited<ReturnType<typeof queryPerformanceCoverage>> | undefined,
+    timezone: string,
     account: { id: string; timezone: string; currency: string }
 ) => {
-    const context = { account, dimension: input.dimension, interval: input.interval, metrics: input.metrics, dateRange: input.dateRange, coverage };
+    const context = {
+        account,
+        dimension: input.dimension,
+        interval: input.interval,
+        metrics: input.metrics,
+        dateRange: input.dateRange,
+        coverage,
+        ...(input.comparisonDateRange && comparisonCoverage ? { comparison: { dateRange: input.comparisonDateRange, coverage: comparisonCoverage } } : {}),
+    };
+    const comparisonInput = input.comparisonDateRange ? { ...input, dateRange: input.comparisonDateRange } : undefined;
     if (input.dimension === 'account') {
-        return buildSeries(context, input.metrics, rows, buckets);
+        return {
+            context,
+            ...buildSeriesValues(input, rows, buckets, timezone),
+            ...(comparisonInput && comparisonRows ? { comparison: buildSeriesValues(comparisonInput, comparisonRows, comparisonBuckets, timezone) } : {}),
+        };
     }
     const rowsByEntity = groupRowsByEntity(rows);
+    const comparisonRowsByEntity = comparisonRows ? groupRowsByEntity(comparisonRows) : undefined;
     return {
         context,
-        series: getEntityIds(input).map(entityId => ({ entityId, ...buildSeriesValues(input.metrics, rowsByEntity.get(entityId) ?? [], buckets) })),
+        series: getEntityIds(input).map(entityId => ({
+            entityId,
+            ...buildSeriesValues(input, rowsByEntity.get(entityId) ?? [], buckets, timezone),
+            ...(comparisonInput && comparisonRowsByEntity ? { comparison: buildSeriesValues(comparisonInput, comparisonRowsByEntity.get(entityId) ?? [], comparisonBuckets, timezone) } : {}),
+        })),
     };
 };
 
-const buildSeries = (context: Record<string, unknown>, metrics: PerformanceMetric[], rows: MetricRow[], buckets: Array<{ key: string; point: Record<string, string> }>) => ({
-    context,
-    ...buildSeriesValues(metrics, rows, buckets),
-});
-
-const buildSeriesValues = (metrics: PerformanceMetric[], rows: MetricRow[], buckets: Array<{ key: string; point: Record<string, string> }>) => {
+const buildSeriesValues = (input: PerformanceInput, rows: MetricRow[], buckets: Bucket[], timezone: string): SeriesWindow => {
     const rowsByBucket = new Map(rows.map(row => [bucketKey(row.bucket), row]));
     const totals = rows.reduce<SearchMetricTotals>(
         (sum, row) => ({
@@ -236,9 +381,58 @@ const buildSeriesValues = (metrics: PerformanceMetric[], rows: MetricRow[], buck
         emptySearchMetrics()
     );
     return {
-        totals: selectMetrics(metrics, totals),
-        points: buckets.map(bucket => ({ ...bucket.point, metrics: selectMetrics(metrics, rowsByBucket.get(bucket.key) ?? emptySearchMetrics()) })),
+        totals: selectMetrics(input.metrics, totals),
+        points: buckets.map(bucket => ({ ...bucket.point, metrics: selectMetrics(input.metrics, rowsByBucket.get(bucket.key) ?? emptySearchMetrics()) })),
+        activity: buildActivity(input, rows, buckets, rowsByBucket, timezone),
     };
+};
+
+const buildActivity = (input: PerformanceInput, rows: MetricRow[], buckets: Bucket[], rowsByBucket: Map<string, MetricRow>, timezone: string) => {
+    if (input.interval === 'month') {
+        return activityFromMonthRows(rows);
+    }
+    if (input.interval === 'hour') {
+        const impressionsByDate = new Map<string, number>();
+        for (const bucket of buckets) {
+            const date = formatInTimeZone(new Date(bucket.key), timezone, 'yyyy-MM-dd');
+            impressionsByDate.set(date, (impressionsByDate.get(date) ?? 0) + Number(rowsByBucket.get(bucket.key)?.impressions ?? 0));
+        }
+        return activityFromDates([...impressionsByDate.entries()].filter(([, impressions]) => impressions > 0).map(([date]) => date));
+    }
+    return activityFromDates(buckets.filter(bucket => Number(rowsByBucket.get(bucket.key)?.impressions ?? 0) > 0).map(bucket => bucket.key));
+};
+
+const activityFromMonthRows = (rows: MetricRow[]) => {
+    const impressionDays = rows.reduce((sum, row) => sum + Number(row.impressionDays ?? 0), 0);
+    const dates = rows
+        .flatMap(row => [calendarDate(row.firstImpressionDate), calendarDate(row.lastImpressionDate)])
+        .filter(date => date !== null)
+        .sort();
+    return {
+        impressionDays,
+        firstImpressionDate: impressionDays === 0 ? null : (dates[0] ?? null),
+        lastImpressionDate: impressionDays === 0 ? null : (dates.at(-1) ?? null),
+    };
+};
+
+const activityFromDates = (dates: string[]) => {
+    const ordered = [...dates].sort();
+    return {
+        impressionDays: ordered.length,
+        firstImpressionDate: ordered[0] ?? null,
+        lastImpressionDate: ordered.at(-1) ?? null,
+    };
+};
+
+const calendarDate = (value: string | Date | null | undefined) => {
+    if (value == null) {
+        return null;
+    }
+    if (value instanceof Date) {
+        return Number.isNaN(value.getTime()) ? null : value.toISOString().slice(0, 10);
+    }
+    const match = String(value).match(CALENDAR_DATE_PREFIX);
+    return match?.[1] ?? null;
 };
 
 const selectMetrics = (metrics: PerformanceMetric[], totals: SearchMetricTotals) => {
@@ -331,6 +525,42 @@ const cardinalityNarrowingSuggestions = (input: PerformanceInput) => [
     ...(input.dimension === 'account' ? [] : [`Request fewer ${dimensionLabel(input)}s.`]),
     'Use a coarser interval or shorter date range.',
 ];
+
+const performanceEntityColumn = (dimension: EntityColumn, table: typeof performanceDaily | typeof performanceHourly) => {
+    switch (dimension) {
+        case 'ad':
+            return table.adId;
+        case 'campaign':
+            return table.campaignId;
+        case 'target':
+            return table.entityId;
+        default: {
+            const unreachable: never = dimension;
+            return unreachable;
+        }
+    }
+};
+
+const isStatementTimeout = (error: unknown) => {
+    const seen = new Set<unknown>();
+    let current = error;
+    while (current && typeof current === 'object' && !seen.has(current)) {
+        seen.add(current);
+        const record = current as { code?: unknown; message?: unknown; cause?: unknown };
+        const message = typeof record.message === 'string' ? record.message.toLowerCase() : '';
+        if (record.code === '57014' || message.includes('statement timeout')) {
+            return true;
+        }
+        current = record.cause;
+    }
+    return false;
+};
+
+const withStatementTimeout = async <T>(db: OperationContext['db'], timeoutMs: number, run: (db: OperationContext['db']) => Promise<T>) =>
+    db.transaction(async tx => {
+        await tx.execute(sql.raw(`SET LOCAL statement_timeout = '${Math.trunc(timeoutMs)}ms'`));
+        return run(tx as OperationContext['db']);
+    });
 
 const withExecutionTimeout = async <T>(promise: Promise<T>, timeoutMs: number): Promise<T> => {
     let timeout: ReturnType<typeof setTimeout> | undefined;

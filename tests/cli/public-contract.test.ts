@@ -110,6 +110,39 @@ describe('canonical bb public contract', () => {
                     },
                 },
             ]);
+
+            requests.length = 0;
+            const compared = await runCli(server, [
+                'performance',
+                '--account',
+                accountId,
+                '--dimension',
+                'campaign',
+                '--entity-ids',
+                'campaign-1',
+                '--interval',
+                'day',
+                '--start-date',
+                '2026-08-01',
+                '--end-date',
+                '2026-08-02',
+                '--comparison-start-date',
+                '2025-08-01',
+                '--comparison-end-date',
+                '2025-08-02',
+                '--metrics',
+                'impressions',
+            ]);
+            expect(compared.code).toBe(0);
+            expect(requests[0]?.input).toEqual({
+                accountId,
+                dimension: 'campaign',
+                entityIds: ['campaign-1'],
+                interval: 'day',
+                dateRange: { startDate: '2026-08-01', endDate: '2026-08-02' },
+                comparisonDateRange: { startDate: '2025-08-01', endDate: '2025-08-02' },
+                metrics: ['impressions'],
+            });
         } finally {
             await closeFixtureServer(server);
         }

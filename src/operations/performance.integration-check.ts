@@ -7,12 +7,12 @@
 // workflow runs `check:fast`, the fast lane only. Add new database-backed
 // suites with the same suffix — the lane is structural, with no list to keep.
 import { afterEach, describe, expect, it } from 'vitest';
-import { ad, advertiserAccount, campaign, performanceDaily, reportDatasetMetadata } from '@/db/schema';
+import { ad, advertiserAccount, campaign, performanceDaily, performanceHourly, reportDatasetMetadata } from '@/db/schema';
 import { createFakeAmazonAdsGateway } from './amazon-ads-gateway';
 import { createOperationContext } from './operation-context';
 import { performance } from './performance';
 import { createTestDatabase, type TestDatabase } from './testing/create-test-database';
-import { buildAd, buildAdvertiserAccount, buildCampaign, buildPerformanceDaily, buildReportDatasetMetadata } from './testing/fixtures';
+import { buildAd, buildAdvertiserAccount, buildCampaign, buildPerformanceDaily, buildPerformanceHourly, buildReportDatasetMetadata } from './testing/fixtures';
 
 const ACCOUNT_ID = '00000000-0000-4000-8000-000000000001';
 
@@ -66,6 +66,7 @@ describe('Performance operation', () => {
                 { date: '2026-08-06', metrics: { impressions: 0, spend: 0, sales: 0, roas: null } },
                 { date: '2026-08-07', metrics: { impressions: 50, spend: 2.5, sales: 10, roas: 4 } },
             ],
+            activity: { impressionDays: 2, firstImpressionDate: '2026-08-05', lastImpressionDate: '2026-08-07' },
         });
         expect('nextCursor' in result).toBe(false);
         expect('complete' in result).toBe(false);
@@ -100,6 +101,7 @@ describe('Performance operation', () => {
                     { date: '2026-08-05', metrics: { orders: 0, cvr: null } },
                     { date: '2026-08-06', metrics: { orders: 0, cvr: null } },
                 ],
+                activity: { impressionDays: 0, firstImpressionDate: null, lastImpressionDate: null },
             },
             {
                 entityId: 'B0PRODUCT01',
@@ -108,6 +110,7 @@ describe('Performance operation', () => {
                     { date: '2026-08-05', metrics: { orders: 2, cvr: 20 } },
                     { date: '2026-08-06', metrics: { orders: 0, cvr: null } },
                 ],
+                activity: { impressionDays: 1, firstImpressionDate: '2026-08-05', lastImpressionDate: '2026-08-05' },
             },
         ]);
     });
@@ -170,11 +173,13 @@ describe('Performance operation', () => {
                 entityId: 'target-2',
                 totals: { impressions: 50, spend: 2.5, orders: 1, cvr: 20 },
                 points: [{ date: '2026-08-05', metrics: { impressions: 50, spend: 2.5, orders: 1, cvr: 20 } }],
+                activity: { impressionDays: 1, firstImpressionDate: '2026-08-05', lastImpressionDate: '2026-08-05' },
             },
             {
                 entityId: 'target-1',
                 totals: { impressions: 100, spend: 12.5, orders: 2, cvr: 20 },
                 points: [{ date: '2026-08-05', metrics: { impressions: 100, spend: 12.5, orders: 2, cvr: 20 } }],
+                activity: { impressionDays: 1, firstImpressionDate: '2026-08-05', lastImpressionDate: '2026-08-05' },
             },
         ]);
     });
@@ -259,9 +264,20 @@ describe('Performance operation', () => {
         expect(boundary.series).toHaveLength(25);
         expect(boundary.series.reduce((count, series) => count + series.points.length, 0)).toBe(5000);
 
-        await database.db
-            .insert(performanceDaily)
-            .values(buildPerformanceDaily({ bucketStart: new Date('2026-02-15T08:00:00.000Z'), bucketDate: '2026-02-15', entityType: 'target', entityId: 'target-1', spend: '3.00' }));
+        await database.db.insert(performanceDaily).values([
+            buildPerformanceDaily({ bucketStart: new Date('2026-02-15T08:00:00.000Z'), bucketDate: '2026-02-15', entityType: 'target', entityId: 'target-1', spend: '3.00' }),
+            buildPerformanceDaily({
+                bucketStart: new Date('2026-02-16T08:00:00.000Z'),
+                bucketDate: '2026-02-16',
+                entityType: 'target',
+                entityId: 'target-2',
+                impressions: 1,
+                clicks: 0,
+                spend: '0.00',
+                sales: '0.00',
+                purchases: 0,
+            }),
+        ]);
         const monthly = await performance(createContext(database), {
             accountId: ACCOUNT_ID,
             dimension: 'account',
@@ -277,6 +293,7 @@ describe('Performance operation', () => {
             { month: '2026-02', metrics: { spend: 3 } },
             { month: '2026-03', metrics: { spend: 0 } },
         ]);
+        expect(monthly.activity).toEqual({ impressionDays: 2, firstImpressionDate: '2026-02-15', lastImpressionDate: '2026-02-16' });
     });
 
     it('reports incomplete coverage, authorization failures, and post-query byte limits separately', async () => {
@@ -357,6 +374,232 @@ describe('Performance operation', () => {
                 { beforeQuery: () => new Promise(resolve => setTimeout(resolve, 20)), timeoutMs: 1 }
             )
         ).rejects.toMatchObject({ code: 'EXECUTION_TIMEOUT', details: { timeoutMs: 1 } });
+    });
+
+    it('returns a zero-filled series for a campaign id with no rows', async () => {
+        database = await createTestDatabase();
+        await seedAccount(database);
+        await database.db.insert(performanceDaily).values([
+            buildPerformanceDaily({ entityType: 'target', entityId: 'target-1', campaignId: 'campaign-1', impressions: 40, clicks: 4, spend: '1.00', sales: '0.00', purchases: 0 }),
+            buildPerformanceDaily({
+                entityType: 'target',
+                entityId: 'target-2',
+                campaignId: 'campaign-1',
+                adId: 'ad-2',
+                impressions: 10,
+                clicks: 1,
+                spend: '0.50',
+                sales: '0.00',
+                purchases: 0,
+            }),
+            buildPerformanceDaily({ entityType: 'target', entityId: 'target-9', campaignId: 'campaign-other', adId: 'ad-9', impressions: 999 }),
+        ]);
+
+        const result = await performance(createContext(database), {
+            accountId: ACCOUNT_ID,
+            dimension: 'campaign',
+            entityIds: ['campaign-missing', 'campaign-1'],
+            interval: 'day',
+            dateRange: { startDate: '2026-08-05', endDate: '2026-08-06' },
+            metrics: ['impressions', 'clicks', 'spend'],
+        });
+
+        if (!('series' in result)) {
+            throw new Error('Expected Campaign Performance result.');
+        }
+        expect(result.series).toEqual([
+            {
+                entityId: 'campaign-missing',
+                totals: { impressions: 0, clicks: 0, spend: 0 },
+                points: [
+                    { date: '2026-08-05', metrics: { impressions: 0, clicks: 0, spend: 0 } },
+                    { date: '2026-08-06', metrics: { impressions: 0, clicks: 0, spend: 0 } },
+                ],
+                activity: { impressionDays: 0, firstImpressionDate: null, lastImpressionDate: null },
+            },
+            {
+                entityId: 'campaign-1',
+                totals: { impressions: 50, clicks: 5, spend: 1.5 },
+                points: [
+                    { date: '2026-08-05', metrics: { impressions: 50, clicks: 5, spend: 1.5 } },
+                    { date: '2026-08-06', metrics: { impressions: 0, clicks: 0, spend: 0 } },
+                ],
+                activity: { impressionDays: 1, firstImpressionDate: '2026-08-05', lastImpressionDate: '2026-08-05' },
+            },
+        ]);
+    });
+
+    it('returns comparison coverage separately when the comparison archive is unknown', async () => {
+        database = await createTestDatabase();
+        await seedAccount(database);
+        await database.db
+            .insert(performanceDaily)
+            .values(buildPerformanceDaily({ bucketDate: '2026-08-05', entityType: 'target', entityId: 'target-1', impressions: 8, clicks: 1, spend: '1.00', sales: '0.00', purchases: 0 }));
+        await database.db.insert(reportDatasetMetadata).values(metadataFor('2026-08-05'));
+
+        const result = await performance(createContext(database), {
+            accountId: ACCOUNT_ID,
+            dimension: 'account',
+            interval: 'day',
+            dateRange: { startDate: '2026-08-05', endDate: '2026-08-05' },
+            comparisonDateRange: { startDate: '2025-08-05', endDate: '2025-08-06' },
+            metrics: ['impressions'],
+        });
+
+        expect(result.context.coverage).toEqual({ status: 'COMPLETE', issues: [] });
+        expect(result.context.comparison).toEqual({
+            dateRange: { startDate: '2025-08-05', endDate: '2025-08-06' },
+            coverage: {
+                status: 'UNKNOWN',
+                issues: [
+                    { date: '2025-08-05', status: 'UNKNOWN' },
+                    { date: '2025-08-06', status: 'UNKNOWN' },
+                ],
+            },
+        });
+        if (!('comparison' in result && result.comparison)) {
+            throw new Error('Expected a comparison window.');
+        }
+        expect(result.points).toEqual([{ date: '2026-08-05', metrics: { impressions: 8 } }]);
+        expect(result.activity).toEqual({ impressionDays: 1, firstImpressionDate: '2026-08-05', lastImpressionDate: '2026-08-05' });
+        expect(result.comparison.points).toEqual([
+            { date: '2025-08-05', metrics: { impressions: 0 } },
+            { date: '2025-08-06', metrics: { impressions: 0 } },
+        ]);
+        expect(result.comparison.activity).toEqual({ impressionDays: 0, firstImpressionDate: null, lastImpressionDate: null });
+        expect(result.comparison.totals).toEqual({ impressions: 0 });
+    });
+
+    it('rejects a comparison that pushes combined points over 5000 before querying', async () => {
+        database = await createTestDatabase();
+        await seedAccount(database);
+        const entityIds = Array.from({ length: 25 }, (_, index) => `campaign-${index}`);
+        let beganQuery = false;
+
+        await expect(
+            performance(
+                createContext(database),
+                {
+                    accountId: ACCOUNT_ID,
+                    dimension: 'campaign',
+                    entityIds,
+                    interval: 'day',
+                    dateRange: { startDate: '2026-01-01', endDate: '2026-07-19' },
+                    comparisonDateRange: { startDate: '2025-01-01', endDate: '2025-01-01' },
+                    metrics: ['spend'],
+                },
+                {
+                    beforeQuery: async () => {
+                        beganQuery = true;
+                    },
+                }
+            )
+        ).rejects.toMatchObject({
+            code: 'RESULT_TOO_LARGE',
+            details: { estimatedPoints: 5025, maxPoints: 5000, dimensions: { dimension: 'campaign', interval: 'day', entities: 25 } },
+        });
+        expect(beganQuery).toBe(false);
+    });
+
+    it('keeps unequal leap-day ranges as separate point lists', async () => {
+        database = await createTestDatabase();
+        await seedAccount(database);
+        await database.db.insert(performanceDaily).values([
+            buildPerformanceDaily({
+                bucketStart: new Date('2024-02-29T08:00:00.000Z'),
+                bucketDate: '2024-02-29',
+                entityType: 'target',
+                entityId: 'target-1',
+                impressions: 4,
+                clicks: 0,
+                spend: '0.00',
+                sales: '0.00',
+                purchases: 0,
+            }),
+            buildPerformanceDaily({
+                bucketStart: new Date('2023-02-28T08:00:00.000Z'),
+                bucketDate: '2023-02-28',
+                entityType: 'target',
+                entityId: 'target-1',
+                impressions: 2,
+                clicks: 0,
+                spend: '0.00',
+                sales: '0.00',
+                purchases: 0,
+            }),
+        ]);
+
+        const result = await performance(createContext(database), {
+            accountId: ACCOUNT_ID,
+            dimension: 'account',
+            interval: 'day',
+            dateRange: { startDate: '2024-02-28', endDate: '2024-03-01' },
+            comparisonDateRange: { startDate: '2023-02-28', endDate: '2023-03-01' },
+            metrics: ['impressions'],
+        });
+
+        if (!('comparison' in result && result.comparison)) {
+            throw new Error('Expected a comparison window.');
+        }
+        expect(result.points.map(point => ('date' in point ? point.date : ''))).toEqual(['2024-02-28', '2024-02-29', '2024-03-01']);
+        expect(result.comparison.points.map(point => ('date' in point ? point.date : ''))).toEqual(['2023-02-28', '2023-03-01']);
+        expect(result.points[1]).toEqual({ date: '2024-02-29', metrics: { impressions: 4 } });
+        expect(result.comparison.points[0]).toEqual({ date: '2023-02-28', metrics: { impressions: 2 } });
+        expect(result.activity).toEqual({ impressionDays: 1, firstImpressionDate: '2024-02-29', lastImpressionDate: '2024-02-29' });
+        expect(result.comparison.activity).toEqual({ impressionDays: 1, firstImpressionDate: '2023-02-28', lastImpressionDate: '2023-02-28' });
+    });
+
+    it('counts hourly impression days in account-local dates across DST fall-back', async () => {
+        database = await createTestDatabase();
+        await seedAccount(database);
+        await database.db.insert(performanceHourly).values([
+            buildPerformanceHourly({
+                bucketStart: new Date('2026-11-01T08:00:00.000Z'),
+                bucketDate: '2026-11-01',
+                bucketHour: 1,
+                impressions: 10,
+                clicks: 0,
+                spend: '0.00',
+                sales: '0.00',
+                purchases: 0,
+            }),
+            buildPerformanceHourly({
+                bucketStart: new Date('2026-11-01T09:00:00.000Z'),
+                bucketDate: '2026-11-01',
+                bucketHour: 1,
+                impressions: 7,
+                clicks: 0,
+                spend: '0.00',
+                sales: '0.00',
+                purchases: 0,
+            }),
+            buildPerformanceHourly({
+                bucketStart: new Date('2026-11-02T08:00:00.000Z'),
+                bucketDate: '2026-11-02',
+                bucketHour: 0,
+                impressions: 3,
+                clicks: 0,
+                spend: '0.00',
+                sales: '0.00',
+                purchases: 0,
+            }),
+        ]);
+
+        const result = await performance(createContext(database), {
+            accountId: ACCOUNT_ID,
+            dimension: 'target',
+            entityIds: ['target-1'],
+            interval: 'hour',
+            dateRange: { startDate: '2026-11-01', endDate: '2026-11-02' },
+            metrics: ['impressions'],
+        });
+
+        if (!('series' in result)) {
+            throw new Error('Expected Target Performance result.');
+        }
+        expect(result.series[0]?.points).toHaveLength(49);
+        expect(result.series[0]?.activity).toEqual({ impressionDays: 2, firstImpressionDate: '2026-11-01', lastImpressionDate: '2026-11-02' });
+        expect(result.series[0]?.totals).toEqual({ impressions: 20 });
     });
 });
 

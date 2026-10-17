@@ -135,16 +135,37 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 	readonly performance: import("@trpc/server").TRPCQueryProcedure<{
 		input: {
 			accountId: string;
-			dimension: "ad" | "target" | "product" | "account";
+			dimension: "campaign" | "ad" | "target" | "product" | "account";
 			interval: "month" | "day" | "hour";
 			dateRange: {
 				startDate: string;
 				endDate: string;
 			};
 			metrics: ("impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr")[];
+			comparisonDateRange?: {
+				startDate: string;
+				endDate: string;
+			} | undefined;
 			entityIds?: string[] | undefined;
 		};
 		output: {
+			totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			points: ({
+				end: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				start: string;
+			} | {
+				date: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			} | {
+				month: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			})[];
+			activity: {
+				impressionDays: number;
+				firstImpressionDate: string | null;
+				lastImpressionDate: string | null;
+			};
 			context: {
 				account: {
 					id: string;
@@ -169,19 +190,43 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						errorCount: number;
 					})[];
 				};
+				comparison?: {
+					dateRange: {
+						startDate: string;
+						endDate: string;
+					};
+					coverage: {
+						status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+						issues: ({
+							date: string;
+							status: "PENDING" | "FAILED" | "UNKNOWN";
+						} | {
+							date: string;
+							status: "PARSE_ERRORS";
+							errorCount: number;
+						})[];
+					};
+				} | undefined;
 			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
-			points: ({
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
-				start: string;
-			} | {
-				date: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
-			} | {
-				month: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
-			})[];
+			comparison?: {
+				totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				points: ({
+					end: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					start: string;
+				} | {
+					date: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				} | {
+					month: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				})[];
+				activity: {
+					impressionDays: number;
+					firstImpressionDate: string | null;
+					lastImpressionDate: string | null;
+				};
+			} | undefined;
 		} | {
 			context: {
 				account: {
@@ -189,7 +234,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					currency: string;
 					timezone: string;
 				};
-				dimension: "ad" | "target" | "product";
+				dimension: "campaign" | "ad" | "target" | "product";
 				interval: "month" | "day" | "hour";
 				dateRange: {
 					startDate: string;
@@ -207,6 +252,23 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						errorCount: number;
 					})[];
 				};
+				comparison?: {
+					dateRange: {
+						startDate: string;
+						endDate: string;
+					};
+					coverage: {
+						status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+						issues: ({
+							date: string;
+							status: "PENDING" | "FAILED" | "UNKNOWN";
+						} | {
+							date: string;
+							status: "PARSE_ERRORS";
+							errorCount: number;
+						})[];
+					};
+				} | undefined;
 			};
 			series: {
 				entityId: string;
@@ -222,6 +284,30 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					month: string;
 					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
 				})[];
+				activity: {
+					impressionDays: number;
+					firstImpressionDate: string | null;
+					lastImpressionDate: string | null;
+				};
+				comparison?: {
+					totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					points: ({
+						end: string;
+						metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+						start: string;
+					} | {
+						date: string;
+						metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					} | {
+						month: string;
+						metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					})[];
+					activity: {
+						impressionDays: number;
+						firstImpressionDate: string | null;
+						lastImpressionDate: string | null;
+					};
+				} | undefined;
 			}[];
 		};
 		meta: object;
@@ -711,16 +797,37 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 	readonly performance: import("@trpc/server").TRPCQueryProcedure<{
 		input: {
 			accountId: string;
-			dimension: "ad" | "target" | "product" | "account";
+			dimension: "campaign" | "ad" | "target" | "product" | "account";
 			interval: "month" | "day" | "hour";
 			dateRange: {
 				startDate: string;
 				endDate: string;
 			};
 			metrics: ("impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr")[];
+			comparisonDateRange?: {
+				startDate: string;
+				endDate: string;
+			} | undefined;
 			entityIds?: string[] | undefined;
 		};
 		output: {
+			totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			points: ({
+				end: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				start: string;
+			} | {
+				date: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			} | {
+				month: string;
+				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+			})[];
+			activity: {
+				impressionDays: number;
+				firstImpressionDate: string | null;
+				lastImpressionDate: string | null;
+			};
 			context: {
 				account: {
 					id: string;
@@ -745,19 +852,43 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						errorCount: number;
 					})[];
 				};
+				comparison?: {
+					dateRange: {
+						startDate: string;
+						endDate: string;
+					};
+					coverage: {
+						status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+						issues: ({
+							date: string;
+							status: "PENDING" | "FAILED" | "UNKNOWN";
+						} | {
+							date: string;
+							status: "PARSE_ERRORS";
+							errorCount: number;
+						})[];
+					};
+				} | undefined;
 			};
-			totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
-			points: ({
-				end: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
-				start: string;
-			} | {
-				date: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
-			} | {
-				month: string;
-				metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
-			})[];
+			comparison?: {
+				totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				points: ({
+					end: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					start: string;
+				} | {
+					date: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				} | {
+					month: string;
+					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+				})[];
+				activity: {
+					impressionDays: number;
+					firstImpressionDate: string | null;
+					lastImpressionDate: string | null;
+				};
+			} | undefined;
 		} | {
 			context: {
 				account: {
@@ -765,7 +896,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					currency: string;
 					timezone: string;
 				};
-				dimension: "ad" | "target" | "product";
+				dimension: "campaign" | "ad" | "target" | "product";
 				interval: "month" | "day" | "hour";
 				dateRange: {
 					startDate: string;
@@ -783,6 +914,23 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 						errorCount: number;
 					})[];
 				};
+				comparison?: {
+					dateRange: {
+						startDate: string;
+						endDate: string;
+					};
+					coverage: {
+						status: "UNKNOWN" | "COMPLETE" | "INCOMPLETE";
+						issues: ({
+							date: string;
+							status: "PENDING" | "FAILED" | "UNKNOWN";
+						} | {
+							date: string;
+							status: "PARSE_ERRORS";
+							errorCount: number;
+						})[];
+					};
+				} | undefined;
 			};
 			series: {
 				entityId: string;
@@ -798,6 +946,30 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 					month: string;
 					metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
 				})[];
+				activity: {
+					impressionDays: number;
+					firstImpressionDate: string | null;
+					lastImpressionDate: string | null;
+				};
+				comparison?: {
+					totals: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					points: ({
+						end: string;
+						metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+						start: string;
+					} | {
+						date: string;
+						metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					} | {
+						month: string;
+						metrics: Partial<Record<"impressions" | "clicks" | "spend" | "sales" | "orders" | "acos" | "cpc" | "ctr" | "roas" | "cvr", number | null>>;
+					})[];
+					activity: {
+						impressionDays: number;
+						firstImpressionDate: string | null;
+						lastImpressionDate: string | null;
+					};
+				} | undefined;
 			}[];
 		};
 		meta: object;
