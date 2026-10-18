@@ -440,7 +440,7 @@ const mapCanonicalCampaign = ({ account, amazonCampaign, fallback }: { account: 
         targetingMode: resolveTargetingMode(amazonCampaign, fallback.targetingMode),
         startDate: resolveCampaignDate(amazonCampaign, 'startDate', 'startDateTime', account.countryCode) ?? fallback.startDate,
         endDate: resolveOptionalCampaignDate(amazonCampaign, 'endDate', 'endDateTime', account.countryCode, fallback.endDate),
-        placementBidAdjustments: placementBidAdjustments.present ? (placementBidAdjustments.value ?? undefined) : fallback.placementBidAdjustments,
+        placementBidAdjustments: placementBidAdjustments.present ? placementBidAdjustments.value : fallback.placementBidAdjustments,
     } satisfies CanonicalCampaign;
 
     if (!canonical.placementBidAdjustments || Object.keys(canonical.placementBidAdjustments).length === 0) {
@@ -783,7 +783,7 @@ const canonicalPlacementUpdate = (
 const canonicalPlacementValue = (decision: PlacementPersistence) => {
     switch (decision.mode) {
         case 'replace':
-            return decision.value ?? undefined;
+            return decision.value;
         case 'preserve':
             return undefined;
         default: {

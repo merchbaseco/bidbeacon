@@ -53,9 +53,9 @@ describe('parsePlacementBidAdjustments', () => {
         });
     });
 
-    it('returns null when the included field has no positive percentage', () => {
-        expect(parsePlacementBidAdjustments([])).toEqual({ present: true, value: null });
-        expect(parsePlacementBidAdjustments({ placementBidAdjustments: { topOfSearch: 0, productPages: 1.2 } })).toEqual({ present: true, value: null });
+    it('returns an empty map when the included field has no positive percentage', () => {
+        expect(parsePlacementBidAdjustments([])).toEqual({ present: true, value: {} });
+        expect(parsePlacementBidAdjustments({ placementBidAdjustments: { topOfSearch: 0, productPages: 1.2 } })).toEqual({ present: true, value: {} });
     });
 
     it('reports an omitted field when a campaign record has no placement key', () => {
@@ -78,9 +78,10 @@ describe('placementFromExportOptimization', () => {
         ).toEqual({ topOfSearch: 165, productPages: 30 });
     });
 
-    it('stores null when the export optimization omits placements', () => {
-        expect(placementFromExportOptimization({ bidStrategy: 'MANUAL' })).toBeNull();
-        expect(placementFromExportOptimization(undefined)).toBeNull();
+    it('stores an empty map when the export reports no placement adjustments', () => {
+        expect(placementFromExportOptimization({ bidStrategy: 'MANUAL' })).toEqual({});
+        expect(placementFromExportOptimization({ bidStrategy: 'MANUAL', placementBidAdjustments: [] })).toEqual({});
+        expect(placementFromExportOptimization(undefined)).toEqual({});
     });
 });
 
@@ -95,14 +96,14 @@ describe('placementWrite', () => {
         ).toEqual({ mode: 'replace', value: { topOfSearch: 165, productPages: 30 } });
     });
 
-    it('replaces with null when Amazon included the field and nothing positive remains', () => {
+    it('replaces with an empty map when Amazon included the field and nothing positive remains', () => {
         expect(
             placementWrite({
-                resolution: { present: true, value: null },
+                resolution: { present: true, value: {} },
                 requested: { topOfSearch: 50 },
                 stored: { topOfSearch: 50 },
             })
-        ).toEqual({ mode: 'replace', value: null });
+        ).toEqual({ mode: 'replace', value: {} });
     });
 
     it('replaces with the merged map when Amazon omitted placements and the request changed them', () => {
@@ -124,6 +125,26 @@ describe('placementWrite', () => {
             })
         ).toEqual({ mode: 'preserve' });
     });
+
+    it('preserves SQL null when Amazon omitted placements and the request did not mention them', () => {
+        expect(
+            placementWrite({
+                resolution: { present: false },
+                requested: undefined,
+                stored: null,
+            })
+        ).toEqual({ mode: 'preserve' });
+    });
+
+    it('replaces with an empty map when a merge clears the last stored key', () => {
+        expect(
+            placementWrite({
+                resolution: { present: false },
+                requested: { topOfSearch: 0 },
+                stored: { topOfSearch: 165 },
+            })
+        ).toEqual({ mode: 'replace', value: {} });
+    });
 });
 
 describe('readStoredPlacementBidAdjustments', () => {
@@ -131,11 +152,17 @@ describe('readStoredPlacementBidAdjustments', () => {
         expect(readStoredPlacementBidAdjustments({ topOfSearch: 165, productPages: 30 })).toEqual({ topOfSearch: 165, productPages: 30 });
     });
 
-    it('returns null for SQL null, an empty object, and a percentage outside 1 to 900', () => {
+    it('returns null for SQL null', () => {
         expect(readStoredPlacementBidAdjustments(null)).toBeNull();
-        expect(readStoredPlacementBidAdjustments({})).toBeNull();
-        expect(readStoredPlacementBidAdjustments({ topOfSearch: 0 })).toBeNull();
-        expect(readStoredPlacementBidAdjustments({ productPages: 900.5 })).toBeNull();
+    });
+
+    it('returns an empty map for a stored empty object', () => {
+        expect(readStoredPlacementBidAdjustments({})).toEqual({});
+    });
+
+    it('returns an empty map when no key survives compaction', () => {
+        expect(readStoredPlacementBidAdjustments({ topOfSearch: 0 })).toEqual({});
+        expect(readStoredPlacementBidAdjustments({ productPages: 900.5 })).toEqual({});
     });
 });
 

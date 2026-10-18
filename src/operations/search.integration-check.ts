@@ -486,6 +486,12 @@ describe('Campaign Search operation', () => {
                 name: 'Beta campaign',
                 placementBidAdjustments: null,
             }),
+            buildSearchCampaign({
+                id: 'search-campaign-row-3',
+                campaignId: 'campaign-search-3',
+                name: 'Gamma campaign',
+                placementBidAdjustments: {},
+            }),
         ]);
 
         const selected = await search(createSearchContext(database), {
@@ -501,6 +507,10 @@ describe('Campaign Search operation', () => {
             {
                 'campaign.id': 'campaign-search-2',
                 'campaign.placementBidAdjustments': null,
+            },
+            {
+                'campaign.id': 'campaign-search-3',
+                'campaign.placementBidAdjustments': {},
             },
         ]);
 
@@ -522,7 +532,7 @@ describe('Campaign Search operation', () => {
             'metrics.roas',
             'metrics.cvr',
         ]);
-        expect(defaults.rows.map(row => Object.hasOwn(row, 'campaign.placementBidAdjustments'))).toEqual([false, false]);
+        expect(defaults.rows.map(row => Object.hasOwn(row, 'campaign.placementBidAdjustments'))).toEqual([false, false, false]);
     });
 });
 
