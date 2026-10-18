@@ -4,16 +4,16 @@ export type PlacementKey = (typeof PLACEMENT_KEYS)[number];
 
 export type PlacementBidAdjustments = Partial<Record<PlacementKey, number>>;
 
-export type PlacementResolution = { present: false } | { present: true; value: PlacementBidAdjustments | null };
+export type PlacementResolution = { present: false } | { present: true; value: PlacementBidAdjustments };
 
-export type PlacementPersistence = { mode: 'replace'; value: PlacementBidAdjustments | null } | { mode: 'preserve' };
+export type PlacementPersistence = { mode: 'replace'; value: PlacementBidAdjustments } | { mode: 'preserve' };
 
 export const parsePlacementBidAdjustments = (value: unknown): PlacementResolution => {
     if (Array.isArray(value)) {
         return { present: true, value: placementsFromArray(value) };
     }
     if (!isRecord(value)) {
-        return value === undefined ? { present: false } : { present: true, value: null };
+        return value === undefined ? { present: false } : { present: true, value: {} };
     }
 
     const directPresent = Object.hasOwn(value, 'placementBidAdjustments');
@@ -24,7 +24,7 @@ export const parsePlacementBidAdjustments = (value: unknown): PlacementResolutio
             return { present: true, value: placementsFromArray(source) };
         }
         if (!isRecord(source)) {
-            return { present: true, value: null };
+            return { present: true, value: {} };
         }
         return { present: true, value: placementsFromObject(source) };
     }
@@ -35,24 +35,23 @@ export const parsePlacementBidAdjustments = (value: unknown): PlacementResolutio
     return { present: true, value: placementsFromObject(value) };
 };
 
-export const placementFromExportOptimization = (optimization: unknown): PlacementBidAdjustments | null => {
+export const placementFromExportOptimization = (optimization: unknown): PlacementBidAdjustments => {
     if (!isRecord(optimization)) {
-        return null;
+        return {};
     }
     if (Object.hasOwn(optimization, 'placementBidAdjustments')) {
         const parsed = parsePlacementBidAdjustments(optimization.placementBidAdjustments);
-        return parsed.present ? parsed.value : null;
+        return parsed.present ? parsed.value : {};
     }
     const parsed = parsePlacementBidAdjustments(optimization);
-    return parsed.present ? parsed.value : null;
+    return parsed.present ? parsed.value : {};
 };
 
 export const readStoredPlacementBidAdjustments = (value: unknown): PlacementBidAdjustments | null => {
-    if (value === null || value === undefined) {
+    if (!isRecord(value)) {
         return null;
     }
-    const parsed = parsePlacementBidAdjustments(value);
-    return parsed.present ? parsed.value : null;
+    return placementsFromObject(value);
 };
 
 export const toAmazonPlacementBidAdjustments = (adjustments: PlacementBidAdjustments | undefined) => {
@@ -109,7 +108,7 @@ const OBJECT_ALIAS_ORDER = {
     amazonBusiness: ['amazonBusiness', 'placementAmazonBusiness', 'AMAZON_BUSINESS', 'PLACEMENT_AMAZON_BUSINESS'],
 } as const satisfies Record<PlacementKey, readonly string[]>;
 
-const placementsFromArray = (source: unknown[]): PlacementBidAdjustments | null => {
+const placementsFromArray = (source: unknown[]): PlacementBidAdjustments => {
     const collected: PlacementBidAdjustments = {};
     for (const value of source) {
         if (!isRecord(value)) {
@@ -129,7 +128,7 @@ const placementsFromArray = (source: unknown[]): PlacementBidAdjustments | null 
     return compact(collected);
 };
 
-const placementsFromObject = (value: Record<string, unknown>): PlacementBidAdjustments | null => {
+const placementsFromObject = (value: Record<string, unknown>): PlacementBidAdjustments => {
     const collected: PlacementBidAdjustments = {};
     for (const key of PLACEMENT_KEYS) {
         const percentage = firstStoredPercent(value, OBJECT_ALIAS_ORDER[key]);
@@ -165,7 +164,7 @@ const nestedPlacementBidAdjustments = (record: Record<string, unknown>) => {
 
 const mergePlacementBidAdjustments = (stored: PlacementBidAdjustments | null, requested: PlacementBidAdjustments) => compact({ ...stored, ...requested });
 
-const compact = (value: PlacementBidAdjustments): PlacementBidAdjustments | null => {
+const compact = (value: PlacementBidAdjustments): PlacementBidAdjustments => {
     const result: PlacementBidAdjustments = {};
     for (const key of PLACEMENT_KEYS) {
         const percentage = storedPercent(value[key]);
@@ -174,7 +173,7 @@ const compact = (value: PlacementBidAdjustments): PlacementBidAdjustments | null
         }
         result[key] = percentage;
     }
-    return Object.keys(result).length > 0 ? result : null;
+    return result;
 };
 
 const storedPercent = (value: unknown) => {

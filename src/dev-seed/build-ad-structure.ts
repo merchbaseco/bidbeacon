@@ -53,7 +53,7 @@ export const buildAdStructure = (input: { accountId: string; campaignCount: numb
             id: campaignId,
             lastUpdatedDateTime: shiftDays(input.now, -input.random.int(0, 6)),
             name: `SP - ${product.theme} - ${KIND_LABELS[kind]}`,
-            placementBidAdjustments: product.theme === 'Trail Runner Belt' && kind === 'AUTO' ? { topOfSearch: 165, productPages: 30 } : null,
+            placementBidAdjustments: product.theme === 'Trail Runner Belt' && kind === 'AUTO' ? { topOfSearch: 165, productPages: 30 } : {},
             startDate: formatInTimeZone(createdAt, input.timezone, 'yyyy-MM-dd'),
             state: paused ? 'PAUSED' : 'ENABLED',
             targetingSettings: kind === 'AUTO' ? 'AUTO' : 'MANUAL',

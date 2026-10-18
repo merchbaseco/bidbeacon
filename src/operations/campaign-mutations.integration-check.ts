@@ -456,7 +456,7 @@ describe('Campaign mutation operations', () => {
 
         expect(result.placementBidAdjustments).toBeUndefined();
         const [row] = await database.db.select({ placementBidAdjustments: campaign.placementBidAdjustments }).from(campaign);
-        expect(row?.placementBidAdjustments).toBeNull();
+        expect(row?.placementBidAdjustments).toEqual({});
         await expect(
             database.db
                 .select()
