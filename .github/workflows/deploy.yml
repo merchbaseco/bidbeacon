@@ -59,6 +59,7 @@ jobs:
       runner: self-hosted
       deploy_command: CI_OP_TOKEN="$DEPLOY_AGENT_PRODUCTION_OP_TOKEN" env -u MERCHBASE_GITHUB_NPM_TOKEN bun run deploy
       install_command: if [ "$RUNNER_OS" = macOS ]; then echo "Skipping host install. The image build resolves GitHub Packages and HugeIcons credentials."; exit 0; fi; bun install --frozen-lockfile
+      publish_install_command: . ./scripts/install-tokens && bun install --frozen-lockfile
       health_urls: https://bidbeacon.merchbase.co/api/live
       published_packages: packages/bidbeacon-api-client:@bidbeacon/http-client,packages/bidbeacon-cli:@bidbeacon/cli
       publish_provenance: true

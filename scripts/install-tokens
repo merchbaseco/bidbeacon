@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Sourced by Quality and by Deploy Stack's publish install. Exports the
+# Development-vault install tokens. CI_OP_TOKEN is already set by the caller.
+# varlock is pinned because this runs before node_modules exists.
+
+resolve_install_token() {
+    local name="$1"
+    local value
+    value="$(
+        BIDBEACON_RESOLVE_INSTALL_TOKENS=true \
+            bunx varlock@1.16.1 printenv "$name"
+    )"
+    if [ -z "$value" ]; then
+        echo "${name} did not resolve; the private packages cannot be installed." >&2
+        exit 1
+    fi
+    printf -v "$name" '%s' "$value"
+    export "$name"
+}
+
+resolve_install_token MERCHBASE_GITHUB_NPM_TOKEN
+resolve_install_token MERCHBASE_HUGEICONS_LICENSE_KEY

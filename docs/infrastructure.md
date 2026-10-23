@@ -44,8 +44,8 @@ grants this repository access, so it is not a substitute for
 `MERCHBASE_GITHUB_NPM_TOKEN`. The deploy command unsets the token the shared
 workflow injects, and `scripts/deploy-with-varlock.ts` resolves the GitHub
 Packages token and the HugeIcons license from the Development vault. The
-publish job's `bun install` still receives `github.token`, because that step
-has no 1Password identity.
+publish install does the same through `scripts/install-tokens`, with
+`CI_OP_TOKEN` set from the deploy identity. Quality uses that script too.
 
 ## Identities
 

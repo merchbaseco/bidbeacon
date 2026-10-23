@@ -38,17 +38,7 @@ jobs:
         timeout-minutes: 5
         env:
           CI_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
-        run: |
-          MERCHBASE_GITHUB_NPM_TOKEN="$(
-            BIDBEACON_RESOLVE_INSTALL_TOKENS=true \
-            bunx varlock@1.16.1 printenv MERCHBASE_GITHUB_NPM_TOKEN
-          )"
-          if [ -z "${MERCHBASE_GITHUB_NPM_TOKEN}" ]; then
-            echo "MERCHBASE_GITHUB_NPM_TOKEN did not resolve; the private @merchbaseco/* packages cannot be installed." >&2
-            exit 1
-          fi
-          export MERCHBASE_GITHUB_NPM_TOKEN
-          bun install --frozen-lockfile
+        run: . ./scripts/install-tokens && bun install --frozen-lockfile
 
       # `check:fast` pins the schema's `test` lifecycle itself, so the gates run
       # fully offline with no 1Password access of their own.
