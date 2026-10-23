@@ -25,7 +25,7 @@ Never publish a client surface at a divergent version from the app/server releas
 
 The CLI, typed HTTP client, and MCP operation names are one public contract. Removing or renaming a procedure, changing an input shape, or changing an output shape is a breaking client release and requires a major SemVer bump under the current policy. Regenerate `src/app-router.d.ts` and `dist/`, update the CLI README and API-client docs, and add the versioned changelog entry in the same change.
 
-During implementation or review, do not publish packages, create a release, tag, push, or deploy. The release owner runs the publication step first, then refreshes `bun.lock`, runs `bun run version:check`, and continues with the release checklist below.
+During implementation or review, do not publish packages, create a release, tag, push, or deploy. Cut the version with the checklist below. Deploy Stack publishes after that commit is in production.
 
 ## Version-Bump Commit Convention
 
@@ -51,50 +51,46 @@ The agent should perform this checklist:
    - Format: `## vX.Y.Z - YYYY-MM-DD`
    - `CHANGELOG.md` is only updated during version bumps.
    - Never create `## Unreleased`.
-4. Update all shared version files to `X.Y.Z`.
-   - `package.json`
-   - `packages/bidbeacon-api-client/package.json`
-   - `packages/bidbeacon-cli/package.json`
-   - The root dependency on `@bidbeacon/http-client` must also match `X.Y.Z`.
-   - If any one of these differs, stop and fix versions before build/publish.
+4. Update the shared release version to `X.Y.Z`.
+   - `package.json` `version`
+   - `packages/bidbeacon-api-client/package.json` `version`
+   - `packages/bidbeacon-cli/package.json` `version` and its dependency on `@bidbeacon/http-client`
+   - Leave the root dependency and `bun.lock` on the previous changelog version. npm does not have `X.Y.Z` yet, and Deploy Stack installs before it publishes.
+   - After Deploy Stack has published `X.Y.Z`, a follow-up commit moves the root dependency to `X.Y.Z` and refreshes `bun.lock`.
+   - `bun run version:check` accepts either pin and fails on any other mismatch.
 5. Run `bun run lint:fix`.
 6. Run `bun run api-client:build`.
-7. Publish `@bidbeacon/http-client` to npm.
-8. Run `bun install` to refresh `bun.lock` now that the new `@bidbeacon/http-client` version exists.
-9. Run `bun run version:check`.
-   - This fails if package versions, the root `@bidbeacon/http-client` dependency, or `bun.lock` drift apart.
-10. Build CLI artifacts with `bun run cli:build`.
-11. Run `bun run test`.
-12. Only if tests pass, publish `@bidbeacon/cli` to npm.
-13. Create a GitHub Release for `vX.Y.Z` using the matching `CHANGELOG.md` section as release notes.
+7. Run `bun run version:check`.
+8. Build CLI artifacts with `bun run cli:build`.
+9. Run `bun run test`.
+10. Do not publish, tag, or open a GitHub Release from the version-bump commit. Deploy Stack publishes `@bidbeacon/http-client`, then `@bidbeacon/cli`, and pushes `vX.Y.Z` after that commit is in production.
 
 ## Completion Criteria
 
-A version bump is only complete when all are true:
+The version-bump commit is complete when all are true:
 
 - Shared versions updated (`package.json`, `packages/bidbeacon-cli/package.json`, and `packages/bidbeacon-api-client/package.json`).
-- Root `package.json` dependency on `@bidbeacon/http-client` matches the shared release version.
-- `bun.lock` has been refreshed after publishing `@bidbeacon/http-client`, and `bun run version:check` passes.
+- The CLI dependency on `@bidbeacon/http-client` matches the shared release version.
+- The root dependency and `bun.lock` either match that version or still pin the previous changelog version. `bun run version:check` passes.
 - `CHANGELOG.md` has a new versioned section for that release.
 - `bun run lint:fix`, `bun run version:check`, `bun run api-client:build`, `bun run cli:build`, and `bun run test` have succeeded.
 - Release commit uses `feat: version bump vX.Y.Z`.
-- Git tag `vX.Y.Z` exists.
-- GitHub Release `vX.Y.Z` exists and matches the release notes from `CHANGELOG.md`.
-- npm publish of `@bidbeacon/http-client@X.Y.Z` succeeds.
-- npm publish of `@bidbeacon/cli@X.Y.Z` succeeds.
+- The commit does not publish npm packages or create `vX.Y.Z`.
 
-If npm publish fails (for example auth/token/permissions), stop and report the exact error.
+Deploy Stack publishes `@bidbeacon/http-client@X.Y.Z` and then `@bidbeacon/cli@X.Y.Z`, and pushes the missing tag. It does not open a GitHub Release. If npm publish fails, stop and report the exact error.
 
 ## Publish + Tag
 
 Deploy Stack publishes `@bidbeacon/http-client` and then `@bidbeacon/cli` when
 that version is not already on npm, after the commit is in production. It
 pushes `vX.Y.Z` when the tag is missing. It does not open a GitHub Release.
-`bun.lock` still cannot pin `@bidbeacon/http-client` until that version exists
-on npm, so publish the client and refresh the lockfile before the version-bump
-commit when the root dependency moves.
+The version-bump commit does not publish or tag. `bun.lock` cannot pin
+`@bidbeacon/http-client` until npm has that version, and the production install
+runs before publish, so the commit leaves the root dependency and `bun.lock`
+on the previous changelog version. Refresh both in a follow-up once npm has
+the release.
 
-After reviewing the release commit:
+To publish and tag by hand instead of Deploy Stack:
 
 ```bash
 git add .
