@@ -63,9 +63,9 @@ cloud agents seed their own PostgreSQL on every boot. See
 bun run deploy:dry-run   # proves every op() reference resolves
 ```
 
-The stack is deployed by the `Deploy Stack` workflow, not by a local
-`docker compose up` — Compose alone has no values to interpolate now that the
-schema owns them.
+The stack is deployed by the `Deploy Stack` workflow after Quality succeeds on
+`main`. Compose alone has no values to interpolate now that the schema owns
+them.
 
 The API will be available at `http://localhost:8091/api/health`.
 
@@ -101,7 +101,7 @@ The skill complements the self-sufficient MCP with progressively disclosed recip
 
 ## API Client (npm)
 
-The typed client package lives in `packages/bidbeacon-api-client` and is published manually to npm.
+The typed client package lives in `packages/bidbeacon-api-client`. Deploy Stack publishes it, then `@bidbeacon/cli`, when that version is not on npm yet.
 
 Build the package:
 
@@ -116,7 +116,7 @@ cd packages/bidbeacon-api-client
 # The suite publish token, resolved from the Tooling vault behind the release
 # switch. (This block previously read RankWrangler's Keychain item.)
 MERCHBASE_NPM_PUBLISH_TOKEN="$(BIDBEACON_RESOLVE_RELEASE_TOKENS=true bunx varlock printenv MERCHBASE_NPM_PUBLISH_TOKEN)" \
-  npm publish --access public
+  npm publish --access public --provenance
 ```
 
 Check current package version:
@@ -130,7 +130,7 @@ cat packages/bidbeacon-api-client/package.json | rg '\"version\"'
 Release policy and step-by-step instructions live in `docs/release-process.md`.
 
 - One shared version (`vX.Y.Z`) is used across app, CLI, and `@bidbeacon/http-client`.
-- Release updates are done manually with agent assistance (no required GitHub automation).
+- Changing a published package means bumping its version in the same PR. Deploy Stack publishes a version that is not on npm yet and pushes the `vX.Y.Z` tag. A GitHub Release with changelog notes is still created by hand.
 
 ## Docker Services
 

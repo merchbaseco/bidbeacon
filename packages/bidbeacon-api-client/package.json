@@ -2,6 +2,11 @@
   "name": "@bidbeacon/http-client",
   "version": "3.1.0",
   "description": "Typed tRPC client for BidBeacon",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/merchbaseco/bidbeacon.git",
+    "directory": "packages/bidbeacon-api-client"
+  },
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

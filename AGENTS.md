@@ -306,11 +306,12 @@ scripts, or which suites run on every commit.
 
 ### Build & Deploy
 
-Deploys go through GitHub Actions, on the mini's self-hosted runner. Manual
-dispatch only — **pushing to `main` does not deploy**.
+- A push to `main` deploys after the Quality workflow succeeds for that exact SHA. `workflow_dispatch` takes an optional `ref` (a SHA on main) for a redeploy or rollback.
+- Deploy Stack calls `merchbaseco/workflows/.github/workflows/deploy-service.yml@main`. It syncs `/Users/zknicker/srv/bidbeacon` and runs `bun run deploy`. Migrations run when the server starts. The deploy script checks baked-in secrets, prunes dangling images, and installs the host `bb` wrapper. Smoke is `GET /api/live`, which reports the deployed commit as `revision`.
+- Service identity is the commit. There are no service version tags.
 
 ```bash
-gh workflow run "Deploy Stack" -R merchbaseco/bidbeacon --ref main
+gh workflow run "Deploy Stack" -R merchbaseco/bidbeacon --ref main -f ref=<40-character-sha>
 
 # Prove every op() reference resolves without shipping anything
 bun run deploy:dry-run
@@ -362,6 +363,11 @@ docker logs bidbeacon-worker --tail 50
 
 ---
 
+## Published packages
+
+- `@bidbeacon/http-client` (`packages/bidbeacon-api-client`), then `@bidbeacon/cli` (`packages/bidbeacon-cli`).
+- Changing a package means bumping its version in the same PR.
+
 ## API Client Publishing (npm)
 
 Typed client package: `packages/bidbeacon-api-client`.
@@ -383,10 +389,10 @@ cd packages/bidbeacon-api-client
 # The publish token is an @internal schema item gated behind the release
 # switch, resolved from the Tooling vault. It never touches a file.
 MERCHBASE_NPM_PUBLISH_TOKEN="$(BIDBEACON_RESOLVE_RELEASE_TOKENS=true bunx varlock printenv MERCHBASE_NPM_PUBLISH_TOKEN)" \
-  npm publish --access public --provenance=false
+  npm publish --access public --provenance
 ```
 
-Update `packages/bidbeacon-api-client/package.json` version before each publish.
+Deploy Stack publishes a listed version that is not on npm yet, after that commit is in production. Update the package version in the same PR. The http client has to be on npm before `bun.lock` can pin it.
 
 ### Update Policy (CLI/Router Changes)
 
