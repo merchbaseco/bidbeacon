@@ -93,4 +93,4 @@ Batching defaults to enabled with 20 items and a 2,000-character URL limit. Disa
 bun run api-client:build
 ```
 
-The generated `src/app-router.d.ts` and `dist/` files must be clean after a second build. Public procedure removals or incompatible input/output changes are a breaking client release under the repository’s SemVer policy. Update the shared app, CLI, and client versions plus `CHANGELOG.md`; follow [release-process.md](release-process.md). Actual npm publication, tagging, and deployment remain explicit release actions.
+The generated `src/app-router.d.ts` and `dist/` files must be clean after a second build. Public procedure removals or incompatible input/output changes are a breaking client release under the repository’s SemVer policy. Update the shared app, CLI, and client versions plus `CHANGELOG.md`; follow [release-process.md](release-process.md). Deploy Stack publishes a version that is not on npm yet after that commit is in production.

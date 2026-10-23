@@ -1,85 +1,68 @@
 name: Deploy Stack
 
-# Manual only. Pushing to main no longer deploys: a deploy is an explicit act
-# now that it resolves production credentials from 1Password.
 on:
+  workflow_run:
+    workflows: [Quality]
+    types: [completed]
+    branches: [main]
   workflow_dispatch:
+    inputs:
+      ref:
+        description: SHA on main to deploy. Set this to roll back.
+        required: false
+        type: string
 
 permissions:
-  contents: read
+  contents: write
+  id-token: write
+  packages: read
 
 concurrency:
-  group: deploy-stack
+  group: bidbeacon-production
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    name: Deploy Stack
-    # The stack is hosted on the Mac mini, so GitHub Actions stays the single
-    # deploy surface and the job runs on the mini's self-hosted runner.
-    runs-on: self-hosted
-    timeout-minutes: 30
-
+  resolve:
+    name: Resolve SHA
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.target.outputs.sha }}
+      explicit_ref: ${{ steps.target.outputs.explicit_ref }}
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Sync the deployment checkout
-        working-directory: /Users/zknicker/srv/bidbeacon
-        run: |
-          # Move the long-lived deploy checkout to the exact dispatched commit.
-          # This discards tracked-file edits on the host that would otherwise
-          # make a fast-forward pull fail.
-          git fetch --depth=1 origin "${GITHUB_SHA}"
-          git reset --hard FETCH_HEAD
-          git rev-parse HEAD
-
-      - name: Deploy
-        working-directory: /Users/zknicker/srv/bidbeacon
+      - id: target
         env:
-          # The deploy-agent role slot, filled here by the GitHub deploy
-          # agent's read-only Production identity. The deploy script pins
-          # VARLOCK_ENV=production and resolves every value through the schema;
-          # no .env file is read and none is written.
-          DEPLOY_AGENT_PRODUCTION_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
-          # The same identity also fills the development slot: it reads both
-          # lifecycle vaults, so the deploy script's install-switch
-          # `varlock printenv` calls resolve the GitHub Packages read token and
-          # the licensed @hugeicons-pro key from the Development vault. Actions'
-          # own `github.token` is deliberately not used for package installs —
-          # it cannot download another repository's GitHub Package.
-          CI_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
-        run: bun run deploy -- --expected-revision "${GITHUB_SHA}"
-
-      - name: Install the host CLI wrapper
+          REF: ${{ github.event.inputs.ref }}
+          SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
         run: |
-          BB_BIN_DIR="$(dirname "$(command -v bun)")"
-          cat > "${BB_BIN_DIR}/bb" <<'WRAPPER'
-          #!/usr/bin/env bash
           set -euo pipefail
-
-          if ! command -v bun >/dev/null 2>&1; then
-            echo "Error: bun is required for BidBeacon CLI but is not installed." >&2
+          sha="${REF:-$SHA}"
+          explicit_ref=false
+          if [ -n "$REF" ]; then
+            explicit_ref=true
+          fi
+          if ! printf '%s' "$sha" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "Target must be a 40-character lowercase SHA." >&2
             exit 1
           fi
+          printf 'sha=%s\nexplicit_ref=%s\n' "$sha" "$explicit_ref" >> "$GITHUB_OUTPUT"
 
-          # BB_BASE_URL is the published CLI's own contract; the previous
-          # wrapper exported BIDBEACON_API_BASE_URL, which the CLI never read.
-          export BB_BASE_URL="${BB_BASE_URL:-http://localhost:8091}"
-          exec bun /Users/zknicker/srv/bidbeacon/packages/bidbeacon-cli/src/index.ts "$@"
-          WRAPPER
-          chmod +x "${BB_BIN_DIR}/bb"
-
-      - name: Verify from the consumer
-        run: |
-          curl --fail --show-error --silent --max-time 20 \
-            https://bidbeacon.merchbase.co/api/live > /tmp/bidbeacon-live.json
-          bun -e '
-            const expected = process.env.GITHUB_SHA;
-            const body = JSON.parse(await Bun.file("/tmp/bidbeacon-live.json").text());
-            if (body.revision !== expected) {
-              console.error(`revision mismatch: got ${body.revision}, expected ${expected}`);
-              process.exit(1);
-            }
-          '
-          echo "Liveness endpoint OK."
+  deploy:
+    name: Deploy Stack
+    needs: resolve
+    uses: merchbaseco/workflows/.github/workflows/deploy-service.yml@main
+    secrets: inherit
+    with:
+      sha: ${{ needs.resolve.outputs.sha }}
+      explicit_ref: ${{ needs.resolve.outputs.explicit_ref == 'true' }}
+      production_checkout: /Users/zknicker/srv/bidbeacon
+      runner: self-hosted
+      deploy_command: CI_OP_TOKEN="$DEPLOY_AGENT_PRODUCTION_OP_TOKEN" env -u MERCHBASE_GITHUB_NPM_TOKEN bun run deploy
+      install_command: if [ "$RUNNER_OS" = macOS ]; then echo "Skipping host install. The image build resolves GitHub Packages and HugeIcons credentials."; exit 0; fi; bun install --frozen-lockfile
+      health_urls: https://bidbeacon.merchbase.co/api/live
+      published_packages: packages/bidbeacon-api-client:@bidbeacon/http-client,packages/bidbeacon-cli:@bidbeacon/cli
+      publish_provenance: true
+      bun_version: "1.4.2"
+      prepublish_command: bun run api-client:build && bun run cli:build
+      release_token_env_name: RELEASE_AGENT_TOOLING_OP_TOKEN
+      release_switch_env_name: BIDBEACON_RESOLVE_RELEASE_TOKENS

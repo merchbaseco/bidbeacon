@@ -87,6 +87,13 @@ If npm publish fails (for example auth/token/permissions), stop and report the e
 
 ## Publish + Tag
 
+Deploy Stack publishes `@bidbeacon/http-client` and then `@bidbeacon/cli` when
+that version is not already on npm, after the commit is in production. It
+pushes `vX.Y.Z` when the tag is missing. It does not open a GitHub Release.
+`bun.lock` still cannot pin `@bidbeacon/http-client` until that version exists
+on npm, so publish the client and refresh the lockfile before the version-bump
+commit when the root dependency moves.
+
 After reviewing the release commit:
 
 ```bash
@@ -104,11 +111,12 @@ cd packages/bidbeacon-api-client
 # The publish token is an @internal schema item gated behind the release
 # switch, resolved from the Tooling vault. It never touches a file.
 MERCHBASE_NPM_PUBLISH_TOKEN="$(BIDBEACON_RESOLVE_RELEASE_TOKENS=true bunx varlock printenv MERCHBASE_NPM_PUBLISH_TOKEN)" \
-  npm publish --access public --provenance=false
+  npm publish --access public --provenance
 ```
 
 Note: the repo root package is marked `private: true` and has a `prepublishOnly` block.
-Always publish from `packages/bidbeacon-api-client`.
+Always publish from `packages/bidbeacon-api-client`. The token resolves through
+the release 1Password client (`RELEASE_AGENT_TOOLING_OP_TOKEN`).
 
 Optional verification:
 
@@ -123,7 +131,7 @@ cd packages/bidbeacon-cli
 # The publish token is an @internal schema item gated behind the release
 # switch, resolved from the Tooling vault. It never touches a file.
 MERCHBASE_NPM_PUBLISH_TOKEN="$(BIDBEACON_RESOLVE_RELEASE_TOKENS=true bunx varlock printenv MERCHBASE_NPM_PUBLISH_TOKEN)" \
-  npm publish --access public --provenance=false
+  npm publish --access public --provenance
 ```
 
 Optional verification:

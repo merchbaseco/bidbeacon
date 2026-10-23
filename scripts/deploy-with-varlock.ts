@@ -1,6 +1,6 @@
 import { spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
-import { delimiter, join } from 'node:path';
+import { chmodSync, existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { delimiter, dirname, join } from 'node:path';
 import { parseCommitSha, readExpectedRevision, removeRevisionStamp, writeRevisionStamp } from '../src/health/revision-stamp';
 
 /**
@@ -59,6 +59,33 @@ const assertRevisionMatchesExpected = (headSha: string) => {
     }
 };
 
+const installHostCli = () => {
+    const located = spawnSync('bash', ['-c', 'command -v bun'], { encoding: 'utf8' });
+    const bunPath = (located.stdout ?? '').trim();
+    if (located.status !== 0 || bunPath.length === 0) {
+        console.error('bun is required to install the host bb wrapper.');
+        process.exit(located.status ?? 1);
+    }
+
+    const wrapperPath = join(dirname(bunPath), 'bb');
+    const cliPath = join(process.cwd(), 'packages/bidbeacon-cli/src/index.ts');
+    writeFileSync(
+        wrapperPath,
+        `#!/usr/bin/env bash
+set -euo pipefail
+
+if ! command -v bun >/dev/null 2>&1; then
+  echo "Error: bun is required for BidBeacon CLI but is not installed." >&2
+  exit 1
+fi
+
+export BB_BASE_URL="\${BB_BASE_URL:-http://localhost:8091}"
+exec bun ${JSON.stringify(cliPath)} "$@"
+`
+    );
+    chmodSync(wrapperPath, 0o755);
+};
+
 if (expectedRevision !== undefined) {
     const headSha = readHeadCommitSha();
     assertRevisionMatchesExpected(headSha);
@@ -108,16 +135,6 @@ const printenv = (name: string, extraEnv: NodeJS.ProcessEnv = {}) => {
     return fetched.status === 0 ? (fetched.stdout ?? '').trim() : '';
 };
 
-// The image build installs private @merchbaseco/* packages and licensed
-// @hugeicons-pro packages through BuildKit secret mounts, which Compose reads
-// from the process environment. On the Actions runner the workflow supplies the
-// GitHub token from `github.token`, which needs no 1Password access at all.
-//
-// The operator fallback resolves them from the Development vault, NOT the
-// production lifecycle: install credentials belong to the development
-// lifecycle, and under VARLOCK_ENV=production the development 1Password client
-// has no usable authentication (its bootstrap is empty and `allowAppAuth` is
-// false), so an op(development, ...) reference cannot resolve there.
 for (const name of [installTokenName, hugeiconsTokenName]) {
     if (environment[name]) {
         continue;
@@ -209,4 +226,9 @@ const verified = spawnSync('bun', ['scripts/verify-deployed-secrets.ts'], { env:
 // Dangling images only — never volumes, and never a blanket `system prune`.
 spawnSync('docker', ['image', 'prune', '-f'], { env: environment, stdio: 'inherit' });
 
-process.exit(verified.status ?? 1);
+if ((verified.status ?? 1) !== 0) {
+    process.exit(verified.status ?? 1);
+}
+
+installHostCli();
+process.exit(0);

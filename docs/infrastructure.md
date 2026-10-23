@@ -38,37 +38,47 @@ them. Three names stay outside the schema entirely because the published
 | Deploy | `scripts/deploy-with-varlock.ts` pins `VARLOCK_ENV=production`, resolves the Production vault, hands values to Compose as process environment, and ends with `docker image prune -f` so the rebuilt images do not leave dangling layers pooling on the Mac mini |
 | Runtime | Compose bakes the resolved environment into each container at `up` time. The containers never contact 1Password |
 
-Actions' own `github.token` is deliberately **not** used for package installs:
-it cannot download another repository's GitHub Package unless that package
+Actions' own `github.token` is deliberately **not** used for the image build.
+It cannot download another repository's GitHub Package unless that package
 grants this repository access, so it is not a substitute for
-`MERCHBASE_GITHUB_NPM_TOKEN`.
+`MERCHBASE_GITHUB_NPM_TOKEN`. The deploy command unsets the token the shared
+workflow injects, and `scripts/deploy-with-varlock.ts` resolves the GitHub
+Packages token and the HugeIcons license from the Development vault. The
+publish job's `bun install` still receives `github.token`, because that step
+has no 1Password identity.
 
 ## Identities
 
-Two, and only two:
-
-- `GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN` — the single repository secret. Reads
-  the Production and Development vaults. Fills both the production deploy slot
-  and, in CI, the development slot used to resolve install credentials.
-- `CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN` — the fleet-wide cloud-agent identity,
+- `GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN` reads the Production and Development
+  vaults. It fills the production deploy slot and, in CI and on the deploy
+  command, the development slot used to resolve install credentials.
+- `GH_RELEASE_AGENT_TOOLING_OP_TOKEN` reads the Tooling vault. The Deploy Stack
+  publish job injects it as `RELEASE_AGENT_TOOLING_OP_TOKEN`.
+- `CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN` is the fleet-wide cloud-agent identity,
   set in each cloud agent platform's own store (a Cursor account Runtime Secret,
   the Claude cloud environment), not per repo.
 
 ## Deploying
 
-`Deploy Stack` is `workflow_dispatch` only. **Pushing to `main` no longer
-deploys** — that changed with the migration, and it is deliberate now that a
-deploy resolves production credentials.
+A push to `main` deploys after the Quality workflow succeeds for that exact
+SHA. `workflow_dispatch` takes an optional `ref` (a SHA on main) for a redeploy
+or rollback. Deploy Stack calls
+`merchbaseco/workflows/.github/workflows/deploy-service.yml@main`.
 
 ```
-gh workflow run "Deploy Stack" -R merchbaseco/bidbeacon --ref main
+gh workflow run "Deploy Stack" -R merchbaseco/bidbeacon --ref main -f ref=<40-character-sha>
 ```
 
-The workflow syncs `/Users/zknicker/srv/bidbeacon` to the dispatched commit and
-runs `bun run deploy`. After `up`, `scripts/verify-deployed-secrets.ts`
-name-diffs what Docker actually baked into the containers against the schema's
-sensitivity split — a delivered name the schema does not declare is stale, and a
-production-required sensitive item missing from a container is a failure.
+The called workflow syncs `/Users/zknicker/srv/bidbeacon` to that commit and
+runs `bun run deploy`. Migrations run when the server starts. After `up`,
+`scripts/verify-deployed-secrets.ts` name-diffs what Docker actually baked into
+the containers against the schema's sensitivity split. A delivered name the
+schema does not declare is stale, and a production-required sensitive item
+missing from a container is a failure. The script then prunes dangling images
+and installs the host `bb` wrapper. The called workflow polls
+`https://bidbeacon.merchbase.co/api/live` until `status` is `ok` and `revision`
+is the deployed commit. `GET /api/health` stays the freshness watcher. A stale
+job must not fail the deploy.
 
 For a local check that every `op()` reference resolves without shipping
 anything: `bun run deploy:dry-run`.
