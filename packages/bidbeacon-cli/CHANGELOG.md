@@ -2,6 +2,23 @@
 
 All notable changes to this project will be documented in this file.
 
+## v3.2.0 - 2026-10-23
+
+### Added
+
+- Added Campaign performance, an optional comparison range, and impression activity to the public `performance` operation, with matching typed HTTP-client, CLI, and MCP coverage. `activity.impressionDays` above zero means the subject served. Zero means it did not serve only when that window's coverage is `COMPLETE`.
+- Added the opt-in Search field `campaign.placementBidAdjustments`. A response that omits `fields` leaves it out, along with `campaign.bidStrategy`.
+- Added the deployed commit as `revision` on `/api/health` and `/api/live`. `/api/health` returns 503 when a freshness check fails.
+
+### Changed
+
+- Changed Search so a stored `AUTO_FOR_SALES` bidding strategy is returned as `DYNAMIC_UP_AND_DOWN`. `RULE_BASED` stays `null`.
+- Changed a campaign placement map to `{}` after a sync or placement write that saw no adjustments. `null` means no sync or placement write has stored the map.
+
+### Fixed
+
+- Fixed create and update errors so Amazon's nested rejection reasons, messages, and fields are returned on `details.amazon`.
+
 ## v3.1.0 - 2026-08-10
 
 ### Added
