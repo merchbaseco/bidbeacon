@@ -135,19 +135,11 @@ from the environment it hands a `varlock run` child even when the parent shell
 exported one, so an internal-marked knob could never reach the dev server it
 configures.
 
-`BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID` is the Clerk User the development
-dashboard signs in as automatically — the shared Merchbase Dev Sign-In user. It
-is an opaque development-instance identifier rather than a credential, so it is
-committed on purpose: an ephemeral checkout has to be correct without vault
-access. It resolves to nothing in production, and the endpoint that mints
-tickets for it (`dev.createClerkSignInToken`) independently refuses
-`NODE_ENV=production` — which the Dockerfile sets — and any non-loopback `Host`.
-See `docs/development-data.md`.
+Development authorization is offline and requires `NODE_ENV=development` plus a loopback database before any migrations. See [development data](development-data.md). Production uses separate Cloudflare interactive, API and BidBeacon internal audiences. The server receives its own snapshot/S2S service credential; the AMS worker receives only the authority origin and evaluates canonical grants locally with explicit memberships. All names and lifecycle references live in `.env.schema`.
 
-Because the parties in `BIDBEACON_CLERK_AUTHORIZED_PARTIES` are matched exactly
-against a token's `azp`, the development arm lists both loopback spellings of
-each dev-server port: `BIDBEACON_DEV_HOST` decides which one Vite prints, and a
-session opened on the other one would otherwise be rejected.
+The authority pushes snapshots to `POST https://bidbeacon-internal.merchbase.co/api/internal/access-snapshot`. Exact raw Host, internal audience and authority service identity are checked before body parsing. Snapshots retain monotonic tombstones and close active realtime connections for reauthorization. Cold identity misses may fetch the authority snapshot; ordinary authorization and worker checks read local projections.
+
+RankWrangler product-title enrichment uses BidBeacon's own service token, canonical user header and only the agreed unbatched internal `product.getMany` mutation. Native credential requests reject redirects.
 
 ## Health
 

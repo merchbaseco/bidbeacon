@@ -1,4 +1,3 @@
-import { useAuth } from '@clerk/clerk-react';
 import { useCallback, useEffect, useState } from 'react';
 import { apiBaseUrl } from '../../router';
 
@@ -7,22 +6,17 @@ type TicketResponse = {
 };
 
 export const useRealtimeTicket = () => {
-    const { getToken } = useAuth();
     const [ticket, setTicket] = useState<string | null>(null);
 
     const refresh = useCallback(async () => {
         setTicket(null);
 
-        const sessionToken = await getToken();
-        if (!sessionToken) {
-            return null;
-        }
-
         try {
             const response = await fetch(`${apiBaseUrl}/api/events/ticket`, {
                 cache: 'no-store',
+                credentials: 'same-origin',
+                redirect: 'manual',
                 headers: {
-                    Authorization: `Bearer ${sessionToken}`,
                     Accept: 'application/json',
                 },
                 method: 'POST',
@@ -41,7 +35,7 @@ export const useRealtimeTicket = () => {
         } catch {
             return null;
         }
-    }, [getToken]);
+    }, []);
 
     useEffect(() => {
         refresh().catch(() => undefined);

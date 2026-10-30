@@ -13,9 +13,9 @@ The typed npm package is the HTTP projection of the same operation contract used
 - Name: `@bidbeacon/http-client`
 - Location: `packages/bidbeacon-api-client`
 - Output: `dist/` (ESM + `.d.ts`)
-- Entry point: `createBidBeaconClient({ baseUrl, credential, headers, batch, batchMaxItems, batchMaxURLLength })`
+- Entry point: `createBidBeaconClient({ baseUrl, credential, accessToken, headers, batch, batchMaxItems, batchMaxURLLength })`
 
-The `credential` is the shared bearer credential: suite API keys, Clerk session tokens, or OAuth credentials. Account authorization is resolved by the server from the credential and the explicit `accountId` in each scoped input.
+Use `https://bidbeacon-api.merchbase.co`. `credential` accepts a bounded `mbk_v1` machine key and sends native Cloudflare service headers. The separate `accessToken` option sends an opaque OAuth bearer; choose one. Both transports omit cookies and reject redirects. The public package has no private SDK dependency. Account authorization uses the canonical local grant and explicit account memberships.
 
 ## Operation surface
 

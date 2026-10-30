@@ -1,6 +1,6 @@
 import { ServiceAccessError } from '@merchbaseco/access';
 import type { CreateFastifyContextOptions } from '@trpc/server/adapters/fastify';
-import { authorizeBidBeaconCredential, getBidBeaconAccess } from '@/services/access/bidbeacon-access';
+import { getBidBeaconAccess } from '@/services/access/bidbeacon-access';
 
 export type AuthenticatedUser = {
     merchbaseUserId: string;
@@ -10,7 +10,6 @@ export type AuthType = 'access' | 'none';
 export type CredentialKind = 'api_key' | 'oauth' | 'session';
 
 export type Context = {
-    accessCredential: string | null;
     accessError: 'access_denied' | 'access_unavailable' | null;
     accessibleAccountIds: string[];
     accessibleAdvertiserAccountIds: string[];
@@ -22,19 +21,13 @@ export type Context = {
 };
 
 export const createContext = async ({ req }: CreateFastifyContextOptions): Promise<Context> => {
-    const credential = getBearerToken(req.headers.authorization);
     const unauthenticated = createUnauthenticatedContext(req as unknown);
-
-    if (!credential) {
-        return unauthenticated;
-    }
 
     try {
         const access = getBidBeaconAccess();
-        const resolved = await authorizeBidBeaconCredential(access, credential);
+        const resolved = await access.authorizeRequest(req);
 
         return {
-            accessCredential: credential,
             accessError: null,
             accessibleAccountIds: resolved.principal.legacyAdsAccountIds,
             accessibleAdvertiserAccountIds: resolved.principal.accessibleAccountIds,
@@ -56,7 +49,6 @@ export const createContext = async ({ req }: CreateFastifyContextOptions): Promi
 };
 
 const createUnauthenticatedContext = (request: unknown): Context => ({
-    accessCredential: null,
     accessError: null,
     accessibleAccountIds: [],
     accessibleAdvertiserAccountIds: [],
@@ -65,13 +57,3 @@ const createUnauthenticatedContext = (request: unknown): Context => ({
     request,
     user: null,
 });
-
-const getBearerToken = (authorization?: string | string[]) => {
-    const value = Array.isArray(authorization) ? authorization[0] : authorization;
-    if (!value?.startsWith('Bearer ')) {
-        return null;
-    }
-
-    const credential = value.slice('Bearer '.length).trim();
-    return credential.length > 0 ? credential : null;
-};

@@ -27,7 +27,7 @@ This shape is fleet-wide, not a BidBeacon quirk: Quality answers one question pe
 - Timezone handling around `periodStart`, `lastReportCreatedAt`, and `nextRefreshAt`.
 - Shared-access credential boundaries, stable-user M:N account resolution, projection webhook ordering, ticket single-use/expiry, and account-job access gates.
 - AMS worker account resolution must cover direct `advertiser_id` identity plus required `marketplace_id`, canonical campaign/ad-group fallback, unknown/ambiguous mappings, and the pre-handler access boundary. Allowed messages route and delete only after handlers succeed; denied, unavailable, unknown, conflicting, and handler-failed messages remain queued.
-- Deployment assertions must cover the five Clerk verifier variables on both server and AMS worker, the absence of the webhook signing secret on the worker, and the server job-runner maintenance flag's unset-safe default.
+- Deployment assertions must cover the three Cloudflare audiences and service credentials on the server, only the authority origin on the AMS worker, and the server job-runner maintenance flag's unset-safe default.
 
 ## Data expectations
 Tests should mirror real production data shapes and timestamps (use sample rows from `report_dataset_metadata` when possible) so edge cases reflect reality, not synthetic assumptions.
@@ -40,7 +40,7 @@ Use the builders in `src/operations/testing/fixtures.ts` for shared advertiser a
 
 Performance acceptance lives in `src/operations/performance.integration-check.ts`. It proves Account aggregation, Product attribution, exact Ad-versus-Target grouping, caller-ordered multi-series output, cross-account isolation, zero activity, ratios, coverage, DST-safe hourly buckets, and point-limit rejection before archive queries begin.
 
-The account acceptance harness builds a shared operation principal from the product access projection and verifies both Clerk-session and suite-API-key credential kinds. It lists only authorized marketplace-specific Advertiser Account UUIDs, returns the canonical metadata contract, ignores dashboard selection, and rejects Amazon account/profile identifiers or cross-account UUIDs. The access-migration test loads a legacy `ads_account_id` membership and verifies that the migration expands it to every matching `advertiser_account.id` without granting an unrelated account.
+The account acceptance harness builds a shared operation principal from the product access projection and verifies interactive-person, API-person and native service-key identities. It lists only authorized marketplace-specific Advertiser Account UUIDs, returns the canonical metadata contract, ignores dashboard selection, and rejects Amazon account/profile identifiers or cross-account UUIDs. The access-migration test loads a legacy `ads_account_id` membership and verifies that the migration expands it to every matching `advertiser_account.id` without granting an unrelated account.
 
 Campaign mutation acceptance lives at the same shared operation seam in
 `src/operations/campaign-mutations.integration-check.ts`. It uses the PGlite database and the programmable
@@ -95,4 +95,6 @@ heavy lane, writing a plan into embedded PGlite through the real writer and then
 dashboard's own routers, so a drifted column, foreign key, or join fails there rather than in a
 cloud session. See [development-data.md](development-data.md).
 
-Auth tests must not use production credentials or database writes. Use the shared package's fake Clerk client/projection store patterns and assert that legacy `bbk_`, `BB_API_KEY`, query-string WebSocket credentials, and product-local API-key routes remain absent.
+Auth tests must not use production credentials or database writes. Use signed local Cloudflare assertions and local projection stores and assert that legacy `bbk_`, `BB_API_KEY`, query-string WebSocket credentials, and product-local API-key routes remain absent.
+
+`src/services/access/cloudflare-access.integration-check.ts` applies the production migrations to PGlite and proves one person plus two keys, two users sharing advertiser profiles, exact Host/audience separation, CSRF, key retirement, stale snapshot replay and unchanged memberships. `tests/cli/machine-credential.test.ts` uses the literal suite wire fixture and real local HTTP redirects for both public client transports.

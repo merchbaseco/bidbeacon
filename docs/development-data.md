@@ -47,7 +47,7 @@ day is always today, so the dashboard always describes the current week.
 The seed applies pending Drizzle migrations before it writes, so a fresh local
 database needs no separate migration step.
 
-It prints a receipt: the database it wrote to, the Clerk subject and Merchbase
+It prints a receipt: the database it wrote to, the canonical Merchbase
 User the data is granted to, a row count per table, and the day the week runs
 through. Nothing in it is a credential, and boot scripts must not swallow it —
 a boot that silently seeded nothing and a boot that seeded a full week are
@@ -55,87 +55,13 @@ otherwise indistinguishable in a log.
 
 ## Authorization comes first
 
-BidBeacon authorizes every request against an Access Projection held in its own
-database and kept current by a signed Clerk webhook. No webhook is ever
-delivered to a developer's machine or a cloud VM, so a freshly migrated local
-database has no projection at all and every request fails before a single seeded
-campaign can be seen. Seeded data without a projection is invisible data.
+The seed and API startup call `createDevCloudflareAccess` from `@merchbaseco/access/dev` through the product projection store. This writes the fixed development person alias and canonical local grant. Both use `DEV_SIGN_IN_MERCHBASE_USER_ID`, which also owns the seeded account membership.
 
-So the first thing the seed does, before any product row, is call
-`bootstrapDevAccessProjection` from `@merchbaseco/access/dev`. The shared package
-writes the projection the webhook would have written — the exact metadata the
-development Clerk User carries — through this repo's own
-`AccessProjectionStore` adapter and the same `apply` upsert the webhook route
-uses. No projection SQL lives in this repository, and there is no override flag.
+`NODE_ENV` must be exactly `development`, the lifecycle must not be production, and the database must be local. `getDatabaseConfig` runs the pure SDK target guard before constructing a connection or running migrations. The seed additionally applies its local-target guard. A newer local revoke cannot be overwritten by the fixed bootstrap version.
 
-Two things have to line up, and the bootstrap refuses if they do not:
+## Opening the dashboard
 
-- The **issuer** must be byte-identical to the one
-  `createClerkAuthenticator` is given in
-  `src/services/access/bidbeacon-access.ts`. Both read
-  `MERCHBASE_CLERK_ISSUER`; a projection is keyed by `(issuer, subject)`, so an
-  issuer differing by a character writes a row no session will ever match.
-- The **database** must be loopback, and `NODE_ENV` must not be `production`.
-  The bootstrap checks both itself, on top of the seed's own refusal.
-
-The seeded account is granted to `DEV_SIGN_IN_MERCHBASE_USER_ID` — the same
-constant, imported rather than copied, so the signed-in user and the data owner
-cannot drift apart.
-
-If it fails with a `DevAccessBootstrapError` saying a newer projection event
-already owns the subject, some other event — a real webhook, or a hand-written
-row — has claimed it with a later source timestamp. The projection is
-monotonic by design and the bootstrap will never mask a revocation. Clear the
-local projection and re-seed:
-
-```sql
-DELETE FROM access_projection_event;
-DELETE FROM access_projection;
-```
-
-## Signing in without a password
-
-A cloud agent has no password to type, and a dashboard that opens on a sign-in
-form has wasted the week of data behind it. In development the dashboard signs
-itself in as the shared Merchbase Dev Sign-In user on load.
-
-`src/dashboard/components/dev-auto-sign-in.tsx` asks the server for a one-minute
-Clerk sign-in ticket and exchanges it for a session through `useSignIn`. The
-ticket is handled in memory and never written to the URL, so it cannot end up in
-browser history, a referrer header, or a proxy access log. Nothing logs it.
-
-`dev.createClerkSignInToken` mints it, and refuses three ways, deliberately not
-one gate:
-
-1. `NODE_ENV=production` — the Dockerfile sets it, so the shipped image refuses
-   before reading anything else.
-2. `BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID` unset — production resolves it to
-   nothing, so there is no user to mint for.
-3. A non-loopback `Host` header. A dev server reached through a port forwarder
-   still presents `localhost` upstream; anything addressing the server by a real
-   name is refused.
-
-The procedure is mounted on the dashboard's private app router rather than under
-`api.*`, so it never reaches the published `@bidbeacon/http-client` surface.
-`src/api/dev/create-clerk-sign-in-token.test.ts` drives the gate directly.
-
-The client half is compiled out of a production bundle: `import.meta.env.DEV` is
-statically false in a `vite build`, so the fetch and the exchange are dead code
-the bundler drops.
-
-For the same reason a dev dashboard talks to **its own origin** rather than the
-production one: `/api` lands on the Vite proxy and from there on
-`BIDBEACON_DASHBOARD_API_PROXY_TARGET`, which is the local server in front of
-the database that was just seeded. Reaching past it to
-`bidbeacon.merchbase.co` would show a cloud session an empty dashboard it holds
-no session for.
-
-Re-running replaces the previous dataset rather than stacking a second one on
-top: everything the last run wrote is cleared inside the same transaction that
-refills it, so the week is refreshed, not duplicated. Account-scoped tables are
-cleared by the seeded account; `api_metrics`, `ams_metrics`, and `job_metrics`
-have no account column, so those rows carry a reserved id prefix and are cleared
-by that. Nothing else in your local database is touched.
+Development needs no identity provider or sign-in ticket. Open the loopback Vite URL; `/api` and realtime requests use its same-origin proxy. Any development port works. Cookie-authenticated writes and websocket upgrades require a loopback UI Origin. Production uses the Cloudflare interactive application and has no offline identity branch.
 
 ## It refuses anything but a local database
 
@@ -197,7 +123,7 @@ processes through that skill rather than leaving a foreground server inside
 a SessionStart hook. For a one-off screenshot of a running dashboard, use
 `capture-page http://127.0.0.1:4174/ /tmp/bidbeacon.png --settle 8000`.
 `capture-page` is the fleet's Playwright wrapper around the image's Chromium;
-it routes external hosts such as Clerk through the agent proxy and keeps
+it routes external hosts through the agent proxy and keeps
 loopback direct. Raw `chromium --screenshot` hangs against the Vite dev server.
 
 ## What the seed promises

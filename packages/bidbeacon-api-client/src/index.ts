@@ -20,6 +20,7 @@ export type PublicRouterOutputs = RouterOutputs;
 export type BidBeaconClientOptions = {
     baseUrl: string;
     credential?: string;
+    accessToken?: string;
     headers?: Record<string, string>;
     batch?: boolean;
     batchMaxItems?: number;
@@ -33,17 +34,22 @@ export type BidBeaconClient = CliProxyClient;
 export const createBidBeaconClient = ({
     baseUrl,
     credential,
+    accessToken,
     headers,
     batch = true,
     batchMaxItems = DEFAULT_BATCH_MAX_ITEMS,
     batchMaxURLLength = DEFAULT_BATCH_MAX_URL_LENGTH,
 }: BidBeaconClientOptions): BidBeaconClient => {
+    if (credential && accessToken) {
+        throw new Error('Choose a machine credential or OAuth access token.');
+    }
+    const credentialHeaders = credential ? machineCredentialHeaders(credential) : accessToken ? { Authorization: `Bearer ${accessToken}` } : {};
     const url = `${normalizeBaseUrl(baseUrl)}/api`;
     const resolveHeaders = () => ({
-        ...(credential ? { Authorization: `Bearer ${credential}` } : {}),
+        ...credentialHeaders,
         ...(headers ?? {}),
     });
-    const transportFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(encodeTrpcProcedurePath(getRequestUrl(input)), init);
+    const transportFetch = (input: RequestInfo | URL, init?: RequestInit) => fetch(encodeTrpcProcedurePath(getRequestUrl(input)), { ...init, redirect: 'manual', credentials: 'omit' });
 
     if (batch) {
         const client = createTRPCProxyClient<CliAppRouter>({
@@ -108,4 +114,47 @@ const encodeTrpcProcedurePath = (urlString: string) => {
 
     url.pathname = `${url.pathname.slice(0, procedurePathStart)}${encodedProcedurePath}`;
     return url.toString();
+};
+
+const encodedPattern = /^[A-Za-z0-9_-]+$/;
+const clientIdPattern = /^[A-Za-z0-9._-]{1,256}$/;
+const clientSecretPattern = /^[A-Za-z0-9_-]{32,512}$/;
+
+/** Native Merchbase key wire format; this public package has no private SDK dependency. */
+const machineCredentialHeaders = (credential: string): Record<string, string> => {
+    const invalid = () => new Error('A valid mbk_v1 Merchbase API key is required.');
+    if (credential.length > 2048 || !credential.startsWith('mbk_v1.')) {
+        throw invalid();
+    }
+    const encoded = credential.slice(7);
+    if (!encodedPattern.test(encoded)) {
+        throw invalid();
+    }
+    let decoded: unknown;
+    try {
+        const bytes = Uint8Array.from(atob(encoded.replace(/-/g, '+').replace(/_/g, '/')), character => character.charCodeAt(0));
+        const canonical = btoa(String.fromCharCode(...bytes))
+            .replace(/=/g, '')
+            .replace(/\+/g, '-')
+            .replace(/\//g, '_');
+        if (canonical !== encoded) {
+            throw invalid();
+        }
+        decoded = JSON.parse(new TextDecoder('utf-8', { fatal: true }).decode(bytes));
+    } catch {
+        throw invalid();
+    }
+    if (typeof decoded !== 'object' || decoded === null || Array.isArray(decoded)) {
+        throw invalid();
+    }
+    if (Object.keys(decoded).sort().join(',') !== 'clientId,clientSecret') {
+        throw invalid();
+    }
+    if (!('clientId' in decoded && typeof decoded.clientId === 'string' && clientIdPattern.test(decoded.clientId))) {
+        throw invalid();
+    }
+    if (!('clientSecret' in decoded && typeof decoded.clientSecret === 'string' && clientSecretPattern.test(decoded.clientSecret))) {
+        throw invalid();
+    }
+    return { 'CF-Access-Client-Id': decoded.clientId, 'CF-Access-Client-Secret': decoded.clientSecret };
 };

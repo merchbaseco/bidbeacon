@@ -1,5 +1,5 @@
 ---
-summary: Remote stateless MCP transport, Clerk OAuth contract, tool inventory, and deployment checks.
+summary: Remote stateless MCP transport, Cloudflare OAuth contract, tool inventory, and deployment checks.
 read_when:
   - implementing or reviewing BidBeacon's remote MCP endpoint
   - deploying or integrating an MCP client with BidBeacon
@@ -7,21 +7,16 @@ read_when:
 
 # Remote MCP
 
-BidBeacon exposes a remote, stateless MCP server at `https://bidbeacon.merchbase.co/mcp`.
+BidBeacon exposes a remote, stateless MCP server at `https://bidbeacon-api.merchbase.co/mcp`.
 The endpoint uses the official TypeScript MCP SDK's Streamable HTTP transport. It is mounted in the existing Fastify API server and does not open a separate port or require a local Postgres service.
 
 ## Authentication
 
-MCP requests require a Clerk OAuth bearer token on every request. OAuth discovery metadata is available at both the root and path-specific well-known URLs:
+MCP requests use a person OAuth access token through Cloudflare Access on the API hostname. The origin verifies the gateway assertion against the API audience and maps its person binding to the canonical local grant. Customer service keys cannot use MCP. Discovery is served at `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`; the configured Cloudflare issuer is the authorization server.
 
-- `/.well-known/oauth-protected-resource`
-- `/.well-known/oauth-protected-resource/mcp`
-- `/.well-known/oauth-authorization-server`
-- `/.well-known/oauth-authorization-server/mcp`
+Each request resolves a fresh canonical Merchbase User and its explicit many-to-many advertiser-account memberships. Tools other than `list_advertiser_accounts` require `accountId`; dashboard selection never grants access. Browser-origin requests accept only the product UI origin. Native clients omit cookies and Origin.
 
-API keys are not accepted by `/mcp`, except the fixed local key `ak_dev_bidbeacon_local`. That key resolves to the seeded dev user only when `NODE_ENV` and `VARLOCK_ENV` are both outside production, and it is refused when either one is production. Each authenticated request resolves a fresh stable Merchbase User and its accessible BidBeacon Advertiser Account UUIDs. Every tool call except `list_advertiser_accounts` must include an explicit `accountId`; selected dashboard account state is never consulted.
-
-Set `MCP_RESOURCE_URL` to the externally reachable `/mcp` URL when deploying outside the default production host. The value must be an absolute `http` or `https` URL ending in `/mcp`, without query or fragment components.
+Development uses the guarded offline identity on a loopback host and local database; send the local UI Origin on POST requests. No development token is minted. `BIDBEACON_MCP_RESOURCE_URL` names the HTTPS resource URL ending in `/mcp`, with no query or fragment.
 
 ## Tool contract
 
@@ -33,7 +28,7 @@ Search returns paginated resource snapshots and range-aggregated resource metric
 
 The server exposes tools only. It does not expose MCP resources, prompts, sampling, Apps, stdio transport, or selected-account/session state. Input and output JSON Schemas are generated from the operation schemas. Successful calls return the same JSON value as portable text content and `structuredContent`. Operation failures use the stable `{ error: { code, message, details } }` envelope documented in [the CLI contract](cli-spec.md).
 
-Server info advertises `websiteUrl` and a 128x128 PNG icon at `https://bidbeacon.merchbase.co/icon.png` (SEP-973). Clients require the icon to share the `/mcp` origin and refuse SVG, so the dashboard ships raster `icon.png` and `favicon.ico` from `src/dashboard/public/`, served by the reverse proxy's static file server. Both are rendered from the lighthouse source in `design/brand/icon/` (`bun run brand:icon`).
+Server info advertises `websiteUrl` and a 128x128 PNG icon at `https://bidbeacon-api.merchbase.co/icon.png` (SEP-973). Clients require the icon to share the `/mcp` origin and refuse SVG, so the dashboard ships raster `icon.png` and `favicon.ico` from `src/dashboard/public/`, served by the reverse proxy's static file server. Both are rendered from the lighthouse source in `design/brand/icon/` (`bun run brand:icon`).
 
 ## Optional Amazon Ads skill
 
@@ -43,7 +38,7 @@ The skill is optional. The MCP remains self-sufficient: tool names, generated sc
 
 ## Deployment checks
 
-The reverse proxy must forward `/mcp` and the four discovery paths to the API server, preserving `Authorization`, `Origin`, `Accept`, `Content-Type`, `Mcp-Protocol-Version`, `Mcp-Session-Id`, and `Last-Event-ID` headers. The server is stateless, so do not add sticky-session or in-memory session requirements.
+The reverse proxy must forward `/mcp` and the two resource discovery paths to the API server, preserving `CF-Access-Jwt-Assertion`, `Origin`, `Accept`, `Content-Type`, `Mcp-Protocol-Version`, `Mcp-Session-Id`, and `Last-Event-ID` headers. The server is stateless, so do not add sticky-session or in-memory session requirements.
 
 Verify without opening a listening test port:
 
@@ -54,4 +49,4 @@ bun run test:integration src/mcp/server.integration-check.ts
 
 `server.integration-check.ts` boots PGlite, so it belongs to the integration lane and takes the second command; see "Two lanes, on purpose" in `docs/testing.md`.
 
-The MCP tests use the SDK's linked in-memory transport and Fastify injection. They do not contact Clerk, Amazon Ads, or a database service.
+The MCP tests use the SDK's linked in-memory transport and Fastify injection. They do not contact an identity provider, Amazon Ads, or a database service.

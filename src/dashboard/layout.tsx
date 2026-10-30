@@ -1,4 +1,3 @@
-import { ClerkProvider, SignedIn, SignedOut, SignIn, UserButton } from '@clerk/clerk-react';
 import { ThemeProvider } from 'next-themes';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
@@ -13,7 +12,6 @@ import './global.css';
 import { HugeiconsIcon } from '@hugeicons/react';
 import { LighthouseIcon } from '@hugeicons-pro/core-solid-rounded';
 import { Outlet } from 'react-router';
-import { DevAutoSignIn } from './components/dev-auto-sign-in';
 import { HeaderLighthouse } from './components/header-lighthouse';
 import { MoreMenu } from './components/more-menu';
 import { Toaster } from './components/ui/toast';
@@ -21,12 +19,6 @@ import { TRPCProvider } from './lib/trpc-provider';
 import { AccountEnabledSwitch } from './routes/components/account-selector/account-enabled-switch';
 import { AccountSelector } from './routes/components/account-selector/account-selector';
 import { useWebSocket } from './routes/hooks/use-websocket';
-
-const MERCHBASE_CLERK_PUBLISHABLE_KEY = import.meta.env.VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY;
-
-if (!MERCHBASE_CLERK_PUBLISHABLE_KEY) {
-    throw new Error('Missing VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY environment variable');
-}
 
 export function RootRoute() {
     // Initialize WebSocket connection for real-time events
@@ -54,7 +46,7 @@ export function RootRoute() {
                                 </div>
                                 <AccountEnabledSwitch />
                                 <MoreMenu />
-                                <UserButton />
+                                <a href="/cdn-cgi/access/logout">Sign out</a>
                             </div>
                         </div>
                     </div>
@@ -70,13 +62,6 @@ export function RootRoute() {
     );
 }
 
-const SignInPage = () => (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-        <DevAutoSignIn />
-        <SignIn />
-    </div>
-);
-
 const rootElement = document.getElementById('root');
 if (!rootElement) {
     throw new Error('Root element not found');
@@ -84,18 +69,11 @@ if (!rootElement) {
 
 createRoot(rootElement).render(
     <StrictMode>
-        <ClerkProvider publishableKey={MERCHBASE_CLERK_PUBLISHABLE_KEY}>
-            <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
-                <SignedIn>
-                    <TRPCProvider>
-                        <RouterProvider router={router} />
-                        <Toaster position="bottom-right" />
-                    </TRPCProvider>
-                </SignedIn>
-                <SignedOut>
-                    <SignInPage />
-                </SignedOut>
-            </ThemeProvider>
-        </ClerkProvider>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+            <TRPCProvider>
+                <RouterProvider router={router} />
+                <Toaster position="bottom-right" />
+            </TRPCProvider>
+        </ThemeProvider>
     </StrictMode>
 );

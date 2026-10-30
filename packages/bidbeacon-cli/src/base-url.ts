@@ -17,7 +17,7 @@ export const withTransportHint = (errorMessage: string) => {
         return errorMessage;
     }
 
-    return `${errorMessage}. Check \`bb config set base-url\`: use the server origin (for example https://bidbeacon.merchbase.co), not a path ending in /api.`;
+    return `${errorMessage}. Check \`bb config set base-url\`: use the server origin (for example https://bidbeacon-api.merchbase.co), not a path ending in /api.`;
 };
 
 export const encodeTrpcProcedurePath = (urlString: string) => {

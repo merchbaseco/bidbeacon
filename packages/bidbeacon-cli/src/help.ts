@@ -44,7 +44,7 @@ const TOPICS: Record<HelpTopicKey, HelpTopic> = {
             { left: '--json', right: 'Print machine-readable status for `auth status`' },
         ],
         commands: [
-            { left: 'set [ak_...]', right: 'Save an API key in the supported local secure store' },
+            { left: 'set [mbk_v1...]', right: 'Save an API key in the supported local secure store' },
             { left: 'clear', right: 'Remove the locally saved API key' },
             { left: 'status', right: `Show auth status; automation may use ${'MERCHBASE_API_KEY'}` },
         ],

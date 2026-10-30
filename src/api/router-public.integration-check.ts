@@ -94,7 +94,7 @@ describe('public operation router', () => {
         });
     });
 
-    it('forwards the authenticated Merchbase credential into the production operation context', async () => {
+    it('passes only the canonical principal into the production operation context', async () => {
         database = await createTestDatabase();
         await database.db.insert(advertiserAccount).values(buildAdvertiserAccount({ id: accountId }));
         productionContextMocks.createProductionOperationContext.mockReturnValue(
@@ -107,14 +107,11 @@ describe('public operation router', () => {
         const caller = publicAppRouter.createCaller(createTestContext(undefined, 'ak_suite-key'));
 
         await expect(caller.search({ accountId, resource: 'campaign', fields: ['campaign.id'] })).resolves.toMatchObject({ rows: [] });
-        expect(productionContextMocks.createProductionOperationContext).toHaveBeenCalledWith(
-            {
-                accessibleAccountIds: [accountId],
-                credentialKind: 'api_key',
-                merchbaseUserId: 'mbu_public_router_test',
-            },
-            'ak_suite-key'
-        );
+        expect(productionContextMocks.createProductionOperationContext).toHaveBeenCalledWith({
+            accessibleAccountIds: [accountId],
+            credentialKind: 'api_key',
+            merchbaseUserId: 'mbu_public_router_test',
+        });
     });
 });
 

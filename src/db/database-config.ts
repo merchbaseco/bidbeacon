@@ -1,3 +1,5 @@
+import { assertDevCloudflareAccessTarget } from '@merchbaseco/access/dev';
+
 // Every value below is declared once, in .env.schema, and delivered by varlock.
 // Nothing is defaulted here: a second default would be a second owner.
 const getDatabaseConfig = () => {
@@ -19,7 +21,23 @@ const getDatabaseConfig = () => {
         throw new Error('BIDBEACON_DATABASE_PORT must be a valid port number');
     }
 
+    if (process.env.NODE_ENV === 'development') {
+        assertDevCloudflareAccessTarget({ databaseUrl: getDatabaseUrl(process.env), env: process.env });
+    }
     return { host, port, name, user, password };
 };
 
 export { getDatabaseConfig };
+
+export const getDatabaseUrl = (env: Record<string, string | undefined>) => {
+    const url = new URL('postgresql://localhost');
+    const host = env.BIDBEACON_DATABASE_HOST ?? '';
+    const normalizedHost = host === '::1' ? '[::1]' : host;
+    url.hostname = normalizedHost;
+    if (!normalizedHost || url.hostname !== normalizedHost) {
+        throw new Error('Invalid database host.');
+    }
+    url.port = env.BIDBEACON_DATABASE_PORT ?? '';
+    url.pathname = `/${env.BIDBEACON_DATABASE_NAME ?? ''}`;
+    return url.href;
+};

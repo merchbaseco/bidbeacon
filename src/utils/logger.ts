@@ -11,12 +11,14 @@ interface SimpleLogger {
 
 type LogMethod = (...args: unknown[]) => void;
 
+const secretHeaders = new Set(['authorization', 'cookie', 'set-cookie', 'cf-access-client-secret', 'cf-access-jwt-assertion']);
+
 const formatContext = (context?: Record<string, unknown>) => {
     if (!context || Object.keys(context).length === 0) {
         return '';
     }
 
-    const parts = Object.entries(context).map(([key, value]) => `${key}=${serialize(value)}`);
+    const parts = Object.entries(context).map(([key, value]) => `${key}=${secretHeaders.has(key.toLowerCase()) ? '[REDACTED]' : serialize(value)}`);
     return `[${parts.join(' ')}] `;
 };
 
@@ -26,7 +28,9 @@ const serialize = (value: unknown) => {
     }
     if (typeof value === 'object') {
         try {
-            const serialized = JSON.stringify(value, (_key, nestedValue) => (nestedValue instanceof Error ? serializeError(nestedValue) : nestedValue));
+            const serialized = JSON.stringify(value, (key, nestedValue) =>
+                secretHeaders.has(key.toLowerCase()) ? '[REDACTED]' : nestedValue instanceof Error ? serializeError(nestedValue) : nestedValue
+            );
             return serialized.length <= 8000 ? serialized : `${serialized.slice(0, 7999)}…`;
         } catch {
             return '[object]';
@@ -54,11 +58,11 @@ const createLogger = (context?: Record<string, unknown>): SimpleLogger => {
             }
 
             if (typeof args[0] === 'string') {
-                writer(`${prefix}${args[0]}`, ...args.slice(1));
+                writer(`${prefix}${args[0]}`, ...args.slice(1).map(normalizeValue));
                 return;
             }
 
-            writer(prefix, ...args);
+            writer(prefix, ...args.map(normalizeValue));
         };
 
     const child = (childContext: Record<string, unknown>) => createLogger({ ...(context ?? {}), ...childContext });
@@ -70,6 +74,8 @@ const createLogger = (context?: Record<string, unknown>): SimpleLogger => {
         child,
     };
 };
+
+const normalizeValue = (value: unknown) => (typeof value === 'object' ? normalizeObject(value) : value);
 
 const normalizeObject = (value: object | null): unknown => {
     const serialized = serialize(value);

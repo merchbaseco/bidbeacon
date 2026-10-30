@@ -1,8 +1,9 @@
-import { ServiceAccessError } from '@merchbaseco/access';
+import { projectionGrantsAccess, ServiceAccessError } from '@merchbaseco/access';
+import { DEV_ACCESS_AUTHORITY_ORIGIN } from '@merchbaseco/access/dev';
 import { eq } from 'drizzle-orm';
 import { db } from '@/db/index';
 import { userAccountAccess } from '@/db/schema';
-import { getBidBeaconAccess } from '@/services/access/bidbeacon-access';
+import { createAccessProjectionStore } from '@/services/access/access-projection-store';
 
 export type AccountAccessGateReason = 'allowed' | 'access_denied' | 'access_unavailable' | 'no_current_members';
 
@@ -41,7 +42,19 @@ export const hasCurrentAccountAccess = async (accountId: string): Promise<Accoun
         const memberships = await db.select({ merchbaseUserId: userAccountAccess.merchbaseUserId }).from(userAccountAccess).where(eq(userAccountAccess.adsAccountId, accountId));
 
         return evaluateAccountAccess({
-            evaluateAccess: merchbaseUserId => getBidBeaconAccess().sessionAccess.evaluateAccess(merchbaseUserId),
+            evaluateAccess: async merchbaseUserId => {
+                const authorityOrigin = process.env.NODE_ENV === 'development' ? DEV_ACCESS_AUTHORITY_ORIGIN : process.env.MERCHBASE_ACCESS_AUTHORITY_ORIGIN;
+                if (!authorityOrigin) {
+                    throw new ServiceAccessError('access_unavailable');
+                }
+                const grant = await createAccessProjectionStore(db, authorityOrigin).findByMerchbaseUserId(merchbaseUserId);
+                if (!grant) {
+                    throw new ServiceAccessError('access_unavailable');
+                }
+                if (!projectionGrantsAccess(grant, Date.now())) {
+                    throw new ServiceAccessError('access_denied');
+                }
+            },
             memberships,
         });
     } catch {

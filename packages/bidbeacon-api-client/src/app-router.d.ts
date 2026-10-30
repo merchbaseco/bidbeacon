@@ -6,7 +6,6 @@ export type AuthenticatedUser = {
 export type AuthType = "access" | "none";
 export type CredentialKind = "api_key" | "oauth" | "session";
 export type Context = {
-	accessCredential: string | null;
 	accessError: "access_denied" | "access_unavailable" | null;
 	accessibleAccountIds: string[];
 	accessibleAdvertiserAccountIds: string[];
@@ -80,7 +79,7 @@ export declare const publicAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 			} | undefined;
 			filters?: {
 				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.placementBidAdjustments" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr";
-				operator: "eq" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
+				operator: "in" | "eq" | "contains" | "gt" | "gte" | "lt" | "lte";
 				value?: unknown;
 			}[] | undefined;
 			cursor?: string | undefined;
@@ -742,7 +741,7 @@ export declare const cliAppRouter: import("@trpc/server").TRPCBuiltRouter<{
 			} | undefined;
 			filters?: {
 				field: "campaign.id" | "campaign.name" | "campaign.state" | "campaign.deliveryStatus" | "campaign.dailyBudget" | "campaign.targetingMode" | "campaign.bidStrategy" | "campaign.placementBidAdjustments" | "campaign.startDate" | "campaign.endDate" | "adGroup.id" | "adGroup.name" | "adGroup.state" | "adGroup.deliveryStatus" | "adGroup.defaultBid" | "ad.id" | "ad.state" | "ad.deliveryStatus" | "ad.asin" | "ad.productTitle" | "ad.type" | "target.id" | "target.state" | "target.deliveryStatus" | "target.type" | "target.scope" | "target.bid" | "target.negative" | "target.keyword" | "target.asin" | "target.matchType" | "product.asin" | "product.title" | "changeEvent.id" | "changeEvent.resourceType" | "changeEvent.resourceId" | "changeEvent.eventType" | "changeEvent.field" | "changeEvent.previousValue" | "changeEvent.newValue" | "changeEvent.changedAt" | "changeEvent.source" | "metrics.impressions" | "metrics.clicks" | "metrics.spend" | "metrics.orders" | "metrics.sales" | "metrics.acos" | "metrics.cpc" | "metrics.ctr" | "metrics.roas" | "metrics.cvr";
-				operator: "eq" | "in" | "contains" | "gt" | "gte" | "lt" | "lte";
+				operator: "in" | "eq" | "contains" | "gt" | "gte" | "lt" | "lte";
 				value?: unknown;
 			}[] | undefined;
 			cursor?: string | undefined;

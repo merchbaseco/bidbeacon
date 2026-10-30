@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## v4.0.0 - 2026-10-29
+
+### Changed
+
+- Breaking: move API and MCP connections to `https://bidbeacon-api.merchbase.co`. Replace saved Clerk credentials with a new Merchbase API key or Cloudflare sign-in.
+- Realtime connections follow the same account permissions and expiration limits as API requests.
+- BidBeacon calls RankWrangler with a dedicated service identity while preserving the requesting account and an audit record.
+
 ## v3.2.0 - 2026-10-23
 
 ### Added

@@ -1,9 +1,8 @@
 import { ServiceAccessError } from '@merchbaseco/access';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
-import { authorizeDevLocalCredential, type BidBeaconAccess } from '@/services/access/bidbeacon-access';
-import { DEV_LOCAL_API_KEY } from '@/services/access/dev-local-credential';
+import type { BidBeaconAccess } from '@/services/access/bidbeacon-access';
 
-export const MCP_SCOPES = ['openid', 'email', 'profile'] as const;
+export const MCP_SCOPES: string[] = [];
 const bearerTokenPattern = /^Bearer\s+(\S+)$/i;
 
 export type McpAuthorizedPrincipal = {
@@ -11,8 +10,10 @@ export type McpAuthorizedPrincipal = {
     merchbaseUserId: string;
 };
 
+export type McpAuthRequest = { headers: Record<string, string | string[] | undefined>; method: string };
+
 export type McpAuthDependencies = {
-    authorize: (token: string) => Promise<McpAuthorizedPrincipal>;
+    authorize: (token: string, request?: McpAuthRequest) => Promise<McpAuthorizedPrincipal>;
 };
 
 export type McpAuthResult =
@@ -21,35 +22,31 @@ export type McpAuthResult =
     | { status: 'unauthorized' }
     | { status: 'unavailable' };
 
-export const createBidBeaconMcpAuth = (access: Pick<BidBeaconAccess, 'oauthAccess'>): McpAuthDependencies => ({
-    authorize: async token => {
-        const dev = await authorizeDevLocalCredential(token);
-        if (dev) {
-            return {
-                accessibleAccountIds: [...dev.principal.accessibleAccountIds],
-                merchbaseUserId: dev.merchbaseUserId,
-            };
+export const createBidBeaconMcpAuth = (access: Pick<BidBeaconAccess, 'authorizeRequest'>): McpAuthDependencies => ({
+    authorize: async (_assertion, request) => {
+        if (!request) {
+            throw new ServiceAccessError('unauthenticated');
         }
-        const authorized = await access.oauthAccess.authorize(token);
-        return {
-            accessibleAccountIds: [...authorized.principal.accessibleAccountIds],
-            merchbaseUserId: authorized.merchbaseUserId,
-        };
+        const authorized = await access.authorizeRequest(request);
+        if (authorized.credentialKind === 'api_key') {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        return { accessibleAccountIds: authorized.principal.accessibleAccountIds, merchbaseUserId: authorized.merchbaseUserId };
     },
 });
 
-export const authenticateMcpRequest = async (authorization: string | undefined, dependencies: McpAuthDependencies): Promise<McpAuthResult> => {
+export const authenticateMcpRequest = async (authorization: string | undefined, dependencies: McpAuthDependencies, request?: McpAuthRequest): Promise<McpAuthResult> => {
     const token = extractBearerToken(authorization);
-    if (!token || (token.startsWith('ak_') && token !== DEV_LOCAL_API_KEY)) {
+    if (!token) {
         return { status: 'unauthorized' };
     }
 
     try {
-        const authorized = await dependencies.authorize(token);
+        const authorized = await dependencies.authorize(token, request);
         return {
             ...authorized,
             authInfo: {
-                clientId: 'clerk',
+                clientId: 'cloudflare',
                 extra: { merchbaseUserId: authorized.merchbaseUserId },
                 scopes: [...MCP_SCOPES],
                 token,

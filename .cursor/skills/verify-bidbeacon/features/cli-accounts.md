@@ -1,6 +1,6 @@
 # CLI accounts
 
-CLI accounts lists advertiser accounts with the `bb` command. The helper sends the local dev key `ak_dev_bidbeacon_local`.
+CLI accounts lists advertiser accounts with the `bb` command. The helper sends the local dev key `a synthetic mbk_v1 wire fixture`.
 
 ## Sub-features
 
@@ -9,7 +9,7 @@ CLI accounts lists advertiser accounts with the `bb` command. The helper sends t
 
 ## How to get to it (user POV)
 
-- Run `bb advertiser-accounts list` with `MERCHBASE_API_KEY` set to a suite key for the dev sign-in user.
+- Run `bb advertiser-accounts list` with `MERCHBASE_API_KEY` set to a synthetic transport fixture on the guarded local development runtime.
 - Run `bb auth status` to see whether a key is configured.
 
 ## Driving it with control-bidbeacon
@@ -17,7 +17,7 @@ CLI accounts lists advertiser accounts with the `bb` command. The helper sends t
 Preconditions:
 
 - Doctor reports `"amazonAds": "fake"` and the local API base URL.
-- The helper sets `MERCHBASE_API_KEY` to `ak_dev_bidbeacon_local` and points `BB_STORAGE_DIR` at an empty directory inside the run.
+- The helper sets `MERCHBASE_API_KEY` to `a synthetic mbk_v1 wire fixture` and points `BB_STORAGE_DIR` at an empty directory inside the run.
 
 - **List accounts.** Run `.cursor/skills/verify-bidbeacon/control-bidbeacon cli -- advertiser-accounts list`. Exit 0 and stdout include `Cedar & Coil (dev seed)`. The captured output is `cli/advertiser-accounts.txt`.
 - **Proof.** `cli/advertiser-accounts.txt` contains the exit code and the account name.

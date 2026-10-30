@@ -397,7 +397,8 @@ const runCli = async (server: { port: number } | null, args: string[], options: 
                 env: {
                     ...process.env,
                     HOME: tempDir,
-                    MERCHBASE_API_KEY: options.apiKey === null ? '' : (options.apiKey ?? 'ak_fixture'),
+                    MERCHBASE_API_KEY:
+                        options.apiKey === null ? '' : (options.apiKey ?? 'mbk_v1.eyJjbGllbnRJZCI6ImZpeHR1cmUuYWNjZXNzIiwiY2xpZW50U2VjcmV0IjoiQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUEifQ'),
                     BB_BASE_URL: server ? `http://127.0.0.1:${server.port}` : 'http://127.0.0.1:1',
                 },
                 maxBuffer: 2_000_000,

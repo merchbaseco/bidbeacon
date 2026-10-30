@@ -849,7 +849,7 @@ export const userPreferences = pgTable('user_preferences', {
  * Merchbase Access Projection
  * ----------------------------------------------------------------------------
  *
- * Verified Clerk webhook events and local cold-load reconciliation project the
+ * Verified authority snapshots and local cold-load reconciliation project the
  * shared Access Profile into this product database. The event table makes
  * deliveries idempotent; the projection source timestamp is monotonic.
  */

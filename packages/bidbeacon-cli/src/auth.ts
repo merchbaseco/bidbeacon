@@ -1,7 +1,6 @@
-import { MERCHBASE_API_KEY_ENV } from '@merchbaseco/access';
 import { createSecureStore, type SecureStore, type SecureStoreStatus } from './secure-store';
 
-export const API_KEY_ENV_VAR = MERCHBASE_API_KEY_ENV;
+export const API_KEY_ENV_VAR = 'MERCHBASE_API_KEY';
 
 export type AuthSource = 'env' | 'secure-store' | 'none';
 

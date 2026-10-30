@@ -1,11 +1,21 @@
-import { type ClerkAuthenticatorOptions, createClerkAuthenticator, createServiceAccess, ServiceAccessError } from '@merchbaseco/access';
-import { DEV_SIGN_IN_MERCHBASE_USER_ID } from '@merchbaseco/access/dev';
+import {
+    CloudflareAssertionError,
+    createAccessSnapshotClient,
+    createCloudflareAssertionVerifier,
+    createCloudflareProjectionHandler,
+    createCloudflareServiceAccess,
+    ServiceAccessError,
+} from '@merchbaseco/access';
+import { createDevCloudflareAccess, DEV_ACCESS_AUTHORITY_ORIGIN } from '@merchbaseco/access/dev';
 import { eq } from 'drizzle-orm';
+import { getDatabaseUrl } from '@/db/database-config';
 import type { Database } from '@/db/index';
 import { db } from '@/db/index';
 import { userAccountAccess } from '@/db/schema';
+import { disconnectUserConnections } from '@/utils/events';
 import { createAccessProjectionStore } from './access-projection-store';
-import { classifyDevLocalCredential } from './dev-local-credential';
+
+const localHostPattern = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
 
 export interface BidBeaconPrincipal {
     accessibleAccountIds: string[];
@@ -13,103 +23,111 @@ export interface BidBeaconPrincipal {
     merchbaseUserId: string;
 }
 
-export interface CreateBidBeaconAccessOptions extends ClerkAuthenticatorOptions {
-    database: Database;
-}
-
-export const createBidBeaconAccess = (options: CreateBidBeaconAccessOptions) => {
-    const authenticator = createClerkAuthenticator(options);
-    const projections = createAccessProjectionStore(options.database);
-    const common = {
-        authenticator,
-        projections,
-        resolveServicePrincipal: ({ merchbaseUserId }: { merchbaseUserId: string }) => resolveBidBeaconPrincipal(options.database, merchbaseUserId),
-        service: 'bidbeacon' as const,
+export const createBidBeaconAccess = (options: { database: Database; env?: Record<string, string | undefined>; resolveKey?: Parameters<typeof createCloudflareAssertionVerifier>[1] }) => {
+    const env = options.env ?? process.env;
+    const development = env.NODE_ENV === 'development';
+    const authorityOrigin = development ? DEV_ACCESS_AUTHORITY_ORIGIN : required(env, 'MERCHBASE_ACCESS_AUTHORITY_ORIGIN');
+    const issuer = development ? 'https://identity.merchbase.invalid' : required(env, 'MERCHBASE_ACCESS_ISSUER');
+    const projections = createAccessProjectionStore(options.database, authorityOrigin);
+    const resolveServicePrincipal = ({ merchbaseUserId }: { merchbaseUserId: string }) => resolveBidBeaconPrincipal(options.database, merchbaseUserId);
+    const loadSnapshot = development
+        ? async () => null
+        : createAccessSnapshotClient({
+              authorityOrigin,
+              issuer,
+              service: 'bidbeacon',
+              clientId: required(env, 'MERCHBASE_ACCESS_BIDBEACON_CLIENT_ID'),
+              clientSecret: required(env, 'MERCHBASE_ACCESS_BIDBEACON_CLIENT_SECRET'),
+          });
+    const verifier = (audience: string, maxLifetimeSeconds?: number) => createCloudflareAssertionVerifier({ issuer, audience, maxLifetimeSeconds, maxMachineLifetimeSeconds: 600 }, options.resolveKey);
+    const interactiveVerifier = development ? null : verifier(required(env, 'MERCHBASE_ACCESS_INTERACTIVE_AUDIENCE'));
+    const apiVerifier = development ? null : verifier(required(env, 'MERCHBASE_ACCESS_API_AUDIENCE'));
+    const common = { authorityOrigin, issuer, service: 'bidbeacon' as const, projections, resolveServicePrincipal, loadSnapshot };
+    const unavailableVerifier = {
+        verify: async () => {
+            throw new ServiceAccessError('unauthenticated');
+        },
     };
-
-    const access = {
-        apiKeyAccess: createServiceAccess({
-            ...common,
-            acceptedCredentialKinds: ['api_key'],
-        }),
-        authenticator,
-        oauthAccess: createServiceAccess({
-            ...common,
-            acceptedCredentialKinds: ['oauth'],
-        }),
-        projections,
-        sessionAccess: createServiceAccess({
-            ...common,
-            acceptedCredentialKinds: ['session'],
-        }),
-    };
-
-    return {
-        ...access,
-        authorize: (credential: string) => authorizeBidBeaconCredential(access, credential),
-    };
-};
-
-export type BidBeaconAccess = ReturnType<typeof createBidBeaconAccess>;
-
-export const authorizeDevLocalCredential = async (credential: string) => {
-    const decision = classifyDevLocalCredential(credential, process.env);
-    if (decision === 'absent') {
-        return null;
-    }
-    if (decision === 'refused') {
-        throw new ServiceAccessError('unauthenticated');
-    }
-    const principal = await resolveBidBeaconPrincipal(db, DEV_SIGN_IN_MERCHBASE_USER_ID);
-    return {
-        credentialKind: 'api_key' as const,
-        merchbaseUserId: principal.merchbaseUserId,
-        principal,
-    };
-};
-
-export const authorizeBidBeaconCredential = async (access: Pick<BidBeaconAccess, 'apiKeyAccess' | 'oauthAccess' | 'sessionAccess'>, credential: string) => {
-    const dev = await authorizeDevLocalCredential(credential);
-    if (dev) {
-        return dev;
-    }
-
-    if (credential.startsWith('ak_')) {
-        return access.apiKeyAccess.authorize(credential);
-    }
-
-    if (credential.startsWith('oat_')) {
-        return access.oauthAccess.authorize(credential);
-    }
-
-    if (isJwtLike(credential)) {
-        try {
-            return await access.sessionAccess.authorize(credential);
-        } catch (error) {
-            if (error instanceof ServiceAccessError && error.code === 'unauthenticated') {
-                return access.oauthAccess.authorize(credential);
-            }
-            throw error;
+    const sessionAccess = createCloudflareServiceAccess({ ...common, acceptedPrincipalKinds: ['person'], verifier: interactiveVerifier ?? unavailableVerifier });
+    const apiAccess = createCloudflareServiceAccess({ ...common, acceptedPrincipalKinds: ['person', 'api_key'], maxConnectionLifetimeSeconds: 300, verifier: apiVerifier ?? unavailableVerifier });
+    let devAccess: Awaited<ReturnType<typeof createDevCloudflareAccess<BidBeaconPrincipal>>> | null = null;
+    const initialize = async () => {
+        if (development) {
+            devAccess = await createDevCloudflareAccess({ databaseUrl: getDatabaseUrl(env), env, projections, resolveServicePrincipal, service: 'bidbeacon' });
         }
-    }
-
-    throw new ServiceAccessError('unauthenticated');
-};
-
-let defaultAccess: BidBeaconAccess | null = null;
-
-export const getBidBeaconAccess = (): BidBeaconAccess => {
-    if (!defaultAccess) {
-        defaultAccess = createBidBeaconAccess({
-            authorizedParties: parseList(requireEnvironment('BIDBEACON_CLERK_AUTHORIZED_PARTIES')),
-            database: db,
-            issuer: requireEnvironment('MERCHBASE_CLERK_ISSUER'),
-            jwtKey: requireEnvironment('MERCHBASE_CLERK_JWT_KEY'),
-            publishableKey: requireEnvironment('MERCHBASE_CLERK_PUBLISHABLE_KEY'),
-            secretKey: requireEnvironment('MERCHBASE_CLERK_SECRET_KEY'),
+    };
+    const authorizeRequest = async (request: { headers: Record<string, string | string[] | undefined>; method: string }) => {
+        if (request.headers['x-merchbase-user-id']) {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        const host = request.headers.host;
+        const origin = request.headers.origin;
+        if (typeof host !== 'string' || Array.isArray(origin)) {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        const local = development && localHostPattern.test(host);
+        const interactive = host === 'bidbeacon.merchbase.co' || local;
+        if (!interactive && host !== 'bidbeacon-api.merchbase.co') {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        if (interactive && (request.method !== 'GET' || request.headers.upgrade)) {
+            if (local ? !isLocalOrigin(origin) : origin !== 'https://bidbeacon.merchbase.co') {
+                throw new ServiceAccessError('unauthenticated');
+            }
+        } else if (origin && origin !== 'https://bidbeacon.merchbase.co' && !(local && isLocalOrigin(origin))) {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        if (local && devAccess) {
+            return { ...(await devAccess.authorize()), credentialKind: 'session' as const, expiresAt: Date.now() + 3_600_000 };
+        }
+        const assertion = request.headers['cf-access-jwt-assertion'];
+        if (typeof assertion !== 'string') {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        const resolved = await (interactive ? sessionAccess : apiAccess).authorize(assertion);
+        return {
+            ...resolved,
+            credentialKind: interactive ? ('session' as const) : resolved.credentialKind === 'person' ? ('oauth' as const) : ('api_key' as const),
+        };
+    };
+    const internalVerifier = development ? null : verifier(required(env, 'MERCHBASE_ACCESS_BIDBEACON_INTERNAL_AUDIENCE'), 600);
+    const authorityClientId = development ? '' : required(env, 'MERCHBASE_ACCESS_AUTHORITY_CLIENT_ID');
+    const authorizeSnapshot = async (assertion: string) => {
+        if (!internalVerifier) {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        const verified = await internalVerifier.verify(assertion).catch((error: unknown) => {
+            throw new ServiceAccessError(error instanceof CloudflareAssertionError && error.code === 'unauthenticated' ? 'unauthenticated' : 'access_unavailable');
         });
-    }
-
+        if (verified.kind !== 'machine' || verified.clientId !== authorityClientId) {
+            throw new ServiceAccessError('access_denied');
+        }
+    };
+    const projectionHandler = internalVerifier
+        ? createCloudflareProjectionHandler({
+              ...common,
+              authorityClientId,
+              verifier: internalVerifier,
+              onChanged: async merchbaseUserId => {
+                  try {
+                      await sessionAccess.evaluateAccess(merchbaseUserId);
+                  } catch (error) {
+                      if (!(error instanceof ServiceAccessError) || error.code !== 'access_denied') {
+                          throw error;
+                      }
+                  } finally {
+                      // Alias ownership can change independently of the previous owner's grant.
+                      disconnectUserConnections();
+                  }
+              },
+          })
+        : null;
+    return { apiAccess, sessionAccess, projections, authorizeRequest, initialize, projectionHandler, authorizeSnapshot };
+};
+export type BidBeaconAccess = ReturnType<typeof createBidBeaconAccess>;
+let defaultAccess: BidBeaconAccess | null = null;
+export const getBidBeaconAccess = () => {
+    defaultAccess ??= createBidBeaconAccess({ database: db });
     return defaultAccess;
 };
 
@@ -138,21 +156,18 @@ export const resolveBidBeaconPrincipal = async (database: Database, merchbaseUse
     }
 };
 
-const isJwtLike = (credential: string) => {
-    const segments = credential.split('.');
-    return segments.length === 3 && segments.every(segment => segment.length > 0);
-};
-
-const parseList = (value: string) =>
-    value
-        .split(',')
-        .map(entry => entry.trim())
-        .filter(Boolean);
-
-const requireEnvironment = (name: string) => {
-    const value = process.env[name]?.trim();
+const required = (env: Record<string, string | undefined>, name: string) => {
+    const value = env[name]?.trim();
     if (!value) {
         throw new Error(`${name} is required for Merchbase Access.`);
     }
     return value;
+};
+const isLocalOrigin = (origin: string | undefined) => {
+    try {
+        const url = new URL(origin ?? '');
+        return url.origin === origin && url.protocol === 'http:' && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    } catch {
+        return false;
+    }
 };

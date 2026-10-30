@@ -26,7 +26,7 @@ describe('BidBeacon MCP server info', () => {
                 name: 'bidbeacon',
                 title: 'BidBeacon',
                 websiteUrl: 'https://bidbeacon.merchbase.co',
-                icons: [{ src: 'https://bidbeacon.merchbase.co/icon.png', mimeType: 'image/png', sizes: ['128x128'] }],
+                icons: [{ src: 'https://bidbeacon-api.merchbase.co/icon.png', mimeType: 'image/png', sizes: ['128x128'] }],
             });
         } finally {
             await Promise.all([client.close(), server.close()]);

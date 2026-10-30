@@ -68,11 +68,11 @@ export const apiProcedure = t.procedure.use(({ ctx, next }) => {
 });
 
 /**
- * Private procedure that requires a Clerk web session.
+ * Private procedure that requires a interactive web session.
  */
 export const privateProcedure = apiProcedure.use(({ ctx, next }) => {
     if (ctx.authType !== 'access' || ctx.credentialKind !== 'session') {
-        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'A Clerk web session is required' });
+        throw new TRPCError({ code: 'UNAUTHORIZED', message: 'A interactive web session is required' });
     }
 
     return next({ ctx });

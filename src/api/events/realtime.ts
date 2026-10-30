@@ -13,13 +13,11 @@ export type BidBeaconRealtimeTicketStore = ReturnType<typeof createBidBeaconReal
 
 export const registerRealtimeTicketRoute = (fastify: FastifyInstance, options: { access: BidBeaconAccess; ticketStore: BidBeaconRealtimeTicketStore }) => {
     fastify.post(REALTIME_TICKET_PATH, async (request, reply) => {
-        const credential = getBearerToken(request.headers.authorization);
-        if (!credential) {
-            return reply.code(401).send({ error: 'Authentication required' });
-        }
-
         try {
-            const resolved = await options.access.sessionAccess.authorize(credential);
+            const resolved = await options.access.authorizeRequest(request);
+            if (resolved.credentialKind !== 'session') {
+                throw new ServiceAccessError('unauthenticated');
+            }
             const ticket = options.ticketStore.issue({
                 merchbaseUserId: resolved.merchbaseUserId,
                 route: REALTIME_ROUTE,

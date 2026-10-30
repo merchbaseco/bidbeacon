@@ -8,21 +8,20 @@
  *   bun run db:seed:dev
  *   bun run db:seed:dev --seed=friday --days=21 --merchbase-user-id=mbu_...
  *
- * Never runs automatically on a developer machine. Local development resolves
- * `BIDBEACON_DATABASE_HOST` to the shared database over Tailscale, so the seed
- * refuses any host that is not loopback and there is no override flag. Cloud
+ * Never runs automatically on a developer machine. The seed refuses any host
+ * that is not loopback and there is no override flag. Cloud
  * agents get it for free: `.agents/cloud/start.sh` points the host at its own
  * PostgreSQL and seeds on every boot.
  *
  * Everything written is a local row. The seed never calls Amazon.
  *
- * It prints a receipt on stdout — database target, the Clerk subject and
+ * It prints a receipt on stdout — database target and the canonical
  * Merchbase User the data is granted to, row counts, and the day the week runs
  * through — because a boot that says nothing is indistinguishable from a boot
  * that seeded nothing. Nothing in the receipt is a credential.
  */
 
-import { bootstrapDevAccessProjection, DEV_SIGN_IN_MERCHBASE_USER_ID } from '@merchbaseco/access/dev';
+import { createDevCloudflareAccess, DEV_ACCESS_AUTHORITY_ORIGIN, DEV_SIGN_IN_MERCHBASE_USER_ID } from '@merchbaseco/access/dev';
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { getDatabaseConfig } from '@/db/database-config';
@@ -81,34 +80,18 @@ try {
     // this script.
     const database = drizzle(client) as unknown as Database;
 
-    // Before any product row, because product rows are unreachable without it.
-    // BidBeacon authorizes against a webhook-synced Access Projection, and a
-    // freshly migrated local database has never received a Clerk webhook — so
-    // every request from the signed-in dev user would 403 before it could see a
-    // single seeded campaign. The shared package writes the projection the
-    // webhook would have written, through this repo's own store adapter and the
-    // same `apply` upsert the webhook route uses. No projection SQL lives here.
-    const access = await bootstrapDevAccessProjection({
+    await createDevCloudflareAccess({
         databaseUrl: toDatabaseUrl(target),
-        // Byte-identical to the value `createClerkAuthenticator` is given in
-        // `src/services/access/bidbeacon-access.ts`: a projection is keyed by
-        // (issuer, subject), so an issuer that differs by a character writes a
-        // row no session will ever match.
-        issuer: requireEnvironment('MERCHBASE_CLERK_ISSUER'),
+        projections: createAccessProjectionStore(database, DEV_ACCESS_AUTHORITY_ORIGIN),
+        resolveServicePrincipal: async ({ merchbaseUserId }) => ({ merchbaseUserId }),
         service: 'bidbeacon',
-        store: createAccessProjectionStore(database),
     });
 
     const plan = buildDevSeedPlan(options);
     await writeDevSeedPlan(database as unknown as SeedDatabase, plan);
 
     const receipt = {
-        access: {
-            clerkSubject: access.clerkSubject,
-            issuer: access.issuer,
-            merchbaseUserId: access.merchbaseUserId,
-            service: access.service,
-        },
+        access: { issuer: DEV_ACCESS_AUTHORITY_ORIGIN, merchbaseUserId: DEV_SIGN_IN_MERCHBASE_USER_ID, service: 'bidbeacon' },
         accountId: plan.accountId,
         countryCode: plan.countryCode,
         dayCount: options.dayCount,

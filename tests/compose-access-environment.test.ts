@@ -3,7 +3,15 @@ import { describe, expect, it } from 'vitest';
 
 const compose = readFileSync(new URL('../compose.yml', import.meta.url), 'utf8');
 const composeDefaultFallbackPattern = /\$\{[A-Z][A-Z0-9_]*:-/u;
-const requiredAccessEnvironment = ['BIDBEACON_CLERK_AUTHORIZED_PARTIES', 'MERCHBASE_CLERK_ISSUER', 'MERCHBASE_CLERK_JWT_KEY', 'MERCHBASE_CLERK_PUBLISHABLE_KEY', 'MERCHBASE_CLERK_SECRET_KEY'];
+const requiredAccessEnvironment = [
+    'MERCHBASE_ACCESS_ISSUER',
+    'MERCHBASE_ACCESS_API_AUDIENCE',
+    'MERCHBASE_ACCESS_INTERACTIVE_AUDIENCE',
+    'MERCHBASE_ACCESS_BIDBEACON_INTERNAL_AUDIENCE',
+    'MERCHBASE_ACCESS_AUTHORITY_CLIENT_ID',
+    'MERCHBASE_ACCESS_BIDBEACON_CLIENT_ID',
+    'MERCHBASE_ACCESS_BIDBEACON_CLIENT_SECRET',
+];
 
 describe('compose access runtime environment', () => {
     it('passes verifier credentials to every service that can run access-gated work', () => {
@@ -12,7 +20,7 @@ describe('compose access runtime environment', () => {
 
         for (const variable of requiredAccessEnvironment) {
             expect(server).toContain(`      - ${variable}`);
-            expect(worker).toContain(`      - ${variable}`);
+            expect(worker).not.toContain(`      - ${variable}`);
         }
 
         // Pass-through shorthand, not `${VAR}`: Compose interpolates what it
@@ -20,7 +28,7 @@ describe('compose access runtime environment', () => {
         expect(server).toContain('      - BIDBEACON_DISABLE_SERVER_JOB_RUNNER');
         expect(compose).not.toMatch(composeDefaultFallbackPattern);
         expect(server).toContain('      - BIDBEACON_RANKWRANGLER_BASE_URL');
-        expect(worker).not.toContain('BIDBEACON_CLERK_WEBHOOK_SIGNING_SECRET');
+        expect(worker).toContain('      - MERCHBASE_ACCESS_AUTHORITY_ORIGIN');
         expect(worker).not.toContain('BIDBEACON_RANKWRANGLER_BASE_URL');
     });
 

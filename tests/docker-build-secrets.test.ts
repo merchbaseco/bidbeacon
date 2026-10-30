@@ -22,7 +22,6 @@ describe('Docker build secret wiring', () => {
         expect(dockerfile.match(merchbaseDockerfileNameRegex)).toHaveLength(2);
         expect(dockerfile).toContain('bun install --frozen-lockfile');
         expect(dockerfile).toContain('bun install --frozen-lockfile --production');
-        expect(dockerfile).toContain('ARG VITE_MERCHBASE_CLERK_PUBLISHABLE');
     });
 
     it('grants private secrets only to the server and caddy build definitions', () => {

@@ -121,20 +121,6 @@ export const fillLabel = async (run: VerifyRun, label: string, value: string) =>
     }
 };
 
-export const sessionToken = async (run: VerifyRun) => {
-    const value = await evaluate(
-        run,
-        `(async () => {
-            const clerk = window.Clerk;
-            if (!clerk || !clerk.session || !clerk.session.getToken) return '';
-            const token = await clerk.session.getToken();
-            return typeof token === 'string' ? token : '';
-        })()`,
-        true
-    );
-    return typeof value === 'string' ? value : '';
-};
-
 export const screenshot = async (run: VerifyRun) => {
     const result = await withPage(run, send => send('Page.captureScreenshot', { format: 'png' }));
     if (!result.data) {

@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 
 export const TRPC_MAX_PATH_PARAM_LENGTH = 4096;
-export const DEFAULT_MCP_RESOURCE_URL = 'https://bidbeacon.merchbase.co/mcp';
+export const DEFAULT_MCP_RESOURCE_URL = 'https://bidbeacon-api.merchbase.co/mcp';
 
 export const createServer = () =>
     Fastify({

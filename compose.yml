@@ -43,7 +43,6 @@ services:
       dockerfile: Dockerfile
       target: runtime
       args:
-        - VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY=${VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY}
       secrets:
         - hugeicons_license_key
         - merchbase_npm_token
@@ -55,6 +54,14 @@ services:
     # process environment (delivered by `varlock run`) without interpolating
     # it. The `${VAR}` form would mangle any value containing a `$`.
     environment:
+      - MERCHBASE_ACCESS_ISSUER
+      - MERCHBASE_ACCESS_AUTHORITY_ORIGIN
+      - MERCHBASE_ACCESS_API_AUDIENCE
+      - MERCHBASE_ACCESS_INTERACTIVE_AUDIENCE
+      - MERCHBASE_ACCESS_BIDBEACON_INTERNAL_AUDIENCE
+      - MERCHBASE_ACCESS_AUTHORITY_CLIENT_ID
+      - MERCHBASE_ACCESS_BIDBEACON_CLIENT_ID
+      - MERCHBASE_ACCESS_BIDBEACON_CLIENT_SECRET
       - BIDBEACON_PORT
       - BIDBEACON_DATABASE_HOST
       - BIDBEACON_DATABASE_PORT
@@ -68,12 +75,6 @@ services:
       - BIDBEACON_AWS_ACCESS_KEY_ID
       - BIDBEACON_AWS_SECRET_ACCESS_KEY
       - BIDBEACON_AMS_QUEUE_URL
-      - BIDBEACON_CLERK_AUTHORIZED_PARTIES
-      - MERCHBASE_CLERK_ISSUER
-      - MERCHBASE_CLERK_JWT_KEY
-      - MERCHBASE_CLERK_PUBLISHABLE_KEY
-      - MERCHBASE_CLERK_SECRET_KEY
-      - BIDBEACON_CLERK_WEBHOOK_SIGNING_SECRET
       - BIDBEACON_DISABLE_SERVER_JOB_RUNNER
       - BIDBEACON_MCP_RESOURCE_URL
       - BIDBEACON_RANKWRANGLER_BASE_URL
@@ -95,6 +96,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     environment:
+      - MERCHBASE_ACCESS_AUTHORITY_ORIGIN
       - BIDBEACON_DATABASE_HOST
       - BIDBEACON_DATABASE_PORT
       - BIDBEACON_DATABASE_NAME
@@ -107,11 +109,6 @@ services:
       - BIDBEACON_AWS_ACCESS_KEY_ID
       - BIDBEACON_AWS_SECRET_ACCESS_KEY
       - BIDBEACON_AMS_QUEUE_URL
-      - BIDBEACON_CLERK_AUTHORIZED_PARTIES
-      - MERCHBASE_CLERK_ISSUER
-      - MERCHBASE_CLERK_JWT_KEY
-      - MERCHBASE_CLERK_PUBLISHABLE_KEY
-      - MERCHBASE_CLERK_SECRET_KEY
     depends_on:
       postgres:
         condition: service_healthy
@@ -133,7 +130,6 @@ services:
       dockerfile: Dockerfile
       target: caddy
       args:
-        - VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY=${VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY}
       secrets:
         - hugeicons_license_key
         - merchbase_npm_token

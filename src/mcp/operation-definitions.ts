@@ -43,7 +43,7 @@ export const MCP_TOOL_NAMES = [
 
 const BIDBEACON_WEBSITE_URL = 'https://bidbeacon.merchbase.co';
 // Served by the dashboard's static file server from src/dashboard/public; must share the /mcp origin.
-const BIDBEACON_ICON_URL = `${BIDBEACON_WEBSITE_URL}/icon.png`;
+const BIDBEACON_ICON_URL = 'https://bidbeacon-api.merchbase.co/icon.png';
 
 export const MCP_SERVER_INFO = {
     name: 'bidbeacon',

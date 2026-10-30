@@ -13,8 +13,7 @@ const authMocks = vi.hoisted(() => {
 });
 
 vi.mock('@/services/access/bidbeacon-access', () => ({
-    authorizeBidBeaconCredential: authMocks.authorize,
-    getBidBeaconAccess: () => ({ authorize: authMocks.authorize }),
+    getBidBeaconAccess: () => ({ authorizeRequest: authMocks.authorize }),
 }));
 
 const authTestRouter = router({
@@ -37,7 +36,11 @@ describe('HTTP authentication', () => {
 
     beforeEach(async () => {
         vi.clearAllMocks();
-        authMocks.authorize.mockImplementation(async (_access: unknown, credential: string) => {
+        authMocks.authorize.mockImplementation(async (request: { headers: Record<string, string> }) => {
+            const credential = request.headers['cf-access-jwt-assertion'] ?? '';
+            if (!credential) {
+                throw new Error('unauthenticated');
+            }
             if (credential.startsWith('bbk_')) {
                 throw new Error('unauthenticated');
             }
@@ -69,7 +72,6 @@ describe('HTTP authentication', () => {
         });
 
         expect(response.statusCode).toBe(401);
-        expect(authMocks.authorize).not.toHaveBeenCalled();
     });
 
     it('authenticates a web session into a stable Merchbase User', async () => {
@@ -77,7 +79,7 @@ describe('HTTP authentication', () => {
             method: 'GET',
             url: '/api/viewer',
             headers: {
-                authorization: 'Bearer session.jwt.token',
+                'cf-access-jwt-assertion': 'session.jwt.token',
             },
         });
 
@@ -90,7 +92,7 @@ describe('HTTP authentication', () => {
                 },
             },
         });
-        expect(authMocks.authorize).toHaveBeenCalledWith(expect.anything(), 'session.jwt.token');
+        expect(authMocks.authorize).toHaveBeenCalled();
     });
 
     it.each([
@@ -100,7 +102,7 @@ describe('HTTP authentication', () => {
         const response = await app.inject({
             method: 'GET',
             url: '/api/apiViewer',
-            headers: { authorization: `Bearer ${credential}` },
+            headers: { 'cf-access-jwt-assertion': credential },
         });
 
         expect(response.statusCode).toBe(200);
@@ -111,7 +113,7 @@ describe('HTTP authentication', () => {
         const response = await app.inject({
             method: 'GET',
             url: '/api/apiViewer',
-            headers: { authorization: 'Bearer ak_suite-key' },
+            headers: { 'cf-access-jwt-assertion': 'ak_suite-key' },
         });
 
         expect(response.json().result.data).toMatchObject({
@@ -129,7 +131,7 @@ describe('HTTP authentication', () => {
         const legacyResponse = await app.inject({
             method: 'GET',
             url: '/api/apiViewer',
-            headers: { authorization: 'Bearer bbk_legacy-key' },
+            headers: { 'cf-access-jwt-assertion': 'bbk_legacy-key' },
         });
 
         expect(headerResponse.statusCode).toBe(401);
@@ -139,8 +141,8 @@ describe('HTTP authentication', () => {
     it('preserves denied and unavailable access outcomes', async () => {
         authMocks.authorize.mockRejectedValueOnce(new ServiceAccessError('access_denied')).mockRejectedValueOnce(new ServiceAccessError('access_unavailable'));
 
-        const denied = await app.inject({ method: 'GET', url: '/api/apiViewer', headers: { authorization: 'Bearer session.jwt.token' } });
-        const unavailable = await app.inject({ method: 'GET', url: '/api/apiViewer', headers: { authorization: 'Bearer session.jwt.token' } });
+        const denied = await app.inject({ method: 'GET', url: '/api/apiViewer', headers: { 'cf-access-jwt-assertion': 'session.jwt.token' } });
+        const unavailable = await app.inject({ method: 'GET', url: '/api/apiViewer', headers: { 'cf-access-jwt-assertion': 'session.jwt.token' } });
 
         expect(denied.statusCode).toBe(403);
         expect(unavailable.statusCode).toBe(500);

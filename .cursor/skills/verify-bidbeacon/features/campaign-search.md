@@ -19,7 +19,6 @@ Campaign search finds seeded campaigns by name from the dashboard table and from
 Preconditions:
 
 - Account home has reached `Cedar & Coil (dev seed)`.
-- `browser token` has written the session file.
 - Doctor still reports the seed account.
 
 - **Filter the table.** Run `.cursor/skills/verify-bidbeacon/control-bidbeacon browser fill --label "Search Campaign" --value "Trail Runner"`. The input's value is `Trail Runner`.
@@ -34,4 +33,4 @@ Preconditions:
 - The search box is `Search Campaign` only while the dimension is `Campaigns`. That is the default.
 - The table asks the API for rows. Wait until `SP - Merino Socks - KW` is gone. The input value alone is not proof.
 - Omit `fields` on `ad` or `product` and the query also calls RankWrangler. This recipe names `campaign.name` and `campaign.state` so the read stays on Postgres.
-- `bb search` is a separate entry. A passing HTTP search does not verify it. The helper sends `ak_dev_bidbeacon_local`.
+- `bb search` is a separate entry. A passing HTTP search does not verify it. The helper sends `a synthetic mbk_v1 wire fixture`.

@@ -32,14 +32,16 @@ describe('WebSocket authentication', () => {
         authMocks.selectWhere.mockResolvedValue([{ adsAccountId: 'account-1' }]);
         authMocks.evaluateAccess.mockResolvedValue({
             merchbaseUserId: 'mbu_one',
-            principal: { accessibleAccountIds: ['account-1'], merchbaseUserId: 'mbu_one' },
+            credentialKind: 'session',
+            expiresAt: Date.now() + 60_000,
+            principal: { legacyAdsAccountIds: ['account-1'], accessibleAccountIds: ['account-1'], merchbaseUserId: 'mbu_one' },
         });
         authMocks.consume.mockReturnValue(null);
 
         app = Fastify();
         await app.register(websocketPlugin);
         registerWebSocketRoute(app, {
-            access: { sessionAccess: { evaluateAccess: authMocks.evaluateAccess } } as never,
+            access: { authorizeRequest: authMocks.evaluateAccess } as never,
             ticketStore: { consume: authMocks.consume } as never,
         });
         await app.listen({ host: '127.0.0.1', port: 0 });
@@ -68,8 +70,8 @@ describe('WebSocket authentication', () => {
         const socket = await connectUntilOpen(getWebSocketBaseUrl(app), [REALTIME_PROTOCOL, 'ticket-one']);
         await vi.waitFor(() => {
             expect(authMocks.consume).toHaveBeenCalledWith('ticket-one', { route: REALTIME_ROUTE, service: 'bidbeacon' });
-            expect(authMocks.evaluateAccess).toHaveBeenCalledWith('mbu_one');
-            expect(authMocks.registerWebSocketConnection).toHaveBeenCalledWith(expect.anything(), ['account-1']);
+            expect(authMocks.evaluateAccess).toHaveBeenCalled();
+            expect(authMocks.registerWebSocketConnection).toHaveBeenCalledWith(expect.anything(), ['account-1'], 'mbu_one');
         });
         await closeWebSocket(socket);
 

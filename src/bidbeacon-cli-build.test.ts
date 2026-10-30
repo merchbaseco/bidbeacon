@@ -84,11 +84,12 @@ describe('bidbeacon cli build', () => {
             env: { ...process.env, HOME: tempDir, MERCHBASE_API_KEY: 'ak_test' },
             stdio: 'pipe',
         });
+        const { version } = JSON.parse(await readFile(join(packageDir, 'package.json'), 'utf8')) as { version: string };
 
         expect(JSON.parse(output)).toMatchObject({
-            currentVersion: '3.2.0',
-            selectedVersion: '3.2.0',
-            entry: { version: '3.2.0' },
+            currentVersion: version,
+            selectedVersion: version,
+            entry: { version },
         });
     });
 });

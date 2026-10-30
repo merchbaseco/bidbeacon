@@ -5,6 +5,7 @@ import type { reportDatasetMetadata } from '@/db/schema';
 interface AuthenticatedConnection {
     socket: WebSocket;
     accessibleAccountIds: string[];
+    merchbaseUserId: string;
 }
 
 export type EventType =
@@ -143,7 +144,7 @@ class EventEmitter {
     /**
      * Add an authenticated WebSocket connection to the emitter
      */
-    addConnection(socket: WebSocket, accessibleAccountIds: string[]) {
+    addConnection(socket: WebSocket, accessibleAccountIds: string[], merchbaseUserId: string) {
         socket.on('close', () => {
             this.connections.delete(socket);
         });
@@ -154,7 +155,15 @@ class EventEmitter {
         });
 
         if (socket.readyState === 1) {
-            this.connections.set(socket, { socket, accessibleAccountIds });
+            this.connections.set(socket, { socket, accessibleAccountIds, merchbaseUserId });
+        }
+    }
+
+    disconnectUser(merchbaseUserId?: string) {
+        for (const connection of this.connections.values()) {
+            if (!merchbaseUserId || connection.merchbaseUserId === merchbaseUserId) {
+                connection.socket.close(4003, 'Access changed');
+            }
         }
     }
 
@@ -216,6 +225,8 @@ export function emitEvent(event: EventWithoutTimestamp): void {
 /**
  * Register an authenticated WebSocket connection with the event emitter
  */
-export function registerWebSocketConnection(socket: WebSocket, accessibleAccountIds: string[]) {
-    eventEmitter.addConnection(socket, accessibleAccountIds);
+export function registerWebSocketConnection(socket: WebSocket, accessibleAccountIds: string[], merchbaseUserId: string) {
+    eventEmitter.addConnection(socket, accessibleAccountIds, merchbaseUserId);
 }
+
+export const disconnectUserConnections = (merchbaseUserId?: string) => eventEmitter.disconnectUser(merchbaseUserId);

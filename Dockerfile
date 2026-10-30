@@ -10,7 +10,6 @@ RUN --mount=type=secret,id=hugeicons_license_key,env=MERCHBASE_HUGEICONS_LICENSE
     bun install --frozen-lockfile
 
 FROM deps AS build
-ARG VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY
 COPY . .
 # The build scripts deliberately do not go through `varlock run`: this stage has
 # no 1Password access. Every value the dashboard bundle needs arrives as a build

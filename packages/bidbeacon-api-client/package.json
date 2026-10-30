@@ -1,6 +1,6 @@
 {
   "name": "@bidbeacon/http-client",
-  "version": "3.2.0",
+  "version": "4.0.0",
   "description": "Typed tRPC client for BidBeacon",
   "repository": {
     "type": "git",

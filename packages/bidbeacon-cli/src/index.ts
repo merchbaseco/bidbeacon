@@ -8,7 +8,7 @@ import { normalizeApiBaseUrl, withTransportHint } from './base-url';
 import { renderHelp, resolveHelpTopicKey } from './help';
 import { SEARCH_FIELD_NAMES } from './search-field-names';
 
-const DEFAULT_BASE_URL = 'http://localhost:8080';
+const DEFAULT_BASE_URL = 'https://bidbeacon-api.merchbase.co';
 const DEFAULT_STORAGE_DIR = join(homedir(), '.bidbeacon');
 const DEFAULT_SETTINGS_PATH = join(DEFAULT_STORAGE_DIR, 'settings.json');
 const CONFIG_FILENAME = 'config.json';
@@ -229,11 +229,11 @@ const handleAuthCommand = async (subcommand: string | undefined, rest: string[],
     assertNoUnexpectedFlags(flags, ['stdin', 'json', 'help']);
     if (subcommand === 'set') {
         if (rest.length > 1) {
-            throw invalidInput('Use `bb auth set [ak_...]` or `bb auth set --stdin`.', {});
+            throw invalidInput('Use `bb auth set [mbk_v1...]` or `bb auth set --stdin`.', {});
         }
         const value = flags.has('stdin') ? await readStdin() : rest[0];
         if (!value) {
-            throw invalidInput('Missing API key. Use `bb auth set [ak_...]` or `bb auth set --stdin`.', {});
+            throw invalidInput('Missing API key. Use `bb auth set [mbk_v1...]` or `bb auth set --stdin`.', {});
         }
         const auth = setStoredApiKey(value);
         printOutput({ source: auth.source, envOverride: auth.envOverride });
@@ -709,7 +709,10 @@ const createApiClient = async () => {
     if (!auth.apiKey) {
         throw new CliContractError({ code: 'AUTHENTICATION_REQUIRED', message: getMissingApiKeyMessage(), details: {} });
     }
-    return createBidBeaconClient({ baseUrl: config.baseUrl ?? DEFAULT_BASE_URL, credential: auth.apiKey });
+    const baseUrl = config.baseUrl ?? DEFAULT_BASE_URL;
+    const local = new URL(baseUrl);
+    const headers = process.env.NODE_ENV === 'development' && ['localhost', '127.0.0.1'].includes(local.hostname) ? { Origin: local.origin } : undefined;
+    return createBidBeaconClient({ baseUrl, credential: auth.apiKey, headers });
 };
 
 const loadConfig = async (): Promise<CliConfig> => {

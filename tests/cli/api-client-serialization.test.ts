@@ -39,7 +39,7 @@ describe('canonical typed client HTTP serialization', () => {
             return Response.json({ result: { data: output } });
         }) as typeof fetch;
 
-        const client = createBidBeaconClient({ baseUrl: 'https://bidbeacon.merchbase.co', credential: 'ak_test', batch: false });
+        const client = createBidBeaconClient({ baseUrl: 'https://bidbeacon.merchbase.co', accessToken: 'oauth_fixture', batch: false });
         await client.search.query({ accountId, resource: 'campaign', fields: ['campaign.id'], limit: 10 });
         await client.update_target.mutate({ accountId, targetId: 'target-1', changes: { bid: 1 } });
 
@@ -52,7 +52,7 @@ describe('canonical typed client HTTP serialization', () => {
             fields: ['campaign.id'],
             limit: 10,
         });
-        expect(requests[0]!.init?.headers).toMatchObject({ Authorization: 'Bearer ak_test' });
+        expect(requests[0]!.init?.headers).toMatchObject({ Authorization: 'Bearer oauth_fixture' });
 
         expect(new URL(requests[1]!.url).pathname).toBe('/api/update_target');
         expect(JSON.parse(String(requests[1]!.init?.body))).toEqual({ accountId, targetId: 'target-1', changes: { bid: 1 } });

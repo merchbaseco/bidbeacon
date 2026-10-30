@@ -11,17 +11,17 @@ The command is `.cursor/skills/verify-bidbeacon/control-bidbeacon`, run from the
 
 ## Launch
 
-One local Postgres database named `bidbeacon` is shared by every server on this VM. Do not start a second server on ports `8080` and `4173` while Cursor's `dev` terminal already holds them.
+Use a local Postgres database and `dev-port` for this worktree. Do not adopt a server that targets a shared or production database.
 
 ```bash
-.cursor/skills/verify-bidbeacon/control-bidbeacon launch --api-port 8090 --dashboard-port 4174
+.cursor/skills/verify-bidbeacon/control-bidbeacon launch
 ```
 
 Launch is ready when stdout is JSON with `"ok": true`, `"account": "Cedar & Coil (dev seed)"`, and `"live"."service": "bidbeacon-server"`. That means Postgres accepts connections, migrations have been applied, the seed account exists, `GET /api/live` returns 200, and the dashboard HTML contains `BidBeacon Dashboard`.
 
 Launch starts Postgres when `127.0.0.1:5432` is down. It runs `scripts/seed-dev-data.ts` only when that account row is missing. It adopts a port that already serves BidBeacon and records a null pid for it. Cleanup will not kill an adopted pid.
 
-Dashboard sign-in works only on `http://127.0.0.1:4173` and `http://127.0.0.1:4174`. Other origins fail the Clerk authorized-party check after the dev ticket is minted.
+Development uses an offline canonical user on loopback origins and requires NODE_ENV=development plus a local database before migrations. Production has no development identity.
 
 ## Doctor
 
@@ -42,7 +42,6 @@ Browser commands talk to headless Chrome through the DevTools socket. They use a
 .cursor/skills/verify-bidbeacon/control-bidbeacon browser wait --text "SP - Trail Runner Belt - Auto" --path account-home/page.txt
 .cursor/skills/verify-bidbeacon/control-bidbeacon browser fill --label "Search Campaign" --value "Trail Runner"
 .cursor/skills/verify-bidbeacon/control-bidbeacon browser screenshot --path account-home/home.png
-.cursor/skills/verify-bidbeacon/control-bidbeacon browser token
 ```
 
 For a quick look at the dashboard in a Claude cloud session, outside a verification run, capture it with:
@@ -51,9 +50,8 @@ For a quick look at the dashboard in a Claude cloud session, outside a verificat
 capture-page http://127.0.0.1:4174/ /tmp/bidbeacon.png --settle 8000
 ```
 
-`capture-page` is the fleet's Playwright wrapper around the image's Chromium; it routes external hosts such as Clerk through the agent proxy and keeps loopback direct. Do not use `google-chrome --screenshot` or `/opt/pw-browsers/chromium --screenshot` there: they hang against the Vite dev server. Evidence for a verification run still comes from `browser screenshot`.
+`capture-page` is the fleet's Playwright wrapper around the image's Chromium; it routes external hosts through the agent proxy and keeps loopback direct. Do not use `google-chrome --screenshot` or `/opt/pw-browsers/chromium --screenshot` there: they hang against the Vite dev server. Evidence for a verification run still comes from `browser screenshot`.
 
-`browser token` writes the Clerk session JWT to the run's token file, mode `600`. Do not print the token. Later HTTP and MCP commands read that file.
 
 ```bash
 .cursor/skills/verify-bidbeacon/control-bidbeacon http get search --input '{"accountId":"5eed0000-0000-4000-8000-000000000001","resource":"campaign","fields":["campaign.name","campaign.state"],"limit":20}' --expect "SP - Trail Runner Belt - Auto" --path http/search.json
@@ -62,7 +60,7 @@ capture-page http://127.0.0.1:4174/ /tmp/bidbeacon.png --settle 8000
 .cursor/skills/verify-bidbeacon/control-bidbeacon worker fixture
 ```
 
-`http get` is a tRPC query, `GET /api/<procedure>?input=<json>`. `http post` is a tRPC mutation. Both send `Authorization: Bearer ak_dev_bidbeacon_local`. `mcp` and `cli` send that same key. `worker fixture` runs `processAmsMessage` and `routePayload` against local Postgres. Its `deleteMessage` records the call and does not import the SQS client.
+`http get` is a tRPC query and `http post` is a mutation. HTTP and MCP send the local UI Origin, without a sign-in token. The CLI uses a synthetic mbk_v1 wire fixture; identity still comes only from the guarded offline development runtime. `worker fixture` runs `processAmsMessage` and `routePayload` against local Postgres. Its `deleteMessage` records the call and does not import the SQS client.
 
 The helper selects `BIDBEACON_AMAZON_ADS_GATEWAY=fake` before varlock starts, and a server it starts inherits that value. Writes are sent only when doctor reports `"amazonAds": "fake"`. An adopted server stays on the live gateway, and `create_*`, `update_*`, `bb create`, and `bb update` exit 2 before any request.
 
@@ -98,17 +96,17 @@ A server this helper starts uses the local Amazon Ads gateway. Cloud sessions al
 
 Default `search` on `ad` or `product` asks RankWrangler for a title and swallows a failure. Pass `fields` that omit `ad.productTitle` and `product.title`.
 
-`http`, `mcp`, and `cli` authenticate as `ak_dev_bidbeacon_local`. That key resolves to the seeded dev user only when neither `NODE_ENV` nor `VARLOCK_ENV` is production. Other `ak_` keys are still rejected by `/mcp`. Do not treat `bun run test:integration src/mcp/server.integration-check.ts` as a drive of the HTTP server.
+`http`, `mcp`, and `cli` use the guarded offline identity only on a local development host and database. No fake key authorizer or token mint exists. Do not treat `bun run test:integration src/mcp/server.integration-check.ts` as a drive of the HTTP server.
 
 Do not run `bun run worker`. Importing the SQS client requires `BIDBEACON_AMS_QUEUE_URL`, and a successful AWS login long-polls the real queue into this database.
 
 ## Gaps
 
-The cloud environment still has to resolve, through varlock and the Development vault, `MERCHBASE_CLERK_SECRET_KEY`, `MERCHBASE_CLERK_PUBLISHABLE_KEY`, `MERCHBASE_CLERK_JWT_KEY`, `MERCHBASE_CLERK_ISSUER`, `BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID`, and the `BIDBEACON_DATABASE_*` settings. With `BIDBEACON_AMAZON_ADS_GATEWAY=fake` outside production, the Amazon Ads client id, secret, and refresh token resolve to a placeholder and are not read.
+The cloud environment resolves only the development database settings through Varlock; auth remains offline. The fake Amazon gateway uses shaped placeholders.
 
 These journeys stay failed:
 
-- A real suite API key or a real Clerk OAuth token. The local dev key is the credential this skill can mint.
+- Live Cloudflare edge OAuth and service-token policy. Local proof tests signed assertions, not the hosted policy.
 - AWS credentials used only to poll SQS. The fixture covers the handler, not the poller.
 
 `GET /api/health` is the wrong ready check for this stack.

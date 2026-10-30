@@ -1,12 +1,12 @@
-import type { AccessProjection, AccessProjectionEvent, AccessProjectionIdentityState, AccessProjectionStore, ClerkIdentity } from '@merchbaseco/access';
-import { and, desc, eq, sql } from 'drizzle-orm';
+import type { AccessProjection, AccessProjectionEvent, AccessProjectionIdentityState, AccessProjectionStore, ProjectionIdentity } from '@merchbaseco/access';
+import { and, eq, sql } from 'drizzle-orm';
 import type { Database } from '@/db/index';
 import { accessProjection, accessProjectionEvent } from '@/db/schema';
 
-export const createAccessProjectionStore = (database: Database): AccessProjectionStore => ({
+export const createAccessProjectionStore = (database: Database, authorityOrigin = process.env.MERCHBASE_ACCESS_AUTHORITY_ORIGIN ?? ''): AccessProjectionStore => ({
     apply: event => applyProjectionEvent(database, event),
     findByIdentity: identity => findByIdentity(database, identity),
-    findByMerchbaseUserId: merchbaseUserId => findByMerchbaseUserId(database, merchbaseUserId),
+    findByMerchbaseUserId: merchbaseUserId => findByMerchbaseUserId(database, merchbaseUserId, authorityOrigin),
 });
 
 const applyProjectionEvent = async (database: Database, event: AccessProjectionEvent) => {
@@ -58,7 +58,7 @@ const applyProjectionEvent = async (database: Database, event: AccessProjectionE
     });
 };
 
-const findByIdentity = async (database: Database, identity: ClerkIdentity): Promise<AccessProjectionIdentityState> => {
+const findByIdentity = async (database: Database, identity: ProjectionIdentity): Promise<AccessProjectionIdentityState> => {
     const rows = await database
         .select({
             access: accessProjection.access,
@@ -87,7 +87,7 @@ const findByIdentity = async (database: Database, identity: ClerkIdentity): Prom
     };
 };
 
-const findByMerchbaseUserId = async (database: Database, merchbaseUserId: string): Promise<AccessProjection | null> => {
+const findByMerchbaseUserId = async (database: Database, merchbaseUserId: string, authorityOrigin: string): Promise<AccessProjection | null> => {
     const rows = await database
         .select({
             access: accessProjection.access,
@@ -99,8 +99,14 @@ const findByMerchbaseUserId = async (database: Database, merchbaseUserId: string
             subject: accessProjection.subject,
         })
         .from(accessProjection)
-        .where(and(eq(accessProjection.merchbaseUserId, merchbaseUserId), eq(accessProjection.state, 'active')))
-        .orderBy(desc(accessProjection.sourceUpdatedAt))
+        .where(
+            and(
+                eq(accessProjection.issuer, authorityOrigin),
+                eq(accessProjection.subject, merchbaseUserId),
+                eq(accessProjection.merchbaseUserId, merchbaseUserId),
+                eq(accessProjection.state, 'active')
+            )
+        )
         .limit(1);
 
     const row = rows[0];
@@ -130,6 +136,6 @@ const toProjection = (row: {
     };
 };
 
-const getEventIdentity = (event: AccessProjectionEvent): ClerkIdentity => (event.type === 'upsert' ? event.projection : event.identity);
+const getEventIdentity = (event: AccessProjectionEvent): ProjectionIdentity => (event.type === 'upsert' ? event.projection : event.identity);
 
 const getSourceUpdatedAt = (event: AccessProjectionEvent) => (event.type === 'upsert' ? event.projection.sourceUpdatedAt : event.sourceUpdatedAt);

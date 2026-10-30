@@ -1,9 +1,6 @@
 import { ServiceAccessError } from '@merchbaseco/access';
-import { eq } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
 import type { WebSocket } from 'ws';
-import { db } from '@/db/index';
-import { userAccountAccess } from '@/db/schema';
 import type { BidBeaconAccess } from '@/services/access/bidbeacon-access';
 import { registerWebSocketConnection } from '@/utils/events';
 import { type BidBeaconRealtimeTicketStore, REALTIME_PROTOCOL, REALTIME_ROUTE } from './realtime';
@@ -34,9 +31,18 @@ export const registerWebSocketRoute = (fastify: FastifyInstance, options: { acce
         }
 
         try {
-            const resolved = await options.access.sessionAccess.evaluateAccess(binding.merchbaseUserId);
-            const accessibleAccountIds = await fetchAccessibleAccountIds(resolved.merchbaseUserId);
-            registerWebSocketConnection(socket, accessibleAccountIds);
+            const resolved = await options.access.authorizeRequest(request);
+            if (resolved.credentialKind !== 'session' || resolved.merchbaseUserId !== binding.merchbaseUserId) {
+                throw new ServiceAccessError('unauthenticated');
+            }
+            registerWebSocketConnection(socket, resolved.principal.legacyAdsAccountIds, resolved.merchbaseUserId);
+            const current = await options.access.authorizeRequest(request);
+            if (current.merchbaseUserId !== resolved.merchbaseUserId) {
+                throw new ServiceAccessError('unauthenticated');
+            }
+            const expiry = setTimeout(() => socket.close(4003, 'Session expired'), Math.max(0, Math.min(resolved.expiresAt - Date.now(), 2_147_483_647)));
+            expiry.unref();
+            socket.once('close', () => clearTimeout(expiry));
         } catch (error) {
             if (!(error instanceof ServiceAccessError)) {
                 console.error('WebSocket authorization failed', error);
@@ -64,10 +70,4 @@ const getTicketFromProtocols = (header: string | string[] | undefined) => {
         return null;
     }
     return values?.map(value => value.trim()).find(value => value.length > 0 && value !== REALTIME_PROTOCOL);
-};
-
-const fetchAccessibleAccountIds = async (merchbaseUserId: string) => {
-    const rows = await db.select({ adsAccountId: userAccountAccess.adsAccountId }).from(userAccountAccess).where(eq(userAccountAccess.merchbaseUserId, merchbaseUserId));
-
-    return [...new Set(rows.map(row => row.adsAccountId))];
 };

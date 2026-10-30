@@ -4,9 +4,8 @@ import websocket from '@fastify/websocket';
 import { fastifyTRPCPlugin } from '@trpc/server/adapters/fastify';
 import { eq, or } from 'drizzle-orm';
 import type { FastifyInstance } from 'fastify';
-import { registerClerkAccessWebhookRoute } from '@/api/access/clerk-webhook-route';
 import { createContext } from '@/api/context.js';
-import { createBidBeaconRealtimeTicketStore, registerRealtimeTicketRoute } from '@/api/events/realtime';
+import { createBidBeaconRealtimeTicketStore, registerRealtimeTicketRoute, sendAccessError } from '@/api/events/realtime';
 import { registerWebSocketRoute } from '@/api/events/websocket';
 import { appRouter } from '@/api/router.js';
 import { db, testConnection } from '@/db/index.js';
@@ -32,6 +31,7 @@ const healthProcessStartedAt = new Date();
 
 async function main() {
     console.log('Starting BidBeacon Server');
+    const access = getBidBeaconAccess();
 
     const runtimeFlags = getServerRuntimeFlags();
     console.log('Server runtime flags', runtimeFlags);
@@ -40,13 +40,14 @@ async function main() {
 
     // Fastify setup
     await registerPlugins(fastify);
-    await registerRoutes(fastify);
     registerErrorHandlers(fastify);
     registerShutdownHandlers(fastify);
 
     // Database
     await runMigrations();
     await testConnection();
+    await access.initialize();
+    await registerRoutes(fastify);
 
     // Cleanup tasks
     await performStartupCleanup();
@@ -119,7 +120,7 @@ async function registerPlugins(fastify: FastifyInstance) {
     await fastify.register(websocket);
     await fastify.register(cors, {
         origin: (origin, callback) => {
-            const allowedOrigins = ['https://merchbase.co', 'https://bidbeacon.merchbase.co', 'http://localhost:3000', 'http://localhost:5173', 'http://localhost:4173', 'http://localhost:4174'];
+            const allowedOrigins = ['https://bidbeacon.merchbase.co'];
 
             // Allow requests with no origin (e.g., mobile apps, server-to-server)
             if (!origin) {
@@ -134,7 +135,7 @@ async function registerPlugins(fastify: FastifyInstance) {
             // Allow any localhost origin for development convenience
             try {
                 const url = new URL(origin);
-                if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+                if (process.env.NODE_ENV === 'development' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {
                     return callback(null, true);
                 }
             } catch {
@@ -157,26 +158,50 @@ async function registerRoutes(fastify: FastifyInstance) {
     });
 
     // Auth, realtime ticket, and WebSocket endpoints are registered before tRPC.
-    await registerClerkAccessWebhookRoute(fastify, {
-        issuer: requireEnvironment('MERCHBASE_CLERK_ISSUER'),
-        onIdentityChanged: identity => access.authenticator.invalidateApiKeys(identity),
-        signingSecret: requireEnvironment('BIDBEACON_CLERK_WEBHOOK_SIGNING_SECRET'),
-        store: access.projections,
-    });
+    fastify.post(
+        '/api/internal/access-snapshot',
+        {
+            bodyLimit: 1_048_576,
+            onRequest: async (request, reply) => {
+                if (request.headers.host !== 'bidbeacon-internal.merchbase.co') {
+                    return reply.code(401).send();
+                }
+                const assertion = request.headers['cf-access-jwt-assertion'];
+                if (typeof assertion !== 'string') {
+                    return reply.code(401).send();
+                }
+                try {
+                    await access.authorizeSnapshot(assertion);
+                } catch (error) {
+                    return sendAccessError(reply, error);
+                }
+            },
+        },
+        async (request, reply) => {
+            if (request.headers.host !== 'bidbeacon-internal.merchbase.co' || !access.projectionHandler) {
+                return reply.code(401).send();
+            }
+            const headers = new Headers();
+            for (const [name, value] of Object.entries(request.headers)) {
+                if (typeof value === 'string') {
+                    headers.set(name, value);
+                }
+            }
+            const response = await access.projectionHandler(new Request(`https://bidbeacon-internal.merchbase.co${request.raw.url}`, { method: 'POST', headers, body: JSON.stringify(request.body) }));
+            return reply.code(response.status).send();
+        }
+    );
     registerRealtimeTicketRoute(fastify, { access, ticketStore });
     registerWebSocketRoute(fastify, { access, ticketStore });
     await registerBidBeaconMcpRoutes(fastify, {
         auth: createBidBeaconMcpAuth(access),
-        createContext: ({ accessibleAccountIds, credential, merchbaseUserId }) =>
-            createProductionOperationContext(
-                {
-                    accessibleAccountIds,
-                    credentialKind: 'oauth',
-                    merchbaseUserId,
-                },
-                credential
-            ),
-        publishableKey: requireEnvironment('MERCHBASE_CLERK_PUBLISHABLE_KEY'),
+        createContext: ({ accessibleAccountIds, merchbaseUserId }) =>
+            createProductionOperationContext({
+                accessibleAccountIds,
+                credentialKind: 'oauth',
+                merchbaseUserId,
+            }),
+        issuer: process.env.NODE_ENV === 'development' ? 'https://identity.merchbase.invalid' : requireEnvironment('MERCHBASE_ACCESS_ISSUER'),
         resourceUrl: getMcpResourceUrl(),
     });
 

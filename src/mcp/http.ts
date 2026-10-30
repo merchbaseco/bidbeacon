@@ -1,14 +1,15 @@
 import type { IncomingMessage } from 'node:http';
-import { corsHeaders, fetchClerkAuthorizationServerMetadata, generateClerkProtectedResourceMetadata } from '@clerk/mcp-tools/server';
+import { createOAuthResourceMetadata } from '@merchbaseco/access';
 import type { AuthInfo } from '@modelcontextprotocol/sdk/server/auth/types.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { OperationContext } from '@/operations/operation-context';
-import { authenticateMcpRequest, MCP_SCOPES, type McpAuthDependencies, type McpAuthResult } from './auth';
+import { authenticateMcpRequest, type McpAuthDependencies, type McpAuthResult } from './auth';
 import { createBidBeaconMcpServer } from './server';
 
+const localHostPattern = /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/;
+
 const protectedResourceBasePath = '/.well-known/oauth-protected-resource';
-const authorizationServerBasePath = '/.well-known/oauth-authorization-server';
 
 export const MCP_CORS = {
     allowedHeaders: ['Authorization', 'Content-Type', 'Last-Event-ID', 'Mcp-Protocol-Version', 'Mcp-Session-Id'],
@@ -26,33 +27,14 @@ const MCP_METADATA_CORS = {
 export type RegisterBidBeaconMcpRoutesOptions = {
     auth: McpAuthDependencies;
     createContext: (input: { accessibleAccountIds: readonly string[]; credential: string; merchbaseUserId: string }) => OperationContext | Promise<OperationContext>;
-    publishableKey: string;
+    issuer: string;
     resourceUrl: string;
 };
 
 export const registerBidBeaconMcpRoutes = async (fastify: FastifyInstance, options: RegisterBidBeaconMcpRoutesOptions) => {
-    const protectedResourceMetadata = generateClerkProtectedResourceMetadata({
-        properties: {
-            resource_name: 'BidBeacon',
-            scopes_supported: [...MCP_SCOPES],
-        },
-        publishableKey: options.publishableKey,
-        resourceUrl: options.resourceUrl,
-    });
-
+    const protectedResourceMetadata = createOAuthResourceMetadata({ authorizationServer: options.issuer, resource: options.resourceUrl });
     for (const path of [protectedResourceBasePath, `${protectedResourceBasePath}/mcp`]) {
-        fastify.get(path, { config: { cors: MCP_METADATA_CORS } }, async (_request, reply) => sendJson(reply, protectedResourceMetadata, corsHeaders));
-    }
-
-    for (const path of [authorizationServerBasePath, `${authorizationServerBasePath}/mcp`]) {
-        fastify.get(path, { config: { cors: MCP_METADATA_CORS } }, async (_request, reply) => {
-            try {
-                const metadata = await fetchClerkAuthorizationServerMetadata({ publishableKey: options.publishableKey });
-                return sendJson(reply, metadata, corsHeaders);
-            } catch {
-                return reply.status(503).send({ error: 'Authorization server metadata unavailable' });
-            }
-        });
+        fastify.get(path, { config: { cors: MCP_METADATA_CORS } }, async (_request, reply) => sendJson(reply, protectedResourceMetadata, { 'Access-Control-Allow-Origin': '*' }));
     }
 
     fastify.route({
@@ -69,14 +51,20 @@ const handleMcpRequest = async (request: FastifyRequest, reply: FastifyReply, op
         return reply.status(403).send({ error: 'Invalid Origin' });
     }
 
-    const authentication = await authenticateMcpRequest(request.headers.authorization, options.auth);
+    const local = process.env.NODE_ENV === 'development' && typeof request.headers.host === 'string' && localHostPattern.test(request.headers.host);
+    if ((!local && request.headers.host !== 'bidbeacon-api.merchbase.co') || request.headers['x-merchbase-user-id']) {
+        return reply.status(401).send({ error: 'Unauthorized' });
+    }
+    const assertion = request.headers['cf-access-jwt-assertion'];
+    const credential = typeof assertion === 'string' ? assertion : local ? 'development' : null;
+    const authentication = await authenticateMcpRequest(credential ? `Bearer ${credential}` : undefined, options.auth, request);
     if (authentication.status !== 'authenticated') {
         return sendAuthenticationFailure(reply, authentication, options.resourceUrl);
     }
 
     const context = await options.createContext({
         accessibleAccountIds: authentication.accessibleAccountIds,
-        credential: authentication.authInfo.token,
+        credential: '',
         merchbaseUserId: authentication.merchbaseUserId,
     });
     const server = createBidBeaconMcpServer(context);
@@ -151,7 +139,7 @@ export const isAllowedMcpOrigin = (origin: string | undefined) => {
 
     try {
         const url = new URL(origin);
-        return url.protocol === 'https:' || (url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'));
+        return origin === 'https://bidbeacon.merchbase.co' || (process.env.NODE_ENV === 'development' && url.protocol === 'http:' && (url.hostname === 'localhost' || url.hostname === '127.0.0.1'));
     } catch {
         return false;
     }

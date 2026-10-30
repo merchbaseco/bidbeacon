@@ -12,8 +12,8 @@ npm install @bidbeacon/http-client
 import { createBidBeaconClient } from '@bidbeacon/http-client';
 
 const client = createBidBeaconClient({
-  baseUrl: 'https://bidbeacon.merchbase.co',
-  credential: 'ak_...',
+  baseUrl: 'https://bidbeacon-api.merchbase.co',
+  credential: 'mbk_v1...',
 });
 
 const accounts = await client.list_advertiser_accounts.query({});
@@ -71,3 +71,5 @@ bun run api-client:build
 ```
 
 The generated types and `dist/` output are release artifacts. Version changes follow [the release process](../../docs/release-process.md).
+
+Use `credential` for a Merchbase `mbk_v1` machine key or the separate `accessToken` option for person OAuth. Requests omit cookies and never follow redirects.

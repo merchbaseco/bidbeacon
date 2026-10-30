@@ -47,13 +47,11 @@ const notDeliveredNames = new Map([
     ['BIDBEACON_DASHBOARD_API_PROXY_TARGET', 'development-only Vite dev-server proxy target'],
     ['BIDBEACON_DEV_HOST', 'development-only Vite dev-server bind address'],
     ['BIDBEACON_AMAZON_ADS_GATEWAY', 'development-only fake Amazon Ads gateway selector; production containers must not receive it'],
-    ['BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID', 'development-only auto sign-in subject; the container must never be able to mint a session for it'],
     ['BIDBEACON_SEARCH_CURSOR_SECRET', 'optional and unprovisioned; the server falls back to a per-process key'],
     ['BIDBEACON_RUN_LIVE_SMOKE', 'opt-in live smoke switch, operator-supplied'],
     ['BIDBEACON_LIVE_ACCOUNT_ID', 'opt-in live smoke input, operator-supplied'],
     ['BIDBEACON_LIVE_ASIN', 'opt-in live smoke input, operator-supplied'],
     ['VITE_BIDBEACON_API_URL', 'build-time dashboard input, not a runtime value'],
-    ['VITE_MERCHBASE_CLERK_PUBLISHABLE_KEY', 'build-time dashboard input, passed as a build argument'],
 ]);
 
 interface SchemaItem {

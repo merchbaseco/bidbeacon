@@ -4,18 +4,23 @@ import { describe, expect, it, vi } from 'vitest';
 import { getBearerToken, registerRealtimeTicketRoute } from './realtime';
 
 describe('realtime authentication tickets', () => {
-    it('issues tickets only after HTTP bearer authentication', async () => {
-        const authorize = vi.fn().mockResolvedValue({ merchbaseUserId: 'mbu_one' });
+    it('issues tickets only after interactive origin authorization', async () => {
+        const authorize = vi.fn().mockImplementation(async request => {
+            if (!request.headers['cf-access-jwt-assertion']) {
+                throw new ServiceAccessError('unauthenticated');
+            }
+            return { credentialKind: 'session', merchbaseUserId: 'mbu_one' };
+        });
         const app = Fastify();
         registerRealtimeTicketRoute(app, {
-            access: { sessionAccess: { authorize } } as never,
+            access: { authorizeRequest: authorize } as never,
             ticketStore: createRealtimeTicketStore({ now: () => 1000 }),
         });
         await app.ready();
 
         const missing = await app.inject({ method: 'POST', url: '/api/events/ticket' });
         const valid = await app.inject({
-            headers: { authorization: 'Bearer session.jwt.token' },
+            headers: { 'cf-access-jwt-assertion': 'session.jwt.token' },
             method: 'POST',
             url: '/api/events/ticket',
         });
@@ -24,7 +29,7 @@ describe('realtime authentication tickets', () => {
         expect(valid.statusCode).toBe(200);
         expect(valid.json().ticket).toEqual(expect.any(String));
         expect(valid.json().ticket).not.toContain('session.jwt.token');
-        expect(authorize).toHaveBeenCalledWith('session.jwt.token');
+        expect(authorize).toHaveBeenCalled();
         await app.close();
     });
 
@@ -35,13 +40,13 @@ describe('realtime authentication tickets', () => {
     ])('maps %s access outcomes without issuing a ticket', async (_label, error, statusCode) => {
         const app = Fastify();
         registerRealtimeTicketRoute(app, {
-            access: { sessionAccess: { authorize: vi.fn().mockRejectedValue(error) } } as never,
+            access: { authorizeRequest: vi.fn().mockRejectedValue(error) } as never,
             ticketStore: { issue: vi.fn() } as never,
         });
         await app.ready();
 
         const response = await app.inject({
-            headers: { authorization: 'Bearer session.jwt.token' },
+            headers: { 'cf-access-jwt-assertion': 'session.jwt.token' },
             method: 'POST',
             url: '/api/events/ticket',
         });

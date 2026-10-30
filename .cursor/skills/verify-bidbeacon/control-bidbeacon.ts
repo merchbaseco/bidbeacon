@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { openSync, writeFileSync } from 'node:fs';
 import { copyFile, mkdir, rm, writeFile } from 'node:fs/promises';
 import net from 'node:net';
@@ -6,14 +6,12 @@ import { dirname, join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { LOCAL_AMAZON_ADS_CALL_LOG } from '@/operations/local-amazon-ads-gateway';
-import { DEV_LOCAL_API_KEY } from '@/services/access/dev-local-credential';
-import { ensureChrome, fillLabel, navigate, pageText, screenshot, sessionToken } from './chrome-session';
-import { amazonWriteRefusal, DASHBOARD_PORTS, SEED_ACCOUNT_NAME, type VerifyRun } from './constants';
+import { ensureChrome, fillLabel, navigate, pageText, screenshot } from './chrome-session';
+import { amazonWriteRefusal, SEED_ACCOUNT_NAME, type VerifyRun } from './constants';
 import { ensurePostgres, ensureSeed, psql, seedAccountName } from './postgres';
 import { readRun, updateRun, writeRun } from './run-file';
 
 const repoRoot = join(import.meta.dir, '../../..');
-const allowedDashboardPorts: readonly number[] = DASHBOARD_PORTS;
 
 const main = async () => {
     const [command, ...args] = process.argv.slice(2);
@@ -46,11 +44,8 @@ const main = async () => {
 };
 
 const launch = async (args: string[]) => {
-    const apiPort = flagNumber(args, '--api-port') ?? 8080;
-    const dashboardPort = flagNumber(args, '--dashboard-port') ?? 4173;
-    if (!allowedDashboardPorts.includes(dashboardPort)) {
-        throw new Error(`Dashboard port ${dashboardPort} cannot sign in. Clerk authorized parties allow only 4173 and 4174.`);
-    }
+    const apiPort = flagNumber(args, '--api-port') ?? Number(execFileSync('dev-port', ['0'], { cwd: repoRoot, encoding: 'utf8' }).trim());
+    const dashboardPort = flagNumber(args, '--dashboard-port') ?? Number(execFileSync('dev-port', ['1'], { cwd: repoRoot, encoding: 'utf8' }).trim());
     await ensurePostgres();
     const seed = await ensureSeed(repoRoot);
     const id = Date.now().toString(36);
@@ -128,12 +123,7 @@ const browser = async (args: string[]) => {
         process.stdout.write(`${path}\n`);
         return;
     }
-    if (sub === 'token') {
-        await writeFile(run.tokenPath, await pollToken(run), { mode: 0o600 });
-        process.stdout.write(`${run.tokenPath}\n`);
-        return;
-    }
-    throw new Error('browser subcommands: open, wait, fill, screenshot, text, token.');
+    throw new Error('browser subcommands: open, wait, fill, screenshot, text.');
 };
 
 const http = async (args: string[]) => {
@@ -147,7 +137,7 @@ const http = async (args: string[]) => {
         refuseAmazon(procedure);
     }
     const input = JSON.parse(flag(args, '--input') ?? (method === 'post' ? 'null' : '{}')) as unknown;
-    const headers = { Authorization: `Bearer ${DEV_LOCAL_API_KEY}` };
+    const headers = { Origin: run.dashboardBase };
     const response =
         method === 'get'
             ? await fetch(`${run.apiBase}/api/${procedure}?input=${encodeURIComponent(JSON.stringify(input))}`, { headers })
@@ -179,11 +169,10 @@ const mcp = async (args: string[]) => {
     if (run.amazonAds !== 'fake') {
         refuseAmazon(tool);
     }
-    const token = DEV_LOCAL_API_KEY;
     const input = JSON.parse(flag(args, '--input') ?? '{}') as Record<string, unknown>;
     const client = new Client({ name: 'verify-bidbeacon', version: '1.0.0' });
     const transport = new StreamableHTTPClientTransport(new URL(`${run.apiBase}/mcp`), {
-        requestInit: { headers: { Authorization: `Bearer ${token}` } },
+        requestInit: { headers: { Origin: run.dashboardBase }, redirect: 'manual' },
     });
     let body: string;
     try {
@@ -219,7 +208,13 @@ const cli = async (args: string[]) => {
     }
     const storage = join(run.dir, 'bb-storage');
     await mkdir(storage, { recursive: true });
-    const env = { ...process.env, BB_BASE_URL: run.apiBase, BB_STORAGE_DIR: storage, MERCHBASE_API_KEY: DEV_LOCAL_API_KEY };
+    const env = {
+        ...process.env,
+        NODE_ENV: 'development',
+        BB_BASE_URL: run.apiBase,
+        BB_STORAGE_DIR: storage,
+        MERCHBASE_API_KEY: 'mbk_v1.eyJjbGllbnRJZCI6ImZpeHR1cmUuYWNjZXNzIiwiY2xpZW50U2VjcmV0IjoiQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUFBQUEifQ',
+    };
     const result = await new Promise<{ code: number; stdout: string; stderr: string }>((resolve, reject) => {
         const child = spawn('bun', ['packages/bidbeacon-cli/src/index.ts', ...commandArgs], { cwd: repoRoot, env });
         let stdout = '';
@@ -300,6 +295,7 @@ const adoptOrStart = async (run: VerifyRun, kind: 'api' | 'dashboard') => {
     }
     const env = {
         ...process.env,
+        NODE_ENV: 'development',
         BIDBEACON_AMAZON_ADS_GATEWAY: 'fake',
         BIDBEACON_DASHBOARD_API_PROXY_TARGET: run.apiBase,
         BIDBEACON_DATABASE_HOST: '127.0.0.1',
@@ -356,17 +352,6 @@ const pollText = async (run: VerifyRun, text: string, absent?: string) => {
         await delay(500);
     }
     throw new Error(absent ? `Page did not show ${text} without ${absent}.` : `Page did not show ${text}.`);
-};
-
-const pollToken = async (run: VerifyRun) => {
-    for (let attempt = 0; attempt < 40; attempt += 1) {
-        const token = await sessionToken(run).catch(() => '');
-        if (token.split('.').length === 3) {
-            return token;
-        }
-        await delay(500);
-    }
-    throw new Error('Clerk session token was not available. Open the dashboard on 127.0.0.1 port 4173 or 4174 and wait for dev sign-in.');
 };
 
 const writeEvidence = async (run: VerifyRun, relativePath: string, body: string | Uint8Array) => {

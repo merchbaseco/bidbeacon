@@ -8,6 +8,9 @@ read_when:
 
 # Centralized Merchbase Access cutover
 
+This is the completed historical Clerk-to-canonical-user database cutover. Its SQL is not a Cloudflare migration procedure. The current runtime contract is [infrastructure](infrastructure.md); Cloudflare preserves these stable users and direct many-to-many advertiser memberships.
+
+
 This cutover completed in production on August 3, 2026, at
 `cd1128f831012cb1327144a3cf3f5b12e1e2bbe9`. The procedure below is retained as
 the acceptance and rollback record; do not rerun it as a routine deployment.
