@@ -6,7 +6,7 @@
 // `vitest.integration.config.ts`. `bun run check` runs both lanes; the Quality
 // workflow runs `check:fast`, the fast lane only. Add new database-backed
 // suites with the same suffix — the lane is structural, with no list to keep.
-import { applyAccessSnapshot, createCloudflareServiceAccess, type CloudflareAssertion } from '@merchbaseco/access';
+import { applyAccessSnapshot, type CloudflareAssertion, createCloudflareServiceAccess } from '@merchbaseco/access';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { advertiserAccount, userAccountAccess, userPreferences } from '@/db/schema';
 import { createAccessProjectionStore } from '@/services/access/access-projection-store';
