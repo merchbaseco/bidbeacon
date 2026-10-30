@@ -42,7 +42,6 @@ services:
       context: .
       dockerfile: Dockerfile
       target: runtime
-      args:
       secrets:
         - hugeicons_license_key
         - merchbase_npm_token
@@ -129,7 +128,6 @@ services:
       context: .
       dockerfile: Dockerfile
       target: caddy
-      args:
       secrets:
         - hugeicons_license_key
         - merchbase_npm_token
