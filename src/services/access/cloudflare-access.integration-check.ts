@@ -95,6 +95,22 @@ describe('BidBeacon real database Cloudflare cutover', () => {
             const apiPerson = await sign('api', 'person-one');
             const keyOne = await sign('api', '', 'key-one');
             const keyTwo = await sign('api', '', 'key-two');
+            const authorizeMcp = (host: string, assertion: string, extra: Record<string, string> = {}, url = '/mcp') =>
+                access.authorizeMcpRequest({ headers: { host, 'cf-access-jwt-assertion': assertion, ...extra }, method: 'POST', url });
+            for (const host of ['bidbeacon.merchbase.co', 'bidbeacon-api.merchbase.co']) {
+                await expect(authorizeMcp(host, apiPerson)).resolves.toMatchObject({ merchbaseUserId: 'mbu_one', credentialKind: 'oauth' });
+                await expect(authorizeMcp(host, person)).rejects.toMatchObject({ code: 'unauthenticated' });
+                await expect(authorizeMcp(host, apiPerson, { origin: 'https://bidbeacon.merchbase.co' })).resolves.toMatchObject({ merchbaseUserId: 'mbu_one' });
+                await expect(authorizeMcp(host, apiPerson, { origin: 'https://evil.test' })).rejects.toMatchObject({ code: 'unauthenticated' });
+                await expect(authorizeMcp(host, apiPerson, {}, '/api/trpc/public.users.getSelectedAccount')).rejects.toMatchObject({ code: 'unauthenticated' });
+            }
+            await expect(
+                access.authorizeMcpRequest({
+                    headers: { host: 'unknown.test', 'x-forwarded-host': 'bidbeacon.merchbase.co', 'cf-access-jwt-assertion': apiPerson },
+                    method: 'POST',
+                    url: '/mcp',
+                })
+            ).rejects.toMatchObject({ code: 'unauthenticated' });
             for (const assertion of [apiPerson, keyOne, keyTwo]) {
                 const authorized = await authorize('bidbeacon-api.merchbase.co', assertion);
                 expect(authorized.principal.accessibleAccountIds.sort()).toEqual([first.id, second.id].sort());

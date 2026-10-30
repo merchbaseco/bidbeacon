@@ -9,13 +9,14 @@ import { createBidBeaconMcpServer } from './server';
 const PNG_SIGNATURE = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 
 describe('BidBeacon MCP server info', () => {
-    it('advertises the website and a same-origin PNG icon', async () => {
+    it.each(['https://bidbeacon.merchbase.co', 'https://bidbeacon-api.merchbase.co'])('advertises the website and a same-origin PNG icon for %s', async origin => {
         const server = createBidBeaconMcpServer(
             createOperationContext({
                 amazonAds: createFakeAmazonAdsGateway(),
                 db: {} as never,
                 principal: { accessibleAccountIds: [], credentialKind: 'oauth', merchbaseUserId: 'mbu_server_info_test' },
-            })
+            }),
+            origin
         );
         const client = new Client({ name: 'test-client', version: '1.0.0' });
         const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
@@ -26,7 +27,7 @@ describe('BidBeacon MCP server info', () => {
                 name: 'bidbeacon',
                 title: 'BidBeacon',
                 websiteUrl: 'https://bidbeacon.merchbase.co',
-                icons: [{ src: 'https://bidbeacon-api.merchbase.co/icon.png', mimeType: 'image/png', sizes: ['128x128'] }],
+                icons: [{ src: `${origin}/icon.png`, mimeType: 'image/png', sizes: ['128x128'] }],
             });
         } finally {
             await Promise.all([client.close(), server.close()]);

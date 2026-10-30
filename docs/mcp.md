@@ -7,16 +7,16 @@ read_when:
 
 # Remote MCP
 
-BidBeacon exposes a remote, stateless MCP server at `https://bidbeacon-api.merchbase.co/mcp`.
+BidBeacon exposes a remote, stateless MCP server at `https://bidbeacon.merchbase.co/mcp` and keeps `https://bidbeacon-api.merchbase.co/mcp` as an alias.
 The endpoint uses the official TypeScript MCP SDK's Streamable HTTP transport. It is mounted in the existing Fastify API server and does not open a separate port or require a local Postgres service.
 
 ## Authentication
 
-MCP requests use a person OAuth access token through Cloudflare Access on the API hostname. The origin verifies the gateway assertion against the API audience and maps its person binding to the canonical local grant. Customer service keys cannot use MCP. Discovery is served at `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp`; the configured Cloudflare issuer is the authorization server.
+MCP requests on either exact hostname use a person OAuth access token through Cloudflare Access's API audience. The origin verifies the gateway assertion against that audience and maps its person binding to the canonical local grant. Customer service keys cannot use MCP. Discovery is served at `/.well-known/oauth-protected-resource` and `/.well-known/oauth-protected-resource/mcp` on the requested hostname; metadata and Bearer challenges keep that resource origin and advertise the configured Cloudflare issuer as the authorization server.
 
 Each request resolves a fresh canonical Merchbase User and its explicit many-to-many advertiser-account memberships. Tools other than `list_advertiser_accounts` require `accountId`; dashboard selection never grants access. Browser-origin requests accept only the product UI origin. Native clients omit cookies and Origin.
 
-Development uses the guarded offline identity on a loopback host and local database; send the local UI Origin on POST requests. No development token is minted. `BIDBEACON_MCP_RESOURCE_URL` names the HTTPS resource URL ending in `/mcp`, with no query or fragment.
+Development uses the guarded offline identity on a loopback host and local database; send the local UI Origin on POST requests. No development token is minted. `BIDBEACON_MCP_RESOURCE_URL` supplies the HTTPS resource metadata fallback for loopback development and must end in `/mcp`, with no query or fragment. Hosted discovery derives the resource from the admitted request hostname.
 
 ## Tool contract
 
@@ -28,7 +28,7 @@ Search returns paginated resource snapshots and range-aggregated resource metric
 
 The server exposes tools only. It does not expose MCP resources, prompts, sampling, Apps, stdio transport, or selected-account/session state. Input and output JSON Schemas are generated from the operation schemas. Successful calls return the same JSON value as portable text content and `structuredContent`. Operation failures use the stable `{ error: { code, message, details } }` envelope documented in [the CLI contract](cli-spec.md).
 
-Server info advertises `websiteUrl` and a 128x128 PNG icon at `https://bidbeacon-api.merchbase.co/icon.png` (SEP-973). Clients require the icon to share the `/mcp` origin and refuse SVG, so the dashboard ships raster `icon.png` and `favicon.ico` from `src/dashboard/public/`, served by the reverse proxy's static file server. Both are rendered from the lighthouse source in `design/brand/icon/` (`bun run brand:icon`).
+Server info advertises the website and a same-origin 128x128 PNG icon at `/icon.png` (SEP-973). Clients require the icon to share the `/mcp` origin and refuse SVG, so both hosted origins serve the raster `icon.png` from `src/dashboard/public/`, through the reverse proxy's static file server. The icon and `favicon.ico` are rendered from the lighthouse source in `design/brand/icon/` (`bun run brand:icon`).
 
 ## Optional Amazon Ads skill
 
@@ -38,7 +38,7 @@ The skill is optional. The MCP remains self-sufficient: tool names, generated sc
 
 ## Deployment checks
 
-The reverse proxy must forward `/mcp` and the two resource discovery paths to the API server, preserving `CF-Access-Jwt-Assertion`, `Origin`, `Accept`, `Content-Type`, `Mcp-Protocol-Version`, `Mcp-Session-Id`, and `Last-Event-ID` headers. The server is stateless, so do not add sticky-session or in-memory session requirements.
+The reverse proxy must forward `/mcp` and the two resource discovery paths for both hosted MCP hostnames to the API server, preserving the original `Host`, `CF-Access-Jwt-Assertion`, `Origin`, `Accept`, `Content-Type`, `Mcp-Protocol-Version`, `Mcp-Session-Id`, and `Last-Event-ID` headers. The server is stateless, so do not add sticky-session or in-memory session requirements.
 
 Verify without opening a listening test port:
 

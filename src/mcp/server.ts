@@ -1,11 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { CallToolRequestSchema, ErrorCode, McpError } from '@modelcontextprotocol/sdk/types.js';
 import type { OperationContext } from '@/operations/operation-context';
-import { MCP_OPERATION_DEFINITIONS, MCP_SERVER_INFO, MCP_SERVER_INSTRUCTIONS } from './operation-definitions';
+import { createMcpServerInfo, MCP_OPERATION_DEFINITIONS, MCP_SERVER_INSTRUCTIONS } from './operation-definitions';
 import { executeMcpOperation } from './tool-result';
 
-export const createBidBeaconMcpServer = (context: OperationContext) => {
-    const server = new McpServer(MCP_SERVER_INFO, {
+export const createBidBeaconMcpServer = (context: OperationContext, origin = 'https://bidbeacon-api.merchbase.co') => {
+    const server = new McpServer(createMcpServerInfo(origin), {
         capabilities: { tools: {} },
         instructions: MCP_SERVER_INSTRUCTIONS,
     });

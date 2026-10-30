@@ -28,18 +28,34 @@ describe('BidBeacon MCP HTTP routes', () => {
         await Promise.all(apps.splice(0).map(app => app.close()));
     });
 
-    it('publishes protected-resource metadata at root and /mcp well-known paths', async () => {
+    it.each([
+        ['bidbeacon.merchbase.co', 'https://bidbeacon.merchbase.co/mcp'],
+        ['bidbeacon-api.merchbase.co', resourceUrl],
+    ])('publishes host-specific metadata and initializes on %s', async (host, expectedResource) => {
         const app = await createApp();
 
         for (const url of ['/.well-known/oauth-protected-resource', '/.well-known/oauth-protected-resource/mcp']) {
-            const response = await app.inject({ method: 'GET', url });
+            const response = await app.inject({ headers: { host }, method: 'GET', url });
 
             expect(response.statusCode).toBe(200);
             expect(response.json()).toMatchObject({
                 authorization_servers: ['https://identity.test'],
-                resource: resourceUrl,
+                resource: expectedResource,
             });
         }
+
+        const challenge = await app.inject({ method: 'POST', payload: initializePayload, url: '/mcp', headers: { host } });
+        expect(challenge.statusCode).toBe(401);
+        expect(challenge.headers['www-authenticate']).toContain(`resource_metadata="https://${host}/.well-known/oauth-protected-resource/mcp"`);
+
+        const initialized = await app.inject({
+            headers: { accept: 'application/json, text/event-stream', host, 'cf-access-jwt-assertion': 'oat_test', 'content-type': 'application/json' },
+            method: 'POST',
+            payload: initializePayload,
+            url: '/mcp',
+        });
+        expect(initialized.statusCode).toBe(200);
+        expect(initialized.body).toContain(`https://${host}/icon.png`);
     });
 
     it('returns an RFC 9728 discovery challenge without a bearer token', async () => {
@@ -53,10 +69,24 @@ describe('BidBeacon MCP HTTP routes', () => {
     it('rejects insecure remote origins before authentication', async () => {
         const authorize = vi.fn();
         const app = await createApp({ authorize });
-        const response = await app.inject({ headers: { origin: 'http://attacker.example' }, method: 'POST', payload: initializePayload, url: '/mcp' });
+        const response = await app.inject({ headers: { host: 'bidbeacon-api.merchbase.co', origin: 'http://attacker.example' }, method: 'POST', payload: initializePayload, url: '/mcp' });
 
         expect(response.statusCode).toBe(403);
         expect(response.json()).toEqual({ error: 'Invalid Origin' });
+        expect(authorize).not.toHaveBeenCalled();
+    });
+
+    it('rejects untrusted hosts and ignores forwarded-host hints', async () => {
+        const authorize = vi.fn();
+        const app = await createApp({ authorize });
+        const response = await app.inject({
+            headers: { host: 'attacker.example', 'x-forwarded-host': 'bidbeacon.merchbase.co' },
+            method: 'POST',
+            payload: initializePayload,
+            url: '/mcp',
+        });
+
+        expect(response.statusCode).toBe(404);
         expect(authorize).not.toHaveBeenCalled();
     });
 

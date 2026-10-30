@@ -12,6 +12,7 @@ import { getDatabaseUrl } from '@/db/database-config';
 import type { Database } from '@/db/index';
 import { db } from '@/db/index';
 import { userAccountAccess } from '@/db/schema';
+import { bidBeaconMcpOriginForHost, isAllowedMcpOrigin, isBidBeaconMcpPath } from '@/mcp/host-policy';
 import { disconnectUserConnections } from '@/utils/events';
 import { createAccessProjectionStore } from './access-projection-store';
 
@@ -90,6 +91,33 @@ export const createBidBeaconAccess = (options: { database: Database; env?: Recor
             credentialKind: interactive ? ('session' as const) : resolved.credentialKind === 'person' ? ('oauth' as const) : ('api_key' as const),
         };
     };
+    const authorizeMcpRequest = async (request: { headers: Record<string, string | string[] | undefined>; method: string; url: string }) => {
+        if (request.headers['x-merchbase-user-id']) {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        const host = request.headers.host;
+        const origin = request.headers.origin;
+        const mcpOrigin = typeof host === 'string' ? bidBeaconMcpOriginForHost(host, env.NODE_ENV) : null;
+        if (!(mcpOrigin && isBidBeaconMcpPath(request.url)) || Array.isArray(origin)) {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        const local = mcpOrigin.startsWith('http:');
+        if ((local && request.method !== 'GET' && !isLocalOrigin(origin)) || (origin && (local ? !isLocalOrigin(origin) : !isAllowedMcpOrigin(origin, env.NODE_ENV)))) {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        if (local && devAccess) {
+            return { ...(await devAccess.authorize()), credentialKind: 'session' as const, expiresAt: Date.now() + 3_600_000 };
+        }
+        const assertion = request.headers['cf-access-jwt-assertion'];
+        if (typeof assertion !== 'string') {
+            throw new ServiceAccessError('unauthenticated');
+        }
+        const resolved = await apiAccess.authorize(assertion);
+        return {
+            ...resolved,
+            credentialKind: resolved.credentialKind === 'person' ? ('oauth' as const) : ('api_key' as const),
+        };
+    };
     const internalVerifier = development ? null : verifier(required(env, 'MERCHBASE_ACCESS_BIDBEACON_INTERNAL_AUDIENCE'), 600);
     const authorityClientId = development ? '' : required(env, 'MERCHBASE_ACCESS_AUTHORITY_CLIENT_ID');
     const authorizeSnapshot = async (assertion: string) => {
@@ -122,7 +150,7 @@ export const createBidBeaconAccess = (options: { database: Database; env?: Recor
               },
           })
         : null;
-    return { apiAccess, sessionAccess, projections, authorizeRequest, initialize, projectionHandler, authorizeSnapshot };
+    return { apiAccess, sessionAccess, projections, authorizeRequest, authorizeMcpRequest, initialize, projectionHandler, authorizeSnapshot };
 };
 export type BidBeaconAccess = ReturnType<typeof createBidBeaconAccess>;
 let defaultAccess: BidBeaconAccess | null = null;

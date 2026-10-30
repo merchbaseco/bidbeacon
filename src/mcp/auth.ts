@@ -10,7 +10,7 @@ export type McpAuthorizedPrincipal = {
     merchbaseUserId: string;
 };
 
-export type McpAuthRequest = { headers: Record<string, string | string[] | undefined>; method: string };
+export type McpAuthRequest = { headers: Record<string, string | string[] | undefined>; method: string; url: string };
 
 export type McpAuthDependencies = {
     authorize: (token: string, request?: McpAuthRequest) => Promise<McpAuthorizedPrincipal>;
@@ -22,12 +22,12 @@ export type McpAuthResult =
     | { status: 'unauthorized' }
     | { status: 'unavailable' };
 
-export const createBidBeaconMcpAuth = (access: Pick<BidBeaconAccess, 'authorizeRequest'>): McpAuthDependencies => ({
+export const createBidBeaconMcpAuth = (access: Pick<BidBeaconAccess, 'authorizeMcpRequest'>): McpAuthDependencies => ({
     authorize: async (_assertion, request) => {
         if (!request) {
             throw new ServiceAccessError('unauthenticated');
         }
-        const authorized = await access.authorizeRequest(request);
+        const authorized = await access.authorizeMcpRequest(request);
         if (authorized.credentialKind === 'api_key') {
             throw new ServiceAccessError('unauthenticated');
         }

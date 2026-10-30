@@ -14,6 +14,7 @@ import { applyProductionMigrations, createTestDatabase, type TestDatabase } from
 import { recordAmsPoll } from '@/worker/record-ams-poll';
 
 const productionShapeTag = '0062_light_roulette';
+const primaryKeyRepairTag = '0063_repair_worker_control_pkey';
 const polledAt = new Date('2026-10-11T17:46:00.000Z');
 const polledAgainAt = new Date('2026-10-11T18:00:00.000Z');
 
@@ -37,7 +38,7 @@ describe('worker_control primary key', () => {
                     ('main', true, 9, '2026-01-17 05:12:21.931591+00'),
                     ('other', true, 1, '2026-02-01 00:00:00+00')
             `);
-            await applyProductionMigrations(client, { fromTag: productionShapeTag });
+            await applyProductionMigrations(client, { fromTag: productionShapeTag, throughTag: primaryKeyRepairTag });
 
             await recordAmsPoll(db as never, polledAt);
 
@@ -59,7 +60,7 @@ describe('worker_control primary key', () => {
             ]);
             expect(await primaryKeyDefinition(client)).toBe('PRIMARY KEY (id)');
 
-            await applyProductionMigrations(client, { fromTag: productionShapeTag });
+            await applyProductionMigrations(client, { fromTag: productionShapeTag, throughTag: primaryKeyRepairTag });
             await recordAmsPoll(db as never, polledAgainAt);
 
             expect(await controlRows(db)).toEqual([

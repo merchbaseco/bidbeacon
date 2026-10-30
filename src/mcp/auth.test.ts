@@ -71,18 +71,29 @@ describe('BidBeacon MCP authentication', () => {
     });
 
     it('uses only the shared OAuth access adapter', async () => {
-        const authorize = vi.fn().mockResolvedValue({
+        const authorizeMcpRequest = vi.fn().mockResolvedValue({
             credentialKind: 'oauth',
             merchbaseUserId: 'mbu_test',
             principal: { accessibleAccountIds: [accessibleAccountId] },
         });
-        const dependencies = createBidBeaconMcpAuth({ authorizeRequest: authorize } as never);
+        const dependencies = createBidBeaconMcpAuth({ authorizeMcpRequest } as never);
 
-        await expect(authenticateMcpRequest(`Bearer ${oauthToken}`, dependencies, { headers: {}, method: 'POST' })).resolves.toMatchObject({
+        await expect(authenticateMcpRequest(`Bearer ${oauthToken}`, dependencies, { headers: {}, method: 'POST', url: '/mcp' })).resolves.toMatchObject({
             accessibleAccountIds: [accessibleAccountId],
             merchbaseUserId: 'mbu_test',
             status: 'authenticated',
         });
-        expect(authorize).toHaveBeenCalledWith({ headers: {}, method: 'POST' });
+        expect(authorizeMcpRequest).toHaveBeenCalledWith({ headers: {}, method: 'POST', url: '/mcp' });
+    });
+
+    it('rejects shared API keys even when the API access adapter accepts them', async () => {
+        const authorizeMcpRequest = vi.fn().mockResolvedValue({
+            credentialKind: 'api_key',
+            merchbaseUserId: 'mbu_test',
+            principal: { accessibleAccountIds: [accessibleAccountId] },
+        });
+        const dependencies = createBidBeaconMcpAuth({ authorizeMcpRequest } as never);
+
+        await expect(authenticateMcpRequest(`Bearer ${oauthToken}`, dependencies, { headers: {}, method: 'POST', url: '/mcp' })).resolves.toEqual({ status: 'unauthorized' });
     });
 });
