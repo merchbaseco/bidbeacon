@@ -69,7 +69,7 @@ const account = await resolveAdvertiserAccount(context, { accountId: input.accou
 
 ### API Keys & CLI
 
-Suite API keys are managed by Merchbase Account Center, use the shared `ak_...` convention, and are used by the `bb` CLI and API-key automation. BidBeacon has no product-local key issuer, verifier, route, table, or header.
+Suite API keys are managed by Merchbase Account Center and use the native `mbk_v1` envelope accepted by the public API client and `bb` CLI. BidBeacon has no product-local key issuer, verifier, route, table, or header.
 - `src/services/access/bidbeacon-access.ts` - Shared session, OAuth, and API-key adapters for fixed service `bidbeacon`
 - `packages/bidbeacon-cli/src/auth.ts` - `MERCHBASE_API_KEY` and shared Keychain convention
 - `packages/bidbeacon-cli/src/index.ts` - CLI entrypoint for the globally installed `bb` binary (`@bidbeacon/cli`)
