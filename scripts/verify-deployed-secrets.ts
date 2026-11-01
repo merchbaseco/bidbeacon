@@ -10,9 +10,8 @@ import { readFileSync } from 'node:fs';
  * process (they are part of the inspect output) but are split off at the first
  * `=` and never printed, logged, or returned — only names leave.
  *
- * The inspect output is read as JSON rather than line-split text: BidBeacon
- * delivers a multi-line PEM (MERCHBASE_CLERK_JWT_KEY), and a naive line split
- * turns each continuation line into a bogus "delivered name".
+ * Parse Docker's JSON environment array before extracting names, so each
+ * delivered variable remains one entry regardless of its value's contents.
  *
  * Fails when a delivered name is not a schema item (a stale name surviving a
  * rename), or when a production-required sensitive item never reached the
