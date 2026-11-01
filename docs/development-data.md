@@ -110,11 +110,9 @@ script) for the same loopback-only database and synthetic seed as Cursor. Runnin
 cached. The shared environment and credential flow live in the agents
 repository's `docs/cloud-environments.md`.
 
-For dashboard verification, the Claude environment must also allow
-`tolerant-roughy-27.clerk.accounts.dev` for the development sign-in page and
-`api.clerk.com` for the API's short-lived development sign-in ticket. Allowing
-only the frontend host leaves the dashboard at the sign-in form. These are
-network settings in the saved Claude environment, not repository secrets.
+The cloud dashboard uses the SDK's guarded local identity and makes no external
+sign-in or ticket request. No identity-provider host needs to be added to the
+Claude environment for dashboard sign-in.
 
 The hook selects the fake Amazon Ads gateway. To start the app and capture
 proof, invoke `/verify-bidbeacon`; `.claude/skills/verify-bidbeacon` exposes

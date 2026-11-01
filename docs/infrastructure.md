@@ -135,7 +135,7 @@ from the environment it hands a `varlock run` child even when the parent shell
 exported one, so an internal-marked knob could never reach the dev server it
 configures.
 
-Development authorization is offline and requires `NODE_ENV=development` plus a loopback database before any migrations. See [development data](development-data.md). Production uses separate Cloudflare interactive, API and BidBeacon internal audiences. The server receives its own snapshot/S2S service credential; the AMS worker receives only the authority origin and evaluates canonical grants locally with explicit memberships. All names and lifecycle references live in `.env.schema`.
+Development authorization is offline and requires `NODE_ENV=development` plus a loopback database before any migrations. See [development data](development-data.md). Production uses Cloudflare Access with Google sign-in and separate interactive, API and BidBeacon internal audiences. The server receives its own snapshot/S2S service credential; the AMS worker receives only the authority origin and evaluates canonical grants locally with explicit memberships. All names and lifecycle references live in `.env.schema`.
 
 The authority pushes snapshots to `POST https://bidbeacon-internal.merchbase.co/api/internal/access-snapshot`. Exact raw Host, internal audience and authority service identity are checked before body parsing. Snapshots retain monotonic tombstones and close active realtime connections for reauthorization. Cold identity misses may fetch the authority snapshot; ordinary authorization and worker checks read local projections.
 

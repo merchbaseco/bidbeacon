@@ -1,14 +1,18 @@
 ---
-summary: Approval-gated production procedure for the BidBeacon Merchbase Access migration and deleted-subject cleanup.
+summary: Historical approval-gated record of BidBeacon's Clerk-to-canonical-user database migration and deleted-subject cleanup.
 read_when:
-  - changing BidBeacon authentication or membership ownership
-  - preparing the centralized Merchbase Access cutover
-  - changing the server/worker production maintenance procedure
+  - reviewing the completed Clerk-era database migration or its rollback record
+  - changing stable-user membership ownership
 ---
 
 # Centralized Merchbase Access cutover
 
 This is the completed historical Clerk-to-canonical-user database cutover. Its SQL is not a Cloudflare migration procedure. The current runtime contract is [infrastructure](infrastructure.md); Cloudflare preserves these stable users and direct many-to-many advertiser memberships.
+
+> Historical runbook: this procedure was executed on August 3, 2026, before
+> BidBeacon's production authentication moved to Cloudflare Access with Google
+> sign-in. The Clerk setup, approval gates, and rollback steps below record that
+> database migration; they are not current authentication or deployment steps.
 
 
 This cutover completed in production on August 3, 2026, at
@@ -17,7 +21,7 @@ the acceptance and rollback record; do not rerun it as a routine deployment.
 Any future production migration, backfill, or rollback still requires explicit
 operator approval and a named database owner.
 
-The target state has one authentication contract: the shared `@merchbaseco/access` package with fixed service `bidbeacon`. BidBeacon accepts Clerk web sessions, suite `ak_...` API keys, and the shared OAuth credential path. Authorization resolves a stable `mbu_...` Merchbase User through the product-local `user_account_access` projection. The old `bbk_` issuer/verifier, header, routes, UI, environment variable, and tables do not exist after cutover.
+At that time, the new contract used the shared `@merchbaseco/access` package with fixed service `bidbeacon`. It accepted Clerk web sessions, suite `ak_...` API keys, and the shared OAuth credential path, resolving authorization through the product-local `user_account_access` projection for each stable `mbu_...` Merchbase User. BidBeacon's current Cloudflare contract is in [Infrastructure](infrastructure.md).
 
 ## Advertiser Account UUID projection
 

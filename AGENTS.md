@@ -42,7 +42,7 @@ Both share the same PostgreSQL database.
 
 ### Authentication & Multi-Tenancy
 
-Uses the shared `@merchbaseco/access` package for Clerk web sessions, suite API keys, and OAuth credentials. BidBeacon keeps a product-local Access Projection and resolves stable Merchbase Users to advertiser memberships:
+Uses Cloudflare Access for browser sign-in through the approved Google identity provider. The shared `@merchbaseco/access` package verifies Access assertions, suite API keys, and OAuth credentials. BidBeacon keeps a product-local Access Projection and resolves stable Merchbase Users to advertiser memberships:
 
 ```
 Merchbase User (merchbase_user_id)
@@ -53,12 +53,12 @@ Merchbase User (merchbase_user_id)
 
 **Key files:**
 - `src/services/access/bidbeacon-access.ts` - Fixed `bidbeacon` shared-access adapters and stable-user membership resolver
-- `src/services/access/access-projection-store.ts` - Verified, idempotent, monotonic Clerk projection persistence
+- `src/services/access/access-projection-store.ts` - Verified, idempotent, monotonic Cloudflare snapshot projection persistence
 - `src/api/context.ts` - Normalizes shared credentials, exposes canonical Advertiser Account UUIDs, and retains legacy Amazon IDs for the old adapters
 - `src/operations/advertiser-accounts.ts` - Canonical Advertiser Account UUID discovery and authorization
 - `src/api/trpc.ts` - Legacy tRPC adapters use the Amazon-ID `assertAccountAccess(accountId)` bridge through PRD-185
 - `src/db/schema.ts` - Stable-user memberships and Access Projection/event tables
-- `src/api/access/clerk-webhook-route.ts` - Signed Clerk projection webhook
+- `src/index.ts` - Exact-host internal snapshot route; `src/services/access/bidbeacon-access.ts` verifies and applies Cloudflare snapshots
 
 **Shared operation access-control pattern:**
 ```typescript
@@ -79,11 +79,11 @@ Suite API keys are managed by Merchbase Account Center, use the shared `ak_...` 
 ### Procedures & Routers
 
 - `publicProcedure` - no auth
-- `privateProcedure` - Clerk web session only
+- `privateProcedure` - Cloudflare interactive Access session only
 - `apiProcedure` - shared session, OAuth, or API-key auth
 
 **Router split:**
-- Clerk/private routers live in `src/api/app/*`
+- Interactive-session private routers live in `src/api/app/*`
 - Public shared-credential routers live in `src/api/public/*` and are mounted under `api.*`
 
 ---
@@ -462,4 +462,4 @@ counts, through-day — and boot scripts must not swallow it.
 
 See `docs/development-data.md`, and "Development-only knobs" in
 `docs/infrastructure.md` for `BIDBEACON_DEV_HOST` and
-`BIDBEACON_DEV_CLERK_SIGN_IN_USER_ID`.
+`DEV_SIGN_IN_MERCHBASE_USER_ID` from `@merchbaseco/access/dev`.
