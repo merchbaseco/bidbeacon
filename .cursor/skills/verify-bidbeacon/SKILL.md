@@ -35,7 +35,7 @@ Run doctor before driving whenever a command looks wrong. Exit 0 means the API l
 
 Read `features/README.md` and follow one feature file. Commands below are the verbs. The feature file has the exact arguments.
 
-Browser commands talk to headless Chrome through the DevTools socket. They use accessible names, not coordinates.
+Browser commands talk to headless Chrome through the DevTools socket. They use accessible names, not coordinates. Chrome keeps its sandbox: the helper starts the packaged binary as the current non-root user and never passes `--no-sandbox`. Do not point it at the Cursor PATH `google-chrome` wrapper; that wrapper disables the sandbox.
 
 ```bash
 .cursor/skills/verify-bidbeacon/control-bidbeacon browser open --url http://127.0.0.1:4174/

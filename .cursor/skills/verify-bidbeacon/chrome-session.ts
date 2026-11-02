@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import { existsSync } from 'node:fs';
 import { mkdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { VerifyRun } from './constants';
@@ -16,19 +17,10 @@ export const ensureChrome = async (run: VerifyRun) => {
     }
     const chromeDir = join(run.dir, 'chrome');
     await mkdir(chromeDir, { recursive: true });
+    // Prefer the packaged binary so a PATH wrapper cannot re-add --no-sandbox.
     const child = spawn(
-        'google-chrome',
-        [
-            '--headless=new',
-            '--no-sandbox',
-            '--disable-gpu',
-            '--disable-dev-shm-usage',
-            '--no-first-run',
-            '--no-default-browser-check',
-            `--user-data-dir=${chromeDir}`,
-            '--remote-debugging-port=0',
-            'about:blank',
-        ],
+        chromeExecutable(),
+        ['--headless=new', '--disable-gpu', '--disable-dev-shm-usage', '--no-first-run', '--no-default-browser-check', `--user-data-dir=${chromeDir}`, '--remote-debugging-port=0', 'about:blank'],
         { detached: true, stdio: 'ignore' }
     );
     child.unref();
@@ -135,6 +127,16 @@ const evaluate = async (run: VerifyRun, expression: string, awaitPromise = false
         throw new Error('Page evaluation failed.');
     }
     return result.result?.value;
+};
+
+const chromeExecutable = () => {
+    if (existsSync('/usr/bin/google-chrome-stable')) {
+        return '/usr/bin/google-chrome-stable';
+    }
+    if (existsSync('/usr/bin/google-chrome')) {
+        return '/usr/bin/google-chrome';
+    }
+    return 'google-chrome';
 };
 
 const chromePort = async (chromeDir: string) => {
