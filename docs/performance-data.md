@@ -24,3 +24,5 @@ To align with the Amazon Ads console:
 - Prefer `performance_daily` for day/month ranges (This Week/Month/Year, Last 30 Days, custom ranges > 1 day).
 
 If you see mismatches versus Amazon for historical dates, validate against `performance_daily` first.
+
+Daily totals for the most recent closed dates are refreshed at T+1, T+2 and T+3 (see `report-state-machine.md`), so late-attributed purchases can be missing for up to about a day. For today and yesterday, read orders from the hourly projection.
