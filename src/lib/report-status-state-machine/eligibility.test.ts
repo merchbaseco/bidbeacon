@@ -66,11 +66,7 @@ describe('report refresh scheduling', () => {
         const periodStart = localDate(2026, 11, 5);
         const schedule = getRefreshSchedule(periodStart, 'daily', 'US');
 
-        expect(schedule.slice(0, 3).map(milestone => milestone.toISOString())).toEqual([
-            '2026-11-06T08:00:00.000Z',
-            '2026-11-07T08:00:00.000Z',
-            '2026-11-08T08:00:00.000Z',
-        ]);
+        expect(schedule.slice(0, 3).map(milestone => milestone.toISOString())).toEqual(['2026-11-06T08:00:00.000Z', '2026-11-07T08:00:00.000Z', '2026-11-08T08:00:00.000Z']);
         expect(getNextRefreshTime({ reportId: null, periodStart, aggregation: 'daily', lastReportCreatedAt: new Date('2026-11-06T08:00:14.557Z'), countryCode: 'US' })?.toISOString()).toBe(
             '2026-11-07T08:00:00.000Z'
         );
