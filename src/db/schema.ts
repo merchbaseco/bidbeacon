@@ -232,6 +232,9 @@ export const reportDatasetMetadata = pgTable(
  * Each table stores performance data exactly as reported by Amazon at that resolution.
  * We do not derive higher-level aggregates from lower-level data, since different
  * reports can have different backfill windows and may not perfectly reconcile.
+ * Exception: performance_daily Target rows for today and the two most recent closed
+ * dates are re-derived from performance_hourly when it is fresher than the daily
+ * report (see docs/performance-data.md, Source Precedence).
  *
  * Time columns:
  *   - bucketStart (TIMESTAMPTZ, UTC)
@@ -554,8 +557,14 @@ export const amsSpTraffic = pgTable(
         clicks: bigint('clicks', { mode: 'number' }).notNull(),
         impressions: bigint('impressions', { mode: 'number' }).notNull(),
         cost: doublePrecision('cost').notNull(),
+        // When the worker last stored this message; proves Stream data is still arriving.
+        receivedAt: timestamp('received_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     },
-    table => [primaryKey({ columns: [table.idempotencyId] }), index('ams_sp_traffic_time_window_start_idx').on(table.timeWindowStart)]
+    table => [
+        primaryKey({ columns: [table.idempotencyId] }),
+        index('ams_sp_traffic_time_window_start_idx').on(table.timeWindowStart),
+        index('ams_sp_traffic_advertiser_received_idx').on(table.advertiserId, table.receivedAt),
+    ]
 );
 
 export const amsSpConversion = pgTable(
@@ -615,8 +624,14 @@ export const amsSpConversion = pgTable(
         attributedUnitsOrdered30dSameSku: bigint('attributed_units_ordered_30d_same_sku', {
             mode: 'number',
         }),
+        // When the worker last stored this message; proves Stream data is still arriving.
+        receivedAt: timestamp('received_at', { withTimezone: true, mode: 'date' }).notNull().defaultNow(),
     },
-    table => [primaryKey({ columns: [table.idempotencyId] }), index('ams_sp_conversion_time_window_start_idx').on(table.timeWindowStart)]
+    table => [
+        primaryKey({ columns: [table.idempotencyId] }),
+        index('ams_sp_conversion_time_window_start_idx').on(table.timeWindowStart),
+        index('ams_sp_conversion_advertiser_received_idx').on(table.advertiserId, table.receivedAt),
+    ]
 );
 
 export const amsBudgetUsage = pgTable(

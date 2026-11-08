@@ -1,7 +1,8 @@
 /**
  * Job: Summarize hourly target stream data from AMS into performanceHourly table for a specific account.
  * Aggregates delta data from amsSpConversion and amsSpTraffic for the trailing 24 hours
- * into performanceHourly, grouped by hour.
+ * into performanceHourly, grouped by hour, then asks the daily refresh to re-derive
+ * performance_daily dates whose hourly data is now the freshest source.
  */
 
 import { formatInTimeZone } from 'date-fns-tz';
@@ -12,6 +13,7 @@ import { withDatabaseRetry } from '@/db/retry';
 import { advertiserAccount, amsSpConversion, amsSpTraffic, performanceHourly } from '@/db/schema';
 import { gateAccountWork } from '@/jobs/account-access-gate';
 import { boss } from '@/jobs/boss';
+import { summarizeDailyTargetStreamForAccountJob } from '@/jobs/summarize-daily-target-stream-for-account';
 import { getHourlyStreamOwnershipStart, zonedTopOfHour } from '@/utils/date';
 import { type JobMetricsRecorder, withJobMetrics } from '@/utils/job-metrics';
 import { getTimezoneForCountry } from '@/utils/timezones';
@@ -26,8 +28,8 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
     .input(jobInputSchema)
     .work(async jobs => {
         await Promise.all(
-            jobs.map(job =>
-                withJobMetrics(
+            jobs.map(async job => {
+                const rolledUp = await withJobMetrics(
                     {
                         jobName: 'summarize-hourly-target-stream-for-account',
                         bossJobId: job.id,
@@ -37,12 +39,18 @@ export const summarizeHourlyTargetStreamForAccountJob = boss
                     },
                     async recorder => {
                         if (!(await gateAccountWork({ accountId: job.data.accountId, countryCode: job.data.countryCode, recorder }))) {
-                            return;
+                            return false;
                         }
-                        return summarizeHourlyForAccount(job.data.accountId, job.data.countryCode, recorder);
+                        await summarizeHourlyForAccount(job.data.accountId, job.data.countryCode, recorder);
+                        return true;
                     }
-                )
-            )
+                );
+
+                // The rollup's job metric is final here, so the daily refresh sees it as the Stream as-of time.
+                if (rolledUp) {
+                    await summarizeDailyTargetStreamForAccountJob.emit({ accountId: job.data.accountId, countryCode: job.data.countryCode });
+                }
+            })
         );
     });
 

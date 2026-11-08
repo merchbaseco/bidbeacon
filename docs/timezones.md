@@ -42,7 +42,7 @@ Notes:
 
 - `ams_sp_*` tables store `time_window_start` as `timestamptz` (Date from the payload string).
 - `summarize-hourly-*` converts `time_window_start` to `bucketDate`/`bucketHour` using the account timezone.
-- `summarize-daily-*` selects the account-local day window and aggregates AMS rows into `performance_daily`.
+- `summarize-daily-*` re-derives `performance_daily` Target rows from `performance_hourly` for today and the two most recent closed dates when hourly data is fresher. It sums hourly buckets whose `bucket_start` falls in the account-local day window, so DST dates sum 23 or 25 hours.
 
 ### UI / API usage
 
