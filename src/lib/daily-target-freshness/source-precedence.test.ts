@@ -33,8 +33,8 @@ describe('resolveStreamAsOf', () => {
         expect(resolveStreamAsOf({ hasEntityId: true, rollupStartedAt: STREAM_ROLLUP, latestReceivedAt: new Date('2026-11-08T06:06:00.000Z'), now: NOW })).toEqual(STREAM_ROLLUP);
     });
 
-    it('treats Stream as not fresh when no AMS message arrived in the last 30 minutes, so the daily report wins', () => {
-        const streamAsOf = resolveStreamAsOf({ hasEntityId: true, rollupStartedAt: STREAM_ROLLUP, latestReceivedAt: new Date('2026-11-08T05:37:00.000Z'), now: NOW });
+    it('treats Stream as not fresh when no AMS message arrived in the last 90 minutes, so the daily report wins', () => {
+        const streamAsOf = resolveStreamAsOf({ hasEntityId: true, rollupStartedAt: STREAM_ROLLUP, latestReceivedAt: new Date('2026-11-08T04:30:00.000Z'), now: NOW });
         expect(streamAsOf).toBeNull();
 
         const decision = chooseDailyTargetSource({

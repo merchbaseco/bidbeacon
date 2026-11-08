@@ -102,12 +102,12 @@ describe('refreshDailyTargetPerformance', () => {
         expect(await dailyRows(database, ACCOUNT_ID, '2026-11-07')).toMatchObject([{ bucketStart: '2026-11-07T08:00:00.000Z', entityId: 'target-1', clicks: 3, spend: '1.30' }]);
     });
 
-    it('does not trust a successful rollup when no AMS message arrived for the advertiser in 30 minutes', async () => {
+    it('does not trust a successful rollup when no AMS message arrived for the advertiser in 90 minutes', async () => {
         database = await seedToday();
         await database.db.insert(advertiserAccount).values(account());
         await database.db.insert(jobMetrics).values(rollup(ACCOUNT_ID, '2026-11-08T06:05:00.000Z'));
-        await database.db.insert(amsSpTraffic).values([trafficMessage('ENTITY-TEST', '2026-11-08T05:30:00.000Z'), trafficMessage('ENTITY-OTHER', '2026-11-08T06:06:00.000Z', 'other-message')]);
-        await database.db.insert(amsSpConversion).values(conversionMessage('ENTITY-TEST', '2026-11-08T05:35:00.000Z'));
+        await database.db.insert(amsSpTraffic).values([trafficMessage('ENTITY-TEST', '2026-11-08T04:30:00.000Z'), trafficMessage('ENTITY-OTHER', '2026-11-08T06:06:00.000Z', 'other-message')]);
+        await database.db.insert(amsSpConversion).values(conversionMessage('ENTITY-TEST', '2026-11-08T04:35:00.000Z'));
 
         const stale = await refreshDailyTargetPerformance({ database: database.db, accountId: ACCOUNT_ID, countryCode: 'US', now: NOW });
         expect(stale.find(result => result.bucketDate === '2026-11-07')).toMatchObject({ outcome: 'kept-daily-report', decision: { reason: 'no-hourly-data', streamAsOf: null } });

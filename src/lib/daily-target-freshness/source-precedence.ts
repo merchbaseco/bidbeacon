@@ -7,7 +7,8 @@ import { getHourlyStreamOwnershipStart, zonedAddDays, zonedStartOfDay, zonedSubt
  */
 const FRESHNESS_WINDOW_DAYS = 3;
 /** Without an AMS message stored this recently, Stream data is not treated as fresh. */
-const STREAM_RECEIPT_MAX_AGE_MS = 30 * 60 * 1000;
+// AMS traffic arrives in hourly bursts with 20-40 minute gaps; 90 minutes tolerates a healthy gap and still catches a stalled Stream.
+const STREAM_RECEIPT_MAX_AGE_MS = 90 * 60 * 1000;
 
 type ReportFreshness = {
     lastReportCreatedAt: Date | null;
@@ -51,7 +52,7 @@ export const getFreshnessDates = (now: Date, timezone: string): FreshnessDate[] 
  * The instant Stream-derived hourly data reflects, or null when Stream cannot be trusted as fresh.
  * A successful rollup only proves the job ran; the data is as fresh as the older of the rollup start
  * and the latest AMS message actually stored for the advertiser. An account without an entity id
- * has no Stream, and no AMS message in the last 30 minutes means Stream is not fresh.
+ * has no Stream, and no AMS message in the last 90 minutes means Stream is not fresh.
  */
 export const resolveStreamAsOf = (input: { hasEntityId: boolean; rollupStartedAt: Date | null; latestReceivedAt: Date | null; now: Date }): Date | null => {
     if (!(input.hasEntityId && input.rollupStartedAt && input.latestReceivedAt)) {
