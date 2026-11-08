@@ -132,7 +132,7 @@
     "vitest": "4.1.6"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=24.22.1"
   },
   "overrides": {
     "ajv": "8.20.0",
@@ -147,7 +147,7 @@
     "vite": "7.3.3",
     "ws": "8.20.1"
   },
-  "packageManager": "bun@1.4.2",
+  "packageManager": "bun@1.4.4",
   "optionalDependencies": {
     "@hugeicons-pro/core-solid-rounded": "4.1.0",
     "@hugeicons-pro/core-stroke-rounded": "4.0.0"

@@ -63,7 +63,7 @@ jobs:
       health_urls: https://bidbeacon.merchbase.co/api/live
       published_packages: packages/bidbeacon-api-client:@bidbeacon/http-client,packages/bidbeacon-cli:@bidbeacon/cli
       publish_provenance: true
-      bun_version: "1.4.2"
+      bun_version: "1.4.4"
       prepublish_command: bun run api-client:build && bun run cli:build
       release_token_env_name: RELEASE_AGENT_TOOLING_OP_TOKEN
       release_switch_env_name: BIDBEACON_RESOLVE_RELEASE_TOKENS
