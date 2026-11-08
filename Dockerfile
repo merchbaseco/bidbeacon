@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.10
-FROM oven/bun:1.4.2-alpine AS base
+FROM oven/bun:1.4.4-alpine AS base
 WORKDIR /app
 RUN apk add --no-cache libc6-compat
 
@@ -23,7 +23,7 @@ RUN --mount=type=secret,id=hugeicons_license_key,env=MERCHBASE_HUGEICONS_LICENSE
     --mount=type=secret,id=merchbase_npm_token,env=MERCHBASE_GITHUB_NPM_TOKEN,required=true \
     bun install --frozen-lockfile --production
 
-FROM node:20-alpine AS runtime
+FROM node:24.22.2-alpine AS runtime
 WORKDIR /app
 ENV NODE_ENV=production
 RUN apk add --no-cache dumb-init \
