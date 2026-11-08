@@ -58,7 +58,22 @@ describe('report refresh scheduling', () => {
         const schedule = getRefreshSchedule(periodStart, 'daily', 'US');
 
         expect(schedule[0]?.toISOString()).toBe('2026-03-08T08:00:00.000Z');
-        expect(schedule[1]?.toISOString()).toBe('2026-03-10T07:00:00.000Z');
+        expect(schedule[1]?.toISOString()).toBe('2026-03-09T07:00:00.000Z');
+        expect(schedule[2]?.toISOString()).toBe('2026-03-10T07:00:00.000Z');
+    });
+
+    it('refreshes a closed daily dataset on each of the first three local days', () => {
+        const periodStart = localDate(2026, 11, 5);
+        const schedule = getRefreshSchedule(periodStart, 'daily', 'US');
+
+        expect(schedule.slice(0, 3).map(milestone => milestone.toISOString())).toEqual([
+            '2026-11-06T08:00:00.000Z',
+            '2026-11-07T08:00:00.000Z',
+            '2026-11-08T08:00:00.000Z',
+        ]);
+        expect(getNextRefreshTime({ reportId: null, periodStart, aggregation: 'daily', lastReportCreatedAt: new Date('2026-11-06T08:00:14.557Z'), countryCode: 'US' })?.toISOString()).toBe(
+            '2026-11-07T08:00:00.000Z'
+        );
     });
 
     it('polls an in-flight report five minutes from now', () => {

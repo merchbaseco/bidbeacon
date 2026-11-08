@@ -68,7 +68,7 @@ The `getNextAction` function determines what action to take:
 
 Reports are eligible for refresh at specific time offsets after the dataset timestamp:
 
-- **Daily reports**: local-calendar T+1, T+3, T+5, T+7, T+14, T+30, T+60 days
+- **Daily reports**: local-calendar T+1, T+2, T+3, T+5, T+7, T+14, T+30, T+60 days. Amazon keeps attributing conversions to a date for 14 days, so T+2 keeps `performance_daily` from freezing at the first post-close snapshot for two days. Cost: one extra daily report per account per date; no other cadence changes.
 - **Hourly-grain reports**: every 3 hours during the first day after the local date closes, then local-calendar T+3 days, T+7 days, and T+13 days 21 hours
 
 All milestones are constructed in the account timezone and stored as UTC instants. They therefore remain on the intended local clock across daylight-saving transitions.

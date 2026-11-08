@@ -2,7 +2,8 @@ import { AGGREGATION_TYPES, type AggregationType } from '@/types/reports';
 import { zonedAddDays, zonedAddHours } from '@/utils/date';
 import { getTimezoneForCountry } from '@/utils/timezones';
 
-const DAILY_REFRESH_DAYS = [1, 3, 5, 7, 14, 30, 60] as const;
+// T+2 narrows the post-close gap while Amazon keeps attributing late conversions (14-day window).
+const DAILY_REFRESH_DAYS = [1, 2, 3, 5, 7, 14, 30, 60] as const;
 const HOURLY_FIRST_DAY_HOURS = [3, 6, 9, 12, 15, 18, 21, 24] as const;
 
 /**
