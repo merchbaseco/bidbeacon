@@ -90,7 +90,7 @@ Key tables (see `src/db/schema.ts` for complete schema):
 
 ### AMS Stream Data
 - `ams_sp_traffic` - Sponsored Products traffic stream (impressions, clicks)
-- `ams_sp_conversion` - Sponsored Products conversion stream (purchases, sales)
+- `ams_sp_conversion` - Sponsored Products conversion stream (purchases, sales). Both AMS tables carry `received_at`, the last time the worker stored each message
 - `ams_cm_campaigns` / `ams_cm_ad_groups` / `ams_cm_ads` / `ams_cm_targets` - Campaign Manager entities
 
 ### Tracking Tables

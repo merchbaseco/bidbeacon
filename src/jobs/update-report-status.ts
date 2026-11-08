@@ -21,6 +21,7 @@ import { emitEvent } from '@/utils/events';
 import { withJobMetrics } from '@/utils/job-metrics';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { boss } from './boss';
+import { summarizeDailyTargetStreamForAccountJob } from './summarize-daily-target-stream-for-account';
 
 // ============================================================================
 // Job Definition
@@ -169,6 +170,13 @@ export const updateReportStatusJob = boss
                                     await setNextRefreshAt(processedRow, getNextRefreshTime(processedRow));
                                     await setRefreshing(processedRow, false);
 
+                                    // Re-apply source precedence: a new hourly report may outrank the daily report,
+                                    // and a daily report created before the latest Stream rollup must not stick.
+                                    // The report is already processed; a failed enqueue must not mark it as errored.
+                                    await summarizeDailyTargetStreamForAccountJob.emit({ accountId, countryCode }).catch(error => {
+                                        console.error('Failed to enqueue daily target refresh after report processing', error);
+                                    });
+
                                     recorder.addEvent({
                                         message: `Report {{badges}} processed. ${parseResult.rowsProcessed} rows, ${parseResult.changedCount} changed, ${parseResult.errorCount} errors.`,
                                         badges: buildBadges(reportDatum.reportId ?? null),
@@ -182,6 +190,7 @@ export const updateReportStatusJob = boss
                                             rowsProcessed: parseResult.rowsProcessed,
                                             successCount: parseResult.successCount,
                                             changedCount: parseResult.changedCount,
+                                            removedCount: parseResult.removedCount ?? 0,
                                             errorCount: parseResult.errorCount,
                                             errorSamples: parseResult.errorSamples,
                                             ...buildFreshnessMetrics(reportDatum),

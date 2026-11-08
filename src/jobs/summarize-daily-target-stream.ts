@@ -1,7 +1,7 @@
 /**
  * Job: Enqueues summarize-daily-target-stream-for-account jobs for all enabled accounts.
- * Runs every 15 minutes and enqueues summarize-daily-target-stream-for-account jobs
- * for each enabled account.
+ * Runs every 15 minutes as a fallback; the hourly Stream rollup and report processing
+ * also enqueue the per-account refresh.
  */
 
 import { eq } from 'drizzle-orm';

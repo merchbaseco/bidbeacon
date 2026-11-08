@@ -54,10 +54,11 @@ The `getNextAction` function determines what action to take:
 ### `'process'` Action
 
 - Sets `status = 'parsing'`
-- Downloads and parses the report data
+- Downloads and parses the report data. A daily report replaces its account-local date in one transaction (see `performance-data.md`, Source Precedence)
 - Sets `status = 'completed'`
 - Clears `reportId`, sets `lastProcessedReportId` to the old `reportId`
 - Recalculates `nextRefreshAt` to the next eligibility offset
+- Enqueues `summarize-daily-target-stream-for-account`, which re-applies daily/hourly source precedence for today and the two most recent closed dates
 
 ### `'none'` Action
 
@@ -122,7 +123,7 @@ flowchart TD
 
 4. **Atomic work claims**: The dispatcher changes `refreshing` from false to true before enqueueing. Manual refresh jobs claim inside `update-report-status`. Duplicate jobs therefore cannot issue duplicate Amazon API calls for the same dataset row.
 
-5. **Eligibility based on creation time**: The `lastReportCreatedAt` timestamp determines eligibility, not when the report was processed. This ensures we don't miss eligibility windows even if processing takes a long time.
+5. **Eligibility based on creation time**: The `lastReportCreatedAt` timestamp determines eligibility, not when the report was processed. This ensures we don't miss eligibility windows even if processing takes a long time. It is also the report's data as-of time for daily/hourly source precedence.
 
 6. **Bounded parse diagnostics**: Report processing records counts and up to five distinct error messages with the job event. Raw failed report rows are not retained.
 

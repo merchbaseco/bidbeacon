@@ -12,6 +12,8 @@ export type ParseReportInput = {
 export type ParseReportOutput = {
     successCount: number;
     changedCount: number;
+    /** Daily target rows removed because the report no longer contains them. */
+    removedCount?: number;
     errorCount: number;
     rowsProcessed: number;
     errorSamples: string[];

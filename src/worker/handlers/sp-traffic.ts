@@ -23,6 +23,7 @@ export async function handleSpTraffic(payload: unknown): Promise<void> {
         // Map from snake_case (AMS) to camelCase (Drizzle schema)
         const record = {
             idempotencyId: data.idempotency_id,
+            receivedAt: new Date(),
             datasetId: data.dataset_id,
             marketplaceId: data.marketplace_id,
             currency: data.currency,
@@ -41,6 +42,7 @@ export async function handleSpTraffic(payload: unknown): Promise<void> {
         };
 
         // Upsert with idempotency
+        // Redeliveries refresh receivedAt too: it records the latest Stream arrival, not first sight.
         await db.insert(amsSpTraffic).values(record).onConflictDoUpdate({
             target: amsSpTraffic.idempotencyId,
             set: record,
