@@ -87,7 +87,7 @@ echo "[start] PostgreSQL ready on 127.0.0.1:5432 (database: ${DB_NAME})."
 # day the week runs through. The receipt contains no credential — the sign-in
 # ticket the dashboard later exchanges is minted per request and never printed.
 echo "[start] Seeding synthetic development data..."
-if ! bunx varlock run -- bunx tsx scripts/seed-dev-data.ts; then
+if ! NODE_ENV=development bunx varlock run -- bunx tsx scripts/seed-dev-data.ts; then
     echo "[start] Skipping synthetic dev data (seed failed)." >&2
 fi
 
