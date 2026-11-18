@@ -23,7 +23,9 @@ fi
 # Local development on a MacBook reaches the production database over
 # Tailscale. A cloud agent has no Tailscale, so it runs its own Postgres and
 # .agents/cloud/start.sh points the schema's database host at loopback for that session.
-if ! command -v psql >/dev/null 2>&1; then
+# Check for the server's initdb, not psql: an image with only postgresql-client
+# (Capy's) has psql but no server, and start.sh then has no cluster to start.
+if ! command -v initdb >/dev/null 2>&1 && ! compgen -G "/usr/lib/postgresql/*/bin/initdb" >/dev/null; then
     echo "[install] Installing PostgreSQL..."
     install_postgres() {
         $SUDO apt-get update -y -o Acquire::Retries=5
