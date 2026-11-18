@@ -78,6 +78,8 @@ The response identifies the account timezone and the resolved range. See [timezo
 ### Money, bids, and percentages
 
 - Money and bids are JSON numbers in the Advertiser account's currency.
+- Server-side spend ceilings refuse bids and ad-group default bids above `BIDBEACON_MAX_BID` (default `5`) and daily budgets above `BIDBEACON_MAX_DAILY_BUDGET` (default `100`). Over-ceiling values are never clamped.
+- `DYNAMIC_UP_AND_DOWN` and placement percentages that would push an effective bid above the max bid are refused the same way.
 - `metrics.acos`, `metrics.ctr`, and `metrics.cvr` are percentage points: `24.45` means 24.45%.
 - `metrics.roas` is a multiplier: `4.09` means 4.09x.
 - A ratio is `null` when its denominator is zero. A zero numerator with a nonzero denominator remains numeric.
@@ -956,7 +958,16 @@ Stable error codes:
 | `AMAZON_REJECTED` | Amazon rejected the requested operation |
 | `AMAZON_UNAVAILABLE` | Amazon remains unavailable after the documented retry policy |
 | `COMPOSITE_PARTIAL_FAILURE` | Composite creation created some resources before a later failure |
+| `WRITE_RATE_LIMITED` | The Advertiser Account exceeded the spend-write rate limit |
 | `INTERNAL_ERROR` | BidBeacon failed without a safe public diagnosis |
+
+Spend writes also enforce process-configured ceilings (`BIDBEACON_MAX_BID`,
+`BIDBEACON_MAX_DAILY_BUDGET`) and a per-account hourly write quota
+(`BIDBEACON_MAX_WRITES_PER_HOUR`). Over-ceiling bids, default bids, daily
+budgets, placement multipliers that push effective bids above the max bid, and
+`DYNAMIC_UP_AND_DOWN` are refused with `INVALID_INPUT` and are never clamped.
+Values above the ceiling need a human to change the env ceiling or choose a
+lower amount.
 
 Errors do not silently retry a mutation as a new background operation. Useful Amazon error codes and messages appear in `details` without exposing credentials or raw transport payloads, and `details.amazon` includes the Amazon code, the Amazon message, and, when Amazon sends them, the batch index, the field, the trigger, and `details`.
 

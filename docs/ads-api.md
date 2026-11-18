@@ -251,6 +251,12 @@ Change events for accepted state and bid changes. Amazon rejection, exhausted un
 invalid input, missing ancestry, and denied Account UUIDs use the stable shared operation error
 codes.
 
+Spend-affecting shared writes (Campaign budget/strategy/placement, Ad-group default bid, Target
+bid, and composite create) enforce `BIDBEACON_MAX_BID`, `BIDBEACON_MAX_DAILY_BUDGET`, and
+`BIDBEACON_MAX_WRITES_PER_HOUR` before the Amazon gateway call. Values above a ceiling return
+`INVALID_INPUT` with a human-needed message and are never clamped. Exhausted write quota returns
+`WRITE_RATE_LIMITED`.
+
 ### Composite Sponsored Products campaign creation
 
 `create_sponsored_products_campaign` is the preferred synchronous ordinary-launch operation. It

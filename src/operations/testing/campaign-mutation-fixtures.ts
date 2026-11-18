@@ -32,6 +32,7 @@ export const buildCampaignMutationArchiveRow = (overrides: Partial<CampaignInser
     endDate: '2026-08-31',
     targetingSettings: 'MANUAL',
     bidStrategy: 'SALES_DOWN_ONLY',
+    placementBidAdjustments: {},
     budgetType: 'MONETARY',
     budgetPeriod: 'DAILY',
     budgetAmount: '25.00',

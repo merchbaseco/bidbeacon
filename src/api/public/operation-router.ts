@@ -132,13 +132,17 @@ const toTrpcErrorCode = (code: OperationErrorCode): TRPC_ERROR_CODE_KEY => {
             return 'NOT_FOUND';
         case 'COMPOSITE_PARTIAL_FAILURE':
             return 'CONFLICT';
+        case 'WRITE_RATE_LIMITED':
+            return 'TOO_MANY_REQUESTS';
         case 'AMAZON_REJECTED':
         case 'AMAZON_UNAVAILABLE':
         case 'EXECUTION_TIMEOUT':
             return 'TIMEOUT';
         case 'INTERNAL_ERROR':
             return 'INTERNAL_SERVER_ERROR';
-        default:
-            return 'INTERNAL_SERVER_ERROR';
+        default: {
+            const exhaustiveCheck: never = code;
+            throw new Error(`Unhandled operation error code: ${exhaustiveCheck}`);
+        }
     }
 };

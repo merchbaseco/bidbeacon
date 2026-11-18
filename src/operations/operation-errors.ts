@@ -10,7 +10,8 @@ export type OperationErrorCode =
     | 'INVALID_INPUT'
     | 'RESPONSE_TOO_LARGE'
     | 'RESULT_TOO_LARGE'
-    | 'RESOURCE_NOT_FOUND';
+    | 'RESOURCE_NOT_FOUND'
+    | 'WRITE_RATE_LIMITED';
 
 export class OperationError extends Error {
     readonly code: OperationErrorCode;

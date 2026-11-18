@@ -34,6 +34,7 @@ export const buildTargetMutationCampaign = (overrides: Partial<CampaignInsert> =
     endDate: null,
     targetingSettings: 'MANUAL',
     bidStrategy: 'SALES_DOWN_ONLY',
+    placementBidAdjustments: {},
     budgetType: 'MONETARY',
     budgetPeriod: 'DAILY',
     budgetAmount: '25.00',
