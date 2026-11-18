@@ -53,3 +53,9 @@ jobs:
       # this job free of builds and database simulations.
       - name: Run fast quality gates
         run: bun run check:fast
+
+  published-package-version-bump:
+    name: Published package version bump
+    uses: merchbaseco/workflows/.github/workflows/published-package-bump.yml@main
+    with:
+      published_packages: packages/bidbeacon-api-client:@bidbeacon/http-client,packages/bidbeacon-cli:@bidbeacon/cli

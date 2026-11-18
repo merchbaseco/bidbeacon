@@ -14,7 +14,7 @@ We use Vitest for unit tests. Run with `bun run test`.
 
 `bun run check` is split, and the split is deliberate — preserve it.
 
-`bun run check:fast` is the polite lane: `env:check`, `env:contract`, lint, and `test:run` (the fast Vitest suites). It is what the Quality workflow runs on every push and PR, and it is meant to stay near a minute. `bun run check` is `check:fast` plus the heavy lanes, `bun run test:integration` and `bun run build`. Full `check` still runs on the operator's machine, in cloud agents, and before a deploy, so total coverage is unchanged — the heavy work simply stops running on every commit.
+`bun run check:fast` is the polite lane: `env:check`, `env:contract`, lint, and `test:run` (the fast Vitest suites). It is what the Quality workflow's Check job runs on every push and PR, and it is meant to stay near a minute. Quality also calls `merchbaseco/workflows`'s published-package version-bump guard for `@bidbeacon/http-client` and `@bidbeacon/cli`, so a PR that changes a shipped file under those packages without bumping the package version fails. `bun run check` is `check:fast` plus the heavy lanes, `bun run test:integration` and `bun run build`. Full `check` still runs on the operator's machine, in cloud agents, and before a deploy, so total coverage is unchanged — the heavy work simply stops running on every commit.
 
 The heavy lane is structural, not a list of exclusions. Every suite that boots PGlite is named `*.integration-check.ts`: `vitest.config.ts` discovers `*.test.ts` only, and `vitest.integration.config.ts` discovers `*.integration-check.ts`. A new database-backed suite joins the lane by taking that suffix — nothing goes into an ignore file. Each moved file carries a header saying so.
 
