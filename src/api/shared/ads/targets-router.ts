@@ -4,8 +4,11 @@ import { updateTargetBid } from '@/amazon-ads/update-target-bid';
 import type { apiProcedure } from '@/api/trpc';
 import { router } from '@/api/trpc';
 import { db } from '@/db/index';
-import { campaign, target } from '@/db/schema';
+import { advertiserAccount, campaign, target } from '@/db/schema';
 import { recordEntityChange } from '@/lib/entity-change-history';
+import { OperationError } from '@/operations/operation-errors';
+import { readStoredPlacementBidAdjustments } from '@/operations/placement-bid-adjustments';
+import { assertBidCeiling, assertPlacementCeilings, assertStoredBidStrategyAllowsSpendWrite, withSpendWriteQuota } from '@/operations/spend-safety';
 import { targetDetailInputSchema, targetDetailOutputSchema, targetListInputSchema, targetListOutputSchema, updateTargetBidInputSchema, updateTargetBidOutputSchema } from '@/types/ads-api';
 import { formatDateTime, formatListResponse, getPagination, isSponsoredProducts, parseNumeric, resolveProfileId, toMoneyString } from './shared';
 
@@ -145,6 +148,8 @@ export const buildTargetsRouter = (procedure: typeof apiProcedure) =>
                         adProduct: target.adProduct,
                         negative: target.negative,
                         bidAmount: target.bidAmount,
+                        bidStrategy: campaign.bidStrategy,
+                        placementBidAdjustments: campaign.placementBidAdjustments,
                     })
                     .from(target)
                     .innerJoin(campaign, eq(target.campaignId, campaign.campaignId))
@@ -186,43 +191,83 @@ export const buildTargetsRouter = (procedure: typeof apiProcedure) =>
                     });
                 }
 
-                const profileId = await resolveProfileId(row.accountId, row.countryCode);
+                const accountId = row.accountId;
+                const countryCode = row.countryCode;
+                const quotaAccountId = await resolveSpendQuotaAccountId(accountId, countryCode);
 
-                await updateTargetBid({
-                    profileId,
-                    targetId: row.targetId,
-                    bid: input.bidAmount,
-                });
+                try {
+                    return await withSpendWriteQuota(quotaAccountId, async () => {
+                        assertBidCeiling(input.bidAmount, 'bidAmount');
+                        assertStoredBidStrategyAllowsSpendWrite(row.bidStrategy);
+                        assertPlacementCeilings(readStoredPlacementBidAdjustments(row.placementBidAdjustments), [input.bidAmount]);
 
-                const updatedAt = new Date();
-                await db
-                    .update(target)
-                    .set({
-                        bidAmount: toMoneyString(input.bidAmount),
-                        lastUpdatedDateTime: updatedAt,
-                    })
-                    .where(eq(target.targetId, row.targetId));
+                        const profileId = await resolveProfileId(accountId, countryCode);
 
-                await recordEntityChange({
-                    accountId: row.accountId,
-                    countryCode: row.countryCode,
-                    entityType: 'target',
-                    entityId: row.targetId,
-                    eventType: 'bid_change',
-                    fieldName: 'bidAmount',
-                    previousValue: parseNumeric(row.bidAmount),
-                    newValue: input.bidAmount,
-                    changedAt: updatedAt,
-                    source: 'bidbeacon',
-                });
+                        await updateTargetBid({
+                            profileId,
+                            targetId: row.targetId,
+                            bid: input.bidAmount,
+                        });
 
-                return {
-                    targetId: row.targetId,
-                    bidAmount: input.bidAmount,
-                    lastUpdatedDateTime: updatedAt.toISOString(),
-                };
+                        const updatedAt = new Date();
+                        await db
+                            .update(target)
+                            .set({
+                                bidAmount: toMoneyString(input.bidAmount),
+                                lastUpdatedDateTime: updatedAt,
+                            })
+                            .where(eq(target.targetId, row.targetId));
+
+                        await recordEntityChange({
+                            accountId,
+                            countryCode,
+                            entityType: 'target',
+                            entityId: row.targetId,
+                            eventType: 'bid_change',
+                            fieldName: 'bidAmount',
+                            previousValue: parseNumeric(row.bidAmount),
+                            newValue: input.bidAmount,
+                            changedAt: updatedAt,
+                            source: 'bidbeacon',
+                        });
+
+                        return {
+                            targetId: row.targetId,
+                            bidAmount: input.bidAmount,
+                            lastUpdatedDateTime: updatedAt.toISOString(),
+                        };
+                    });
+                } catch (error) {
+                    throw toLegacySpendSafetyError(error);
+                }
             }),
     });
+
+const resolveSpendQuotaAccountId = async (adsAccountId: string, countryCode: string) => {
+    const [account] = await db
+        .select({ id: advertiserAccount.id })
+        .from(advertiserAccount)
+        .where(and(eq(advertiserAccount.adsAccountId, adsAccountId), eq(advertiserAccount.countryCode, countryCode)))
+        .limit(1);
+
+    return account?.id ?? `${adsAccountId}:${countryCode}`;
+};
+
+const toLegacySpendSafetyError = (error: unknown) => {
+    if (!(error instanceof OperationError)) {
+        return error;
+    }
+
+    if (error.code === 'WRITE_RATE_LIMITED') {
+        return new TRPCError({ code: 'TOO_MANY_REQUESTS', message: error.message, cause: error });
+    }
+
+    if (error.code === 'INVALID_INPUT') {
+        return new TRPCError({ code: 'BAD_REQUEST', message: error.message, cause: error });
+    }
+
+    return error;
+};
 
 const buildTargetSearchCondition = (search: string | null) => {
     const trimmed = search?.trim();

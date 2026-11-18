@@ -7,6 +7,8 @@ import { resolveAdvertiserAccount } from './advertiser-accounts';
 import { logAmazonRejection } from './amazon-rejection';
 import type { OperationContext } from './operation-context';
 import { OperationError } from './operation-errors';
+import { readStoredPlacementBidAdjustments } from './placement-bid-adjustments';
+import { assertBidCeiling, assertPlacementCeilings, assertStoredBidStrategyAllowsSpendWrite, withSpendWriteQuota } from './spend-safety';
 import {
     type AutoTargetCreateInput,
     autoTargetCreateInputSchema,
@@ -56,37 +58,44 @@ export const createKeywordTarget = async (context: OperationContext, input: unkn
         throw new OperationError('RESOURCE_NOT_FOUND', 'Ad group not found in the requested Advertiser Account.', { adGroupId: parsedInput.adGroupId });
     }
 
-    const response = await callAmazon(context, 'createTargets', {
-        profileId: resolveProfileId(account),
-        region: resolveApiRegion(account.countryCode),
-        targets: [buildKeywordCreatePayload(parsedInput)],
-    });
-    const amazonTarget = extractTarget(response);
-    const canonical = mapCanonicalTarget({
-        amazonTarget,
-        fallback: {
-            id: amazonTarget.targetId,
-            campaignId: ownedAdGroup.campaignId,
-            adGroupId: ownedAdGroup.adGroupId,
-            state: parsedInput.state,
-            deliveryStatus: inferDeliveryStatus(parsedInput.state),
-            type: 'KEYWORD',
-            negative: false,
-            matchType: parsedInput.matchType,
-            keyword: parsedInput.keyword,
-            bid: parsedInput.bid,
-        },
-    });
-    assertReturnedTargetIdentity(canonical, { campaignId: ownedAdGroup.campaignId, adGroupId: ownedAdGroup.adGroupId, type: 'KEYWORD', negative: false });
-    const changedAt = new Date();
+    return withSpendWriteQuota(parsedInput.accountId, async () => {
+        const spendControls = await loadCampaignSpendControls(context, ownedAdGroup.campaignId);
+        assertBidCeiling(parsedInput.bid, 'bid');
+        assertStoredBidStrategyAllowsSpendWrite(spendControls.bidStrategy);
+        assertPlacementCeilings(spendControls.placementBidAdjustments, [parsedInput.bid]);
 
-    await reconcileTarget(context, canonical, undefined, changedAt);
-    await recordTargetChanges(context, account, canonical.id, changedAt, [
-        { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
-        { eventType: 'bid_change', fieldName: 'bidAmount', previousValue: null, newValue: canonical.bid },
-    ]);
+        const response = await callAmazon(context, 'createTargets', {
+            profileId: resolveProfileId(account),
+            region: resolveApiRegion(account.countryCode),
+            targets: [buildKeywordCreatePayload(parsedInput)],
+        });
+        const amazonTarget = extractTarget(response);
+        const canonical = mapCanonicalTarget({
+            amazonTarget,
+            fallback: {
+                id: amazonTarget.targetId,
+                campaignId: ownedAdGroup.campaignId,
+                adGroupId: ownedAdGroup.adGroupId,
+                state: parsedInput.state,
+                deliveryStatus: inferDeliveryStatus(parsedInput.state),
+                type: 'KEYWORD',
+                negative: false,
+                matchType: parsedInput.matchType,
+                keyword: parsedInput.keyword,
+                bid: parsedInput.bid,
+            },
+        });
+        assertReturnedTargetIdentity(canonical, { campaignId: ownedAdGroup.campaignId, adGroupId: ownedAdGroup.adGroupId, type: 'KEYWORD', negative: false });
+        const changedAt = new Date();
 
-    return canonical;
+        await reconcileTarget(context, canonical, undefined, changedAt);
+        await recordTargetChanges(context, account, canonical.id, changedAt, [
+            { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
+            { eventType: 'bid_change', fieldName: 'bidAmount', previousValue: null, newValue: canonical.bid },
+        ]);
+
+        return canonical;
+    });
 };
 
 export const createProductTarget = async (context: OperationContext, input: unknown): Promise<CanonicalTarget> => {
@@ -97,37 +106,44 @@ export const createProductTarget = async (context: OperationContext, input: unkn
         throw new OperationError('RESOURCE_NOT_FOUND', 'Ad group not found in the requested Advertiser Account.', { adGroupId: parsedInput.adGroupId });
     }
 
-    const response = await callAmazon(context, 'createTargets', {
-        profileId: resolveProfileId(account),
-        region: resolveApiRegion(account.countryCode),
-        targets: [buildProductCreatePayload(parsedInput)],
-    });
-    const amazonTarget = extractTarget(response);
-    const canonical = mapCanonicalTarget({
-        amazonTarget,
-        fallback: {
-            id: amazonTarget.targetId,
-            campaignId: ownedAdGroup.campaignId,
-            adGroupId: ownedAdGroup.adGroupId,
-            state: parsedInput.state,
-            deliveryStatus: inferDeliveryStatus(parsedInput.state),
-            type: 'PRODUCT',
-            negative: false,
-            matchType: 'PRODUCT_EXACT',
-            asin: parsedInput.asin,
-            bid: parsedInput.bid,
-        },
-    });
-    assertReturnedTargetIdentity(canonical, { campaignId: ownedAdGroup.campaignId, adGroupId: ownedAdGroup.adGroupId, type: 'PRODUCT', negative: false });
-    const changedAt = new Date();
+    return withSpendWriteQuota(parsedInput.accountId, async () => {
+        const spendControls = await loadCampaignSpendControls(context, ownedAdGroup.campaignId);
+        assertBidCeiling(parsedInput.bid, 'bid');
+        assertStoredBidStrategyAllowsSpendWrite(spendControls.bidStrategy);
+        assertPlacementCeilings(spendControls.placementBidAdjustments, [parsedInput.bid]);
 
-    await reconcileTarget(context, canonical, undefined, changedAt);
-    await recordTargetChanges(context, account, canonical.id, changedAt, [
-        { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
-        { eventType: 'bid_change', fieldName: 'bidAmount', previousValue: null, newValue: canonical.bid },
-    ]);
+        const response = await callAmazon(context, 'createTargets', {
+            profileId: resolveProfileId(account),
+            region: resolveApiRegion(account.countryCode),
+            targets: [buildProductCreatePayload(parsedInput)],
+        });
+        const amazonTarget = extractTarget(response);
+        const canonical = mapCanonicalTarget({
+            amazonTarget,
+            fallback: {
+                id: amazonTarget.targetId,
+                campaignId: ownedAdGroup.campaignId,
+                adGroupId: ownedAdGroup.adGroupId,
+                state: parsedInput.state,
+                deliveryStatus: inferDeliveryStatus(parsedInput.state),
+                type: 'PRODUCT',
+                negative: false,
+                matchType: 'PRODUCT_EXACT',
+                asin: parsedInput.asin,
+                bid: parsedInput.bid,
+            },
+        });
+        assertReturnedTargetIdentity(canonical, { campaignId: ownedAdGroup.campaignId, adGroupId: ownedAdGroup.adGroupId, type: 'PRODUCT', negative: false });
+        const changedAt = new Date();
 
-    return canonical;
+        await reconcileTarget(context, canonical, undefined, changedAt);
+        await recordTargetChanges(context, account, canonical.id, changedAt, [
+            { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
+            { eventType: 'bid_change', fieldName: 'bidAmount', previousValue: null, newValue: canonical.bid },
+        ]);
+
+        return canonical;
+    });
 };
 
 export const createAutomaticTarget = async (context: OperationContext, input: unknown): Promise<CanonicalTarget> => {
@@ -138,36 +154,43 @@ export const createAutomaticTarget = async (context: OperationContext, input: un
         throw new OperationError('RESOURCE_NOT_FOUND', 'Ad group not found in the requested Advertiser Account.', { adGroupId: parsedInput.adGroupId });
     }
 
-    const response = await callAmazon(context, 'createTargets', {
-        profileId: resolveProfileId(account),
-        region: resolveApiRegion(account.countryCode),
-        targets: [buildAutomaticCreatePayload(parsedInput)],
-    });
-    const amazonTarget = extractTarget(response);
-    const canonical = mapCanonicalTarget({
-        amazonTarget,
-        fallback: {
-            id: amazonTarget.targetId,
-            campaignId: ownedAdGroup.campaignId,
-            adGroupId: ownedAdGroup.adGroupId,
-            state: parsedInput.state,
-            deliveryStatus: inferDeliveryStatus(parsedInput.state),
-            type: 'AUTO',
-            negative: false,
-            matchType: parsedInput.matchType,
-            bid: parsedInput.bid,
-        },
-    });
-    assertReturnedTargetIdentity(canonical, { campaignId: ownedAdGroup.campaignId, adGroupId: ownedAdGroup.adGroupId, type: 'AUTO', negative: false });
-    const changedAt = new Date();
+    return withSpendWriteQuota(parsedInput.accountId, async () => {
+        const spendControls = await loadCampaignSpendControls(context, ownedAdGroup.campaignId);
+        assertBidCeiling(parsedInput.bid, 'bid');
+        assertStoredBidStrategyAllowsSpendWrite(spendControls.bidStrategy);
+        assertPlacementCeilings(spendControls.placementBidAdjustments, [parsedInput.bid]);
 
-    await reconcileTarget(context, canonical, undefined, changedAt);
-    await recordTargetChanges(context, account, canonical.id, changedAt, [
-        { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
-        { eventType: 'bid_change', fieldName: 'bidAmount', previousValue: null, newValue: canonical.bid },
-    ]);
+        const response = await callAmazon(context, 'createTargets', {
+            profileId: resolveProfileId(account),
+            region: resolveApiRegion(account.countryCode),
+            targets: [buildAutomaticCreatePayload(parsedInput)],
+        });
+        const amazonTarget = extractTarget(response);
+        const canonical = mapCanonicalTarget({
+            amazonTarget,
+            fallback: {
+                id: amazonTarget.targetId,
+                campaignId: ownedAdGroup.campaignId,
+                adGroupId: ownedAdGroup.adGroupId,
+                state: parsedInput.state,
+                deliveryStatus: inferDeliveryStatus(parsedInput.state),
+                type: 'AUTO',
+                negative: false,
+                matchType: parsedInput.matchType,
+                bid: parsedInput.bid,
+            },
+        });
+        assertReturnedTargetIdentity(canonical, { campaignId: ownedAdGroup.campaignId, adGroupId: ownedAdGroup.adGroupId, type: 'AUTO', negative: false });
+        const changedAt = new Date();
 
-    return canonical;
+        await reconcileTarget(context, canonical, undefined, changedAt);
+        await recordTargetChanges(context, account, canonical.id, changedAt, [
+            { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
+            { eventType: 'bid_change', fieldName: 'bidAmount', previousValue: null, newValue: canonical.bid },
+        ]);
+
+        return canonical;
+    });
 };
 
 export const createNegativeKeyword = async (context: OperationContext, input: unknown): Promise<CanonicalTarget> => {
@@ -277,49 +300,71 @@ export const updateTarget = async (context: OperationContext, input: unknown): P
     assertTargetChangeEligibility(current, parsedInput.changes);
     assertArchiveOnlyPatch(parsedInput.changes);
 
-    const response =
-        parsedInput.changes.state === 'ARCHIVED'
-            ? await callAmazon(context, resolveTargetArchiveOperation(current), {
-                  profileId: resolveProfileId(account),
-                  region: resolveApiRegion(account.countryCode),
-                  targets: [{ targetId: parsedInput.targetId }],
-              })
-            : await callAmazon(context, 'updateTargets', {
-                  profileId: resolveProfileId(account),
-                  region: resolveApiRegion(account.countryCode),
-                  targets: [buildUpdatePayload(parsedInput.targetId, parsedInput.changes, current.adGroupId === null ? current.campaignId : undefined)],
-              });
-    const amazonTarget = extractTarget(response);
-    const previous = mapArchiveTarget(current);
-    const canonical = mapCanonicalTarget({
-        amazonTarget,
-        fallback: {
-            ...previous,
-            state: parsedInput.changes.state ?? previous.state,
-            deliveryStatus: parsedInput.changes.state ? inferDeliveryStatus(parsedInput.changes.state) : previous.deliveryStatus,
-            bid: parsedInput.changes.bid ?? previous.bid,
-        },
-    });
-    assertReturnedTargetIdentity(canonical, {
-        campaignId: current.campaignId,
-        adGroupId: current.adGroupId,
-        targetId: current.targetId,
-        type: previous.type,
-        negative: previous.negative,
-    });
-    const changedAt = new Date();
+    return withSpendWriteQuota(parsedInput.accountId, async () => {
+        if (parsedInput.changes.bid !== undefined) {
+            const spendControls = await loadCampaignSpendControls(context, current.campaignId);
+            assertBidCeiling(parsedInput.changes.bid, 'bid');
+            assertStoredBidStrategyAllowsSpendWrite(spendControls.bidStrategy);
+            assertPlacementCeilings(spendControls.placementBidAdjustments, [parsedInput.changes.bid]);
+        }
 
-    await reconcileTarget(context, canonical, current, changedAt);
-    const historyChanges: TargetHistoryChange[] = [];
-    if (parsedInput.changes.state !== undefined) {
-        historyChanges.push({ eventType: 'state_change', fieldName: 'state', previousValue: previous.state, newValue: canonical.state });
-    }
-    if (parsedInput.changes.bid !== undefined) {
-        historyChanges.push({ eventType: 'bid_change', fieldName: 'bidAmount', previousValue: previous.bid, newValue: canonical.bid });
-    }
-    await recordTargetChanges(context, account, canonical.id, changedAt, historyChanges);
+        const response =
+            parsedInput.changes.state === 'ARCHIVED'
+                ? await callAmazon(context, resolveTargetArchiveOperation(current), {
+                      profileId: resolveProfileId(account),
+                      region: resolveApiRegion(account.countryCode),
+                      targets: [{ targetId: parsedInput.targetId }],
+                  })
+                : await callAmazon(context, 'updateTargets', {
+                      profileId: resolveProfileId(account),
+                      region: resolveApiRegion(account.countryCode),
+                      targets: [buildUpdatePayload(parsedInput.targetId, parsedInput.changes, current.adGroupId === null ? current.campaignId : undefined)],
+                  });
+        const amazonTarget = extractTarget(response);
+        const previous = mapArchiveTarget(current);
+        const canonical = mapCanonicalTarget({
+            amazonTarget,
+            fallback: {
+                ...previous,
+                state: parsedInput.changes.state ?? previous.state,
+                deliveryStatus: parsedInput.changes.state ? inferDeliveryStatus(parsedInput.changes.state) : previous.deliveryStatus,
+                bid: parsedInput.changes.bid ?? previous.bid,
+            },
+        });
+        assertReturnedTargetIdentity(canonical, {
+            campaignId: current.campaignId,
+            adGroupId: current.adGroupId,
+            targetId: current.targetId,
+            type: previous.type,
+            negative: previous.negative,
+        });
+        const changedAt = new Date();
 
-    return canonical;
+        await reconcileTarget(context, canonical, current, changedAt);
+        const historyChanges: TargetHistoryChange[] = [];
+        if (parsedInput.changes.state !== undefined) {
+            historyChanges.push({ eventType: 'state_change', fieldName: 'state', previousValue: previous.state, newValue: canonical.state });
+        }
+        if (parsedInput.changes.bid !== undefined) {
+            historyChanges.push({ eventType: 'bid_change', fieldName: 'bidAmount', previousValue: previous.bid, newValue: canonical.bid });
+        }
+        await recordTargetChanges(context, account, canonical.id, changedAt, historyChanges);
+
+        return canonical;
+    });
+};
+
+const loadCampaignSpendControls = async (context: OperationContext, campaignId: string) => {
+    const [row] = await context.db
+        .select({ placementBidAdjustments: campaign.placementBidAdjustments, bidStrategy: campaign.bidStrategy })
+        .from(campaign)
+        .where(eq(campaign.campaignId, campaignId))
+        .limit(1);
+
+    return {
+        bidStrategy: row?.bidStrategy ?? null,
+        placementBidAdjustments: row ? readStoredPlacementBidAdjustments(row.placementBidAdjustments) : null,
+    };
 };
 
 const parseInput = <T>(schema: { safeParse: (input: unknown) => { success: boolean; data?: T; error?: { issues: unknown[] } } }, input: unknown, operationName: string): T => {

@@ -207,7 +207,7 @@ describe('Campaign mutation operations', () => {
             ],
             optimizations: {
                 bidSettings: {
-                    bidStrategy: 'SALES_UP_AND_DOWN',
+                    bidStrategy: 'MANUAL',
                     bidAdjustments: {
                         placementBidAdjustments: [
                             { placement: 'REST_OF_SEARCH', percentage: 0 },
@@ -236,7 +236,7 @@ describe('Campaign mutation operations', () => {
             changes: {
                 state: 'ENABLED',
                 dailyBudget: 40,
-                bidStrategy: 'DYNAMIC_UP_AND_DOWN',
+                bidStrategy: 'FIXED',
                 placementBidAdjustments: { restOfSearch: 0, productPages: 20 },
             },
         });
@@ -264,7 +264,7 @@ describe('Campaign mutation operations', () => {
                             ],
                             optimizations: {
                                 bidSettings: {
-                                    bidStrategy: 'SALES_UP_AND_DOWN',
+                                    bidStrategy: 'MANUAL',
                                     bidAdjustments: {
                                         placementBidAdjustments: [
                                             { placement: 'REST_OF_SEARCH', percentage: 0 },
@@ -284,7 +284,7 @@ describe('Campaign mutation operations', () => {
             state: 'ENABLED',
             deliveryStatus: 'DELIVERING',
             dailyBudget: 40,
-            bidStrategy: 'DYNAMIC_UP_AND_DOWN',
+            bidStrategy: 'FIXED',
             targetingMode: 'MANUAL_KEYWORD',
             startDate: '2026-08-01',
             endDate: '2026-08-31',
@@ -297,7 +297,7 @@ describe('Campaign mutation operations', () => {
                 campaignId: 'campaign-existing-1',
                 state: 'ENABLED',
                 budgetAmount: '40.00',
-                bidStrategy: 'SALES_UP_AND_DOWN',
+                bidStrategy: 'MANUAL',
                 placementBidAdjustments: { productPages: 20 },
             },
         ]);
@@ -307,9 +307,9 @@ describe('Campaign mutation operations', () => {
             .where(eq(entityChangeHistory.entityId, 'campaign-existing-1'))
             .orderBy(asc(entityChangeHistory.fieldName));
         expect(changes).toEqual([
-            { eventType: 'bid_change', fieldName: 'bidStrategy', previousValue: 'DYNAMIC_DOWN_ONLY', newValue: 'DYNAMIC_UP_AND_DOWN' },
+            { eventType: 'bid_change', fieldName: 'bidStrategy', previousValue: 'DYNAMIC_DOWN_ONLY', newValue: 'FIXED' },
             { eventType: 'budget_change', fieldName: 'budgetAmount', previousValue: '25', newValue: '40' },
-            { eventType: 'bid_change', fieldName: 'placementBidAdjustments', previousValue: null, newValue: '{"productPages":20}' },
+            { eventType: 'bid_change', fieldName: 'placementBidAdjustments', previousValue: '{}', newValue: '{"productPages":20}' },
             { eventType: 'state_change', fieldName: 'state', previousValue: 'PAUSED', newValue: 'ENABLED' },
         ]);
     });

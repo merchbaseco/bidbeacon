@@ -4,8 +4,11 @@ import { updateAdGroupBid } from '@/amazon-ads/update-ad-group-bid';
 import type { apiProcedure } from '@/api/trpc';
 import { router } from '@/api/trpc';
 import { db } from '@/db/index';
-import { adGroup, campaign } from '@/db/schema';
+import { adGroup, advertiserAccount, campaign } from '@/db/schema';
 import { recordEntityChange } from '@/lib/entity-change-history';
+import { OperationError } from '@/operations/operation-errors';
+import { readStoredPlacementBidAdjustments } from '@/operations/placement-bid-adjustments';
+import { assertBidCeiling, assertPlacementCeilings, assertStoredBidStrategyAllowsSpendWrite, withSpendWriteQuota } from '@/operations/spend-safety';
 import { adGroupDetailInputSchema, adGroupDetailOutputSchema, adGroupListInputSchema, adGroupListOutputSchema, updateAdGroupBidInputSchema, updateAdGroupBidOutputSchema } from '@/types/ads-api';
 import { formatDateTime, formatListResponse, getPagination, isSponsoredProducts, parseNumeric, resolveProfileId, toMoneyString } from './shared';
 
@@ -117,6 +120,8 @@ export const buildAdGroupsRouter = (procedure: typeof apiProcedure) =>
                         countryCode: campaign.countryCode,
                         adProduct: adGroup.adProduct,
                         bidAmount: adGroup.bidAmount,
+                        bidStrategy: campaign.bidStrategy,
+                        placementBidAdjustments: campaign.placementBidAdjustments,
                     })
                     .from(adGroup)
                     .innerJoin(campaign, eq(adGroup.campaignId, campaign.campaignId))
@@ -144,41 +149,66 @@ export const buildAdGroupsRouter = (procedure: typeof apiProcedure) =>
                     });
                 }
 
-                const profileId = await resolveProfileId(row.accountId, row.countryCode);
+                const accountId = row.accountId;
+                const countryCode = row.countryCode;
+                const [quotaAccount] = await db
+                    .select({ id: advertiserAccount.id })
+                    .from(advertiserAccount)
+                    .where(and(eq(advertiserAccount.adsAccountId, accountId), eq(advertiserAccount.countryCode, countryCode)))
+                    .limit(1);
+                const quotaAccountId = quotaAccount?.id ?? `${accountId}:${countryCode}`;
 
-                await updateAdGroupBid({
-                    profileId,
-                    adGroupId: row.adGroupId,
-                    bid: input.bidAmount,
-                });
+                try {
+                    return await withSpendWriteQuota(quotaAccountId, async () => {
+                        assertBidCeiling(input.bidAmount, 'bidAmount');
+                        assertStoredBidStrategyAllowsSpendWrite(row.bidStrategy);
+                        assertPlacementCeilings(readStoredPlacementBidAdjustments(row.placementBidAdjustments), [input.bidAmount]);
 
-                const updatedAt = new Date();
-                await db
-                    .update(adGroup)
-                    .set({
-                        bidAmount: toMoneyString(input.bidAmount),
-                        lastUpdatedDateTime: updatedAt,
-                    })
-                    .where(eq(adGroup.adGroupId, row.adGroupId));
+                        const profileId = await resolveProfileId(accountId, countryCode);
 
-                await recordEntityChange({
-                    accountId: row.accountId,
-                    countryCode: row.countryCode,
-                    entityType: 'adGroup',
-                    entityId: row.adGroupId,
-                    eventType: 'bid_change',
-                    fieldName: 'bidAmount',
-                    previousValue: parseNumeric(row.bidAmount),
-                    newValue: input.bidAmount,
-                    changedAt: updatedAt,
-                    source: 'bidbeacon',
-                });
+                        await updateAdGroupBid({
+                            profileId,
+                            adGroupId: row.adGroupId,
+                            bid: input.bidAmount,
+                        });
 
-                return {
-                    adGroupId: row.adGroupId,
-                    bidAmount: input.bidAmount,
-                    lastUpdatedDateTime: updatedAt.toISOString(),
-                };
+                        const updatedAt = new Date();
+                        await db
+                            .update(adGroup)
+                            .set({
+                                bidAmount: toMoneyString(input.bidAmount),
+                                lastUpdatedDateTime: updatedAt,
+                            })
+                            .where(eq(adGroup.adGroupId, row.adGroupId));
+
+                        await recordEntityChange({
+                            accountId,
+                            countryCode,
+                            entityType: 'adGroup',
+                            entityId: row.adGroupId,
+                            eventType: 'bid_change',
+                            fieldName: 'bidAmount',
+                            previousValue: parseNumeric(row.bidAmount),
+                            newValue: input.bidAmount,
+                            changedAt: updatedAt,
+                            source: 'bidbeacon',
+                        });
+
+                        return {
+                            adGroupId: row.adGroupId,
+                            bidAmount: input.bidAmount,
+                            lastUpdatedDateTime: updatedAt.toISOString(),
+                        };
+                    });
+                } catch (error) {
+                    if (error instanceof OperationError && error.code === 'WRITE_RATE_LIMITED') {
+                        throw new TRPCError({ code: 'TOO_MANY_REQUESTS', message: error.message, cause: error });
+                    }
+                    if (error instanceof OperationError && error.code === 'INVALID_INPUT') {
+                        throw new TRPCError({ code: 'BAD_REQUEST', message: error.message, cause: error });
+                    }
+                    throw error;
+                }
             }),
     });
 

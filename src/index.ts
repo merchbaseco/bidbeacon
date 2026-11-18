@@ -17,6 +17,7 @@ import { startJobs, stopJobs } from '@/jobs/index.js';
 import { createBidBeaconMcpAuth } from '@/mcp/auth';
 import { registerBidBeaconMcpRoutes } from '@/mcp/http';
 import { createProductionOperationContext } from '@/operations/production-operation-context';
+import { assertSpendSafetyConfigured } from '@/operations/spend-safety';
 import { createServer, getMcpResourceUrl } from '@/server-config.js';
 import { getServerRuntimeFlags } from '@/server-runtime';
 import { getBidBeaconAccess } from '@/services/access/bidbeacon-access';
@@ -32,6 +33,9 @@ const healthProcessStartedAt = new Date();
 async function main() {
     console.log('Starting BidBeacon Server');
     const access = getBidBeaconAccess();
+
+    const spendSafety = assertSpendSafetyConfigured();
+    console.log('Spend safety policy', spendSafety);
 
     const runtimeFlags = getServerRuntimeFlags();
     console.log('Server runtime flags', runtimeFlags);

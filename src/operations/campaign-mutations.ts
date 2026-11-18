@@ -1,7 +1,7 @@
 import { formatInTimeZone, fromZonedTime } from 'date-fns-tz';
 import { and, eq } from 'drizzle-orm';
 import { readAmazonRejection } from '@/amazon-ads/mutation-error';
-import { campaign, entityChangeHistory } from '@/db/schema';
+import { adGroup, campaign, entityChangeHistory, target } from '@/db/schema';
 import { getAdvertiserAccountMetadata } from '@/utils/advertiser-account-metadata';
 import { getTimezoneForCountry } from '@/utils/timezones';
 import { createAd, createAdGroup } from './ad-mutations';
@@ -21,6 +21,7 @@ import { type CompositeCampaignCreateInput, type CompositeCampaignCreationResult
 import type { OperationContext } from './operation-context';
 import { OperationError } from './operation-errors';
 import { type PlacementPersistence, parsePlacementBidAdjustments, placementWrite, readStoredPlacementBidAdjustments, toAmazonPlacementBidAdjustments } from './placement-bid-adjustments';
+import { assertBidCeiling, assertBidStrategyCeiling, assertDailyBudgetCeiling, assertPlacementCeilings, withSpendWriteQuota } from './spend-safety';
 import { createAutomaticTarget, createKeywordTarget, createNegativeKeyword, createNegativeProductTarget, createProductTarget } from './target-mutations';
 import type { CanonicalTarget } from './target-schemas';
 
@@ -54,6 +55,7 @@ type CampaignHistoryChange = {
 };
 type CampaignCreationOptions = {
     autoCreateTargets?: boolean;
+    placementReferenceBids?: number[];
 };
 
 const AMAZON_UNAVAILABLE_MESSAGE_REGEX = /network|unavailable|timeout|timed out|fetch failed|econn|enet|eai_again/i;
@@ -85,56 +87,66 @@ export const updateCampaign = async (context: OperationContext, input: unknown):
     }
     assertArchiveOnlyPatch(parsedInput.changes, 'Campaign');
 
-    const profileId = resolveProfileId(account);
-    const response =
-        parsedInput.changes.state === 'ARCHIVED'
-            ? await callAmazon(context, 'deleteCampaigns', {
-                  profileId,
-                  region: resolveApiRegion(account.countryCode),
-                  campaigns: [{ campaignId: parsedInput.campaignId }],
-              })
-            : await callAmazon(context, 'updateCampaigns', {
-                  profileId,
-                  region: resolveApiRegion(account.countryCode),
-                  campaigns: [buildUpdatePayload(parsedInput.campaignId, parsedInput.changes, account)],
-              });
-    const amazonCampaign = extractCampaign(response);
-    const previous = mapArchiveFallback(current);
-    const storedPlacement = readStoredPlacementBidAdjustments(current.placementBidAdjustments);
-    const canonical = mapCanonicalCampaign({
-        account,
-        amazonCampaign,
-        fallback: buildUpdateFallback(previous, parsedInput.changes, amazonCampaign),
-    });
-    const now = new Date();
-    const placement = placementWrite({
-        resolution: parsePlacementBidAdjustments(amazonCampaign),
-        requested: parsedInput.changes.placementBidAdjustments,
-        stored: storedPlacement,
-    });
+    return withSpendWriteQuota(parsedInput.accountId, async () => {
+        if (parsedInput.changes.dailyBudget !== undefined) {
+            assertDailyBudgetCeiling(parsedInput.changes.dailyBudget);
+        }
+        assertBidStrategyCeiling(parsedInput.changes.bidStrategy);
+        if (parsedInput.changes.placementBidAdjustments !== undefined) {
+            assertPlacementCeilings(parsedInput.changes.placementBidAdjustments, await loadCampaignReferenceBids(context, parsedInput.campaignId));
+        }
 
-    await reconcileCampaign(context, account, canonical, current, now, placement);
-    const historyChanges: CampaignHistoryChange[] = [];
-    if (parsedInput.changes.state !== undefined) {
-        historyChanges.push({ eventType: 'state_change', fieldName: 'state', previousValue: previous.state, newValue: canonical.state });
-    }
-    if (parsedInput.changes.dailyBudget !== undefined) {
-        historyChanges.push({ eventType: 'budget_change', fieldName: 'budgetAmount', previousValue: previous.dailyBudget, newValue: canonical.dailyBudget });
-    }
-    if (parsedInput.changes.bidStrategy !== undefined) {
-        historyChanges.push({ eventType: 'bid_change', fieldName: 'bidStrategy', previousValue: previous.bidStrategy, newValue: canonical.bidStrategy });
-    }
-    if (parsedInput.changes.placementBidAdjustments !== undefined) {
-        historyChanges.push({
-            eventType: 'bid_change',
-            fieldName: 'placementBidAdjustments',
-            previousValue: serializePlacementBidAdjustments(storedPlacement ?? undefined),
-            newValue: serializePlacementBidAdjustments(canonical.placementBidAdjustments),
+        const profileId = resolveProfileId(account);
+        const response =
+            parsedInput.changes.state === 'ARCHIVED'
+                ? await callAmazon(context, 'deleteCampaigns', {
+                      profileId,
+                      region: resolveApiRegion(account.countryCode),
+                      campaigns: [{ campaignId: parsedInput.campaignId }],
+                  })
+                : await callAmazon(context, 'updateCampaigns', {
+                      profileId,
+                      region: resolveApiRegion(account.countryCode),
+                      campaigns: [buildUpdatePayload(parsedInput.campaignId, parsedInput.changes, account)],
+                  });
+        const amazonCampaign = extractCampaign(response);
+        const previous = mapArchiveFallback(current);
+        const storedPlacement = readStoredPlacementBidAdjustments(current.placementBidAdjustments);
+        const canonical = mapCanonicalCampaign({
+            account,
+            amazonCampaign,
+            fallback: buildUpdateFallback(previous, parsedInput.changes, amazonCampaign),
         });
-    }
-    await recordCampaignChanges(context, account, canonical.id, now, historyChanges);
+        const now = new Date();
+        const placement = placementWrite({
+            resolution: parsePlacementBidAdjustments(amazonCampaign),
+            requested: parsedInput.changes.placementBidAdjustments,
+            stored: storedPlacement,
+        });
 
-    return canonical;
+        await reconcileCampaign(context, account, canonical, current, now, placement);
+        const historyChanges: CampaignHistoryChange[] = [];
+        if (parsedInput.changes.state !== undefined) {
+            historyChanges.push({ eventType: 'state_change', fieldName: 'state', previousValue: previous.state, newValue: canonical.state });
+        }
+        if (parsedInput.changes.dailyBudget !== undefined) {
+            historyChanges.push({ eventType: 'budget_change', fieldName: 'budgetAmount', previousValue: previous.dailyBudget, newValue: canonical.dailyBudget });
+        }
+        if (parsedInput.changes.bidStrategy !== undefined) {
+            historyChanges.push({ eventType: 'bid_change', fieldName: 'bidStrategy', previousValue: previous.bidStrategy, newValue: canonical.bidStrategy });
+        }
+        if (parsedInput.changes.placementBidAdjustments !== undefined) {
+            historyChanges.push({
+                eventType: 'bid_change',
+                fieldName: 'placementBidAdjustments',
+                previousValue: serializePlacementBidAdjustments(storedPlacement ?? undefined),
+                newValue: serializePlacementBidAdjustments(canonical.placementBidAdjustments),
+            });
+        }
+        await recordCampaignChanges(context, account, canonical.id, now, historyChanges);
+
+        return canonical;
+    });
 };
 
 export const createSponsoredProductsCampaign = async (context: OperationContext, input: unknown): Promise<CompositeCampaignCreationResult> => {
@@ -146,121 +158,126 @@ export const createSponsoredProductsCampaign = async (context: OperationContext,
             issues: [{ path: ['campaign', 'endDate'], message: 'endDate must be on or after startDate.' }],
         });
     }
-    const campaign = await createCampaignWithOptions(
-        context,
-        {
-            accountId: parsedInput.accountId,
-            name: parsedInput.campaign.name,
-            state: 'PAUSED',
-            dailyBudget: parsedInput.campaign.dailyBudget,
-            bidStrategy: parsedInput.campaign.bidStrategy,
-            targetingMode: parsedInput.targeting.mode,
-            startDate,
-            endDate: parsedInput.campaign.endDate ?? null,
-            placementBidAdjustments: parsedInput.campaign.placementBidAdjustments,
-        },
-        { autoCreateTargets: false }
-    );
 
-    const created: {
-        campaign: CompositeCampaignCreationResult['campaign'];
-        adGroup: CompositeCampaignCreationResult['adGroup'] | undefined;
-        ads: CompositeCampaignCreationResult['ads'];
-        targets: CompositeCampaignCreationResult['targets'];
-    } = { campaign, adGroup: undefined, ads: [], targets: [] };
+    return withSpendWriteQuota(parsedInput.accountId, async () => {
+        const placementReferenceBids = assertCompositeSpendCeilings(parsedInput);
 
-    try {
-        const adGroupInput = {
-            accountId: parsedInput.accountId,
-            campaignId: campaign.id,
-            name: parsedInput.adGroup.name,
-            state: 'ENABLED' as const,
-            defaultBid: parsedInput.adGroup.defaultBid,
-        };
-        created.adGroup = await runCompositeStep('create_ad_group', adGroupInput, () => createAdGroup(context, adGroupInput));
-
-        for (const asin of parsedInput.asins) {
-            const adInput = {
+        const campaign = await createCampaignWithOptions(
+            context,
+            {
                 accountId: parsedInput.accountId,
-                adGroupId: created.adGroup.id,
-                asin,
-                state: 'ENABLED' as const,
-            };
-            created.ads.push(await runCompositeStep('create_ad', adInput, () => createAd(context, adInput)));
-        }
+                name: parsedInput.campaign.name,
+                state: 'PAUSED',
+                dailyBudget: parsedInput.campaign.dailyBudget,
+                bidStrategy: parsedInput.campaign.bidStrategy,
+                targetingMode: parsedInput.targeting.mode,
+                startDate,
+                endDate: parsedInput.campaign.endDate ?? null,
+                placementBidAdjustments: parsedInput.campaign.placementBidAdjustments,
+            },
+            { autoCreateTargets: false, placementReferenceBids }
+        );
 
-        if (parsedInput.targeting.mode === 'AUTO') {
-            for (const automaticTarget of COMPOSITE_AUTO_TARGETS) {
-                const targetInput = {
+        const created: {
+            campaign: CompositeCampaignCreationResult['campaign'];
+            adGroup: CompositeCampaignCreationResult['adGroup'] | undefined;
+            ads: CompositeCampaignCreationResult['ads'];
+            targets: CompositeCampaignCreationResult['targets'];
+        } = { campaign, adGroup: undefined, ads: [], targets: [] };
+
+        try {
+            const adGroupInput = {
+                accountId: parsedInput.accountId,
+                campaignId: campaign.id,
+                name: parsedInput.adGroup.name,
+                state: 'ENABLED' as const,
+                defaultBid: parsedInput.adGroup.defaultBid,
+            };
+            created.adGroup = await runCompositeStep('create_ad_group', adGroupInput, () => createAdGroup(context, adGroupInput));
+
+            for (const asin of parsedInput.asins) {
+                const adInput = {
                     accountId: parsedInput.accountId,
                     adGroupId: created.adGroup.id,
-                    matchType: automaticTarget.matchType,
-                    bid: parsedInput.targeting.bidOverrides?.[automaticTarget.key] ?? parsedInput.adGroup.defaultBid,
+                    asin,
                     state: 'ENABLED' as const,
                 };
-                created.targets.push(await runCompositeStep('create_auto_target', targetInput, () => createAutomaticTarget(context, targetInput)));
+                created.ads.push(await runCompositeStep('create_ad', adInput, () => createAd(context, adInput)));
             }
-        } else if (parsedInput.targeting.mode === 'MANUAL_KEYWORD') {
-            for (const keyword of parsedInput.targeting.keywords) {
+
+            if (parsedInput.targeting.mode === 'AUTO') {
+                for (const automaticTarget of COMPOSITE_AUTO_TARGETS) {
+                    const targetInput = {
+                        accountId: parsedInput.accountId,
+                        adGroupId: created.adGroup.id,
+                        matchType: automaticTarget.matchType,
+                        bid: parsedInput.targeting.bidOverrides?.[automaticTarget.key] ?? parsedInput.adGroup.defaultBid,
+                        state: 'ENABLED' as const,
+                    };
+                    created.targets.push(await runCompositeStep('create_auto_target', targetInput, () => createAutomaticTarget(context, targetInput)));
+                }
+            } else if (parsedInput.targeting.mode === 'MANUAL_KEYWORD') {
+                for (const keyword of parsedInput.targeting.keywords) {
+                    const targetInput = {
+                        accountId: parsedInput.accountId,
+                        adGroupId: created.adGroup.id,
+                        keyword: keyword.keyword,
+                        matchType: keyword.matchType,
+                        bid: keyword.bid,
+                        state: 'ENABLED' as const,
+                    };
+                    created.targets.push(await runCompositeStep('create_keyword_target', targetInput, () => createKeywordTarget(context, targetInput)));
+                }
+            } else {
+                for (const product of parsedInput.targeting.products) {
+                    const targetInput = {
+                        accountId: parsedInput.accountId,
+                        adGroupId: created.adGroup.id,
+                        asin: product.asin,
+                        bid: product.bid,
+                        state: 'ENABLED' as const,
+                    };
+                    created.targets.push(await runCompositeStep('create_product_target', targetInput, () => createProductTarget(context, targetInput)));
+                }
+            }
+
+            for (const keyword of parsedInput.negatives?.keywords ?? []) {
                 const targetInput = {
                     accountId: parsedInput.accountId,
+                    campaignId: campaign.id,
                     adGroupId: created.adGroup.id,
                     keyword: keyword.keyword,
                     matchType: keyword.matchType,
-                    bid: keyword.bid,
                     state: 'ENABLED' as const,
                 };
-                created.targets.push(await runCompositeStep('create_keyword_target', targetInput, () => createKeywordTarget(context, targetInput)));
+                created.targets.push(await runCompositeStep('create_negative_keyword', targetInput, () => createNegativeKeyword(context, targetInput)));
             }
-        } else {
-            for (const product of parsedInput.targeting.products) {
+
+            for (const asin of parsedInput.negatives?.asins ?? []) {
                 const targetInput = {
                     accountId: parsedInput.accountId,
+                    campaignId: campaign.id,
                     adGroupId: created.adGroup.id,
-                    asin: product.asin,
-                    bid: product.bid,
+                    asin,
                     state: 'ENABLED' as const,
                 };
-                created.targets.push(await runCompositeStep('create_product_target', targetInput, () => createProductTarget(context, targetInput)));
+                created.targets.push(await runCompositeStep('create_negative_product_target', targetInput, () => createNegativeProductTarget(context, targetInput)));
             }
-        }
 
-        for (const keyword of parsedInput.negatives?.keywords ?? []) {
-            const targetInput = {
-                accountId: parsedInput.accountId,
-                campaignId: campaign.id,
-                adGroupId: created.adGroup.id,
-                keyword: keyword.keyword,
-                matchType: keyword.matchType,
-                state: 'ENABLED' as const,
-            };
-            created.targets.push(await runCompositeStep('create_negative_keyword', targetInput, () => createNegativeKeyword(context, targetInput)));
-        }
+            if (parsedInput.campaign.state === 'ENABLED') {
+                const updateInput = {
+                    accountId: parsedInput.accountId,
+                    campaignId: campaign.id,
+                    changes: { state: 'ENABLED' as const },
+                };
+                created.campaign = await runCompositeStep('update_campaign', updateInput, () => updateCampaign(context, updateInput));
+            }
 
-        for (const asin of parsedInput.negatives?.asins ?? []) {
-            const targetInput = {
-                accountId: parsedInput.accountId,
-                campaignId: campaign.id,
-                adGroupId: created.adGroup.id,
-                asin,
-                state: 'ENABLED' as const,
-            };
-            created.targets.push(await runCompositeStep('create_negative_product_target', targetInput, () => createNegativeProductTarget(context, targetInput)));
+            return compositeCampaignCreationResultSchema.parse({ campaign: created.campaign, adGroup: created.adGroup, ads: created.ads, targets: created.targets });
+        } catch (error) {
+            throw toCompositePartialFailure(error, created);
         }
-
-        if (parsedInput.campaign.state === 'ENABLED') {
-            const updateInput = {
-                accountId: parsedInput.accountId,
-                campaignId: campaign.id,
-                changes: { state: 'ENABLED' as const },
-            };
-            created.campaign = await runCompositeStep('update_campaign', updateInput, () => updateCampaign(context, updateInput));
-        }
-
-        return compositeCampaignCreationResultSchema.parse({ campaign: created.campaign, adGroup: created.adGroup, ads: created.ads, targets: created.targets });
-    } catch (error) {
-        throw toCompositePartialFailure(error, created);
-    }
+    });
 };
 
 const createCampaignWithOptions = async (context: OperationContext, input: unknown, options: CampaignCreationOptions = {}): Promise<CanonicalCampaign> => {
@@ -271,34 +288,88 @@ const createCampaignWithOptions = async (context: OperationContext, input: unkno
         });
     }
     const account = await resolveAdvertiserAccount(context, { accountId: parsedInput.accountId });
-    const profileId = resolveProfileId(account);
-    const response = await callAmazon(context, 'createCampaigns', {
-        profileId,
-        region: resolveApiRegion(account.countryCode),
-        campaigns: [buildCreatePayload(parsedInput, account, options)],
-    });
-    const amazonCampaign = extractCampaign(response);
-    const canonical = mapCanonicalCampaign({
-        account,
-        amazonCampaign,
-        fallback: buildCreateFallback(parsedInput, amazonCampaign),
-    });
-    const now = new Date();
 
-    await reconcileCampaign(context, account, canonical, undefined, now, createPlacementWrite(amazonCampaign, parsedInput.placementBidAdjustments));
-    await recordCampaignChanges(context, account, canonical.id, now, [
-        { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
-        { eventType: 'budget_change', fieldName: 'budgetAmount', previousValue: null, newValue: canonical.dailyBudget },
-        { eventType: 'bid_change', fieldName: 'bidStrategy', previousValue: null, newValue: canonical.bidStrategy },
-        {
-            eventType: 'bid_change',
-            fieldName: 'placementBidAdjustments',
-            previousValue: null,
-            newValue: serializePlacementBidAdjustments(canonical.placementBidAdjustments),
-        },
+    return withSpendWriteQuota(parsedInput.accountId, async () => {
+        assertDailyBudgetCeiling(parsedInput.dailyBudget);
+        assertBidStrategyCeiling(parsedInput.bidStrategy);
+        assertPlacementCeilings(parsedInput.placementBidAdjustments, options.placementReferenceBids ?? []);
+
+        const profileId = resolveProfileId(account);
+        const response = await callAmazon(context, 'createCampaigns', {
+            profileId,
+            region: resolveApiRegion(account.countryCode),
+            campaigns: [buildCreatePayload(parsedInput, account, options)],
+        });
+        const amazonCampaign = extractCampaign(response);
+        const canonical = mapCanonicalCampaign({
+            account,
+            amazonCampaign,
+            fallback: buildCreateFallback(parsedInput, amazonCampaign),
+        });
+        const now = new Date();
+
+        await reconcileCampaign(context, account, canonical, undefined, now, createPlacementWrite(amazonCampaign, parsedInput.placementBidAdjustments));
+        await recordCampaignChanges(context, account, canonical.id, now, [
+            { eventType: 'state_change', fieldName: 'state', previousValue: null, newValue: canonical.state },
+            { eventType: 'budget_change', fieldName: 'budgetAmount', previousValue: null, newValue: canonical.dailyBudget },
+            { eventType: 'bid_change', fieldName: 'bidStrategy', previousValue: null, newValue: canonical.bidStrategy },
+            {
+                eventType: 'bid_change',
+                fieldName: 'placementBidAdjustments',
+                previousValue: null,
+                newValue: serializePlacementBidAdjustments(canonical.placementBidAdjustments),
+            },
+        ]);
+
+        return canonical;
+    });
+};
+
+const assertCompositeSpendCeilings = (input: CompositeCampaignCreateInput): number[] => {
+    assertDailyBudgetCeiling(input.campaign.dailyBudget);
+    assertBidStrategyCeiling(input.campaign.bidStrategy);
+    assertBidCeiling(input.adGroup.defaultBid, 'defaultBid');
+
+    const referenceBids = [input.adGroup.defaultBid];
+    if (input.targeting.mode === 'AUTO') {
+        for (const bid of Object.values(input.targeting.bidOverrides ?? {})) {
+            if (typeof bid === 'number') {
+                assertBidCeiling(bid, 'bid');
+                referenceBids.push(bid);
+            }
+        }
+    } else if (input.targeting.mode === 'MANUAL_KEYWORD') {
+        for (const keyword of input.targeting.keywords) {
+            assertBidCeiling(keyword.bid, 'bid');
+            referenceBids.push(keyword.bid);
+        }
+    } else {
+        for (const product of input.targeting.products) {
+            assertBidCeiling(product.bid, 'bid');
+            referenceBids.push(product.bid);
+        }
+    }
+
+    assertPlacementCeilings(input.campaign.placementBidAdjustments, referenceBids);
+    return referenceBids;
+};
+
+const loadCampaignReferenceBids = async (context: OperationContext, campaignId: string): Promise<number[]> => {
+    const [adGroupRows, targetRows] = await Promise.all([
+        context.db.select({ bidAmount: adGroup.bidAmount }).from(adGroup).where(eq(adGroup.campaignId, campaignId)),
+        context.db
+            .select({ bidAmount: target.bidAmount })
+            .from(target)
+            .where(and(eq(target.campaignId, campaignId), eq(target.negative, false))),
     ]);
 
-    return canonical;
+    return [...adGroupRows, ...targetRows].flatMap(row => {
+        if (row.bidAmount == null) {
+            return [];
+        }
+        const value = Number(row.bidAmount);
+        return Number.isFinite(value) ? [value] : [];
+    });
 };
 
 const parseCampaignInput = <T>(schema: { safeParse: (input: unknown) => { success: boolean; data?: T; error?: { issues: unknown[] } } }, input: unknown, operationName: string): T => {
