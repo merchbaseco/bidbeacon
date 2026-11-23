@@ -32,12 +32,12 @@ jobs:
       # token: Actions' own `github.token` cannot download another repository's
       # package unless that package grants this repository access, so it is not
       # a substitute. The token is an @internal schema item, resolved here from
-      # the Development vault through the deploy identity. The plugin version is
-      # pinned in .env.schema, so this works before node_modules exists.
+      # the Development vault through the CI development identity. The plugin
+      # version is pinned in .env.schema, so this works before node_modules exists.
       - name: Install dependencies
         timeout-minutes: 5
         env:
-          CI_OP_TOKEN: ${{ secrets.GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN }}
+          CI_OP_TOKEN: ${{ secrets.GH_CI_DEVELOPMENT_OP_TOKEN }}
         run: . ./scripts/install-tokens && bun install --frozen-lockfile
 
       # `check:fast` pins the schema's `test` lifecycle itself, so the gates run
