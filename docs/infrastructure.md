@@ -34,7 +34,7 @@ them. Three names stay outside the schema entirely because the published
 | --- | --- |
 | Local development | `varlock run` resolves the Development vault through the 1Password desktop app, or the local-agents identity in the Keychain |
 | CI (`Quality`) | Offline. `check:fast` pins `VARLOCK_ENV=test`, so every value is a fake-but-shaped literal and nothing contacts 1Password. Quality runs the fast lane only — see "Two lanes, on purpose" in `docs/testing.md` |
-| CI install step | The deploy identity fills the schema's development slot; `varlock printenv` resolves the GitHub Packages read token under the install switch |
+| CI install step | The CI development identity fills the schema's development slot; `varlock printenv` resolves the GitHub Packages read token under the install switch |
 | Deploy | `scripts/deploy-with-varlock.ts` pins `VARLOCK_ENV=production`, resolves the Production vault, hands values to Compose as process environment, and ends with `docker image prune -f` so the rebuilt images do not leave dangling layers pooling on the Mac mini |
 | Runtime | Compose bakes the resolved environment into each container at `up` time. The containers never contact 1Password |
 
@@ -45,13 +45,17 @@ grants this repository access, so it is not a substitute for
 workflow injects, and `scripts/deploy-with-varlock.ts` resolves the GitHub
 Packages token and the HugeIcons license from the Development vault. The
 publish install does the same through `scripts/install-tokens`, with
-`CI_OP_TOKEN` set from the deploy identity. Quality uses that script too.
+`CI_OP_TOKEN` set from the deploy identity. Quality uses that script too,
+with `CI_OP_TOKEN` set from the CI development identity.
 
 ## Identities
 
 - `GH_DEPLOY_AGENT_PRODUCTION_OP_TOKEN` reads the Production and Development
-  vaults. It fills the production deploy slot and, in CI and on the deploy
-  command, the development slot used to resolve install credentials.
+  vaults. It fills the production deploy slot and, on the deploy command, the
+  development slot used to resolve install credentials.
+- `GH_CI_DEVELOPMENT_OP_TOKEN` is a merchbaseco org secret for the Development
+  1Password connection. Quality, which pull requests trigger, injects it as
+  `CI_OP_TOKEN` to resolve install credentials.
 - `GH_RELEASE_AGENT_TOOLING_OP_TOKEN` reads the Tooling vault. The Deploy Stack
   publish job injects it as `RELEASE_AGENT_TOOLING_OP_TOKEN`.
 - `CLOUD_AGENTS_DEVELOPMENT_OP_TOKEN` is the fleet-wide cloud-agent identity,
